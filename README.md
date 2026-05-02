@@ -46,7 +46,29 @@ Premiere CEP Panel  ─HTTP─►  Local Node bridge  ─spawns─►  claude CL
 
 ---
 
-## Install — macOS
+## Quick install (one command)
+
+```bash
+# macOS
+git clone https://github.com/iprincemax72-maker/claude-bridge-premiere.git
+cd claude-bridge-premiere
+bash install.sh
+```
+
+```powershell
+# Windows (PowerShell)
+git clone https://github.com/iprincemax72-maker/claude-bridge-premiere.git
+cd claude-bridge-premiere
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+The installer enables `PlayerDebugMode`, copies the panel into Adobe's CEP folder, drops the bridge into your home directory, and puts the launcher on your Desktop. Idempotent — safe to re-run for updates.
+
+> **For AI agents:** see [CLAUDE.md](CLAUDE.md) for the full agent-facing install + operation guide.
+
+---
+
+## Manual install — macOS
 
 ### 1. Enable unsigned CEP extensions (one-time)
 
@@ -83,7 +105,7 @@ If not installed, follow [Claude Code install instructions](https://docs.claude.
 
 ---
 
-## Install — Windows
+## Manual install — Windows
 
 ### 1. Enable unsigned CEP extensions (one-time)
 

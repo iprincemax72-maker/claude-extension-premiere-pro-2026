@@ -22,37 +22,50 @@ The user runs on a **Claude Code subscription, not API key**. The bridge invokes
 
 ---
 
-## INSTALL — execute these steps in order
+## INSTALL — one command
 
-### Step 0. Detect environment
+There is a single installer per OS. Run it from the repo root.
 
-Run these and confirm before proceeding:
+### macOS
 
 ```bash
-uname -s          # macOS prints "Darwin"; Windows (Git Bash) prints "MINGW..." or "MSYS..."
-node --version    # need v18+
-claude --version  # need to be installed and logged in
+git clone https://github.com/iprincemax72-maker/claude-bridge-premiere.git
+cd claude-bridge-premiere
+bash install.sh
 ```
 
-If any of those fail, **stop and tell the user what's missing** before continuing.
+### Windows (PowerShell)
 
-If `claude` is not installed, point the user to: https://docs.claude.com/en/docs/claude-code
-
-### Step 1. Enable unsigned CEP extensions (one-time per machine)
-
-**macOS:**
-```bash
-defaults write com.adobe.CSXS.12 PlayerDebugMode 1
-```
-
-**Windows (PowerShell):**
 ```powershell
-reg add "HKCU\Software\Adobe\CSXS.12" /t REG_SZ /v PlayerDebugMode /d 1 /f
+git clone https://github.com/iprincemax72-maker/claude-bridge-premiere.git
+cd claude-bridge-premiere
+powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-> If the user has Premiere Pro 2022 or older, replace `CSXS.12` with `CSXS.11`. Don't ask — just run the `.12` version first; if their panel doesn't show up later, retry with `.11`.
+The installer is **idempotent** — re-running it is safe and updates files in place. It will:
 
-### Step 2. Copy the panel into Adobe's extensions folder
+1. Check that `node` and `claude` CLI are installed (warns if missing, points to install URLs)
+2. Enable `PlayerDebugMode` for CSXS versions 8–12 (no admin needed — uses HKCU on Windows)
+3. Copy the panel to the Adobe CEP extensions folder
+4. Copy the bridge to `~/PremiereClaude/` (macOS) or `%USERPROFILE%\PremiereClaude\` (Windows)
+5. Place the desktop launcher
+6. Print next-steps
+
+### What to tell the user when done
+
+> "Installed. Double-click **Claude Bridge.command** (macOS) or **Claude Bridge.bat** (Windows) on your Desktop, then open Premiere → Window → Extensions → Claude."
+
+### Manual install (only if the installer fails)
+
+<details>
+<summary>Click to expand manual steps</summary>
+
+#### Step 1. Enable unsigned CEP extensions
+
+**macOS:** `defaults write com.adobe.CSXS.12 PlayerDebugMode 1`
+**Windows:** `reg add "HKCU\Software\Adobe\CSXS.12" /t REG_SZ /v PlayerDebugMode /d 1 /f`
+
+#### Step 2. Copy the panel
 
 **macOS:**
 ```bash
@@ -60,16 +73,14 @@ mkdir -p ~/Library/Application\ Support/Adobe/CEP/extensions/
 cp -R extension/com.claudebridge.panel ~/Library/Application\ Support/Adobe/CEP/extensions/
 ```
 
-**Windows (PowerShell):**
+**Windows:**
 ```powershell
 $dest = "$env:APPDATA\Adobe\CEP\extensions"
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
 Copy-Item -Recurse -Force extension\com.claudebridge.panel $dest\
 ```
 
-**Verify:** Confirm the directory exists and contains `index.html`, `CSXS/manifest.xml`, `jsx/host.jsx`.
-
-### Step 3. Drop the bridge into the user's home
+#### Step 3. Drop the bridge
 
 **macOS:**
 ```bash
@@ -79,7 +90,7 @@ cp bridge/start.command ~/Desktop/"Claude Bridge.command"
 chmod +x ~/Desktop/"Claude Bridge.command"
 ```
 
-**Windows (PowerShell):**
+**Windows:**
 ```powershell
 $pc = "$env:USERPROFILE\PremiereClaude"
 New-Item -ItemType Directory -Force -Path $pc | Out-Null
@@ -87,9 +98,7 @@ Copy-Item -Force bridge\bridge.js $pc\
 Copy-Item -Force bridge\start.bat "$env:USERPROFILE\Desktop\Claude Bridge.bat"
 ```
 
-### Step 4. Tell the user what to do next
-
-> "Done. Double-click **Claude Bridge.command** (macOS) or **Claude Bridge.bat** (Windows) on your Desktop, then open Premiere → Window → Extensions → Claude."
+</details>
 
 ---
 
