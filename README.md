@@ -37,16 +37,16 @@ Premiere CEP Panel  ─HTTP─►  Local Node bridge  ─spawns─►  claude CL
 
 ## Requirements
 
-- macOS (tested on Darwin 25 / Apple Silicon)
+- **macOS** (Darwin 22+) **or Windows 10/11**
 - **Adobe Premiere Pro 2023+**
 - **Node.js 18+** ([nodejs.org](https://nodejs.org))
 - **Claude Code CLI** ([claude.com/product/claude-code](https://www.claude.com/product/claude-code)) — logged into your subscription
-- **Remotion CLI deps** auto-installed on first render (you don't install Remotion yourself)
-- **ffmpeg** (optional, only for video reference frames) — `brew install ffmpeg`
+- **Remotion CLI deps** auto-installed on first render
+- **ffmpeg** (optional, only for video reference frames) — `brew install ffmpeg` on macOS, [ffmpeg.org](https://ffmpeg.org/download.html) on Windows
 
 ---
 
-## Install
+## Install — macOS
 
 ### 1. Enable unsigned CEP extensions (one-time)
 
@@ -83,12 +83,55 @@ If not installed, follow [Claude Code install instructions](https://docs.claude.
 
 ---
 
+## Install — Windows
+
+### 1. Enable unsigned CEP extensions (one-time)
+
+Open **PowerShell** and run:
+
+```powershell
+reg add "HKCU\Software\Adobe\CSXS.12" /t REG_SZ /v PlayerDebugMode /d 1 /f
+```
+
+(Replace `CSXS.12` with `CSXS.11` if you're on an older Premiere version.)
+
+### 2. Drop the panel into the CEP extensions folder
+
+```powershell
+$dest = "$env:APPDATA\Adobe\CEP\extensions"
+New-Item -ItemType Directory -Force -Path $dest | Out-Null
+Copy-Item -Recurse -Force extension\com.claudebridge.panel $dest\
+```
+
+### 3. Drop the bridge somewhere local
+
+```powershell
+$pc = "$env:USERPROFILE\PremiereClaude"
+New-Item -ItemType Directory -Force -Path $pc | Out-Null
+Copy-Item -Force bridge\bridge.js $pc\
+Copy-Item -Force bridge\start.bat "$env:USERPROFILE\Desktop\Claude Bridge.bat"
+```
+
+### 4. Make sure `claude` CLI works
+
+```powershell
+claude --version
+```
+
+If not installed, follow the [Claude Code install instructions for Windows](https://docs.claude.com/en/docs/claude-code).
+
+---
+
 ## Usage
 
-1. **Double-click `Claude Bridge.command`** on your Desktop — a Terminal opens with the bridge running on `localhost:3737`
+1. **Start the bridge** by double-clicking the launcher on your Desktop:
+   - macOS: `Claude Bridge.command`
+   - Windows: `Claude Bridge.bat`
+
+   A terminal window opens with the bridge running on `localhost:3737`.
 2. **Open Premiere Pro** → **Window** → **Extensions** → **Claude**
 3. Status pill turns green; type a prompt or click a suggestion chip and hit ↵
-4. When you're done, **close the terminal** to stop the bridge
+4. When you're done, **close the terminal window** to stop the bridge
 
 ### Keyboard shortcuts (inside the panel)
 

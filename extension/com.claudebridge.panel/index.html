@@ -1344,6 +1344,9 @@ const _fs = nodeRequire('fs');
 const _path = nodeRequire('path');
 const _os = nodeRequire('os');
 const OUTPUT_DIR_JS = (_os && _path) ? _path.join(_os.homedir(), 'PremiereClaude', 'output') : null;
+const _platform = (_os && _os.platform) ? _os.platform() : 'unknown';
+const isMac = _platform === 'darwin';
+const isWindows = _platform === 'win32';
 
 /* ───── Editor-friendly prompt library (used for chips + ghost autocomplete) ───── */
 const SUGGESTIONS = [
@@ -1727,8 +1730,10 @@ renderRefBar();
    The previous handler was preventing default whenever an image was on the
    clipboard, which broke text paste when both formats were present. */
 
-// Read an image off the system clipboard via the modern API, with an
-// AppleScript fallback for CEP / older Chromium where clipboard.read is blocked.
+// Read an image off the system clipboard. Tries the modern Clipboard API
+// first, then falls back to a platform-specific shell command:
+//   macOS   → osascript reads PNG data
+//   Windows → PowerShell pulls Clipboard.GetImage() and saves PNG
 async function readClipboardImage() {
   if (navigator.clipboard && navigator.clipboard.read) {
     try {
@@ -1743,28 +1748,41 @@ async function readClipboardImage() {
       }
     } catch {}
   }
-  // Fallback: macOS osascript pulls the PNG off the clipboard to a temp file
   if (!_fs || !OUTPUT_DIR_JS) return null;
-  try {
-    const cp = nodeRequire('child_process');
-    if (!cp) return null;
-    const tmpPath = _path.join(OUTPUT_DIR_JS, '_clip_' + Date.now() + '.png');
-    const script = 'try\n'
-      + '  set theImageData to (the clipboard as «class PNGf»)\n'
-      + '  set theFile to open for access POSIX file "' + tmpPath + '" with write permission\n'
-      + '  write theImageData to theFile\n'
-      + '  close access theFile\n'
-      + '  return "ok"\n'
-      + 'on error\n'
-      + '  return "no"\n'
-      + 'end try';
-    const out = cp.execFileSync('osascript', ['-e', script], { encoding: 'utf8' });
-    if (out && out.trim() === 'ok' && _fs.existsSync(tmpPath)) {
-      const buf = _fs.readFileSync(tmpPath);
-      try { _fs.unlinkSync(tmpPath); } catch {}
-      return { blob: new Blob([buf], { type: 'image/png' }), ext: 'png' };
-    }
-  } catch {}
+  const cp = nodeRequire('child_process');
+  if (!cp) return null;
+  const tmpPath = _path.join(OUTPUT_DIR_JS, '_clip_' + Date.now() + '.png');
+
+  if (isMac) {
+    try {
+      const script = 'try\n'
+        + '  set theImageData to (the clipboard as «class PNGf»)\n'
+        + '  set theFile to open for access POSIX file "' + tmpPath + '" with write permission\n'
+        + '  write theImageData to theFile\n'
+        + '  close access theFile\n'
+        + '  return "ok"\n'
+        + 'on error\n  return "no"\nend try';
+      const out = cp.execFileSync('osascript', ['-e', script], { encoding: 'utf8' });
+      if (out && out.trim() === 'ok' && _fs.existsSync(tmpPath)) {
+        const buf = _fs.readFileSync(tmpPath);
+        try { _fs.unlinkSync(tmpPath); } catch {}
+        return { blob: new Blob([buf], { type: 'image/png' }), ext: 'png' };
+      }
+    } catch {}
+  } else if (isWindows) {
+    try {
+      const psPath = tmpPath.replace(/'/g, "''");
+      const ps = "Add-Type -AssemblyName System.Windows.Forms,System.Drawing;"
+        + "$img = [System.Windows.Forms.Clipboard]::GetImage();"
+        + "if ($img) { $img.Save('" + psPath + "', [System.Drawing.Imaging.ImageFormat]::Png); $img.Dispose(); 'ok' } else { 'no' }";
+      const out = cp.execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], { encoding: 'utf8', timeout: 8000 });
+      if (out && out.trim() === 'ok' && _fs.existsSync(tmpPath)) {
+        const buf = _fs.readFileSync(tmpPath);
+        try { _fs.unlinkSync(tmpPath); } catch {}
+        return { blob: new Blob([buf], { type: 'image/png' }), ext: 'png' };
+      }
+    } catch {}
+  }
   return null;
 }
 
@@ -1780,12 +1798,16 @@ async function readClipboardText() {
       if (typeof t === 'string') return t;
     } catch {}
   }
-  // Fallback: macOS pbpaste
-  try {
-    const cp = nodeRequire('child_process');
-    if (!cp) return null;
-    return cp.execFileSync('pbpaste', [], { encoding: 'utf8' });
-  } catch {}
+  const cp = nodeRequire('child_process');
+  if (!cp) return null;
+  if (isMac) {
+    try { return cp.execFileSync('pbpaste', [], { encoding: 'utf8' }); } catch {}
+  } else if (isWindows) {
+    try {
+      const out = cp.execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', 'Get-Clipboard -Raw'], { encoding: 'utf8', timeout: 4000 });
+      return out.replace(/\r\n$/, '');
+    } catch {}
+  }
   return null;
 }
 
