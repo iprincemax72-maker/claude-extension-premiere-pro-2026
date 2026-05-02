@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+*.log
+output/
+_pasted_*
+_clip_*
+_ref_frame.png
+.vscode/
+.idea/
