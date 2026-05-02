@@ -1,4 +1,4 @@
-# Claude Bridge for Adobe Premiere Pro
+# Claude Extension Premiere Pro 2026
 
 A CEP panel that brings **Claude** straight into Premiere Pro. Chat, generate motion graphics with [Remotion](https://remotion.dev), and drop them onto your timeline — all without leaving your edit.
 
@@ -50,15 +50,15 @@ Premiere CEP Panel  ─HTTP─►  Local Node bridge  ─spawns─►  claude CL
 
 ```bash
 # macOS
-git clone https://github.com/iprincemax72-maker/claude-bridge-premiere.git
-cd claude-bridge-premiere
+git clone https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026.git
+cd claude-extension-premiere-pro-2026
 bash install.sh
 ```
 
 ```powershell
 # Windows (PowerShell)
-git clone https://github.com/iprincemax72-maker/claude-bridge-premiere.git
-cd claude-bridge-premiere
+git clone https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026.git
+cd claude-extension-premiere-pro-2026
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 

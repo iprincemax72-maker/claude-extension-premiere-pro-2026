@@ -1,6 +1,6 @@
 # CLAUDE.md — Agent install + operation guide
 
-> Hi Claude. The user wants you to install or work on **Claude Bridge for Premiere Pro**. This file tells you exactly what to do, in order, with verification steps. Read it end-to-end before acting.
+> Hi Claude. The user wants you to install or work on **Claude Extension Premiere Pro 2026**. This file tells you exactly what to do, in order, with verification steps. Read it end-to-end before acting.
 
 ---
 
@@ -29,16 +29,16 @@ There is a single installer per OS. Run it from the repo root.
 ### macOS
 
 ```bash
-git clone https://github.com/iprincemax72-maker/claude-bridge-premiere.git
-cd claude-bridge-premiere
+git clone https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026.git
+cd claude-extension-premiere-pro-2026
 bash install.sh
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-git clone https://github.com/iprincemax72-maker/claude-bridge-premiere.git
-cd claude-bridge-premiere
+git clone https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026.git
+cd claude-extension-premiere-pro-2026
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
