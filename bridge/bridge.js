@@ -10,9 +10,30 @@ const PORT = 3737;
 const SESSION_ID = crypto.randomUUID();
 const WORK_DIR = path.join(os.homedir(), 'PremiereClaude');
 const OUTPUT_DIR = path.join(WORK_DIR, 'output');
+const PANEL_DIR = (process.platform === 'win32')
+  ? path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Adobe', 'CEP', 'extensions', 'com.claudebridge.panel')
+  : path.join(os.homedir(), 'Library', 'Application Support', 'Adobe', 'CEP', 'extensions', 'com.claudebridge.panel');
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
-let firstMessage = true;
+// Live-reload — fs.watch on the panel index, broadcasts to any open SSE client
+const devReloadClients = new Set();
+let _reloadDebounce = null;
+function broadcastReload() {
+  if (_reloadDebounce) return;
+  _reloadDebounce = setTimeout(() => {
+    _reloadDebounce = null;
+    for (const c of devReloadClients) {
+      try { c.write('event: reload\ndata: 1\n\n'); } catch {}
+    }
+  }, 120);
+}
+try {
+  const watchTarget = path.join(PANEL_DIR, 'index.html');
+  if (fs.existsSync(watchTarget)) {
+    fs.watch(watchTarget, { persistent: false }, () => broadcastReload());
+  }
+} catch (e) { console.error('live-reload watcher failed:', e.message); }
+
 
 const COMPLETION_SYSTEM = `You are an inline autocomplete running inside an Adobe Premiere Pro extension panel. The user is mid-sentence, writing a natural-language request for AI-generated motion graphics, transitions, intros, lower thirds, callouts, or any other video element.
 
@@ -104,6 +125,12 @@ When the user asks for motion graphics, intros, outros, lower thirds, transition
 2. Render the final file into ${OUTPUT_DIR} as MP4 (or PNG/GIF when more appropriate).
 3. Emit the import marker so the panel auto-imports it.
 
+AUDIO POLICY — NEVER include audio in rendered output. The user is a video editor who handles their own audio in Premiere; renders that ship with audio (especially loud auto-generated SFX or music) are unwanted and can damage hearing.
+- Do NOT use Remotion's <Audio>, <Sequence audio>, or any sound-emitting components.
+- Do NOT add SFX, narration, music, or stingers — even when the prompt would seem to suggest one ("dramatic intro", "boom", "whoosh transition", "alarm", etc). These are visual cues only.
+- When invoking Remotion's renderMedia / CLI, render video-only. Pass a codec and config that produces a silent track (e.g. \`--enforce-audio-track=false\`, or omit any audio-producing components).
+- If the user explicitly says "with audio" or "include sound", you may add audio but must keep peaks below -20 dBFS and gently fade in/out.
+
 REFERENCE FILES — when a message contains a [REFERENCE: /abs/path] block, treat that file as the visual style guide for the animation:
 - For images (.png/.jpg/.jpeg/.webp/.gif): use the Read tool on the path. Examine colors, typography, layout, lighting, mood, composition. Mirror those decisions in your Remotion design.
 - For videos (.mp4/.mov/.webm/.mkv): use the Bash tool to extract a representative frame (~1s in) with ffmpeg, e.g. \`ffmpeg -y -ss 1 -i "<path>" -frames:v 1 "${OUTPUT_DIR}/_ref_frame.png"\`, then Read that PNG. Note motion style and pacing from the source duration.
@@ -125,9 +152,92 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
+  // Dev mode — serve the panel UI in Chrome at http://localhost:3737/panel
+  // so the user can iterate on index.html without reloading Premiere Pro.
+  // CEP-only features (timeline import, source monitor) won't work in Chrome,
+  // but chat / expand / autocomplete / preview all do.
+  if (req.method === 'GET' && (req.url === '/panel' || req.url === '/panel/' || req.url.startsWith('/panel?'))) {
+    try {
+      const indexPath = path.join(PANEL_DIR, 'index.html');
+      if (!fs.existsSync(indexPath)) { res.writeHead(404); res.end('panel not found at ' + PANEL_DIR); return; }
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      });
+      res.end(fs.readFileSync(indexPath));
+    } catch (e) { res.writeHead(500); res.end('error: ' + e.message); }
+    return;
+  }
+
+  // SSE stream that pushes a 'reload' event whenever index.html changes on
+  // disk. The dev-mode tab listens to this and refreshes automatically.
+  if (req.method === 'GET' && req.url === '/dev/reload-stream') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+    res.write(': connected\n\n');
+    const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 25000);
+    devReloadClients.add(res);
+    req.on('close', () => { clearInterval(ping); devReloadClients.delete(res); });
+    return;
+  }
+
   if (req.method === 'GET' && req.url === '/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, session: SESSION_ID, outputDir: OUTPUT_DIR }));
+    return;
+  }
+
+  // Local file preview — serves anything under ~/PremiereClaude/output/ over HTTP
+  // so the user can open it in Chrome at http://localhost:3737/preview/<file>
+  if (req.method === 'GET' && req.url.startsWith('/preview/')) {
+    try {
+      const rel = decodeURIComponent(req.url.slice('/preview/'.length).split('?')[0]);
+      const abs = path.resolve(OUTPUT_DIR, rel);
+      // prevent path traversal
+      if (!abs.startsWith(OUTPUT_DIR + path.sep) && abs !== OUTPUT_DIR) {
+        res.writeHead(403); res.end('forbidden'); return;
+      }
+      if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
+        res.writeHead(404); res.end('not found'); return;
+      }
+      const ext = path.extname(abs).toLowerCase();
+      const mime = ({
+        '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime',
+        '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif', '.webp': 'image/webp',
+      })[ext] || 'application/octet-stream';
+      const stat = fs.statSync(abs);
+      const range = req.headers.range;
+      // Range support so Chrome can seek video without buffering whole file
+      if (range && /^bytes=/.test(range)) {
+        const [s, e] = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(s, 10);
+        const end = e ? parseInt(e, 10) : stat.size - 1;
+        if (isNaN(start) || isNaN(end) || start >= stat.size) {
+          res.writeHead(416, { 'Content-Range': 'bytes */' + stat.size });
+          res.end(); return;
+        }
+        res.writeHead(206, {
+          'Content-Range': 'bytes ' + start + '-' + end + '/' + stat.size,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': end - start + 1,
+          'Content-Type': mime,
+        });
+        fs.createReadStream(abs, { start, end }).pipe(res);
+      } else {
+        res.writeHead(200, {
+          'Content-Length': stat.size,
+          'Content-Type': mime,
+          'Accept-Ranges': 'bytes',
+        });
+        fs.createReadStream(abs).pipe(res);
+      }
+    } catch (e) {
+      res.writeHead(500); res.end('error: ' + e.message);
+    }
     return;
   }
 
@@ -285,18 +395,17 @@ const server = http.createServer((req, res) => {
         fullMessage = ctxLines.join('\n') + '\n' + message;
       }
 
+      // Each /chat call is intentionally a fresh Claude invocation with no
+      // memory of prior prompts, so the user doesn't get repeats of past
+      // animations. Iteration context is passed explicitly inside the message
+      // body (see the panel's "Changes" button).
       const args = [
         '-p',
         '--output-format', 'json',
         '--permission-mode', 'bypassPermissions',
         '--append-system-prompt', SYSTEM_PROMPT,
+        '--no-session-persistence',
       ];
-      if (firstMessage) {
-        args.push('--session-id', SESSION_ID);
-        firstMessage = false;
-      } else {
-        args.push('--resume', SESSION_ID);
-      }
       args.push(fullMessage);
 
       console.log('\n> ' + message.slice(0, 80));

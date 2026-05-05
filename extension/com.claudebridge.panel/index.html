@@ -406,6 +406,14 @@
     color: var(--text-faint);
     font-variant-numeric: tabular-nums;
   }
+  .thinking-eta {
+    font-size: 10.5px;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    padding-left: 8px;
+    border-left: 1px solid var(--border-soft);
+    margin-left: 4px;
+  }
   .progress-bar {
     margin-top: 10px;
     width: 100%;
@@ -523,6 +531,68 @@
   }
   .receipt-name { font-weight: 500; color: var(--text); }
   .receipt-sub  { color: var(--text-dim); margin-left: 5px; font-size: 10.5px; }
+
+  /* ───── Render preview card (inline video + Import button) ───── */
+  .render-preview {
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(20, 20, 24, 0.55);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    animation: receiptIn 0.55s var(--spring) backwards;
+    transform-origin: left center;
+  }
+  .render-preview-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .render-preview-name {
+    flex: 1;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .render-preview-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .render-import-btn {
+    padding: 8px 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border: none;
+    border-radius: var(--radius-sm);
+    color: #fff;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.2s var(--ease), opacity 0.2s var(--ease);
+    box-shadow: 0 2px 8px rgba(217, 119, 87, 0.22);
+  }
+  .render-import-btn:hover { filter: brightness(1.08); }
+  .render-import-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+  .render-discard-btn {
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    cursor: pointer;
+    transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+  }
+  .render-discard-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
 
   /* ───── COMPOSER ───── */
   .composer {
@@ -695,14 +765,29 @@
     background: transparent;
     color: var(--text-faint);
     border: none;
-    width: 26px; height: 24px;
+    height: 24px;
+    padding: 0 8px;
     border-radius: 6px;
     cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 4px;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
     transition: transform 0.3s var(--spring), background 0.2s var(--ease), color 0.2s var(--ease), box-shadow 0.3s var(--ease);
     position: relative;
   }
-  .expand-btn svg { width: 14px; height: 14px; transition: transform 0.4s var(--ease); }
+  .expand-btn svg { width: 11px; height: 11px; transition: transform 0.4s var(--ease); }
+  .expand-group::before {
+    content: 'Extend';
+    color: var(--text-dim);
+    font-size: 10.5px;
+    font-weight: 500;
+    padding: 0 6px 0 4px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
   .expand-btn[data-level="light"]  { color: rgba(217, 119, 87, 0.55); }
   .expand-btn[data-level="medium"] { color: rgba(217, 119, 87, 0.78); }
   .expand-btn[data-level="heavy"]  { color: rgba(217, 119, 87, 1); }
@@ -874,6 +959,33 @@
     border-bottom: 1px solid var(--border-soft);
     min-height: 30px;
   }
+  .iter-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px;
+    border-bottom: 1px solid var(--border-soft);
+    background: rgba(217, 119, 87, 0.06);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .iter-bar .iter-label { color: var(--accent); font-weight: 500; }
+  .iter-bar .iter-name {
+    color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1; min-width: 0;
+  }
+  .iter-bar .iter-cancel {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1;
+  }
+  .iter-bar .iter-cancel:hover { color: var(--text); background: rgba(255,255,255,0.06); }
   .ref-add {
     display: inline-flex;
     align-items: center;
@@ -1266,10 +1378,6 @@
   <div class="input-wrap">
     <div class="mode-bar" id="modeBar">
       <span class="mode-bar-label">Place</span>
-      <button class="mode-pill" data-mode="insert" type="button" title="Insert at playhead — pushes existing clips on V1 to the right">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-        Insert
-      </button>
       <button class="mode-pill" data-mode="overwrite" type="button" title="Overwrite at playhead — replaces what's there on V1">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12h8"/></svg>
         Overwrite
@@ -1280,6 +1388,7 @@
       </button>
     </div>
     <div class="ref-bar" id="refBar"></div>
+    <div class="iter-bar" id="iterBar" style="display:none;"></div>
     <div class="input-stack">
       <div class="ghost" id="ghost" aria-hidden="true"><span class="ghost-typed"></span><span class="ghost-suggest"></span></div>
       <textarea id="input" placeholder="Ask Claude…" rows="1" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
@@ -1290,12 +1399,14 @@
       <div class="expand-group" id="expandGroup">
         <button class="expand-btn" data-level="light" type="button" aria-label="Light expand" title="Light — adds a couple missing specifics (duration, primary color)" disabled>
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l1.5 4.5L18 10l-4.5 1.5L12 16l-1.5-4.5L6 10l4.5-1.5L12 4z"/></svg>
+          Low
         </button>
         <button class="expand-btn" data-level="medium" type="button" aria-label="Medium expand" title="Medium — full creative brief with palette, animation style, mood" disabled>
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M11 3l1.5 4.5L17 9.3l-4.5 1.5L11 15.6l-1.5-4.5L5 9.3l4.5-1.5L11 3z"/>
             <path d="M19 14l.9 2.4L22 17l-2.1.6L19 20l-.9-2.4L16 17l2.1-.6L19 14z"/>
           </svg>
+          Mid
         </button>
         <button class="expand-btn" data-level="heavy" type="button" aria-label="Heavy expand" title="Heavy — exhaustive production brief with hex codes, beats, easing curves, fps" disabled>
           <svg viewBox="0 0 24 24" fill="currentColor">
@@ -1303,6 +1414,7 @@
             <path d="M19 14l.9 2.4L22 17l-2.1.6L19 20l-.9-2.4L16 17l2.1-.6L19 14z"/>
             <path d="M5 16l.7 1.7L7 18l-1.3.4L5 20l-.7-1.6L3 18l1.3-.3L5 16z"/>
           </svg>
+          High
         </button>
       </div>
       <button id="send" type="button" aria-label="Send" title="Send · ↵">
@@ -1608,6 +1720,7 @@ const refBar = document.getElementById('refBar');
 const REF_EXTS = ['png','jpg','jpeg','webp','gif','mp4','mov','webm','mkv','heic'];
 const IMAGE_EXTS = new Set(['png','jpg','jpeg','webp','gif','heic']);
 let activeReferences = []; // [{ path, name, kind:'image'|'video', dataUrl? }]
+let iterationContext = null; // { originalPrompt, originalPath } — set by the Changes button
 
 function extOf(p) { return (p || '').split('.').pop().toLowerCase(); }
 function kindOf(p) { return IMAGE_EXTS.has(extOf(p)) ? 'image' : 'video'; }
@@ -1883,7 +1996,7 @@ const MODE_STORAGE = 'claudeBridge.placementMode';
 let activeMode = 'overlay';
 try {
   const saved = localStorage.getItem(MODE_STORAGE);
-  if (saved === 'insert' || saved === 'overwrite' || saved === 'overlay') activeMode = saved;
+  if (saved === 'overwrite' || saved === 'overlay') activeMode = saved;
 } catch {}
 
 function setMode(m) {
@@ -1998,9 +2111,17 @@ function thinkingHTML() {
     +   '<span class="orbit"><span class="orbit-dot"></span><span class="orbit-dot"></span><span class="orbit-dot"></span></span>'
     +   '<span class="orbit-label">Working</span>'
     +   '<span class="thinking-elapsed"></span>'
+    +   '<span class="thinking-eta"></span>'
     + '</div>'
     + '<div class="progress-bar"><div class="progress-bar-fill"></div></div>'
     + '</div>';
+}
+
+function formatDuration(sec) {
+  if (sec < 60) return Math.round(sec) + 's';
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return s ? m + 'm ' + s + 's' : m + 'm';
 }
 
 /* Estimate how long a prompt will take based on what it's asking for.
@@ -2028,16 +2149,29 @@ function makeProgressUI(thinkingBody, estimateSeconds) {
   const fill = thinkingBody.querySelector('.progress-bar-fill');
   const bar = thinkingBody.querySelector('.progress-bar');
   const elapsedEl = thinkingBody.querySelector('.thinking-elapsed');
+  const etaEl = thinkingBody.querySelector('.thinking-eta');
   const start = Date.now();
   let completed = false;
   const T = Math.max(8, estimateSeconds || 30);
   const CAP = 92;
+
+  // Show the upfront estimate immediately so the user knows what to expect
+  if (etaEl) etaEl.textContent = '~' + formatDuration(T);
 
   function tick() {
     if (completed) return;
     const sec = (Date.now() - start) / 1000;
     const s = Math.floor(sec);
     if (s >= 1) elapsedEl.textContent = (s < 60) ? s + 's' : (Math.floor(s / 60) + 'm ' + (s % 60) + 's');
+    // Update remaining-estimate as time progresses; if we overshoot, show "longer than expected"
+    if (etaEl) {
+      const remaining = T - sec;
+      if (remaining > 0) {
+        etaEl.textContent = '~' + formatDuration(remaining) + ' left';
+      } else {
+        etaEl.textContent = 'taking longer than expected';
+      }
+    }
     const pct = (1 - Math.exp(-sec / T)) * CAP;
     fill.style.width = Math.min(pct, CAP).toFixed(1) + '%';
   }
@@ -2094,6 +2228,131 @@ function addReceipt(msgWrap, result) {
       }
     });
   }
+  log.scrollTop = log.scrollHeight;
+}
+
+/* Build a localhost URL the bridge will serve the file from. Chrome handles
+   localhost URLs cleanly (no file:// security weirdness, full seek support). */
+function localPreviewURL(absPath) {
+  const filename = (absPath || '').split('/').pop().split('\\').pop();
+  return BRIDGE + '/preview/' + encodeURIComponent(filename);
+}
+
+/* Auto-open the rendered file in the user's browser (Chrome preferred, falls
+   back to default). Detached so it doesn't tie a process to the panel.
+   In Chrome dev mode (no child_process), just opens a new tab. */
+function openInBrowser(absPath) {
+  const url = localPreviewURL(absPath);
+  const cp = nodeRequire('child_process');
+  if (!cp) {
+    try { window.open(url, '_blank'); return true; } catch { return false; }
+  }
+  try {
+    if (isMac) {
+      try {
+        cp.spawn('open', ['-a', 'Google Chrome', url], { detached: true, stdio: 'ignore' }).unref();
+      } catch {
+        cp.spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
+      }
+    } else if (isWindows) {
+      try {
+        cp.spawn('cmd', ['/c', 'start', '', 'chrome', url], { detached: true, stdio: 'ignore' }).unref();
+      } catch {
+        cp.spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
+      }
+    } else {
+      cp.spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
+    }
+    return true;
+  } catch { return false; }
+}
+
+/* Render preview card — auto-opens the rendered file in Chrome, then waits for
+   the user to click Import. Nothing touches Premiere until they do. */
+function addRenderPreview(msgWrap, absPath, prompt) {
+  const card = document.createElement('div');
+  card.className = 'render-preview';
+
+  const filename = (absPath || '').split('/').pop();
+
+  card.innerHTML =
+      '<div class="render-preview-meta"><span class="render-preview-name">' + escapeHTML(filename) + '</span><span>ready</span></div>'
+    + '<div class="render-preview-actions">'
+    +   '<button class="render-import-btn" type="button">Import to Timeline</button>'
+    +   '<button class="render-discard-btn" type="button" data-act="preview">Preview</button>'
+    +   '<button class="render-discard-btn" type="button" data-act="changes">Changes</button>'
+    + '</div>';
+
+  msgWrap.querySelector('.msg-content').appendChild(card);
+
+  const importBtn = card.querySelector('.render-import-btn');
+  const previewBtn = card.querySelector('[data-act="preview"]');
+  const changesBtn = card.querySelector('[data-act="changes"]');
+
+  importBtn.addEventListener('click', async () => {
+    importBtn.disabled = true;
+    importBtn.textContent = 'Importing…';
+    const meta = card.querySelector('.render-preview-meta');
+    try {
+      const result = await importIntoPremiere(absPath, activeMode);
+      if (result && result.imported) addHistoryEntry({ prompt: prompt || '', path: absPath, mode: activeMode });
+
+      // Update the meta line in place so the user can see the import status
+      // without losing access to Preview / Reopen / Changes.
+      let statusText = 'ready';
+      if (result && result.ok) {
+        if (result.placed) {
+          const verb = result.mode === 'overwrite' ? 'overwrote' : (result.mode === 'overlay' ? 'overlayed on' : 'inserted on');
+          const at = (typeof result.seconds === 'number') ? ' @ ' + result.seconds.toFixed(2) + 's' : '';
+          statusText = 'imported · ' + verb + ' ' + (result.track || '?') + at;
+        } else {
+          statusText = 'imported · ' + (result.reason || 'to bin');
+        }
+      } else if (result && result.error) {
+        statusText = 'import failed: ' + result.error;
+      }
+      if (meta) {
+        const statusSpan = meta.querySelectorAll('span')[1];
+        if (statusSpan) statusSpan.textContent = statusText;
+      }
+      refreshStatus(false);
+    } catch (e) {
+      // network / parse error
+      const statusSpan = meta && meta.querySelectorAll('span')[1];
+      if (statusSpan) statusSpan.textContent = 'import failed';
+    } finally {
+      importBtn.disabled = false;
+      importBtn.textContent = 'Import to Timeline';
+    }
+  });
+
+  previewBtn.addEventListener('click', async () => {
+    const orig = previewBtn.textContent;
+    previewBtn.disabled = true;
+    previewBtn.textContent = 'Opening…';
+    try {
+      const r = await previewInSource(absPath);
+      if (!r || !r.ok) {
+        previewBtn.textContent = 'Preview failed';
+        setTimeout(() => { previewBtn.textContent = orig; previewBtn.disabled = false; }, 2000);
+      } else {
+        previewBtn.textContent = orig;
+        previewBtn.disabled = false;
+      }
+    } catch {
+      previewBtn.textContent = orig;
+      previewBtn.disabled = false;
+    }
+  });
+
+  changesBtn.addEventListener('click', () => {
+    // Set hidden iteration state — the user just types their tweak in the
+    // composer, panel attaches the original prompt + file path silently when
+    // sending. A small chip above the input shows what's being iterated on.
+    setIterationContext({ originalPrompt: (prompt || '').trim(), originalPath: absPath });
+    input.focus();
+  });
+
   log.scrollTop = log.scrollHeight;
 }
 
@@ -2175,6 +2434,20 @@ function cancelActive() {
   return cancelled;
 }
 
+function setIterationContext(ctx) {
+  iterationContext = ctx;
+  const bar = document.getElementById('iterBar');
+  if (!bar) return;
+  if (!ctx) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+  const filename = (ctx.originalPath || '').split('/').pop().split('\\').pop();
+  bar.innerHTML =
+      '<span class="iter-label">Iterating on</span>'
+    + '<span class="iter-name">' + escapeHTML(filename) + '</span>'
+    + '<button class="iter-cancel" type="button" title="Cancel iteration">×</button>';
+  bar.style.display = '';
+  bar.querySelector('.iter-cancel').addEventListener('click', () => setIterationContext(null));
+}
+
 async function sendMessage() {
   if (activeChatAbort) return; // already in flight
   const msg = input.value.trim();
@@ -2184,11 +2457,20 @@ async function sendMessage() {
   autosize();
   clearGhost();
 
-  // Build the message that goes to Claude — one [REFERENCE: ...] line per attached file
+  // Build the message that goes to Claude — one [REFERENCE: ...] line per attached file.
+  // Iteration context (from the Changes button) is prepended invisibly so the
+  // user's bubble shows just their tweak.
   let outboundMsg = msg;
+  if (iterationContext) {
+    outboundMsg =
+        'Make a new version of a previous render.\n'
+      + 'Original prompt: "' + iterationContext.originalPrompt + '"\n'
+      + 'Previous file: ' + iterationContext.originalPath + '\n'
+      + 'Change: ' + msg;
+  }
   if (activeReferences.length) {
     const refLines = activeReferences.map(r => '[REFERENCE: ' + r.path + ']').join('\n');
-    outboundMsg = refLines + '\n' + msg;
+    outboundMsg = refLines + '\n' + outboundMsg;
   }
 
   // Build the user-message bubble with inline thumbnails for any images
@@ -2207,6 +2489,9 @@ async function sendMessage() {
   }
   makeMsg('you', youHTML);
   setBusy(true);
+  // The iteration context was already baked into outboundMsg; clear it so the
+  // next prompt is fresh unless the user explicitly hits Changes again.
+  if (iterationContext) setIterationContext(null);
 
   const placeholder = makeMsg('claude', thinkingHTML());
 
@@ -2237,11 +2522,8 @@ async function sendMessage() {
 
     if (data.imports && data.imports.length) {
       for (const p of data.imports) {
-        const result = await importIntoPremiere(p, activeMode);
-        addReceipt(placeholder.wrap, result);
-        if (result.imported) addHistoryEntry({ prompt: msg, path: p, mode: activeMode });
+        addRenderPreview(placeholder.wrap, p, msg);
       }
-      refreshStatus(false);
     }
   } catch (err) {
     progressUI.cleanup();
@@ -2468,6 +2750,30 @@ chipsContainer.addEventListener('click', (e) => {
   clearGhost();
   input.focus();
 });
+</script>
+
+<!-- Dev-only live-reload (TEMPORARY). Remove this script when shipping. -->
+<script>
+(function(){
+  var BRIDGE_URL = 'http://127.0.0.1:3737/dev/reload-stream';
+  var es = null;
+  function connect() {
+    try {
+      es = new EventSource(BRIDGE_URL);
+      es.addEventListener('reload', function () {
+        try { if (window.__adobe_cep__ && window.__adobe_cep__.invalidateContents) window.__adobe_cep__.invalidateContents(); } catch (e) {}
+        location.reload();
+      });
+      es.onerror = function () {
+        try { es.close(); } catch (e) {}
+        setTimeout(connect, 1500);
+      };
+    } catch (e) {
+      setTimeout(connect, 2000);
+    }
+  }
+  connect();
+})();
 </script>
 </body>
 </html>
