@@ -145,6 +145,39 @@ if (-not (Test-Path (Join-Path $bridgeDir 'bridge.js'))) {
 }
 Ok "$bridgeDir\bridge.js"
 
+# ---------- 8b. Pre-scaffold Remotion project ----------
+Step "Setting up Remotion project (first install: 2-4 min for npm install)"
+$remotionDir = Join-Path $bridgeDir 'remotion-intro'
+if (Test-Path (Join-Path $remotionDir 'node_modules')) {
+    Ok "Remotion already installed at $remotionDir — skipping npm install"
+} else {
+    New-Item -ItemType Directory -Force -Path $remotionDir | Out-Null
+    if (-not (Test-Path (Join-Path $remotionDir 'package.json'))) {
+        Copy-Item -Recurse -Force "bridge\remotion-template\*" $remotionDir
+        # PowerShell's wildcard skips dotfiles — copy .gitignore explicitly
+        if (Test-Path "bridge\remotion-template\.gitignore") {
+            Copy-Item -Force "bridge\remotion-template\.gitignore" $remotionDir
+        }
+    }
+    if (Test-Cmd 'npm') {
+        Info "Running npm install in $remotionDir (this is the slow part — be patient)…"
+        Push-Location $remotionDir
+        try {
+            & npm install --silent --no-audit --no-fund 2>&1 | Out-Null
+        } catch {
+            Warn "npm install hit issues — first render may need to retry"
+        }
+        Pop-Location
+        if (Test-Path (Join-Path $remotionDir 'node_modules\remotion')) {
+            Ok "Remotion installed"
+        } else {
+            Warn "Remotion node_modules missing — first render will install it"
+        }
+    } else {
+        Warn "npm not on PATH — Remotion will install itself on the first render (slower)"
+    }
+}
+
 # ---------- 9. Place launcher on Desktop ----------
 Step "Placing launcher on Desktop"
 $desktop = [Environment]::GetFolderPath('Desktop')

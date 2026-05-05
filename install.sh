@@ -127,6 +127,31 @@ if [ ! -f "$BRIDGE_DIR/bridge.js" ]; then
 fi
 ok "$BRIDGE_DIR/bridge.js"
 
+# ---------- 8b. Pre-scaffold Remotion project ----------
+step "Setting up Remotion project (first install: 2-4 min for npm install)"
+REMOTION_DIR="$BRIDGE_DIR/remotion-intro"
+if [ -d "$REMOTION_DIR/node_modules" ]; then
+    ok "Remotion already installed at $REMOTION_DIR — skipping npm install"
+else
+    mkdir -p "$REMOTION_DIR"
+    # Copy template files (don't overwrite existing user code)
+    if [ ! -f "$REMOTION_DIR/package.json" ]; then
+        cp -R bridge/remotion-template/* "$REMOTION_DIR/"
+        cp bridge/remotion-template/.gitignore "$REMOTION_DIR/" 2>/dev/null || true
+    fi
+    if have npm; then
+        info "Running npm install in $REMOTION_DIR (this is the slow part — be patient)…"
+        ( cd "$REMOTION_DIR" && npm install --silent --no-audit --no-fund ) >/dev/null 2>&1 || warn "npm install hit issues — first render may need to retry"
+        if [ -d "$REMOTION_DIR/node_modules/remotion" ]; then
+            ok "Remotion installed"
+        else
+            warn "Remotion node_modules missing — first render will install it"
+        fi
+    else
+        warn "npm not on PATH — Remotion will install itself on the first render (slower)"
+    fi
+fi
+
 # ---------- 9. Desktop launcher ----------
 step "Placing launcher on Desktop"
 DESKTOP="$HOME/Desktop"

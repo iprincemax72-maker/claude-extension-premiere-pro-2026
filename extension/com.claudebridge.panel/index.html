@@ -1648,6 +1648,7 @@ function renderHistory() {
       +     (fileExists ? '<button data-act="preview" data-id="' + e.id + '">Preview</button>' : '')
       +     '<button data-act="reuse" data-id="' + e.id + '">Use prompt</button>'
       +     (fileExists ? '<button data-act="reimport" data-id="' + e.id + '">Re-import</button>' : '')
+      +     (fileExists ? '<button data-act="changes" data-id="' + e.id + '">Changes</button>' : '')
       +     '<button class="danger" data-act="delete" data-id="' + e.id + '">Delete</button>'
       +   '</div>'
       + '</div>'
@@ -1693,6 +1694,12 @@ function renderHistory() {
           const msg = makeMsg('claude', '<p style="color:var(--text-dim);font-style:italic">Re-imported ' + escapeHTML(e.path.split('/').pop()) + '</p>');
           addReceipt(msg.wrap, r);
         }
+      } else if (btn.dataset.act === 'changes') {
+        // Same flow as the Changes button on a render card — set silent
+        // iteration context, focus the composer, close history.
+        setIterationContext({ originalPrompt: (e.prompt || '').trim(), originalPath: e.path });
+        closeHistory();
+        input.focus();
       } else if (btn.dataset.act === 'delete') {
         history.splice(idx, 1);
         saveHistory();
