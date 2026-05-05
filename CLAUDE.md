@@ -22,50 +22,144 @@ The user runs on a **Claude Code subscription, not API key**. The bridge invokes
 
 ---
 
-## INSTALL — one command
+## INSTALL — for AI agents (one prompt, end-to-end)
 
-There is a single installer per OS. Run it from the repo root.
+> **If you are an AI agent installing this for the user, follow this section literally. Do every step. Do not skip verification.** If a step fails, do the troubleshooting in that step before moving on. Do NOT improvise — every command here is here for a reason.
 
-### macOS
+### Prerequisites the user must already have
+
+- Adobe Premiere Pro 2024 or newer (panel targets 23+, tested on Premiere Pro 2026)
+- Internet connection (to install Node, Claude CLI, ffmpeg, and Remotion's npm deps on first render)
+- A Claude.ai paid plan (Pro or Max) — the bridge spawns the `claude` CLI and uses the user's existing OAuth session, NOT an API key
+
+If the user does NOT have Premiere installed yet, stop and tell them to install it first.
+
+### Step 1. Clone the repo
 
 ```bash
-git clone https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026.git
+# macOS
+cd ~ && git clone https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026.git
 cd claude-extension-premiere-pro-2026
+```
+
+```powershell
+# Windows
+cd $HOME ; git clone https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026.git
+cd claude-extension-premiere-pro-2026
+```
+
+If `git` is missing on Windows: `winget install -e --id Git.Git` and open a new shell.
+If on macOS: `xcode-select --install` (Apple's built-in dev tools include git).
+
+### Step 2. Run the auto-installer
+
+The installer will auto-install Node.js, Claude CLI, and ffmpeg if any are missing.
+
+```bash
+# macOS
 bash install.sh
 ```
 
-### Windows (PowerShell)
-
 ```powershell
-git clone https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026.git
-cd claude-extension-premiere-pro-2026
+# Windows — IMPORTANT: must be run with the bypass flag, otherwise PowerShell blocks it
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-The installer is **idempotent** — re-running it is safe and updates files in place. It will:
+The installer is **idempotent** — safe to re-run if anything went sideways.
 
-1. Check that `node` and `claude` CLI are installed (warns if missing, points to install URLs)
-2. Enable `PlayerDebugMode` for CSXS versions 8–12 (no admin needed — uses HKCU on Windows)
-3. Copy the panel to the Adobe CEP extensions folder
-4. Copy the bridge to `~/PremiereClaude/` (macOS) or `%USERPROFILE%\PremiereClaude\` (Windows)
-5. Place the desktop launcher
-6. Print next-steps
+### Step 3. Verify the bridge runs
 
-### What to tell the user when done
+After the installer finishes, the user has a `Claude Bridge.command` (macOS) or `Claude Bridge.bat` (Windows) on their Desktop. Tell them to double-click it. A terminal window will pop up showing `Claude Bridge listening on port 3737`.
 
-> "Installed. Double-click **Claude Bridge.command** (macOS) or **Claude Bridge.bat** (Windows) on your Desktop, then open Premiere → Window → Extensions → Claude."
+Then verify from your AI shell:
 
-### Manual install (only if the installer fails)
+```bash
+# both OSes
+curl -s http://127.0.0.1:3737/ping
+# Expected output: {"ok":true,"session":"<uuid>","outputDir":"..."}
+```
+
+If `curl` returns nothing or "connection refused", the bridge isn't running. Common causes:
+- The user closed the terminal window — tell them to re-launch the desktop file
+- Port 3737 is in use — `lsof -ti tcp:3737 | xargs kill -9` (macOS) or `Get-NetTCPConnection -LocalPort 3737 | %{ Stop-Process -Id $_.OwningProcess -Force }` (Windows)
+
+### Step 4. Verify Claude CLI is authenticated
+
+```bash
+claude /doctor
+```
+
+Look for "logged in" / "authenticated" / "account:" in the output. If not authenticated:
+
+```bash
+claude /login
+```
+
+This opens a browser tab; user clicks Allow. After they're back in the terminal, run `claude /doctor` again to confirm.
+
+### Step 5. Verify the panel loads in Premiere
+
+Tell the user to:
+1. Open Adobe Premiere Pro
+2. Window menu → Extensions → **Claude**
+
+If "Claude" doesn't appear in Extensions:
+- The user must restart Premiere completely (not just close the project)
+- If still missing, the panel folder didn't copy correctly. Re-run the installer.
+
+If the panel opens but says "Bridge offline" or the status pill is red:
+- The bridge isn't running. See Step 3.
+
+### Step 6. Smoke test
+
+Tell the user to type into the panel: `Generate a 3 second logo intro that says HELLO in white on dark blue`
+
+First render takes 3–5 minutes (Remotion installs its npm deps). Subsequent renders take 30–60s.
+
+### Common install failures and fixes
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `node` not found after install | New PATH not loaded | Open a fresh shell and re-run installer |
+| `claude` not found after install | Same — npm global bin not on PATH | Open fresh shell. On Windows, also try: `npm config get prefix` and ensure that path is in PATH |
+| Installer says winget/brew missing | OS package manager not installed | Win: install App Installer from MS Store. Mac: install Homebrew at https://brew.sh |
+| Panel doesn't show in Premiere | PlayerDebugMode didn't apply, or panel folder didn't copy | Re-run installer; check `%APPDATA%\Adobe\CEP\extensions\com.claudebridge.panel\index.html` (Win) or `~/Library/Application Support/Adobe/CEP/extensions/com.claudebridge.panel/index.html` (Mac) exists |
+| Render fails with "ffmpeg not found" | Remotion can't find ffmpeg | Install ffmpeg manually: `brew install ffmpeg` (Mac) or `winget install -e --id Gyan.FFmpeg` (Win) |
+| First render times out / takes forever | Remotion is doing initial `npm install` | Look at `~/PremiereClaude/bridge.log` — if it shows `npm install` running, just wait. 3–5 min is normal first time. |
+| `claude` CLI hits 5-hour usage limit | User burned through their plan quota | Wait or upgrade plan. Bridge will report errors back to panel. |
+
+### Manual install (only if the auto-installer hard-fails)
 
 <details>
 <summary>Click to expand manual steps</summary>
 
-#### Step 1. Enable unsigned CEP extensions
+#### Step 1. Install dependencies
 
-**macOS:** `defaults write com.adobe.CSXS.12 PlayerDebugMode 1`
-**Windows:** `reg add "HKCU\Software\Adobe\CSXS.12" /t REG_SZ /v PlayerDebugMode /d 1 /f`
+**macOS:**
+```bash
+brew install node ffmpeg
+npm install -g @anthropic-ai/claude-code
+claude /login
+```
 
-#### Step 2. Copy the panel
+**Windows:**
+```powershell
+winget install -e --id OpenJS.NodeJS.LTS
+winget install -e --id Gyan.FFmpeg
+# open a NEW PowerShell window so PATH refreshes
+npm install -g "@anthropic-ai/claude-code"
+claude /login
+```
+
+#### Step 2. Enable unsigned CEP extensions
+
+**macOS:** `for v in 8 9 10 11 12; do defaults write "com.adobe.CSXS.$v" PlayerDebugMode 1; done`
+**Windows:**
+```powershell
+8..12 | % { New-Item -Path "HKCU:\Software\Adobe\CSXS.$_" -Force | Out-Null; New-ItemProperty -Path "HKCU:\Software\Adobe\CSXS.$_" -Name PlayerDebugMode -Value 1 -PropertyType String -Force | Out-Null }
+```
+
+#### Step 3. Copy the panel
 
 **macOS:**
 ```bash
@@ -80,11 +174,11 @@ New-Item -ItemType Directory -Force -Path $dest | Out-Null
 Copy-Item -Recurse -Force extension\com.claudebridge.panel $dest\
 ```
 
-#### Step 3. Drop the bridge
+#### Step 4. Drop the bridge + launcher
 
 **macOS:**
 ```bash
-mkdir -p ~/PremiereClaude
+mkdir -p ~/PremiereClaude/output
 cp bridge/bridge.js ~/PremiereClaude/
 cp bridge/start.command ~/Desktop/"Claude Bridge.command"
 chmod +x ~/Desktop/"Claude Bridge.command"
@@ -93,12 +187,16 @@ chmod +x ~/Desktop/"Claude Bridge.command"
 **Windows:**
 ```powershell
 $pc = "$env:USERPROFILE\PremiereClaude"
-New-Item -ItemType Directory -Force -Path $pc | Out-Null
+New-Item -ItemType Directory -Force -Path "$pc\output" | Out-Null
 Copy-Item -Force bridge\bridge.js $pc\
-Copy-Item -Force bridge\start.bat "$env:USERPROFILE\Desktop\Claude Bridge.bat"
+Copy-Item -Force bridge\start.bat "$([Environment]::GetFolderPath('Desktop'))\Claude Bridge.bat"
 ```
 
 </details>
+
+### What to tell the user when everything is verified
+
+> "Installed and tested. Double-click **Claude Bridge.command** (macOS) or **Claude Bridge.bat** (Windows) on your Desktop whenever you want to use it, then open Premiere → Window → Extensions → Claude. The first render takes 3–5 minutes while Remotion installs; after that, 30–60s per render."
 
 ---
 

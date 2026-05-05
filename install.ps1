@@ -1,8 +1,13 @@
-# install.ps1 — Claude Bridge for Premiere Pro (Windows installer)
-# ----------------------------------------------------------------
+# install.ps1 — Claude Extension Premiere Pro 2026 (Windows installer)
+# ---------------------------------------------------------------------
 # Run from the repo root:
 #     powershell -ExecutionPolicy Bypass -File install.ps1
 # Idempotent — safe to re-run.
+#
+# This installer auto-installs missing dependencies via winget + npm:
+#   - Node.js LTS  (OpenJS.NodeJS.LTS)
+#   - Claude Code CLI  (npm i -g @anthropic-ai/claude-code)
+#   - ffmpeg  (Gyan.FFmpeg) — required by Remotion for video encoding
 
 $ErrorActionPreference = 'Stop'
 
@@ -10,35 +15,104 @@ function Step($msg)  { Write-Host "==>"  -ForegroundColor Cyan -NoNewline; Write
 function Ok($msg)    { Write-Host " OK"   -ForegroundColor Green -NoNewline; Write-Host " $msg" }
 function Warn($msg)  { Write-Host " !!"   -ForegroundColor Yellow -NoNewline; Write-Host " $msg" }
 function Fail($msg)  { Write-Host " XX"   -ForegroundColor Red -NoNewline; Write-Host " $msg"; exit 1 }
+function Info($msg)  { Write-Host "    $msg" -ForegroundColor Gray }
+
+function Test-Cmd($name) {
+    return [bool](Get-Command $name -ErrorAction SilentlyContinue)
+}
+
+# Refresh PATH inside this session so a freshly-installed exe is callable
+function Refresh-Path {
+    $env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') +
+                ';' +
+                [System.Environment]::GetEnvironmentVariable('Path','User')
+}
 
 # ---------- 0. Sanity check: are we in the repo root? ----------
 if (-not (Test-Path "extension\com.claudebridge.panel\index.html") -or -not (Test-Path "bridge\bridge.js")) {
     Fail "Run this from the repo root (where extension\ and bridge\ live)."
 }
 
-# ---------- 1. Node check ----------
+# ---------- 1. winget availability ----------
+Step "Checking winget (App Installer)"
+if (Test-Cmd 'winget') {
+    Ok "winget present"
+} else {
+    Warn "winget not found. Install 'App Installer' from the Microsoft Store, then re-run."
+    Info "https://apps.microsoft.com/store/detail/app-installer/9NBLGGH4NNS1"
+    Info "Continuing — will fall back to manual instructions for missing deps."
+}
+
+# ---------- 2. Node.js ----------
 Step "Checking Node.js"
-try {
-    $nodeVer = (& node --version) 2>$null
-    if (-not $nodeVer) { throw }
-    Ok "node $nodeVer"
-} catch {
-    Fail "Node.js not found. Install from https://nodejs.org (LTS), then re-run this script."
+if (Test-Cmd 'node') {
+    Ok "node $((& node --version))"
+} else {
+    if (Test-Cmd 'winget') {
+        Info "Installing Node.js LTS via winget…"
+        winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements --silent | Out-Null
+        Refresh-Path
+        if (Test-Cmd 'node') {
+            Ok "node $((& node --version))"
+        } else {
+            Fail "Node install completed but 'node' still not on PATH. Open a new PowerShell window and re-run this script."
+        }
+    } else {
+        Fail "Node.js not installed and winget unavailable. Install from https://nodejs.org (LTS), open a new shell, and re-run."
+    }
 }
 
-# ---------- 2. claude CLI check ----------
-Step "Checking claude CLI"
-try {
-    $claudeVer = (& claude --version) 2>$null
-    if (-not $claudeVer) { throw }
-    Ok "$claudeVer"
-} catch {
-    Warn "claude CLI not found in PATH."
-    Write-Host "    Install: https://docs.claude.com/en/docs/claude-code"
-    Write-Host "    Continuing — the extension will install but won't work until claude is set up."
+# ---------- 3. Claude Code CLI ----------
+Step "Checking Claude Code CLI"
+if (Test-Cmd 'claude') {
+    Ok "$((& claude --version))"
+} else {
+    Info "Installing Claude Code CLI via npm…"
+    & npm install -g "@anthropic-ai/claude-code" 2>&1 | Out-Null
+    Refresh-Path
+    if (Test-Cmd 'claude') {
+        Ok "$((& claude --version))"
+    } else {
+        Warn "Claude CLI install ran but 'claude' isn't on PATH yet."
+        Info "Open a NEW PowerShell window and run:  claude /login"
+        Info "Then re-run this installer."
+    }
 }
 
-# ---------- 3. Enable unsigned CEP extensions (HKCU, no admin needed) ----------
+# ---------- 4. ffmpeg (Remotion needs it) ----------
+Step "Checking ffmpeg"
+if (Test-Cmd 'ffmpeg') {
+    Ok "ffmpeg present"
+} else {
+    if (Test-Cmd 'winget') {
+        Info "Installing ffmpeg via winget…"
+        winget install -e --id Gyan.FFmpeg --accept-source-agreements --accept-package-agreements --silent | Out-Null
+        Refresh-Path
+        if (Test-Cmd 'ffmpeg') { Ok "ffmpeg installed" }
+        else { Warn "ffmpeg install completed but not on PATH yet — open a new shell after this script." }
+    } else {
+        Warn "ffmpeg not installed. Remotion needs it for rendering."
+        Info "Install via Chocolatey:  choco install ffmpeg"
+        Info "Or download from https://www.gyan.dev/ffmpeg/builds/ and add to PATH."
+    }
+}
+
+# ---------- 5. Authentication check (claude login) ----------
+Step "Checking Claude authentication"
+$authedOK = $false
+try {
+    # `claude /doctor` prints account state; grep for an OK line
+    $doctor = (& claude /doctor 2>&1) -join "`n"
+    if ($doctor -match 'logged in|authenticated|account:') { $authedOK = $true }
+} catch { }
+if ($authedOK) {
+    Ok "Claude CLI is logged in"
+} else {
+    Warn "Claude CLI may not be logged in yet."
+    Info "After this script finishes, run in a NEW PowerShell window:  claude /login"
+}
+
+# ---------- 6. Enable unsigned CEP extensions (HKCU, no admin) ----------
 Step "Enabling PlayerDebugMode for CEP"
 $cepVersions = @('12','11','10','9','8')
 foreach ($v in $cepVersions) {
@@ -48,7 +122,7 @@ foreach ($v in $cepVersions) {
 }
 Ok "set on CSXS 8-12"
 
-# ---------- 4. Copy panel into Adobe's CEP extensions folder ----------
+# ---------- 7. Copy panel into Adobe's CEP extensions folder ----------
 Step "Installing panel"
 $cepDir = Join-Path $env:APPDATA 'Adobe\CEP\extensions'
 New-Item -ItemType Directory -Force -Path $cepDir | Out-Null
@@ -60,7 +134,7 @@ if (-not (Test-Path (Join-Path $panelDest 'index.html'))) {
 }
 Ok "$panelDest"
 
-# ---------- 5. Copy bridge to %USERPROFILE%\PremiereClaude ----------
+# ---------- 8. Copy bridge to %USERPROFILE%\PremiereClaude ----------
 Step "Installing bridge"
 $bridgeDir = Join-Path $env:USERPROFILE 'PremiereClaude'
 New-Item -ItemType Directory -Force -Path $bridgeDir | Out-Null
@@ -71,7 +145,7 @@ if (-not (Test-Path (Join-Path $bridgeDir 'bridge.js'))) {
 }
 Ok "$bridgeDir\bridge.js"
 
-# ---------- 6. Place launcher on Desktop ----------
+# ---------- 9. Place launcher on Desktop ----------
 Step "Placing launcher on Desktop"
 $desktop = [Environment]::GetFolderPath('Desktop')
 $launcherSrc = "bridge\start.bat"
@@ -79,16 +153,29 @@ $launcherDst = Join-Path $desktop 'Claude Bridge.bat'
 Copy-Item -Force $launcherSrc $launcherDst
 Ok "$launcherDst"
 
-# ---------- 7. Done ----------
+# ---------- 10. Premiere Pro detection (informational) ----------
+Step "Detecting Adobe Premiere Pro"
+$ppPaths = @(
+    "$env:ProgramFiles\Adobe\Adobe Premiere Pro 2026",
+    "$env:ProgramFiles\Adobe\Adobe Premiere Pro 2025",
+    "$env:ProgramFiles\Adobe\Adobe Premiere Pro 2024"
+)
+$ppFound = $ppPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($ppFound) { Ok "Found at $ppFound" }
+else { Warn "Premiere Pro not detected in default locations — install it before using the panel." }
+
+# ---------- 11. Done ----------
 Write-Host ""
 Write-Host "----------------------------------------" -ForegroundColor Green
-Write-Host " Claude Bridge installed."                 -ForegroundColor Green
+Write-Host " Claude Extension Premiere Pro 2026 installed."  -ForegroundColor Green
 Write-Host "----------------------------------------" -ForegroundColor Green
 Write-Host ""
 Write-Host " Next steps:"
-Write-Host "  1. Double-click " -NoNewline; Write-Host "Claude Bridge.bat" -ForegroundColor Cyan -NoNewline; Write-Host " on your Desktop."
-Write-Host "  2. Open Premiere Pro -> Window -> Extensions -> Claude."
-Write-Host "  3. Status pill turns green; you're ready."
+Write-Host "  1. If Claude isn't logged in yet, open a NEW PowerShell window and run:" -NoNewline
+Write-Host "  claude /login" -ForegroundColor Cyan
+Write-Host "  2. Double-click " -NoNewline; Write-Host "Claude Bridge.bat" -ForegroundColor Cyan -NoNewline; Write-Host " on your Desktop."
+Write-Host "  3. Open Premiere Pro -> Window -> Extensions -> Claude."
+Write-Host "  4. Status pill turns green; you're ready."
 Write-Host ""
 Write-Host " To stop the bridge: close its terminal window."
 Write-Host ""
