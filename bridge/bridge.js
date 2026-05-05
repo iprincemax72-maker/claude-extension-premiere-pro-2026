@@ -27,6 +27,65 @@ function broadcastReload() {
     }
   }, 120);
 }
+
+// Real-time progress — bridge parses Claude's stream-json events and pushes
+// human-readable status lines ("Writing component", "Rendering frames", etc.)
+// over SSE so the panel can display what's actually happening.
+const progressClients = new Set();
+function broadcastProgress(text) {
+  if (!text) return;
+  const data = JSON.stringify({ text });
+  for (const c of progressClients) {
+    try { c.write('event: progress\ndata: ' + data + '\n\n'); } catch {}
+  }
+}
+function broadcastProgressDone() {
+  for (const c of progressClients) {
+    try { c.write('event: done\ndata: 1\n\n'); } catch {}
+  }
+}
+
+// Translate a Claude stream-json event into a short human-readable status line.
+// Returns null if the event isn't worth showing the user.
+function streamEventToStatus(evt) {
+  if (!evt || typeof evt !== 'object') return null;
+  const msg = evt.message || evt;
+  // tool_use blocks live inside assistant messages
+  if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+    for (const block of msg.content) {
+      if (block.type === 'tool_use') {
+        return toolUseToStatus(block);
+      }
+    }
+  }
+  // Top-level tool_use (some claude versions stream them flat)
+  if (evt.type === 'tool_use') return toolUseToStatus(evt);
+  return null;
+}
+function toolUseToStatus(block) {
+  const name = block.name || '';
+  const input = block.input || {};
+  const basename = (p) => (p ? String(p).split('/').pop().split('\\').pop() : '');
+  if (name === 'Bash') {
+    const cmd = String(input.command || '');
+    const desc = String(input.description || '').trim();
+    if (/npx\s+remotion\s+render/.test(cmd)) return 'Rendering video';
+    if (/npm\s+install/.test(cmd))            return 'Installing dependencies';
+    if (/ffmpeg/.test(cmd) && /-frames:v/.test(cmd)) return 'Extracting reference frame';
+    if (/ffmpeg/.test(cmd))                   return 'Running ffmpeg';
+    if (desc)                                  return desc;
+    return 'Running command';
+  }
+  if (name === 'Read')      return 'Reading ' + basename(input.file_path);
+  if (name === 'Write')     return 'Writing ' + basename(input.file_path);
+  if (name === 'Edit')      return 'Editing ' + basename(input.file_path);
+  if (name === 'Glob')      return 'Searching project';
+  if (name === 'Grep')      return 'Searching code';
+  if (name === 'WebFetch')  return 'Fetching reference';
+  if (name === 'TodoWrite') return null;
+  if (name)                 return 'Tool: ' + name;
+  return null;
+}
 try {
   const watchTarget = path.join(PANEL_DIR, 'index.html');
   if (fs.existsSync(watchTarget)) {
@@ -194,6 +253,23 @@ const server = http.createServer((req, res) => {
     const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 25000);
     devReloadClients.add(res);
     req.on('close', () => { clearInterval(ping); devReloadClients.delete(res); });
+    return;
+  }
+
+  // Real-time progress channel — panel subscribes when sending /chat so the
+  // "Working" indicator can swap in to "Writing component", "Rendering video",
+  // etc. as Claude actually does each step.
+  if (req.method === 'GET' && req.url === '/progress-stream') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.write(': connected\n\n');
+    const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 25000);
+    progressClients.add(res);
+    req.on('close', () => { clearInterval(ping); progressClients.delete(res); });
     return;
   }
 
@@ -408,13 +484,14 @@ const server = http.createServer((req, res) => {
         fullMessage = ctxLines.join('\n') + '\n' + message;
       }
 
-      // Each /chat call is intentionally a fresh Claude invocation with no
-      // memory of prior prompts, so the user doesn't get repeats of past
-      // animations. Iteration context is passed explicitly inside the message
-      // body (see the panel's "Changes" button).
+      // Stream-JSON output gives us a JSONL feed of system/tool/assistant
+      // events as they happen, so the bridge can push real-time progress to
+      // the panel via SSE. The final assistant message is collected and
+      // returned to the panel in the original /chat response shape.
       const args = [
         '-p',
-        '--output-format', 'json',
+        '--output-format', 'stream-json',
+        '--verbose',
         '--permission-mode', 'bypassPermissions',
         '--append-system-prompt', SYSTEM_PROMPT,
         '--no-session-persistence',
@@ -422,22 +499,56 @@ const server = http.createServer((req, res) => {
       args.push(fullMessage);
 
       console.log('\n> ' + message.slice(0, 80));
+      broadcastProgress('Thinking');
       const proc = spawn('claude', args, { cwd: WORK_DIR, env: process.env });
-      let stdout = '', stderr = '';
-      proc.stdout.on('data', d => stdout += d);
+      let stderr = '';
+      let lineBuf = '';
+      let finalReply = '';
+
       proc.stderr.on('data', d => stderr += d);
+
+      proc.stdout.on('data', chunk => {
+        lineBuf += chunk.toString();
+        let nl;
+        while ((nl = lineBuf.indexOf('\n')) >= 0) {
+          const line = lineBuf.slice(0, nl).trim();
+          lineBuf = lineBuf.slice(nl + 1);
+          if (!line) continue;
+          let evt;
+          try { evt = JSON.parse(line); } catch { continue; }
+
+          // Push human-readable status when we see a tool call
+          const status = streamEventToStatus(evt);
+          if (status) broadcastProgress(status);
+
+          // Capture the final assistant text
+          if (evt.type === 'result' && typeof evt.result === 'string') {
+            finalReply = evt.result;
+          }
+          if (evt.type === 'assistant' && evt.message && Array.isArray(evt.message.content)) {
+            for (const blk of evt.message.content) {
+              if (blk.type === 'text' && typeof blk.text === 'string') {
+                finalReply = blk.text;
+              }
+            }
+          }
+        }
+      });
+
       let chatDone = false;
-      const sendErr = (msg) => {
+      const sendErr = (m) => {
         if (chatDone) return; chatDone = true;
-        try { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: msg })); } catch {}
+        broadcastProgressDone();
+        try { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: m })); } catch {}
       };
       const sendOk = (obj) => {
         if (chatDone) return; chatDone = true;
+        broadcastProgressDone();
         try { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); } catch {}
       };
 
       req.on('aborted', () => {
-        if (!chatDone) { try { proc.kill('SIGKILL'); } catch {} chatDone = true; }
+        if (!chatDone) { try { proc.kill('SIGKILL'); } catch {} chatDone = true; broadcastProgressDone(); }
       });
 
       proc.on('error', err => {
@@ -451,11 +562,7 @@ const server = http.createServer((req, res) => {
           sendErr(stderr.trim() || `claude exited with code ${code}`);
           return;
         }
-        let reply = stdout.trim();
-        try {
-          const parsed = JSON.parse(stdout);
-          reply = parsed.result || parsed.text || parsed.message || reply;
-        } catch {}
+        const reply = (finalReply || '').trim() || '(no response)';
         const imports = [];
         const re = /\[\[IMPORT:([^\]]+)\]\]/g;
         let m;

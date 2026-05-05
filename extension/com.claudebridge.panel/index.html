@@ -360,6 +360,35 @@
   }
   .msg-body p { margin: 0 0 8px; }
   .msg-body p:last-child { margin-bottom: 0; }
+
+  /* "Replying to filename.mp4" header on a user bubble that came from
+     the Changes button — visible signal that iteration context was attached. */
+  .reply-ref {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 9px 4px 7px;
+    margin-bottom: 6px;
+    background: rgba(217, 119, 87, 0.1);
+    border-left: 2px solid var(--accent);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text-dim);
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .reply-ref svg { width: 11px !important; height: 11px !important; color: var(--accent); flex-shrink: 0; }
+  /* Safety net — any inline SVG inside a chat bubble caps at 14px so a
+     missing width attribute can never blow the panel up again. */
+  .msg-body svg { max-width: 14px; max-height: 14px; }
+  .reply-ref-label { color: var(--accent); font-weight: 500; }
+  .reply-ref-name {
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
   .msg-body strong { color: #fff; font-weight: 600; }
   .msg-body em { color: var(--text); font-style: italic; }
   .msg-body code {
@@ -408,14 +437,6 @@
     font-size: 11px;
     color: var(--text-faint);
     font-variant-numeric: tabular-nums;
-  }
-  .thinking-eta {
-    font-size: 10.5px;
-    color: var(--text-dim);
-    font-variant-numeric: tabular-nums;
-    padding-left: 8px;
-    border-left: 1px solid var(--border-soft);
-    margin-left: 4px;
   }
   .progress-bar {
     margin-top: 10px;
@@ -2215,7 +2236,6 @@ function thinkingHTML() {
     +   '<span class="orbit"><span class="orbit-dot"></span><span class="orbit-dot"></span><span class="orbit-dot"></span></span>'
     +   '<span class="orbit-label">Working</span>'
     +   '<span class="thinking-elapsed"></span>'
-    +   '<span class="thinking-eta"></span>'
     + '</div>'
     + '<div class="progress-bar"><div class="progress-bar-fill"></div></div>'
     + '</div>';
@@ -2260,29 +2280,19 @@ function makeProgressUI(thinkingBody, estimateSeconds) {
   const fill = thinkingBody.querySelector('.progress-bar-fill');
   const bar = thinkingBody.querySelector('.progress-bar');
   const elapsedEl = thinkingBody.querySelector('.thinking-elapsed');
-  const etaEl = thinkingBody.querySelector('.thinking-eta');
   const start = Date.now();
   let completed = false;
+  // Time constant for the bar's asymptotic fill — not shown to the user.
+  // The bar still creeps forward so it doesn't look frozen between status
+  // updates, but no fake countdown is displayed.
   const T = Math.max(8, estimateSeconds || 30);
   const CAP = 92;
-
-  // Show the upfront estimate immediately so the user knows what to expect
-  if (etaEl) etaEl.textContent = '~' + formatDuration(T);
 
   function tick() {
     if (completed) return;
     const sec = (Date.now() - start) / 1000;
     const s = Math.floor(sec);
     if (s >= 1) elapsedEl.textContent = (s < 60) ? s + 's' : (Math.floor(s / 60) + 'm ' + (s % 60) + 's');
-    // Update remaining-estimate as time progresses; if we overshoot, show "longer than expected"
-    if (etaEl) {
-      const remaining = T - sec;
-      if (remaining > 0) {
-        etaEl.textContent = '~' + formatDuration(remaining) + ' left';
-      } else {
-        etaEl.textContent = 'taking longer than expected';
-      }
-    }
     const pct = (1 - Math.exp(-sec / T)) * CAP;
     fill.style.width = Math.min(pct, CAP).toFixed(1) + '%';
   }
@@ -2584,8 +2594,20 @@ async function sendMessage() {
     outboundMsg = refLines + '\n' + outboundMsg;
   }
 
-  // Build the user-message bubble with inline thumbnails for any images
-  let youHTML = '<p>' + escapeHTML(msg).replace(/\n/g,'<br>') + '</p>';
+  // Build the user-message bubble with inline thumbnails for any images.
+  // If this send was an iteration (Changes button), prepend a small
+  // "Replying to <filename>" header so the bubble visibly shows what it's
+  // tweaking — without leaking the original prompt + path into the chat.
+  let youHTML = '';
+  if (iterationContext) {
+    const iterFile = (iterationContext.originalPath || '').split('/').pop().split('\\').pop();
+    youHTML += '<div class="reply-ref">'
+      + '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;flex-shrink:0;color:var(--accent)"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>'
+      + '<span class="reply-ref-label">Replying to</span>'
+      + '<span class="reply-ref-name">' + escapeHTML(iterFile) + '</span>'
+      + '</div>';
+  }
+  youHTML += '<p>' + escapeHTML(msg).replace(/\n/g,'<br>') + '</p>';
   if (activeReferences.length) {
     let thumbsHTML = '<div class="msg-thumbs">';
     for (const r of activeReferences) {
@@ -2603,6 +2625,10 @@ async function sendMessage() {
   // The iteration context was already baked into outboundMsg; clear it so the
   // next prompt is fresh unless the user explicitly hits Changes again.
   if (iterationContext) setIterationContext(null);
+  // References were already serialized into outboundMsg + thumbs were rendered
+  // into the user bubble — clear the composer's reference bar so they don't
+  // silently get re-attached to the next prompt.
+  if (activeReferences.length) clearReferences();
 
   const placeholder = makeMsg('claude', thinkingHTML());
 
@@ -2612,6 +2638,25 @@ async function sendMessage() {
   activeChatAbort = new AbortController();
   const estimateSec = estimatePromptDuration(msg, activeReferences.length > 0);
   const progressUI = makeProgressUI(placeholder.body, estimateSec);
+
+  // Subscribe to bridge progress events — bridge pushes a status string each
+  // time Claude calls a tool (Bash, Read, Write, etc.), and the working
+  // indicator swaps from "Working" to e.g. "Rendering video".
+  const labelEl = placeholder.body.querySelector('.orbit-label');
+  let progressES = null;
+  try {
+    progressES = new EventSource(BRIDGE + '/progress-stream');
+    progressES.addEventListener('progress', (ev) => {
+      try {
+        const { text } = JSON.parse(ev.data);
+        if (text && labelEl) labelEl.textContent = text;
+      } catch {}
+    });
+    progressES.addEventListener('done', () => {
+      try { progressES.close(); } catch {}
+      progressES = null;
+    });
+  } catch {}
 
   try {
     const r = await fetch(BRIDGE + '/chat', {
@@ -2644,6 +2689,7 @@ async function sendMessage() {
       placeholder.body.innerHTML = '<p>Error: ' + escapeHTML(err.message) + '</p><p style="color:var(--text-dim);font-size:11.5px">Is the bridge running?</p>';
     }
   } finally {
+    if (progressES) { try { progressES.close(); } catch {} progressES = null; }
     activeChatAbort = null;
     setBusy(false);
     input.focus();
