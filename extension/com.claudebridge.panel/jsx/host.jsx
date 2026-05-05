@@ -244,3 +244,40 @@ function ccImportFile(path) {
         return JSON.stringify({ ok: false, error: String(e), path: path });
     }
 }
+
+// Toggle the panel's frame maximize state (same as Premiere's default backtick
+// shortcut). CEP textareas eat backtick before Premiere sees it, so the panel
+// JS forwards the keystroke through ExtendScript instead.
+function ccMaximizeFrame() {
+    try {
+        if (typeof app === "undefined" || !app) {
+            return JSON.stringify({ ok: false, error: "no app" });
+        }
+        // Premiere's menu function ID for "Maximize Frame" / "Restore Frame Size".
+        // 4 has been the stable id across recent Premiere versions; 3520 is the
+        // older legacy id. Try the modern one first.
+        var commandIds = [4, 3520];
+        for (var i = 0; i < commandIds.length; i++) {
+            var done = _ccSafe(function () {
+                if (typeof app.menuFunctionId !== "undefined" && app.menuFunctionId) {
+                    app.menuFunctionId(commandIds[i]);
+                    return true;
+                }
+                return false;
+            });
+            if (done) return JSON.stringify({ ok: true, via: "menuFunctionId:" + commandIds[i] });
+        }
+        // Fallback — execute by menu name
+        var named = _ccSafe(function () {
+            if (typeof app.executeCommand === "function") {
+                app.executeCommand("Maximize Frame");
+                return true;
+            }
+            return false;
+        });
+        if (named) return JSON.stringify({ ok: true, via: "executeCommand" });
+        return JSON.stringify({ ok: false, error: "no fullscreen api in this Premiere version" });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e) });
+    }
+}

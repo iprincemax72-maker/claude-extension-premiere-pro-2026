@@ -354,6 +354,9 @@
     overflow-wrap: anywhere;
     font-size: 13px;
     line-height: 1.6;
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
   }
   .msg-body p { margin: 0 0 8px; }
   .msg-body p:last-child { margin-bottom: 0; }
@@ -1394,7 +1397,7 @@
       <textarea id="input" placeholder="Ask Claude…" rows="1" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
     </div>
     <div class="input-toolbar">
-      <span class="hint-text" id="hint"><kbd class="k-tab">⇥</kbd> accept · <kbd>↵</kbd> send · <kbd>⇧B</kbd> paste · <kbd>⇧V</kbd> image</span>
+      <span class="hint-text" id="hint"><kbd class="k-tab">⇥</kbd> accept · <kbd>↵</kbd> send · <kbd>⇧V</kbd> paste · <kbd>⇧B</kbd> image · <kbd>⇧C</kbd> copy</span>
       <span class="esc-hint" id="escHint" title="Cancel the current request"><kbd>esc</kbd> cancel</span>
       <div class="expand-group" id="expandGroup">
         <button class="expand-btn" data-level="light" type="button" aria-label="Light expand" title="Light — adds a couple missing specifics (duration, primary color)" disabled>
@@ -1522,6 +1525,11 @@ async function importIntoPremiere(absPath, mode) {
   const escapedMode = (mode || 'overlay').replace(/[^a-z]/gi, '');
   const raw = await evalES('ccImportToTimeline("' + escapedPath + '","' + escapedMode + '")');
   try { return JSON.parse(raw); } catch { return { ok:false, error:'parse failed', path:absPath }; }
+}
+
+async function maximizeFrame() {
+  const raw = await evalES('ccMaximizeFrame()');
+  try { return JSON.parse(raw); } catch { return { ok:false }; }
 }
 
 async function previewInSource(absPath) {
@@ -1846,7 +1854,7 @@ function renderRefBar() {
 renderRefBar();
 
 /* Plain paste (Cmd+V or right-click → Paste) is now ALWAYS treated as text.
-   Use Shift+V to explicitly attach an image from clipboard as a reference.
+   Use Shift+B to explicitly attach an image from clipboard as a reference.
    The previous handler was preventing default whenever an image was on the
    clipboard, which broke text paste when both formats were present. */
 
@@ -1906,10 +1914,11 @@ async function readClipboardImage() {
   return null;
 }
 
-// Shift+V → paste image from clipboard.
-// Shift+B → paste text from clipboard at the cursor in the input.
-// Both intercept their key (V and B won't type with Shift held). Use Caps Lock
-// for capital V/B, or paste them in via Shift+B.
+// Shift+V → paste text from clipboard at the cursor in the input.
+// Shift+B → paste image from clipboard as a reference attachment.
+// Shift+C → copy current input value (or selection) to clipboard.
+// All three intercept their key (V/B/C won't type with Shift held). Use Caps
+// Lock for capital V/B/C, or paste them in via Shift+V.
 
 async function readClipboardText() {
   if (navigator.clipboard && navigator.clipboard.readText) {
@@ -1931,6 +1940,59 @@ async function readClipboardText() {
   return null;
 }
 
+function writeClipboardTextSync(text) {
+  if (!text) return false;
+  // execCommand('copy') is the most reliable path inside CEP's older Chromium
+  // and respects the user-gesture from the keydown event we're inside.
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-9999px';
+    ta.style.left = '-9999px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    const prevActive = document.activeElement;
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch {}
+    document.body.removeChild(ta);
+    if (prevActive && prevActive.focus) { try { prevActive.focus(); } catch {} }
+    if (ok) return true;
+  } catch {}
+  return false;
+}
+
+async function writeClipboardText(text) {
+  if (!text) return false;
+  // 1) execCommand path (works in CEP, doesn't need user-gesture continuation)
+  if (writeClipboardTextSync(text)) return true;
+  // 2) Modern Clipboard API (may fail in CEP without permission)
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try { await navigator.clipboard.writeText(text); return true; } catch {}
+  }
+  // 3) Shell fallbacks for macOS / Windows
+  const cp = nodeRequire('child_process');
+  if (!cp) return false;
+  if (isMac) {
+    try {
+      const p = cp.spawn('/usr/bin/pbcopy');
+      p.stdin.write(text); p.stdin.end();
+      return true;
+    } catch {}
+  } else if (isWindows) {
+    try {
+      const p = cp.spawn('powershell', ['-NoProfile', '-NonInteractive', '-Command', '$input | Set-Clipboard']);
+      p.stdin.write(text); p.stdin.end();
+      return true;
+    } catch {}
+  }
+  return false;
+}
+
 function insertTextAtCursor(text) {
   if (!text) return;
   if (document.activeElement !== input) input.focus();
@@ -1947,12 +2009,28 @@ function insertTextAtCursor(text) {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+// Backtick (`) — toggle Premiere's frame maximize. CEP textareas eat the key
+// before Premiere sees it, so we intercept in capture phase, prevent the
+// textarea typing, and dispatch the menu command via ExtendScript instead.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== '`' || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
+  e.preventDefault();
+  e.stopPropagation();
+  maximizeFrame();
+}, true);
+
 document.addEventListener('keydown', async (e) => {
   if (!e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
   if (lightbox.classList.contains('show')) return;
   const k = e.key;
 
   if (k === 'V' || k === 'v') {
+    e.preventDefault();
+    const text = await readClipboardText();
+    if (text) insertTextAtCursor(text);
+    return;
+  }
+  if (k === 'B' || k === 'b') {
     e.preventDefault();
     const img = await readClipboardImage();
     if (img) {
@@ -1961,10 +2039,29 @@ document.addEventListener('keydown', async (e) => {
     }
     return;
   }
-  if (k === 'B' || k === 'b') {
+  if (k === 'C' || k === 'c') {
     e.preventDefault();
-    const text = await readClipboardText();
-    if (text) insertTextAtCursor(text);
+    let toCopy = '';
+    // 1) Any text selected on the page (chat messages, receipts, anywhere) wins
+    const sel = window.getSelection && window.getSelection();
+    if (sel && sel.toString && sel.toString().length > 0) {
+      toCopy = sel.toString();
+    }
+    // 2) Otherwise the input field — current selection or whole value
+    else if (document.activeElement === input && typeof input.selectionStart === 'number' && input.selectionStart !== input.selectionEnd) {
+      toCopy = input.value.slice(input.selectionStart, input.selectionEnd);
+    } else {
+      toCopy = input.value;
+    }
+    if (toCopy) {
+      // Sync path first — must run inside the same user-gesture tick, no await
+      let ok = writeClipboardTextSync(toCopy);
+      if (!ok) ok = await writeClipboardText(toCopy);
+      if (ok) {
+        const wrap = document.querySelector('.input-wrap');
+        if (wrap) { wrap.classList.add('flash'); setTimeout(() => wrap.classList.remove('flash'), 900); }
+      }
+    }
     return;
   }
 });
@@ -2132,18 +2229,25 @@ function formatDuration(sec) {
 }
 
 /* Estimate how long a prompt will take based on what it's asking for.
+   Heuristic, not measured — Remotion is pre-scaffolded so npm install no
+   longer dominates. Cold-start of the claude CLI is ~7s baseline.
    Used as the time-constant in the asymptotic progress curve below. */
 function estimatePromptDuration(message, hasReference) {
   const lower = (message || '').toLowerCase();
-  let est = 25; // baseline chat reply
-  // Render-style work — Remotion scaffolding + render takes minutes
-  if (/render|animation|animate|intro|outro|transition|lower\s*third|callout|countdown|logo|kinetic|caption|particles?|grain|reveal|graphic|video clip|motion/.test(lower)) {
-    est = 180;
+  let est = 12; // baseline chat reply (claude cold-start + reasoning)
+
+  const isRender = /render|animation|animate|intro|outro|transition|lower\s*third|callout|countdown|logo|kinetic|caption|particles?|grain|reveal|graphic|video clip|motion|card|toast|banner|popup/.test(lower);
+  const isComplex = /multi.?scene|with\s+sound|cinematic|particle|3d|three.?dee|sequence|montage|complex|advanced|elaborate/.test(lower);
+  const isIteration = /^make a new version|previous file|previous render/i.test(message || '');
+
+  if (isIteration) {
+    // Editing an existing component — Claude usually keeps changes minimal
+    est = 35;
+  } else if (isRender) {
+    est = isComplex ? 110 : 55;
   }
-  // First-time renders (Remotion not installed yet) are extra slow
-  if (/install|fresh|new\s+remotion|first/.test(lower)) est += 60;
-  // Reference reads add image/video processing time
-  if (hasReference) est += 25;
+  // Reference image/video reads add a Read or ffmpeg call
+  if (hasReference) est += 20;
   // Heavy phrasing implies more work
   if (/multiple|several|3 variations|variations|alternate/.test(lower)) est *= 1.4;
   return Math.round(est);
