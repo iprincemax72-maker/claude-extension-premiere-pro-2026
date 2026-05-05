@@ -114,7 +114,11 @@ If the panel opens but says "Bridge offline" or the status pill is red:
 
 Tell the user to type into the panel: `Generate a 3 second logo intro that says HELLO in white on dark blue`
 
-First render takes 3–5 minutes (Remotion installs its npm deps). Subsequent renders take 30–60s.
+The pre-scaffolded Remotion project means first render is ~60s, not 3–5 min. If `~/PremiereClaude/remotion-intro/node_modules/remotion` doesn't exist (installer's npm install failed), the first render falls back to installing — that's when you'd see 3–5 min.
+
+### Optional: Remotion best-practice skills
+
+If the user wants higher-quality Remotion output, you can install community skills like `remotion-video-skill` and `remotion-best-practices`. The bridge's system prompt tells Claude to use them if available, and falls back to direct Remotion code (from training knowledge) if not. **Plain installs work fine without these skills.**
 
 ### Common install failures and fixes
 
