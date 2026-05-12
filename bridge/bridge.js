@@ -179,7 +179,7 @@ function transcriptAnalyse(clipPath, clipDuration, silenceCuts) {
       try { proc.kill('SIGKILL'); } catch {}
       didResolve = true;
       _activeAutocut = null;
-      resolve({ cuts: silenceCuts, transcribed: false, summary: 'Transcript timed out (3 min) — silence-only.' });
+      resolve({ cuts: silenceCuts, transcribed: false, summary: null });
     }, HARD_TIMEOUT_MS);
 
     // Idle watchdog — if no stream-json event has arrived in 60s, claude is
@@ -231,7 +231,7 @@ function transcriptAnalyse(clipPath, clipDuration, silenceCuts) {
     proc.on('error', () => {
       if (didResolve) return; didResolve = true;
       clearTimeout(killer); clearInterval(idleCheck); _activeAutocut = null;
-      resolve({ cuts: silenceCuts, transcribed: false, summary: 'Claude CLI unavailable — silence-only.' });
+      resolve({ cuts: silenceCuts, transcribed: false, summary: null });
     });
 
     proc.on('close', () => {
@@ -266,7 +266,7 @@ function transcriptAnalyse(clipPath, clipDuration, silenceCuts) {
       if (!parsed || !Array.isArray(parsed.cuts)) {
         console.log('  [autocut] JSON parse failed — falling back to silence-only');
         didResolve = true;
-        resolve({ cuts: silenceCuts, transcribed: false, summary: 'Transcript step failed — silence-only.' });
+        resolve({ cuts: silenceCuts, transcribed: false, summary: null });
         return;
       }
       didResolve = true;
