@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "3.3";
+var HOST_JSX_VERSION = "3.6";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -351,6 +351,22 @@ function ccApplyAutoCuts(cutsJson) {
         var inPt = (typeof sel.inPoint === "number") ? sel.inPoint : 0;
         var timelineStart = (typeof sel.timelineStart === "number") ? sel.timelineStart : 0;
 
+        // Sequence FPS for frame-aligned snapping. ffmpeg gives us silences
+        // in seconds, but Premiere works in frames — if the cut doesn't land
+        // on a frame boundary, ripple-delete leaves a 1-frame sliver. We
+        // floor the START to the nearest frame and ceil the END so each cut
+        // covers at least the silence and no leftover frame remains.
+        var fps = 30;
+        try {
+            var settings = seq.getSettings && seq.getSettings();
+            if (settings && settings.videoFrameRate && settings.videoFrameRate.ticks) {
+                fps = 254016000000 / Number(settings.videoFrameRate.ticks);
+            }
+        } catch (e) {}
+        if (!fps || fps < 1 || fps > 240) fps = 30;
+        var frameDur = 1 / fps;
+        note("fps=" + fps.toFixed(3) + " frameDur=" + frameDur.toFixed(5));
+
         // Enable QE — extract() lives there
         var qeSeq = null;
         try {
@@ -379,10 +395,14 @@ function ccApplyAutoCuts(cutsJson) {
             if (typeof c.start !== "number" || typeof c.end !== "number") { failed++; continue; }
             // Original timeline positions, then subtract the cumulative ripple
             // shift from all previously-applied cuts.
-            var tStart = (timelineStart + (c.start - inPt)) - shiftOffset;
-            var tEnd   = (timelineStart + (c.end   - inPt)) - shiftOffset;
+            var rawStart = (timelineStart + (c.start - inPt)) - shiftOffset;
+            var rawEnd   = (timelineStart + (c.end   - inPt)) - shiftOffset;
+            // Snap to frame boundaries: start DOWN to nearest frame, end UP
+            // to nearest frame. Prevents 1-frame slivers from ripple-delete.
+            var tStart = Math.floor(rawStart * fps) / fps;
+            var tEnd   = Math.ceil( rawEnd   * fps) / fps;
             if (tEnd <= tStart) { failed++; continue; }
-            note("cut[" + i + "] " + tStart.toFixed(3) + " → " + tEnd.toFixed(3) + " (" + (tEnd - tStart).toFixed(2) + "s)  shift=" + shiftOffset.toFixed(2));
+            note("cut[" + i + "] raw " + rawStart.toFixed(3) + "→" + rawEnd.toFixed(3) + " snapped " + tStart.toFixed(3) + "→" + tEnd.toFixed(3) + " (" + (tEnd - tStart).toFixed(3) + "s)  shift=" + shiftOffset.toFixed(2));
 
             // Set sequence in/out — try several signatures because the API
             // varies (seconds vs Time vs Time-string vs ticks).
