@@ -1885,7 +1885,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">2.7</span>
+    <span class="version-tag" id="versionTag">2.8</span>
   </div>
   <div style="display:flex;align-items:center">
     <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
@@ -1905,7 +1905,6 @@
         <circle cx="12" cy="12" r="9"/>
         <path d="M12 7v5l3 2"/>
       </svg>
-      <span class="count-badge" id="historyCount" style="display:none">0</span>
     </button>
     <div id="status" class="pill">
       <span class="led"></span>
@@ -2686,7 +2685,6 @@ const HISTORY_MAX = 30;
 const historyBtn = document.getElementById('historyBtn');
 const historyPanel = document.getElementById('historyPanel');
 const historyList = document.getElementById('historyList');
-const historyCount = document.getElementById('historyCount');
 let history = [];
 try { history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { history = []; }
 
@@ -2705,14 +2703,7 @@ function addHistoryEntry({prompt, path, mode}) {
   if (historyPanel.classList.contains('show')) renderHistory();
 }
 
-function renderHistoryBadge() {
-  if (history.length > 0) {
-    historyCount.textContent = history.length;
-    historyCount.style.display = '';
-  } else {
-    historyCount.style.display = 'none';
-  }
-}
+function renderHistoryBadge() { /* badge removed — was stuck at 30 and not useful */ }
 
 function relTime(ts) {
   const s = Math.max(1, Math.floor((Date.now() - ts) / 1000));
@@ -2830,7 +2821,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '2.7';
+  const PANEL_VERSION = '2.8';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -3546,7 +3537,6 @@ function thinkingHTML() {
     +   '<span class="orbit"><span class="orbit-dot"></span><span class="orbit-dot"></span><span class="orbit-dot"></span></span>'
     +   '<span class="orbit-label">Working</span>'
     +   '<span class="thinking-elapsed"></span>'
-    +   '<span class="thinking-eta"></span>'
     + '</div>'
     + '<div class="progress-bar"><div class="progress-bar-fill"></div></div>'
     + '</div>';
@@ -3641,7 +3631,6 @@ function makeProgressUI(thinkingBody, estimateSeconds) {
   const fill = thinkingBody.querySelector('.progress-bar-fill');
   const bar = thinkingBody.querySelector('.progress-bar');
   const elapsedEl = thinkingBody.querySelector('.thinking-elapsed');
-  const etaEl = thinkingBody.querySelector('.thinking-eta');
   const start = Date.now();
   let completed = false;
   const CAP = 92;
@@ -3677,18 +3666,6 @@ function makeProgressUI(thinkingBody, estimateSeconds) {
     const sec = (Date.now() - start) / 1000;
     const s = Math.floor(sec);
     if (s >= 1) elapsedEl.textContent = (s < 60) ? s + 's' : (Math.floor(s / 60) + 'm ' + (s % 60) + 's');
-
-    // ETA = (time left in this step) + (duration of remaining steps)
-    const stepElapsed = (Date.now() - stepStart) / 1000;
-    const stepLeft = Math.max(0, stepDuration - stepElapsed);
-    const totalLeft = stepLeft + stepRemainingAfter;
-    if (etaEl) {
-      if (totalLeft > 1) {
-        etaEl.textContent = '~' + formatDuration(totalLeft) + ' left';
-      } else {
-        etaEl.textContent = 'finishing up';
-      }
-    }
 
     // Once the bridge has started driving the bar via setPct, stop running
     // the asymptotic curve — otherwise the two fight and the bar oscillates.
@@ -3890,8 +3867,8 @@ function addRenderPreview(msgWrap, absPath, prompt) {
 // the bridge detached so it survives panel close, and pipe its log to the
 // usual file so we can still see what happened.
 let _bridgeAutoStartTried = false;
-async function tryAutoStartBridge() {
-  if (_bridgeAutoStartTried) return false;
+async function tryAutoStartBridge(force) {
+  if (_bridgeAutoStartTried && !force) return false;
   _bridgeAutoStartTried = true;
   const cp = nodeRequire('child_process');
   const _path = nodeRequire('path');
@@ -3934,11 +3911,49 @@ async function tryAutoStartBridge() {
   }
 }
 
+// Ping with a tight timeout so "Connecting…" can't get stuck waiting on a
+// hung TCP socket. AbortController bails after 1.5s and we treat it as offline.
+async function pingBridgeTimed(ms) {
+  return new Promise((resolve) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => { try { ctrl.abort(); } catch {} resolve(null); }, ms || 1500);
+    fetch(BRIDGE + '/ping', { signal: ctrl.signal })
+      .then(r => r.json())
+      .then(j => { clearTimeout(t); resolve((j && j.ok) ? j : null); })
+      .catch(() => { clearTimeout(t); resolve(null); });
+  });
+}
+
+let _bridgeStartingNow = false;
+async function startBridgeAndWait(opts) {
+  if (_bridgeStartingNow) return false;
+  _bridgeStartingNow = true;
+  statusEl.className = 'pill err';
+  statusText.textContent = 'Bridge offline · starting…';
+  const force = opts && opts.force;
+  const started = await tryAutoStartBridge(!!force);
+  if (!started) {
+    _bridgeStartingNow = false;
+    statusText.textContent = 'Bridge offline · click to start';
+    return false;
+  }
+  for (let i = 0; i < 30; i++) {  // ~15 s window
+    await new Promise(r => setTimeout(r, 500));
+    const j = await pingBridgeTimed(900);
+    if (j && j.ok) {
+      _bridgeStartingNow = false;
+      refreshStatus();
+      return true;
+    }
+  }
+  _bridgeStartingNow = false;
+  statusText.textContent = 'Bridge offline · click to start';
+  return false;
+}
+
 async function refreshStatus() {
-  try {
-    const r = await fetch(BRIDGE + '/ping');
-    const j = await r.json();
-    if (!j.ok) throw new Error('not ok');
+  const j = await pingBridgeTimed(1500);
+  if (j && j.ok) {
     statusEl.className = 'pill ok';
     const ctx = await getPremiereContext();
     if (ctx && ctx.sequenceName) {
@@ -3950,38 +3965,24 @@ async function refreshStatus() {
       statusText.textContent = 'Bridge live';
     }
     return true;
-  } catch {
-    statusEl.className = 'pill err';
-    statusText.textContent = "Bridge offline · starting…";
-    // First failure → try to auto-spawn the bridge, then poll quickly until it answers.
-    const started = await tryAutoStartBridge();
-    if (started) {
-      let tries = 0;
-      const poll = setInterval(async () => {
-        tries++;
-        try {
-          const r2 = await fetch(BRIDGE + '/ping');
-          const j2 = await r2.json();
-          if (j2 && j2.ok) {
-            clearInterval(poll);
-            statusEl.className = 'pill ok';
-            statusText.textContent = 'Bridge live';
-            refreshStatus();
-            return;
-          }
-        } catch {}
-        if (tries > 20) {
-          clearInterval(poll);
-          statusEl.className = 'pill err';
-          statusText.textContent = "Bridge offline · run Claude Bridge.command";
-        }
-      }, 500);
-    } else {
-      statusText.textContent = "Bridge offline · run Claude Bridge.command";
-    }
-    return false;
   }
+  // Offline — auto-try once, then surface a clickable manual fallback
+  if (!_bridgeStartingNow) startBridgeAndWait();
+  return false;
 }
+
+// Make the status pill clickable to manually retry / spawn the bridge.
+// Solves "stuck on Connecting…" — user can always force a fresh attempt.
+statusEl.style.cursor = 'pointer';
+statusEl.title = 'Click to retry / start the bridge';
+statusEl.addEventListener('click', async () => {
+  if (statusEl.classList.contains('ok')) {
+    // Already connected — just refresh the context
+    refreshStatus();
+    return;
+  }
+  await startBridgeAndWait({ force: true });
+});
 
 refreshStatus();
 // Slower polling — every 4s was hammering Premiere's ExtendScript engine.
