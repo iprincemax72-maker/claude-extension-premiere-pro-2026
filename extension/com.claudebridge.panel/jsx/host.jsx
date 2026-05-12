@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "1.8";
+var HOST_JSX_VERSION = "2.4";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -434,28 +434,80 @@ function ccApplyAutoCuts(cutsJson) {
     }
 }
 
-// Trigger Premiere's Edit > Undo N times. Cleanest way to reverse auto-cut
-// since each extract() pushes its own undo step; we just call undo once per
-// applied cut. Menu function id 101 is "Edit > Undo" across PPro versions.
+// Trigger Premiere's Edit > Undo N times. Tries several APIs in order
+// because the right one varies across Premiere versions and OS.
 function ccUndo(count) {
+    var attempts = [];
     try {
         var n = parseInt(count, 10);
         if (!n || n < 1) n = 1;
         if (n > 200) n = 200; // safety cap
-
         if (typeof app === "undefined" || !app) {
-            return JSON.stringify({ ok: false, error: "no app" });
+            return JSON.stringify({ ok: false, error: "no app", attempts: attempts });
         }
-        if (typeof app.menuFunctionId !== "function") {
-            return JSON.stringify({ ok: false, error: "menuFunctionId unavailable in this Premiere version" });
+
+        // Try each available undo path once to see what works on this system
+        var undoFn = null;
+        // (1) Direct menuFunctionId — most common
+        if (typeof app.menuFunctionId === "function") {
+            attempts.push("menuFunctionId");
+            // Try a handful of known IDs across PPro releases
+            var menuIds = [101, 16, 7, 0xA01];
+            for (var mi = 0; mi < menuIds.length && !undoFn; mi++) {
+                (function (id) {
+                    var ok = _ccSafe(function () { app.menuFunctionId(id); return true; });
+                    if (ok) undoFn = function () { app.menuFunctionId(id); };
+                })(menuIds[mi]);
+                if (undoFn) { attempts.push("menuFunctionId(" + menuIds[mi] + ")"); break; }
+            }
         }
-        var done = 0;
-        for (var i = 0; i < n; i++) {
-            try { app.menuFunctionId(101); done++; } catch (e) { break; }
+        // (2) executeCommand("Undo")
+        if (!undoFn && typeof app.executeCommand === "function") {
+            attempts.push("executeCommand");
+            var ok2 = _ccSafe(function () { app.executeCommand("Undo"); return true; });
+            if (ok2) undoFn = function () { app.executeCommand("Undo"); };
         }
-        return JSON.stringify({ ok: true, count: done });
+        // (3) Send Cmd+Z to Premiere via osascript (macOS) / PowerShell (Win)
+        if (!undoFn) {
+            attempts.push("system-keystroke");
+            var isMac = ($.os || "").toLowerCase().indexOf("mac") >= 0 || File.fs === "Macintosh";
+            if (isMac) {
+                undoFn = function () {
+                    try {
+                        var script = 'tell application "System Events" to keystroke "z" using command down';
+                        var f = new File(Folder.temp + "/_pp_undo.sh");
+                        f.open("w");
+                        f.write('#!/bin/sh\nosascript -e \'' + script + '\'\n');
+                        f.close();
+                        f.execute();
+                    } catch (e) {}
+                };
+            } else {
+                undoFn = function () {
+                    try {
+                        var bat = new File(Folder.temp + "/_pp_undo.ps1");
+                        bat.open("w");
+                        bat.write('Add-Type -AssemblyName System.Windows.Forms\n[System.Windows.Forms.SendKeys]::SendWait("^z")\n');
+                        bat.close();
+                        bat.execute();
+                    } catch (e) {}
+                };
+            }
+        }
+
+        if (!undoFn) {
+            return JSON.stringify({ ok: false, error: "no undo path worked", attempts: attempts });
+        }
+
+        // Already consumed one undo from the path-probing call. Apply the rest.
+        var done = 1;
+        for (var i = 1; i < n; i++) {
+            var ok3 = _ccSafe(function () { undoFn(); return true; });
+            if (ok3) done++; else break;
+        }
+        return JSON.stringify({ ok: true, count: done, attempts: attempts });
     } catch (e) {
-        return JSON.stringify({ ok: false, error: String(e) });
+        return JSON.stringify({ ok: false, error: String(e), attempts: attempts });
     }
 }
 

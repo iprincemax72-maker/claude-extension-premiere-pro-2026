@@ -90,36 +90,52 @@ function transcriptAnalyse(clipPath, clipDuration, silenceCuts) {
     })));
 
     const userMsg = [
-      'You are helping cut pauses, filler words, and false starts out of a video.',
+      'TASK: auto-cut a talking-head video. You MUST transcribe and analyse — do not stop at silence detection.',
       '',
       'Source media file:  ' + clipPath,
       'Duration:           ' + (typeof clipDuration === 'number' ? clipDuration.toFixed(2) + 's' : 'unknown'),
       'Output dir:         ' + OUTPUT_DIR,
       '',
-      'I already ran ffmpeg silencedetect. These pause ranges (≥0.6s, ≤-30dB) are confirmed:',
+      'PRE-COMPUTED SILENCES (ffmpeg silencedetect, ≥0.6s @ -30dB). These are already confirmed — include them in final output:',
       silenceJson,
       '',
-      'YOUR JOB — do all of this, then output ONE JSON object:',
-      '1. Transcribe the audio with word-level timestamps. Use the asr-transcribe-to-text skill if it is installed. Otherwise extract audio with ffmpeg to ' + OUTPUT_DIR + '/_autocut_audio.wav (16kHz mono) and use whisper.cpp / faster-whisper / any local STT you have. If you genuinely cannot transcribe, set "transcribed": false and just return the silence cuts.',
-      '2. Scan the transcript for:',
-      '   - FILLER words: "um", "uh", "like" (only as filler, NOT as a comparison), "you know", "I mean", "sorta", "kinda", "actually" used as filler.',
-      '   - FALSE STARTS / REPEATS: speaker starts a sentence then re-starts a similar one. Suggest cutting the FIRST attempt, keep the better take.',
-      '   - MISTAKES the speaker audibly corrects themselves on.',
-      '   For each one, use word-level timestamps to set start/end tight to the unwanted span (include the breath before/after when it improves the cut).',
-      '3. Combine with the silence cuts. If a silence overlaps a filler cut, merge them into one cut and use the longer reason.',
-      '4. DOUBLE-CHECK: re-read your proposed cuts. Drop any that would orphan a partial word, cut mid-syllable, or remove content that\'s actually meaningful. Be conservative — when unsure, skip the cut.',
-      '5. Sort cuts by start time.',
+      'STEPS — do every one:',
       '',
-      'OUTPUT — EXACTLY this JSON shape, nothing else (no prose, no markdown fences, no commentary):',
+      'STEP 1 — TRANSCRIBE with WORD-LEVEL TIMESTAMPS.',
+      '  Try these paths in order, stop at the first that works:',
+      '  (a) asr-transcribe-to-text skill (Qwen3-ASR via MLX on macOS) — preferred.',
+      '  (b) whisper.cpp at /opt/homebrew/bin/whisper-cli with a base/small model.',
+      '  (c) `python -m whisper` or `faster-whisper` if installed.',
+      '  (d) Last resort: extract audio with ffmpeg → `ffmpeg -y -i "' + clipPath + '" -ac 1 -ar 16000 "' + OUTPUT_DIR + '/_autocut_audio.wav"`, then transcribe that wav.',
+      '  Only set "transcribed": false if ALL four paths fail. Note which path you used in your reasoning.',
+      '',
+      'STEP 2 — ANALYSE the transcript for cuts:',
+      '   - FILLER words: "um", "uh", "like" (as filler, not comparison), "you know", "I mean", "sorta", "kinda", redundant "actually"/"basically".',
+      '   - FALSE STARTS / REPEATS: speaker starts a sentence, stops, restarts a similar phrase. Cut the FIRST broken attempt, keep the better take.',
+      '   - SELF-CORRECTIONS: "I went to — sorry, I came from..." — cut the wrong half.',
+      '   Use word-level timestamps for tight cut boundaries. Include the trailing breath after a filler so the edit feels natural.',
+      '',
+      'STEP 3 — MERGE with silence cuts. If a filler-cut range overlaps a silence range, merge them and use the more descriptive reason.',
+      '',
+      'STEP 4 — DOUBLE-CHECK every proposed cut:',
+      '   - Would it orphan part of a word? Drop it.',
+      '   - Would it remove meaningful content? Drop it.',
+      '   - Be CONSERVATIVE. When unsure, skip.',
+      '',
+      'STEP 5 — Sort cuts by start time ascending.',
+      '',
+      'OUTPUT — your FINAL assistant message must be EXACTLY this JSON. No prose, no code fences, no commentary, nothing else:',
       '{',
-      '  "transcribed": true|false,',
+      '  "transcribed": true,',
       '  "cuts": [',
       '    { "start": 2.30, "end": 3.10, "kind": "silence",     "reason": "long pause (0.8s)" },',
       '    { "start": 5.20, "end": 5.62, "kind": "filler",      "reason": "um" },',
-      '    { "start": 14.0, "end": 16.4, "kind": "false_start", "reason": "re-started the sentence" }',
+      '    { "start": 14.0, "end": 16.4, "kind": "false_start", "reason": "restarted sentence" }',
       '  ],',
       '  "summary": "Found 6 pauses, 4 fillers, 2 false starts. Would remove 9.8s."',
       '}',
+      '',
+      '"kind" must be one of: silence, filler, false_start, mistake. Do all reasoning silently — only emit the JSON in your final message.',
     ].join('\n');
 
     const sysPrompt = 'You are an audio editor\'s assistant inside an Adobe Premiere panel. You return ONLY valid JSON when asked — no prose. You use installed Claude Code skills (asr-transcribe-to-text, ffmpeg, etc.) freely. You are conservative about what to cut: when in doubt, keep the content.';
@@ -179,17 +195,34 @@ function transcriptAnalyse(clipPath, clipDuration, silenceCuts) {
     });
 
     proc.on('close', () => {
-      // Parse Claude's reply as JSON. Be tolerant of code fences / leading prose.
+      // Parse Claude's reply as JSON. Tolerant: strict → code-fenced → first {…} block.
       let parsed = null;
       const reply = (finalReply || '').trim();
-      // Try strict first
+      console.log('  [autocut] claude reply length: ' + reply.length);
+      console.log('  [autocut] claude reply preview: ' + reply.slice(0, 200).replace(/\n/g, ' '));
+      // 1) Strict JSON
       try { parsed = JSON.parse(reply); } catch {}
-      // Try extracting first {...} block
+      // 2) ```json ... ``` fenced block
       if (!parsed) {
-        const m = reply.match(/\{[\s\S]*\}/);
-        if (m) { try { parsed = JSON.parse(m[0]); } catch {} }
+        const fence = reply.match(/```(?:json)?\s*([\s\S]+?)```/);
+        if (fence) { try { parsed = JSON.parse(fence[1].trim()); } catch {} }
+      }
+      // 3) First {...} run that parses
+      if (!parsed) {
+        const starts = [];
+        for (let i = 0; i < reply.length; i++) if (reply[i] === '{') starts.push(i);
+        for (const s of starts) {
+          // Try expanding ends backwards for the largest matching parse
+          for (let e = reply.length; e > s + 1; e--) {
+            const chunk = reply.slice(s, e);
+            if (chunk[chunk.length - 1] !== '}') continue;
+            try { parsed = JSON.parse(chunk); if (parsed && Array.isArray(parsed.cuts)) break; parsed = null; } catch {}
+          }
+          if (parsed && Array.isArray(parsed.cuts)) break;
+        }
       }
       if (!parsed || !Array.isArray(parsed.cuts)) {
+        console.log('  [autocut] JSON parse failed — falling back to silence-only');
         resolve({ cuts: silenceCuts, transcribed: false, summary: 'Transcript step failed — silence-only.' });
         return;
       }
@@ -887,9 +920,9 @@ const server = http.createServer((req, res) => {
 
         broadcastProgress('Transcribing audio', 18);
         const analysisResult = await transcriptAnalyse(clipPath, clipDuration, silenceCuts);
-        // transcriptAnalyse internally broadcasts statuses while claude runs;
-        // here we ensure we cross the finish line cleanly.
-        broadcastProgress('Done', 100);
+        // Don't broadcast a "Done" status — that would flash as the visible
+        // label before the panel knows the real result has arrived. The
+        // panel calls progressUI.complete() itself when the fetch returns.
 
         const finalCuts = analysisResult.cuts.length ? analysisResult.cuts : silenceCuts;
         let totalCut = 0;

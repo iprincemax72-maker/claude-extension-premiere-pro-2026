@@ -1885,7 +1885,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">2.2</span>
+    <span class="version-tag" id="versionTag">2.4</span>
   </div>
   <div style="display:flex;align-items:center">
     <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
@@ -2806,7 +2806,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '2.2';
+  const PANEL_VERSION = '2.4';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -3637,6 +3637,17 @@ function makeProgressUI(thinkingBody, estimateSeconds) {
     stepRemainingAfter = remainingAfter(text);
   }
 
+  // Bar must never go backward. Track the highest pct we've shown.
+  let externalPct = null;
+  let shownPct = 0;
+  function setBarPct(p) {
+    if (completed) return;
+    if (p < shownPct) p = shownPct;
+    if (p > CAP)    p = CAP;
+    shownPct = p;
+    fill.style.width = p.toFixed(1) + '%';
+  }
+
   function tick() {
     if (completed) return;
     const sec = (Date.now() - start) / 1000;
@@ -3655,17 +3666,16 @@ function makeProgressUI(thinkingBody, estimateSeconds) {
       }
     }
 
-    // Progress bar — use total elapsed vs. total estimated
+    // Once the bridge has started driving the bar via setPct, stop running
+    // the asymptotic curve — otherwise the two fight and the bar oscillates.
+    if (externalPct !== null) return;
     const totalEstimate = stepDuration + stepRemainingAfter + (stepStart - start) / 1000 || 30;
     const pct = (1 - Math.exp(-sec / Math.max(8, totalEstimate))) * CAP;
-    fill.style.width = Math.min(pct, CAP).toFixed(1) + '%';
+    setBarPct(pct);
   }
   const timer = setInterval(tick, 200);
   tick();
 
-  // External driver — when the bridge knows the real percentage it pushes
-  // it via SSE and the bar honors that value instead of the asymptotic curve.
-  let externalPct = null;
   return {
     complete() {
       if (completed) return;
@@ -3678,7 +3688,7 @@ function makeProgressUI(thinkingBody, estimateSeconds) {
     setPct(p) {
       if (typeof p !== 'number' || completed) return;
       externalPct = Math.max(0, Math.min(100, p));
-      fill.style.width = externalPct.toFixed(1) + '%';
+      setBarPct(externalPct);
     },
   };
 }
