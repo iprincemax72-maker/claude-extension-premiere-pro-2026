@@ -967,29 +967,36 @@ const server = http.createServer((req, res) => {
       let payload;
       try { payload = JSON.parse(body); }
       catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
-      const { clipPath, clipDuration } = payload;
+      const { clipPath, clipDuration, useTranscript } = payload;
       if (!clipPath) { res.writeHead(400); res.end('{"error":"missing clipPath"}'); return; }
       if (!fs.existsSync(clipPath)) { res.writeHead(404); res.end('{"error":"file not found"}'); return; }
 
       try {
-        // Stage budgets — known endpoints. Inside each stage, helpers update
-        // the bar with finer-grained pct values as work completes.
-        // 0-15% silence detect, 15-55% transcribe, 55-92% analyse, 92-100% done.
-
-        broadcastProgress('Detecting silences', 2);
+        // Silence-only by default. Fast, reliable, doesn't involve Claude.
+        // useTranscript is opt-in from Settings (false until user enables it).
+        broadcastProgress('Detecting silences', 5);
         const silenceCuts = await detectSilences(clipPath, clipDuration, (p) => {
-          // ffmpeg progress 0..1 → 2..14%
-          broadcastProgress('Detecting silences', 2 + p * 12);
+          // ffmpeg progress 0..1 → 5..95% in silence-only mode
+          broadcastProgress('Detecting silences', 5 + p * 90);
         });
-        broadcastProgress('Parsing silences', 15);
 
-        broadcastProgress('Transcribing audio', 18);
-        const analysisResult = await transcriptAnalyse(clipPath, clipDuration, silenceCuts);
-        // Don't broadcast a "Done" status — that would flash as the visible
-        // label before the panel knows the real result has arrived. The
-        // panel calls progressUI.complete() itself when the fetch returns.
+        let finalCuts = silenceCuts;
+        let transcribed = false;
+        let summary = silenceCuts.length
+          ? ('Found ' + silenceCuts.length + ' pauses. Cutting ' + silenceCuts.reduce((s,c) => s + (c.end-c.start), 0).toFixed(1) + 's total.')
+          : 'No pauses detected.';
 
-        const finalCuts = analysisResult.cuts.length ? analysisResult.cuts : silenceCuts;
+        if (useTranscript) {
+          // Opt-in transcript pass — Claude analyses for fillers / false starts
+          broadcastProgress('Transcribing audio', 25);
+          const analysisResult = await transcriptAnalyse(clipPath, clipDuration, silenceCuts);
+          if (analysisResult.cuts && analysisResult.cuts.length) {
+            finalCuts = analysisResult.cuts;
+            transcribed = !!analysisResult.transcribed;
+            summary = analysisResult.summary || summary;
+          }
+        }
+
         let totalCut = 0;
         for (const c of finalCuts) totalCut += (c.end - c.start);
 
@@ -998,9 +1005,9 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({
           cuts: finalCuts,
           totalCut,
-          transcribed: analysisResult.transcribed,
-          summary: analysisResult.summary || ('Found ' + finalCuts.length + ' cuts.'),
-          method: analysisResult.transcribed ? 'silence+transcript' : 'silence-only',
+          transcribed,
+          summary,
+          method: transcribed ? 'silence+transcript' : 'silence-only',
         }));
       } catch (e) {
         broadcastProgressDone();
