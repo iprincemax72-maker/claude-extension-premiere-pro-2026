@@ -319,55 +319,109 @@ function ccGetSelectedClip() {
 
 // Apply a list of cuts to the currently selected timeline clip. Each cut is
 // { start, end } in seconds relative to the SOURCE media (not the timeline).
-// Strategy: razor the clip at each cut boundary, ripple-delete the segment.
-// Done in reverse-time order so earlier cut indices don't shift.
+// Strategy: razor at each cut boundary via QE (which is the only reliable
+// razor API across PPro versions), then locate the freshly-split segment
+// and ripple-delete it. Cuts run reverse-time so earlier indices don't shift.
 function ccApplyAutoCuts(cutsJson) {
+    var debug = { steps: [] };
+    function note(s) { debug.steps.push(String(s)); }
+    function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+
     try {
         if (typeof app === "undefined" || !app || !app.project) {
-            return JSON.stringify({ ok: false, error: "no project" });
+            return JSON.stringify({ ok: false, error: "no project", debug: debug });
         }
         var seq = _ccSafe(function () { return app.project.activeSequence; });
-        if (!seq) return JSON.stringify({ ok: false, error: "no active sequence" });
+        if (!seq) return JSON.stringify({ ok: false, error: "no active sequence", debug: debug });
 
         var cuts;
-        try { cuts = JSON.parse(cutsJson); } catch (e) { return JSON.stringify({ ok: false, error: "bad cuts json" }); }
-        if (!cuts || !cuts.length) return JSON.stringify({ ok: false, error: "no cuts" });
+        try { cuts = JSON.parse(cutsJson); } catch (e) { return JSON.stringify({ ok: false, error: "bad cuts json", debug: debug }); }
+        if (!cuts || !cuts.length) return JSON.stringify({ ok: false, error: "no cuts", debug: debug });
 
-        // Find the currently selected clip again (Premiere may have re-indexed)
+        // Re-find the selected clip (premiere may have re-indexed since last call)
         var selRaw = ccGetSelectedClip();
         var sel = JSON.parse(selRaw);
         if (!sel.ok) return selRaw;
+        note("sel: name=" + sel.name + " track=" + sel.track + " start=" + sel.timelineStart);
 
         var inPt = (typeof sel.inPoint === "number") ? sel.inPoint : 0;
         var timelineStart = (typeof sel.timelineStart === "number") ? sel.timelineStart : 0;
 
-        // Sort cuts descending so we cut from the END first, preserving the
-        // earlier indices' timeline positions through the ripple deletes.
+        // Frame rate for timecode conversion. Premiere stores it in ticks/sec
+        // where 1 second = 254016000000 ticks.
+        var fps = 30;
+        try {
+            var settings = seq.getSettings && seq.getSettings();
+            if (settings && settings.videoFrameRate && settings.videoFrameRate.ticks) {
+                fps = 254016000000 / Number(settings.videoFrameRate.ticks);
+            }
+        } catch (e) { note("fps fallback: " + e); }
+        if (!fps || fps < 1 || fps > 240) fps = 30;
+        note("fps=" + fps.toFixed(3));
+
+        function tc(sec) {
+            // Build HH:MM:SS:FF — QE razor accepts this format on PPro 2018+.
+            if (sec < 0) sec = 0;
+            var totalFrames = Math.round(sec * fps);
+            var ff = Math.floor(totalFrames % fps);
+            var ss = Math.floor(totalFrames / fps) % 60;
+            var mm = Math.floor(totalFrames / (fps * 60)) % 60;
+            var hh = Math.floor(totalFrames / (fps * 3600));
+            return pad2(hh) + ":" + pad2(mm) + ":" + pad2(ss) + ":" + pad2(ff);
+        }
+
+        // Enable QE so razor() is available
+        var qeSeq = null;
+        try {
+            if (typeof app.enableQE === "function") app.enableQE();
+            if (typeof qe !== "undefined" && qe && qe.project) {
+                qeSeq = qe.project.getActiveSequence ? qe.project.getActiveSequence() : null;
+            }
+        } catch (e) { note("enableQE error: " + e); }
+        if (!qeSeq) {
+            return JSON.stringify({ ok: false, error: "QE unavailable — Premiere build doesn't expose qe.project.getActiveSequence", debug: debug });
+        }
+        note("QE sequence loaded");
+
+        // Sort cuts descending so we operate on later cuts first
         cuts.sort(function (a, b) { return b.start - a.start; });
 
-        var applied = 0;
-        var failed = 0;
+        var applied = 0, failed = 0;
+        var trackList = (sel.trackKind === "audio") ? seq.audioTracks : seq.videoTracks;
+        if (!trackList) return JSON.stringify({ ok: false, error: "no track list", debug: debug });
+
         for (var i = 0; i < cuts.length; i++) {
             var c = cuts[i];
             if (typeof c.start !== "number" || typeof c.end !== "number") { failed++; continue; }
-            // Translate source-relative seconds to timeline-relative seconds
             var tStart = timelineStart + (c.start - inPt);
             var tEnd   = timelineStart + (c.end   - inPt);
+            note("cut[" + i + "] tStart=" + tStart.toFixed(3) + " tEnd=" + tEnd.toFixed(3) + " (" + tc(tStart) + " → " + tc(tEnd) + ")");
 
-            var ok = _ccSafe(function () {
-                // Razor at the two boundaries, then ripple-delete the middle
-                if (seq.razor) seq.razor(tStart, true, true);
-                if (seq.razor) seq.razor(tEnd, true, true);
-                return true;
-            });
-            if (!ok) { failed++; continue; }
+            var razored = false;
+            try {
+                // QE razor — second arg true would razor only selected, false = all
+                qeSeq.razor(tc(tStart), false);
+                qeSeq.razor(tc(tEnd), false);
+                razored = true;
+            } catch (e) {
+                note("qe razor failed: " + e + " — trying per-track");
+                // Per-track fallback: each QE track has its own razor
+                try {
+                    var qeTrack = (sel.trackKind === "audio")
+                        ? qeSeq.getAudioTrackAt(sel.trackIdx)
+                        : qeSeq.getVideoTrackAt(sel.trackIdx);
+                    if (qeTrack && qeTrack.razor) {
+                        qeTrack.razor(tc(tStart));
+                        qeTrack.razor(tc(tEnd));
+                        razored = true;
+                    }
+                } catch (e2) { note("per-track razor failed: " + e2); }
+            }
+            if (!razored) { failed++; continue; }
 
-            // After razoring, find the segment whose timelineStart >= tStart and
-            // timelineEnd <= tEnd, on the same track, and delete it.
-            var trackList = (sel.trackKind === "audio") ? seq.audioTracks : seq.videoTracks;
-            var track = _ccSafe(function () { return trackList[sel.trackIdx]; });
-            if (!track) { failed++; continue; }
-            var clips = _ccSafe(function () { return track.clips; });
+            // Find the newly-cut segment on the original track and remove it
+            var track = trackList[sel.trackIdx];
+            var clips = track && track.clips;
             if (!clips) { failed++; continue; }
 
             var deleted = false;
@@ -375,20 +429,22 @@ function ccApplyAutoCuts(cutsJson) {
                 var cc = clips[k];
                 var cs = _ccSafe(function () { return cc.start && cc.start.seconds; });
                 var ce = _ccSafe(function () { return cc.end && cc.end.seconds; });
-                if (typeof cs === "number" && typeof ce === "number" &&
-                    cs >= tStart - 0.05 && ce <= tEnd + 0.05) {
-                    var rip = _ccSafe(function () {
-                        if (cc.remove) { cc.remove(true, true); return true; }
-                        return false;
-                    });
-                    if (rip) { deleted = true; break; }
+                if (typeof cs !== "number" || typeof ce !== "number") continue;
+                if (cs >= tStart - 0.08 && ce <= tEnd + 0.08 && (ce - cs) > 0.05) {
+                    try {
+                        if (cc.remove) {
+                            cc.remove(true, true); // ripple, alignToVideo
+                            deleted = true;
+                            break;
+                        }
+                    } catch (e3) { note("remove failed: " + e3); }
                 }
             }
-            if (deleted) applied++; else failed++;
+            if (deleted) applied++; else { failed++; note("cut[" + i + "] no segment found in range"); }
         }
-        return JSON.stringify({ ok: true, applied: applied, failed: failed });
+        return JSON.stringify({ ok: true, applied: applied, failed: failed, debug: debug });
     } catch (e) {
-        return JSON.stringify({ ok: false, error: String(e) });
+        return JSON.stringify({ ok: false, error: String(e), debug: debug });
     }
 }
 

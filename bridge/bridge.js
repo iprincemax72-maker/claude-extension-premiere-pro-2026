@@ -575,6 +575,12 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Manual update trigger from the panel — pulls latest files from GitHub raw
+  if (req.method === 'POST' && req.url === '/update') {
+    handleUpdateRequest(req, res);
+    return;
+  }
+
   // Auto-cut endpoint — bridge runs ffmpeg silencedetect on the source media,
   // optionally invokes claude to scan the transcript for false starts / repeats,
   // and returns a structured list of cut suggestions.
@@ -650,6 +656,71 @@ const server = http.createServer((req, res) => {
   res.writeHead(404); res.end();
 });
 
+// Auto-update — on launch, the bridge pulls the latest panel + bridge files
+// from GitHub raw. Diff against on-disk; rewrite only if changed. Skip with
+// CLAUDE_BRIDGE_NO_UPDATE=1 in the environment.
+const GITHUB_RAW = 'https://raw.githubusercontent.com/iprincemax72-maker/claude-extension-premiere-pro-2026/main';
+const UPDATE_TARGETS = [
+  { url: GITHUB_RAW + '/extension/com.claudebridge.panel/index.html',     dest: path.join(PANEL_DIR, 'index.html'),     label: 'panel UI' },
+  { url: GITHUB_RAW + '/extension/com.claudebridge.panel/jsx/host.jsx',   dest: path.join(PANEL_DIR, 'jsx', 'host.jsx'), label: 'ExtendScript', needsPremRestart: true },
+  { url: GITHUB_RAW + '/extension/com.claudebridge.panel/CSXS/manifest.xml', dest: path.join(PANEL_DIR, 'CSXS', 'manifest.xml'), label: 'manifest' },
+  { url: GITHUB_RAW + '/bridge/bridge.js',                                 dest: __filename, label: 'bridge', needsBridgeRestart: true },
+];
+
+async function checkForUpdates() {
+  if (process.env.CLAUDE_BRIDGE_NO_UPDATE === '1') {
+    console.log('Auto-update skipped (CLAUDE_BRIDGE_NO_UPDATE=1).\n');
+    return;
+  }
+  if (typeof fetch !== 'function') {
+    console.log('Auto-update skipped — Node fetch unavailable (upgrade to Node 18+).\n');
+    return;
+  }
+  console.log('Checking for updates…');
+  const updated = [];
+  let bridgeChanged = false;
+  let premiereRestartNeeded = false;
+  for (const target of UPDATE_TARGETS) {
+    try {
+      const r = await fetch(target.url + '?t=' + Date.now(), { headers: { 'Cache-Control': 'no-cache' } });
+      if (!r.ok) continue;
+      const remote = Buffer.from(await r.arrayBuffer());
+      let local = null;
+      try { local = fs.readFileSync(target.dest); } catch {}
+      if (!local || !local.equals(remote)) {
+        fs.mkdirSync(path.dirname(target.dest), { recursive: true });
+        fs.writeFileSync(target.dest, remote);
+        updated.push(target);
+        if (target.needsBridgeRestart) bridgeChanged = true;
+        if (target.needsPremRestart) premiereRestartNeeded = true;
+      }
+    } catch (e) {
+      console.error('  update check failed for ' + target.label + ': ' + e.message);
+    }
+  }
+  if (!updated.length) { console.log('Up to date.\n'); return; }
+  console.log('Updated ' + updated.length + ' file' + (updated.length === 1 ? '' : 's') + ':');
+  updated.forEach(t => console.log('  • ' + t.label + '  (' + t.dest + ')'));
+  if (bridgeChanged) {
+    console.log('\n!! Bridge itself was updated. Close this terminal and re-launch the bridge to load the new version.');
+  }
+  if (premiereRestartNeeded) {
+    console.log('!! ExtendScript was updated — restart Premiere Pro so it picks up host.jsx changes.');
+  }
+  console.log('');
+}
+
+// Manual update trigger from the panel
+async function handleUpdateRequest(req, res) {
+  try {
+    await checkForUpdates();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true }));
+  } catch (e) {
+    res.writeHead(500); res.end(JSON.stringify({ ok: false, error: String(e) }));
+  }
+}
+
 server.listen(PORT, '127.0.0.1', () => {
   console.log('Claude Bridge v2 running at http://localhost:' + PORT);
   console.log('Session ID: ' + SESSION_ID);
@@ -657,4 +728,5 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log('Output dir: ' + OUTPUT_DIR);
   console.log('Open Premiere Pro → Window → Extensions → Claude');
   console.log('(keep this terminal open)\n');
+  checkForUpdates().catch(e => console.error('Update check error:', e.message));
 });

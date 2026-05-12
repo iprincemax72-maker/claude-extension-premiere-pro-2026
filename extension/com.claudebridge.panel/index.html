@@ -149,10 +149,18 @@
     color: var(--text-dim);
     font-variant-numeric: tabular-nums;
     max-width: 60%;
+    min-width: 0;
+    overflow: hidden;
+    transition: border-color 0.4s var(--ease), background 0.4s var(--ease);
+  }
+  /* Ellipsis on the inner text span — the flex container can't truncate
+     because the LED dot is a sibling. The text needs its own overflow rule. */
+  .pill .status-text {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    transition: border-color 0.4s var(--ease), background 0.4s var(--ease);
+    min-width: 0;
+    flex: 1 1 auto;
   }
   .led {
     position: relative;
@@ -1504,6 +1512,12 @@
     <span>Claude</span>
   </div>
   <div style="display:flex;align-items:center">
+    <button class="icon-btn" id="updateBtn" type="button" title="Check for updates from GitHub" aria-label="Update" style="margin-right:4px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-3-6.7"/>
+        <polyline points="21 4 21 10 15 10"/>
+      </svg>
+    </button>
     <button class="icon-btn" id="historyBtn" type="button" title="History — past renders" aria-label="History">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="9"/>
@@ -1919,8 +1933,19 @@ function addAutoCutCard(clipInfo, cuts, totalCut) {
       if (!r.classList.contains('applied')) remaining.push(cuts[+r.dataset.idx]);
     });
     const r = await applyAutoCuts(remaining);
-    e.target.textContent = r.ok ? ('Applied ' + r.applied) : 'Failed';
-    list.querySelectorAll('.autocut-row:not(.applied)').forEach(rr => rr.classList.add('applied'));
+    if (r.ok && r.applied > 0) {
+      e.target.textContent = 'Applied ' + r.applied;
+      list.querySelectorAll('.autocut-row:not(.applied)').forEach(rr => rr.classList.add('applied'));
+    } else {
+      e.target.disabled = false;
+      e.target.textContent = 'Apply all';
+      // Surface the failure with debug info so we can see what's going on
+      const note = document.createElement('div');
+      note.style.cssText = 'margin-top:8px;padding:8px 10px;background:rgba(224,116,116,0.08);border:1px solid rgba(224,116,116,0.25);border-radius:6px;font-size:11px;color:var(--text-dim);white-space:pre-wrap';
+      const dbg = (r.debug && r.debug.steps) ? r.debug.steps.join('\n') : '';
+      note.textContent = (r.error || 'No segments were removed.') + (dbg ? ('\n\n' + dbg) : '');
+      card.appendChild(note);
+    }
   });
 
   card.querySelector('.autocut-dismiss').addEventListener('click', () => wrap.wrap.remove());
@@ -2554,6 +2579,26 @@ document.getElementById('modeBar').addEventListener('click', (e) => {
 });
 const _autocutBtn = document.getElementById('autocutBtn');
 if (_autocutBtn) _autocutBtn.addEventListener('click', runAutoCut);
+
+// Update button — asks the bridge to pull the latest panel + bridge from GitHub
+const _updateBtn = document.getElementById('updateBtn');
+if (_updateBtn) {
+  _updateBtn.addEventListener('click', async () => {
+    _updateBtn.disabled = true;
+    const origTitle = _updateBtn.title;
+    _updateBtn.title = 'Checking…';
+    try {
+      const r = await fetch(BRIDGE + '/update', { method: 'POST' });
+      const data = await r.json();
+      _updateBtn.title = data.ok ? 'Up to date — bridge may need restart if anything changed' : ('Update failed: ' + (data.error || ''));
+      // The bridge logs to its terminal. If index.html changed, live-reload fires automatically.
+    } catch (e) {
+      _updateBtn.title = 'Update failed: ' + e.message;
+    } finally {
+      setTimeout(() => { _updateBtn.title = origTitle; _updateBtn.disabled = false; }, 4000);
+    }
+  });
+}
 // Sync UI to whatever was loaded from storage
 setMode(activeMode);
 
