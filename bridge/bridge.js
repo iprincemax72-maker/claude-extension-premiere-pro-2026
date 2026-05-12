@@ -28,6 +28,191 @@ function broadcastReload() {
   }, 120);
 }
 
+// Run ffmpeg silencedetect and return parsed pause ranges.
+// `onProgress(0..1)` fires as ffmpeg's "time=" reports advance through the clip.
+function detectSilences(clipPath, clipDuration, onProgress) {
+  return new Promise((resolve, reject) => {
+    const args = ['-i', clipPath, '-af', 'silencedetect=noise=-30dB:d=0.6', '-f', 'null', '-'];
+    const ff = spawn('ffmpeg', args);
+    let stderr = '';
+    const timeRe = /time=([\d:.]+)/g;
+    ff.stderr.on('data', d => {
+      const chunk = d.toString();
+      stderr += chunk;
+      // ffmpeg prints "time=HH:MM:SS.MS" repeatedly while processing
+      if (onProgress && typeof clipDuration === 'number' && clipDuration > 0) {
+        let m, latest = null;
+        while ((m = timeRe.exec(chunk)) !== null) latest = m[1];
+        if (latest) {
+          const parts = latest.split(':').map(parseFloat);
+          let sec = 0;
+          if (parts.length === 3) sec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+          else if (parts.length === 2) sec = parts[0] * 60 + parts[1];
+          else sec = parts[0] || 0;
+          if (sec > 0) onProgress(Math.min(1, sec / clipDuration));
+        }
+      }
+    });
+    ff.on('error', err => reject(new Error('ffmpeg failed: ' + err.message)));
+    ff.on('close', () => {
+      const cuts = [];
+      const re = /silence_start:\s*([\d.]+)|silence_end:\s*([\d.]+)\s*\|\s*silence_duration:\s*([\d.]+)/g;
+      let lastStart = null;
+      let m;
+      while ((m = re.exec(stderr)) !== null) {
+        if (m[1] !== undefined) lastStart = parseFloat(m[1]);
+        else if (m[2] !== undefined && lastStart !== null) {
+          cuts.push({
+            start: lastStart,
+            end: parseFloat(m[2]),
+            duration: parseFloat(m[3]),
+            kind: 'silence',
+            reason: 'long pause (' + parseFloat(m[3]).toFixed(1) + 's)',
+          });
+          lastStart = null;
+        }
+      }
+      const safe = (typeof clipDuration === 'number' && clipDuration > 0) ? clipDuration : Number.MAX_SAFE_INTEGER;
+      resolve(cuts.filter(c => c.end <= safe + 0.5));
+    });
+  });
+}
+
+// Ask Claude to transcribe the audio + analyse the transcript for filler
+// words, false starts, repeats. Combine with the pre-computed silence cuts.
+// Returns { cuts: [...], transcribed: bool, summary: string }.
+function transcriptAnalyse(clipPath, clipDuration, silenceCuts) {
+  return new Promise(resolve => {
+    const silenceJson = JSON.stringify(silenceCuts.map(c => ({
+      start: +c.start.toFixed(3),
+      end: +c.end.toFixed(3),
+      duration: +c.duration.toFixed(3),
+    })));
+
+    const userMsg = [
+      'You are helping cut pauses, filler words, and false starts out of a video.',
+      '',
+      'Source media file:  ' + clipPath,
+      'Duration:           ' + (typeof clipDuration === 'number' ? clipDuration.toFixed(2) + 's' : 'unknown'),
+      'Output dir:         ' + OUTPUT_DIR,
+      '',
+      'I already ran ffmpeg silencedetect. These pause ranges (≥0.6s, ≤-30dB) are confirmed:',
+      silenceJson,
+      '',
+      'YOUR JOB — do all of this, then output ONE JSON object:',
+      '1. Transcribe the audio with word-level timestamps. Use the asr-transcribe-to-text skill if it is installed. Otherwise extract audio with ffmpeg to ' + OUTPUT_DIR + '/_autocut_audio.wav (16kHz mono) and use whisper.cpp / faster-whisper / any local STT you have. If you genuinely cannot transcribe, set "transcribed": false and just return the silence cuts.',
+      '2. Scan the transcript for:',
+      '   - FILLER words: "um", "uh", "like" (only as filler, NOT as a comparison), "you know", "I mean", "sorta", "kinda", "actually" used as filler.',
+      '   - FALSE STARTS / REPEATS: speaker starts a sentence then re-starts a similar one. Suggest cutting the FIRST attempt, keep the better take.',
+      '   - MISTAKES the speaker audibly corrects themselves on.',
+      '   For each one, use word-level timestamps to set start/end tight to the unwanted span (include the breath before/after when it improves the cut).',
+      '3. Combine with the silence cuts. If a silence overlaps a filler cut, merge them into one cut and use the longer reason.',
+      '4. DOUBLE-CHECK: re-read your proposed cuts. Drop any that would orphan a partial word, cut mid-syllable, or remove content that\'s actually meaningful. Be conservative — when unsure, skip the cut.',
+      '5. Sort cuts by start time.',
+      '',
+      'OUTPUT — EXACTLY this JSON shape, nothing else (no prose, no markdown fences, no commentary):',
+      '{',
+      '  "transcribed": true|false,',
+      '  "cuts": [',
+      '    { "start": 2.30, "end": 3.10, "kind": "silence",     "reason": "long pause (0.8s)" },',
+      '    { "start": 5.20, "end": 5.62, "kind": "filler",      "reason": "um" },',
+      '    { "start": 14.0, "end": 16.4, "kind": "false_start", "reason": "re-started the sentence" }',
+      '  ],',
+      '  "summary": "Found 6 pauses, 4 fillers, 2 false starts. Would remove 9.8s."',
+      '}',
+    ].join('\n');
+
+    const sysPrompt = 'You are an audio editor\'s assistant inside an Adobe Premiere panel. You return ONLY valid JSON when asked — no prose. You use installed Claude Code skills (asr-transcribe-to-text, ffmpeg, etc.) freely. You are conservative about what to cut: when in doubt, keep the content.';
+
+    const args = [
+      '-p',
+      '--output-format', 'stream-json',
+      '--verbose',
+      '--permission-mode', 'bypassPermissions',
+      '--append-system-prompt', sysPrompt,
+      '--no-session-persistence',
+      userMsg,
+    ];
+
+    const proc = spawn('claude', args, { cwd: WORK_DIR, env: process.env });
+    let stderr = '';
+    let lineBuf = '';
+    let finalReply = '';
+
+    proc.stderr.on('data', d => stderr += d);
+
+    // Step inside the 18-92% transcript-stage budget — each tool call bumps
+    // the bar by a fixed amount, capped at 90% so we don't pretend to be done.
+    let stagePct = 18;
+    const stepBump = (status) => {
+      if (!status) return;
+      if (/^Transcrib/.test(status))            stagePct = Math.max(stagePct, 25);
+      else if (/^Reading|^Running ffmpeg/.test(status)) stagePct = Math.min(58, stagePct + 4);
+      else if (/^Analys/.test(status))          stagePct = Math.max(stagePct, 62);
+      else if (/^Double-check/.test(status))    stagePct = Math.max(stagePct, 88);
+      else                                       stagePct = Math.min(90, stagePct + 3);
+      broadcastProgress(status, stagePct);
+    };
+
+    proc.stdout.on('data', chunk => {
+      lineBuf += chunk.toString();
+      let nl;
+      while ((nl = lineBuf.indexOf('\n')) >= 0) {
+        const line = lineBuf.slice(0, nl).trim();
+        lineBuf = lineBuf.slice(nl + 1);
+        if (!line) continue;
+        let evt;
+        try { evt = JSON.parse(line); } catch { continue; }
+        const status = streamEventToStatus(evt);
+        if (status) stepBump(status);
+        if (evt.type === 'result' && typeof evt.result === 'string') finalReply = evt.result;
+        if (evt.type === 'assistant' && evt.message && Array.isArray(evt.message.content)) {
+          for (const blk of evt.message.content) {
+            if (blk.type === 'text' && typeof blk.text === 'string') finalReply = blk.text;
+          }
+        }
+      }
+    });
+
+    proc.on('error', () => {
+      resolve({ cuts: silenceCuts, transcribed: false, summary: 'Claude CLI unavailable — silence-only.' });
+    });
+
+    proc.on('close', () => {
+      // Parse Claude's reply as JSON. Be tolerant of code fences / leading prose.
+      let parsed = null;
+      const reply = (finalReply || '').trim();
+      // Try strict first
+      try { parsed = JSON.parse(reply); } catch {}
+      // Try extracting first {...} block
+      if (!parsed) {
+        const m = reply.match(/\{[\s\S]*\}/);
+        if (m) { try { parsed = JSON.parse(m[0]); } catch {} }
+      }
+      if (!parsed || !Array.isArray(parsed.cuts)) {
+        resolve({ cuts: silenceCuts, transcribed: false, summary: 'Transcript step failed — silence-only.' });
+        return;
+      }
+      // Sanitize cuts
+      const safeClipDur = (typeof clipDuration === 'number' && clipDuration > 0) ? clipDuration : Number.MAX_SAFE_INTEGER;
+      const cuts = parsed.cuts
+        .filter(c => typeof c.start === 'number' && typeof c.end === 'number' && c.end > c.start && c.end <= safeClipDur + 0.5)
+        .map(c => ({
+          start: +c.start.toFixed(3),
+          end: +c.end.toFixed(3),
+          kind: c.kind || 'cut',
+          reason: c.reason || 'cut',
+        }))
+        .sort((a, b) => a.start - b.start);
+      resolve({
+        cuts,
+        transcribed: !!parsed.transcribed,
+        summary: parsed.summary || ('Found ' + cuts.length + ' cuts.'),
+      });
+    });
+  });
+}
+
 // Auto-transcode files Premiere Pro refuses (webm, vp8, vp9) to MP4 H.264.
 // Returns a path Premiere can definitely import. If the input is already an
 // MP4/MOV/PNG/GIF/JPG it's returned as-is (no work). Failed transcodes return
@@ -80,9 +265,11 @@ function ensurePremiereImportable(absPath) {
 // human-readable status lines ("Writing component", "Rendering frames", etc.)
 // over SSE so the panel can display what's actually happening.
 const progressClients = new Set();
-function broadcastProgress(text) {
-  if (!text) return;
-  const data = JSON.stringify({ text });
+function broadcastProgress(text, pct) {
+  if (!text && pct == null) return;
+  const payload = { text: text || '' };
+  if (typeof pct === 'number') payload.pct = Math.max(0, Math.min(100, pct));
+  const data = JSON.stringify(payload);
   for (const c of progressClients) {
     try { c.write('event: progress\ndata: ' + data + '\n\n'); } catch {}
   }
@@ -140,6 +327,25 @@ try {
     fs.watch(watchTarget, { persistent: false }, () => broadcastReload());
   }
 } catch (e) { console.error('live-reload watcher failed:', e.message); }
+
+// Hot-reload host.jsx — when the ExtendScript file changes, push a separate
+// event so the panel can re-evaluate the jsx in place without closing.
+let _jsxReloadDebounce = null;
+function broadcastJsxReload() {
+  if (_jsxReloadDebounce) return;
+  _jsxReloadDebounce = setTimeout(() => {
+    _jsxReloadDebounce = null;
+    for (const c of devReloadClients) {
+      try { c.write('event: jsx-reload\ndata: 1\n\n'); } catch {}
+    }
+  }, 120);
+}
+try {
+  const jsxTarget = path.join(PANEL_DIR, 'jsx', 'host.jsx');
+  if (fs.existsSync(jsxTarget)) {
+    fs.watch(jsxTarget, { persistent: false }, () => broadcastJsxReload());
+  }
+} catch (e) { console.error('jsx watcher failed:', e.message); }
 
 
 const COMPLETION_SYSTEM = `You are an inline autocomplete running inside an Adobe Premiere Pro extension panel. The user is mid-sentence, writing a natural-language request for AI-generated motion graphics, transitions, intros, lower thirds, callouts, or any other video element.
@@ -649,9 +855,13 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Auto-cut endpoint — bridge runs ffmpeg silencedetect on the source media,
-  // optionally invokes claude to scan the transcript for false starts / repeats,
-  // and returns a structured list of cut suggestions.
+  // Auto-cut endpoint — three-stage pipeline:
+  // 1. ffmpeg silencedetect → pause ranges
+  // 2. Claude transcribes the audio (using asr-transcribe-to-text skill if
+  //    installed, otherwise whatever local transcription it can run) and
+  //    finds filler words / false starts / repeated takes
+  // 3. Claude double-checks the proposed cuts against the transcript before
+  //    returning the final list
   if (req.method === 'POST' && req.url === '/autocut') {
     let body = '';
     req.on('data', c => body += c);
@@ -663,60 +873,41 @@ const server = http.createServer((req, res) => {
       if (!clipPath) { res.writeHead(400); res.end('{"error":"missing clipPath"}'); return; }
       if (!fs.existsSync(clipPath)) { res.writeHead(404); res.end('{"error":"file not found"}'); return; }
 
-      broadcastProgress('Detecting silences');
+      try {
+        // Stage budgets — known endpoints. Inside each stage, helpers update
+        // the bar with finer-grained pct values as work completes.
+        // 0-15% silence detect, 15-55% transcribe, 55-92% analyse, 92-100% done.
 
-      // Run ffmpeg silencedetect — gives us "silence_start" and "silence_end" lines
-      // in stderr. Conservative defaults: noise -30dB, min 0.6s duration.
-      const silenceArgs = ['-i', clipPath, '-af', 'silencedetect=noise=-30dB:d=0.6', '-f', 'null', '-'];
-      const ff = spawn('ffmpeg', silenceArgs);
-      let ffStderr = '';
-      ff.stderr.on('data', d => ffStderr += d.toString());
-      ff.on('error', err => {
-        try { res.writeHead(500); res.end(JSON.stringify({ error: 'ffmpeg failed: ' + err.message })); } catch {}
-        broadcastProgressDone();
-      });
-      ff.on('close', () => {
-        broadcastProgress('Parsing silences');
-        const cuts = [];
-        const re = /silence_start:\s*([\d.]+)|silence_end:\s*([\d.]+)\s*\|\s*silence_duration:\s*([\d.]+)/g;
-        let lastStart = null;
-        let m;
-        while ((m = re.exec(ffStderr)) !== null) {
-          if (m[1] !== undefined) {
-            lastStart = parseFloat(m[1]);
-          } else if (m[2] !== undefined && lastStart !== null) {
-            const end = parseFloat(m[2]);
-            const dur = parseFloat(m[3]);
-            cuts.push({
-              start: lastStart,
-              end: end,
-              duration: dur,
-              kind: 'silence',
-              reason: 'long pause (' + dur.toFixed(1) + 's)',
-            });
-            lastStart = null;
-          }
-        }
+        broadcastProgress('Detecting silences', 2);
+        const silenceCuts = await detectSilences(clipPath, clipDuration, (p) => {
+          // ffmpeg progress 0..1 → 2..14%
+          broadcastProgress('Detecting silences', 2 + p * 12);
+        });
+        broadcastProgress('Parsing silences', 15);
 
-        // Cap and clamp — never propose a cut beyond the clip
+        broadcastProgress('Transcribing audio', 18);
+        const analysisResult = await transcriptAnalyse(clipPath, clipDuration, silenceCuts);
+        // transcriptAnalyse internally broadcasts statuses while claude runs;
+        // here we ensure we cross the finish line cleanly.
+        broadcastProgress('Done', 100);
+
+        const finalCuts = analysisResult.cuts.length ? analysisResult.cuts : silenceCuts;
         let totalCut = 0;
-        const safeClipDuration = (typeof clipDuration === 'number' && clipDuration > 0) ? clipDuration : Number.MAX_SAFE_INTEGER;
-        const filtered = cuts.filter(c => c.end <= safeClipDuration + 0.5);
-        for (const c of filtered) totalCut += c.duration;
+        for (const c of finalCuts) totalCut += (c.end - c.start);
 
         broadcastProgressDone();
-        try {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({
-            cuts: filtered,
-            totalCut,
-            method: 'ffmpeg-silencedetect',
-            note: 'Pauses ≥0.6s at -30dB. Transcript-based repeat detection coming next.',
-          }));
-        } catch {}
-      });
-
-      req.on('aborted', () => { try { ff.kill('SIGKILL'); } catch {} });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          cuts: finalCuts,
+          totalCut,
+          transcribed: analysisResult.transcribed,
+          summary: analysisResult.summary || ('Found ' + finalCuts.length + ' cuts.'),
+          method: analysisResult.transcribed ? 'silence+transcript' : 'silence-only',
+        }));
+      } catch (e) {
+        broadcastProgressDone();
+        try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e) })); } catch {}
+      }
     });
     return;
   }
@@ -736,18 +927,19 @@ const UPDATE_TARGETS = [
 ];
 
 async function checkForUpdates() {
+  const result = { ok: true, updated: [], bridgeChanged: false, premiereRestartNeeded: false, skipped: false };
   if (process.env.CLAUDE_BRIDGE_NO_UPDATE === '1') {
     console.log('Auto-update skipped (CLAUDE_BRIDGE_NO_UPDATE=1).\n');
-    return;
+    result.skipped = true;
+    return result;
   }
   if (typeof fetch !== 'function') {
     console.log('Auto-update skipped — Node fetch unavailable (upgrade to Node 18+).\n');
-    return;
+    result.skipped = true;
+    result.error = 'fetch unavailable';
+    return result;
   }
   console.log('Checking for updates…');
-  const updated = [];
-  let bridgeChanged = false;
-  let premiereRestartNeeded = false;
   for (const target of UPDATE_TARGETS) {
     try {
       const r = await fetch(target.url + '?t=' + Date.now(), { headers: { 'Cache-Control': 'no-cache' } });
@@ -758,32 +950,36 @@ async function checkForUpdates() {
       if (!local || !local.equals(remote)) {
         fs.mkdirSync(path.dirname(target.dest), { recursive: true });
         fs.writeFileSync(target.dest, remote);
-        updated.push(target);
-        if (target.needsBridgeRestart) bridgeChanged = true;
-        if (target.needsPremRestart) premiereRestartNeeded = true;
+        result.updated.push(target.label);
+        if (target.needsBridgeRestart) result.bridgeChanged = true;
+        if (target.needsPremRestart) result.premiereRestartNeeded = true;
       }
     } catch (e) {
       console.error('  update check failed for ' + target.label + ': ' + e.message);
     }
   }
-  if (!updated.length) { console.log('Up to date.\n'); return; }
-  console.log('Updated ' + updated.length + ' file' + (updated.length === 1 ? '' : 's') + ':');
-  updated.forEach(t => console.log('  • ' + t.label + '  (' + t.dest + ')'));
-  if (bridgeChanged) {
+  if (!result.updated.length) {
+    console.log('Up to date.\n');
+    return result;
+  }
+  console.log('Updated ' + result.updated.length + ' file' + (result.updated.length === 1 ? '' : 's') + ':');
+  result.updated.forEach(label => console.log('  • ' + label));
+  if (result.bridgeChanged) {
     console.log('\n!! Bridge itself was updated. Close this terminal and re-launch the bridge to load the new version.');
   }
-  if (premiereRestartNeeded) {
-    console.log('!! ExtendScript was updated — restart Premiere Pro so it picks up host.jsx changes.');
+  if (result.premiereRestartNeeded) {
+    console.log('!! ExtendScript was updated — host.jsx hot-reload should pick it up automatically.');
   }
   console.log('');
+  return result;
 }
 
 // Manual update trigger from the panel
 async function handleUpdateRequest(req, res) {
   try {
-    await checkForUpdates();
+    const result = await checkForUpdates();
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true }));
+    res.end(JSON.stringify(result));
   } catch (e) {
     res.writeHead(500); res.end(JSON.stringify({ ok: false, error: String(e) }));
   }

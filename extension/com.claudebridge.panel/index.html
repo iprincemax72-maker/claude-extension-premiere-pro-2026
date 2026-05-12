@@ -82,6 +82,263 @@
   ::-webkit-scrollbar-thumb:hover { background: rgba(217, 119, 87, 0.55); background-clip: padding-box; }
   ::-webkit-scrollbar-corner { background: transparent; }
 
+  /* ───── SETTINGS PANEL ───── */
+  .settings-panel {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--bg-base);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    transform: translate3d(0, 18px, 0);
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s linear;
+  }
+  .settings-panel.show {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .settings-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px 24px;
+  }
+  .settings-section {
+    margin-bottom: 22px;
+  }
+  .settings-section-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 10px;
+    padding: 0 2px;
+  }
+  .settings-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: 6px;
+  }
+  .settings-row + .settings-row { margin-top: 0; }
+  .settings-row-label { flex: 1; min-width: 0; }
+  .settings-row-name { font-size: 12.5px; color: var(--text); font-weight: 500; }
+  .settings-row-hint { font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
+
+  /* Segmented control */
+  .settings-segmented {
+    display: inline-flex;
+    padding: 2px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .settings-segmented button {
+    background: transparent;
+    color: var(--text-dim);
+    border: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.1s var(--ease-out), background 0.1s var(--ease-out);
+  }
+  .settings-segmented button:hover { color: var(--text); }
+  .settings-segmented button.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(217, 119, 87, 0.3);
+  }
+
+  /* Color swatches */
+  .settings-swatches { display: inline-flex; gap: 6px; flex-shrink: 0; }
+  .settings-swatches .sw {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.12s var(--ease-out), border-color 0.12s var(--ease-out);
+  }
+  .settings-swatches .sw:hover { transform: scale(1.08); }
+  .settings-swatches .sw.active {
+    border-color: #fff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.3);
+  }
+
+  /* Toggle switch */
+  .settings-toggle {
+    position: relative;
+    display: inline-block;
+    width: 36px; height: 20px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .settings-toggle input { opacity: 0; width: 0; height: 0; }
+  .settings-toggle span {
+    position: absolute; inset: 0;
+    background: rgba(255,255,255,0.1);
+    border-radius: 100px;
+    transition: background 0.2s var(--ease);
+  }
+  .settings-toggle span::before {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .settings-toggle input:checked + span { background: var(--accent); }
+  .settings-toggle input:checked + span::before { transform: translateX(16px); }
+
+  /* Action buttons */
+  .settings-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .settings-btn {
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.1s var(--ease-out), border-color 0.1s var(--ease-out), color 0.1s var(--ease-out);
+    text-align: left;
+  }
+  .settings-btn:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.16); }
+  .settings-btn.danger { color: rgba(224, 116, 116, 0.85); }
+  .settings-btn.danger:hover { color: #e07474; border-color: rgba(224, 116, 116, 0.35); background: rgba(224, 116, 116, 0.06); }
+  .settings-foot { margin-top: 16px; font-size: 10.5px; color: var(--text-faint); text-align: center; }
+  .settings-foot a { color: var(--text-dim); text-decoration: none; }
+  .settings-foot a:hover { color: var(--accent); }
+
+  /* ───── BOOT INTRO ───── */
+  .boot-intro {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: radial-gradient(circle at 50% 45%, #1a1418 0%, #0a0808 70%, #060406 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    opacity: 1;
+    animation: bootRoot 1.0s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+  @keyframes bootRoot {
+    0%, 78%   { opacity: 1; pointer-events: auto; }
+    100%      { opacity: 0; pointer-events: none; visibility: hidden; }
+  }
+  .boot-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    transform: translateZ(0);
+  }
+  .boot-logo {
+    width: 56px; height: 56px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent) 55%, #b04d2f 100%);
+    color: #fff;
+    font-weight: 700;
+    font-size: 26px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow:
+      0 14px 40px rgba(217, 119, 87, 0.42),
+      0 0 0 1px rgba(255,255,255,0.1) inset,
+      0 1px 0 rgba(255, 255, 255, 0.3) inset;
+    opacity: 0;
+    transform: translate3d(0, 4px, 0) scale(0.7);
+    animation: bootLogo 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) 0.0s forwards;
+    position: relative;
+    will-change: transform, opacity;
+  }
+  .boot-logo::before {
+    content: '';
+    position: absolute;
+    inset: -16px;
+    border-radius: inherit;
+    background: radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);
+    z-index: -1;
+    opacity: 0;
+    animation: bootGlow 0.6s ease-out 0.15s forwards;
+  }
+  @keyframes bootLogo {
+    to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  }
+  @keyframes bootGlow {
+    to { opacity: 0.7; }
+  }
+  .boot-title {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.4px;
+    background: linear-gradient(180deg, #fff 0%, #d8d2c5 100%);
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: transparent;
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+    animation: bootRise 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.22s forwards;
+  }
+  .boot-subtitle {
+    font-size: 10.5px;
+    color: var(--text-faint);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    opacity: 0;
+    transform: translate3d(0, 3px, 0);
+    animation: bootRise 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+  }
+  @keyframes bootRise {
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+  .boot-bar {
+    margin-top: 6px;
+    width: 110px;
+    height: 2px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    opacity: 0;
+    animation: bootRise 0.25s var(--ease-out) 0.35s forwards;
+  }
+  .boot-bar-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    animation: bootFill 0.5s cubic-bezier(0.5, 0.1, 0.3, 1) 0.38s forwards;
+  }
+  @keyframes bootFill { to { width: 100%; } }
+
   /* ───── HEADER ───── */
   .header {
     display: flex;
@@ -117,6 +374,17 @@
   .brand:hover { background: rgba(255, 255, 255, 0.04); }
   .brand:active { background: rgba(255, 255, 255, 0.07); }
   .brand:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px; }
+  .version-tag {
+    font-size: 9.5px;
+    font-weight: 500;
+    color: var(--text-faint);
+    background: rgba(255,255,255,0.04);
+    padding: 2px 6px;
+    border-radius: 100px;
+    margin-left: 2px;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+  }
   .brand-dot {
     position: relative;
     width: 22px; height: 22px;
@@ -175,7 +443,7 @@
     border-radius: inherit;
   }
   .pill.ok  .led { background: var(--ok); box-shadow: 0 0 8px rgba(111,191,138,0.7); }
-  .pill.ok  .led::after { animation: ledPulse 2.4s var(--ease-out) infinite; box-shadow: 0 0 0 0 rgba(111,191,138,0.6); }
+  .pill.ok  .led::after { animation: ledPulse 4s var(--ease-out) infinite; box-shadow: 0 0 0 0 rgba(111,191,138,0.6); will-change: box-shadow; }
   .pill.err .led { background: var(--err); box-shadow: 0 0 8px rgba(224,116,116,0.7); }
   .pill.err {
     border-color: rgba(224, 116, 116, 0.4);
@@ -195,7 +463,6 @@
     overflow-x: hidden;
     overscroll-behavior: contain;
     padding: 22px 14px 8px;
-    scroll-behavior: smooth;
     position: relative;
     -webkit-overflow-scrolling: touch;
   }
@@ -222,8 +489,10 @@
       0 12px 30px rgba(217, 119, 87, 0.3),
       0 0 0 1px rgba(255,255,255,0.08) inset,
       0 1px 0 rgba(255, 255, 255, 0.25) inset;
-    animation: breath 4s var(--ease-out) infinite, fadeUp 0.7s var(--spring) backwards;
+    animation: fadeUp 0.7s var(--spring) backwards;
   }
+  /* Static glow behind the logo — animating a radial-gradient kills FPS in
+     CEP's older Chromium. Keep the look without paying the per-frame cost. */
   .empty-logo::before {
     content: '';
     position: absolute;
@@ -231,7 +500,7 @@
     border-radius: inherit;
     background: radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);
     z-index: -1;
-    animation: halo 4s var(--ease-out) infinite;
+    opacity: 0.6;
   }
   .empty-logo::after {
     content: '';
@@ -329,7 +598,7 @@
     font-size: 10.5px;
     line-height: 1.3;
     cursor: pointer;
-    transition: transform 0.4s var(--spring), background 0.25s var(--ease), border-color 0.25s var(--ease), color 0.25s var(--ease), box-shadow 0.3s var(--ease);
+    transition: transform 0.12s var(--ease-out), background 0.12s var(--ease-out), border-color 0.12s var(--ease-out), color 0.12s var(--ease-out);
     user-select: none;
     opacity: 0;
     animation: fadeUp 0.6s var(--spring) forwards;
@@ -868,10 +1137,10 @@
     font-size: 11px;
     font-weight: 500;
     letter-spacing: 0.02em;
-    transition: transform 0.3s var(--spring), background 0.2s var(--ease), color 0.2s var(--ease), box-shadow 0.3s var(--ease);
+    transition: background 0.12s var(--ease-out), color 0.12s var(--ease-out);
     position: relative;
   }
-  .expand-btn svg { width: 11px; height: 11px; transition: transform 0.4s var(--ease); }
+  .expand-btn svg { width: 11px; height: 11px; transition: transform 0.15s var(--ease-out); }
   .expand-group::before {
     content: 'Extend';
     color: var(--text-dim);
@@ -1022,7 +1291,7 @@
     font-size: 11px;
     font-weight: 500;
     cursor: pointer;
-    transition: transform 0.3s var(--spring), background 0.25s var(--ease), color 0.25s var(--ease), border-color 0.25s var(--ease), box-shadow 0.3s var(--ease);
+    transition: background 0.12s var(--ease-out), color 0.12s var(--ease-out), border-color 0.12s var(--ease-out);
     user-select: none;
   }
   .mode-pill svg { width: 11px; height: 11px; }
@@ -1093,7 +1362,13 @@
     border-radius: 7px;
     font-size: 11.5px;
     font-variant-numeric: tabular-nums;
+    border-left: 3px solid var(--text-faint);
   }
+  .autocut-row.kind-silence     { border-left-color: rgba(155, 149, 136, 0.55); }
+  .autocut-row.kind-filler      { border-left-color: rgba(217, 119, 87, 0.7); }
+  .autocut-row.kind-false_start { border-left-color: rgba(224, 116, 116, 0.7); }
+  .autocut-row.kind-mistake     { border-left-color: rgba(232, 154, 108, 0.7); }
+  .autocut-row.kind-cut         { border-left-color: rgba(155, 149, 136, 0.55); }
   .autocut-row.applied { opacity: 0.5; }
   .autocut-row.applied .autocut-row-time { text-decoration: line-through; }
   .autocut-row-time { color: var(--text); min-width: 110px; }
@@ -1134,8 +1409,22 @@
     color: var(--text-dim);
     font-size: 11.5px;
     cursor: pointer;
+    transition: color 0.1s var(--ease-out), border-color 0.1s var(--ease-out);
   }
-  .autocut-dismiss:hover { color: var(--text); }
+  .autocut-dismiss:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+  .autocut-undo {
+    padding: 7px 12px;
+    background: rgba(217, 119, 87, 0.1);
+    border: 1px solid var(--accent-line);
+    border-radius: 7px;
+    color: var(--accent);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.1s var(--ease-out), color 0.1s var(--ease-out);
+  }
+  .autocut-undo:hover { background: rgba(217, 119, 87, 0.2); color: var(--text); }
+  .autocut-undo:disabled { opacity: 0.55; cursor: not-allowed; }
 
   /* ───── REFERENCE BAR ───── */
   .ref-bar {
@@ -1185,7 +1474,7 @@
     font-size: 10.5px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.25s var(--ease);
+    transition: background 0.12s var(--ease-out), color 0.12s var(--ease-out), border-color 0.12s var(--ease-out);
     user-select: none;
   }
   .ref-add svg { width: 11px; height: 11px; }
@@ -1249,7 +1538,7 @@
     padding: 3px 9px;
     border-radius: 100px;
     cursor: pointer;
-    transition: all 0.2s var(--ease);
+    transition: background 0.1s var(--ease-out), color 0.1s var(--ease-out), border-color 0.1s var(--ease-out);
     flex-shrink: 0;
     margin-left: 4px;
   }
@@ -1291,7 +1580,7 @@
     width: 18px; height: 18px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s var(--ease);
+    transition: background 0.1s var(--ease-out), color 0.1s var(--ease-out), border-color 0.1s var(--ease-out);
     flex-shrink: 0;
     padding: 0;
   }
@@ -1336,7 +1625,7 @@
     color: var(--text);
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s var(--ease);
+    transition: background 0.1s var(--ease-out), color 0.1s var(--ease-out), border-color 0.1s var(--ease-out);
   }
   .lightbox-close:hover { background: var(--accent); color: #fff; }
   .lightbox-close svg { width: 14px; height: 14px; }
@@ -1357,12 +1646,46 @@
     border-radius: 7px;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s var(--ease);
+    transition: background 0.1s var(--ease-out), color 0.1s var(--ease-out), border-color 0.1s var(--ease-out);
     margin-right: 6px;
     position: relative;
   }
   .icon-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--border-strong); }
-  .icon-btn svg { width: 13px; height: 13px; }
+  .icon-btn svg { width: 13px; height: 13px; transition: transform 0.15s var(--ease-out); }
+  .icon-btn.spinning svg { animation: iconSpin 1s linear infinite; }
+  @keyframes iconSpin { to { transform: rotate(360deg); } }
+
+  /* Toast for update status — GPU-accelerated translate3d, no spring overshoot,
+     simple short ease-out so it doesn't lag in CEP's older Chromium. */
+  .update-toast {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    background: var(--bg-elevated);
+    color: var(--text);
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 7px 13px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    max-width: 80%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transform: translate3d(-50%, -16px, 0);
+    transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1), opacity 0.18s linear;
+    will-change: transform, opacity;
+  }
+  .update-toast.show {
+    transform: translate3d(-50%, 0, 0);
+    opacity: 1;
+  }
+  .update-toast.ok      { border-color: rgba(111, 191, 138, 0.4); color: var(--ok); }
+  .update-toast.fail    { border-color: rgba(224, 116, 116, 0.4); color: var(--err); }
+  .update-toast.pending { border-color: var(--accent-line); color: var(--accent); }
   .icon-btn .count-badge {
     position: absolute;
     top: -4px; right: -4px;
@@ -1384,15 +1707,38 @@
     z-index: 50;
     display: flex;
     flex-direction: column;
-    transform: translateY(8px);
+    transform: translate3d(0, 24px, 0) scale(0.985);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.25s var(--ease), transform 0.3s var(--ease-out);
+    will-change: transform, opacity;
+    transition:
+      transform 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+      opacity   0.22s linear;
   }
   .history-panel.show {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0) scale(1);
     pointer-events: auto;
+  }
+  /* Header eases in slightly after the panel so the slide feels layered */
+  .history-panel .history-header {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0);
+    transition: opacity 0.25s var(--ease-out) 0.05s, transform 0.32s cubic-bezier(0.16, 1, 0.3, 1) 0.05s;
+  }
+  .history-panel.show .history-header {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  /* List body — small upward reveal with extra delay */
+  .history-panel .history-list {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+    transition: opacity 0.3s var(--ease-out) 0.08s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.08s;
+  }
+  .history-panel.show .history-list {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
   }
   .history-header {
     display: flex;
@@ -1423,10 +1769,29 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     margin-bottom: 8px;
-    transition: border-color 0.2s var(--ease), transform 0.2s var(--ease);
-    animation: msgIn 0.3s var(--ease-out);
+    transition: border-color 0.12s var(--ease-out), transform 0.12s var(--ease-out);
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+    animation: histItemIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
-  .history-item:hover { border-color: var(--accent-line); transform: translateY(-1px); }
+  /* Stagger the first ~12 items; later items just fade in immediately */
+  .history-item:nth-child(1)  { animation-delay: 0.09s; }
+  .history-item:nth-child(2)  { animation-delay: 0.12s; }
+  .history-item:nth-child(3)  { animation-delay: 0.15s; }
+  .history-item:nth-child(4)  { animation-delay: 0.18s; }
+  .history-item:nth-child(5)  { animation-delay: 0.21s; }
+  .history-item:nth-child(6)  { animation-delay: 0.24s; }
+  .history-item:nth-child(7)  { animation-delay: 0.27s; }
+  .history-item:nth-child(8)  { animation-delay: 0.30s; }
+  .history-item:nth-child(9)  { animation-delay: 0.33s; }
+  .history-item:nth-child(10) { animation-delay: 0.36s; }
+  .history-item:nth-child(11) { animation-delay: 0.39s; }
+  .history-item:nth-child(12) { animation-delay: 0.42s; }
+  @keyframes histItemIn {
+    from { opacity: 0; transform: translate3d(0, 8px, 0); }
+    to   { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+  .history-item:hover { border-color: var(--accent-line); transform: translate3d(0, -1px, 0); }
   .history-thumb {
     width: 56px; height: 56px;
     border-radius: 6px;
@@ -1472,7 +1837,7 @@
     padding: 3px 8px;
     border-radius: 100px;
     cursor: pointer;
-    transition: all 0.2s var(--ease);
+    transition: background 0.1s var(--ease-out), color 0.1s var(--ease-out), border-color 0.1s var(--ease-out);
   }
   .history-actions button:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); }
   .history-actions button.danger:hover { background: rgba(224,116,116,0.12); color: var(--err); border-color: rgba(224,116,116,0.4); }
@@ -1506,12 +1871,29 @@
 
 <div class="aurora"><div class="blob"></div></div>
 
+<!-- Boot intro — plays once when panel mounts, auto-hides ~1.8s in -->
+<div class="boot-intro" id="bootIntro">
+  <div class="boot-stage">
+    <div class="boot-logo">C</div>
+    <div class="boot-title"><span>Claude</span></div>
+    <div class="boot-subtitle">for Premiere Pro</div>
+    <div class="boot-bar"><div class="boot-bar-fill"></div></div>
+  </div>
+</div>
+
 <div class="header">
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
+    <span class="version-tag" id="versionTag">2.2</span>
   </div>
   <div style="display:flex;align-items:center">
+    <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
     <button class="icon-btn" id="updateBtn" type="button" title="Check for updates from GitHub" aria-label="Update" style="margin-right:4px">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 12a9 9 0 1 1-3-6.7"/>
@@ -1543,6 +1925,149 @@
     </button>
   </div>
   <div class="history-list" id="historyList"></div>
+</div>
+
+<!-- Settings Panel (overlay) -->
+<div class="settings-panel" id="settingsPanel">
+  <div class="settings-header">
+    <span>Settings</span>
+    <button class="icon-btn" id="settingsClose" type="button" aria-label="Close" style="margin:0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 6L6 18M6 6l12 12"/>
+      </svg>
+    </button>
+  </div>
+  <div class="settings-body">
+
+    <div class="settings-section">
+      <div class="settings-section-title">Appearance</div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Theme</div>
+          <div class="settings-row-hint">Color scheme for the panel</div>
+        </div>
+        <div class="settings-segmented" id="settingTheme">
+          <button data-val="dark" class="seg active">Dark</button>
+          <button data-val="dim">Dim</button>
+          <button data-val="midnight">Midnight</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Accent color</div>
+          <div class="settings-row-hint">Buttons, highlights, badges</div>
+        </div>
+        <div class="settings-swatches" id="settingAccent">
+          <button data-val="coral"   class="sw active" style="background:#d97757" aria-label="Coral"></button>
+          <button data-val="violet"  class="sw"        style="background:#8b6dd9" aria-label="Violet"></button>
+          <button data-val="emerald" class="sw"        style="background:#6fbf8a" aria-label="Emerald"></button>
+          <button data-val="amber"   class="sw"        style="background:#e89a4e" aria-label="Amber"></button>
+          <button data-val="sky"     class="sw"        style="background:#5eb6e8" aria-label="Sky"></button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Show boot intro</div>
+          <div class="settings-row-hint">Play the splash animation on panel open</div>
+        </div>
+        <label class="settings-toggle"><input type="checkbox" id="settingBootIntro" checked><span></span></label>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Behavior</div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Default placement</div>
+          <div class="settings-row-hint">Where renders land on the timeline</div>
+        </div>
+        <div class="settings-segmented" id="settingPlacement">
+          <button data-val="overwrite">Overwrite</button>
+          <button data-val="overlay" class="active">Overlap</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Default expand level</div>
+          <div class="settings-row-hint">Sparkles button default — Low / Mid / High</div>
+        </div>
+        <div class="settings-segmented" id="settingExpand">
+          <button data-val="light"  class="active">Low</button>
+          <button data-val="medium">Mid</button>
+          <button data-val="heavy">High</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Auto-check for updates</div>
+          <div class="settings-row-hint">Pull from GitHub on bridge launch</div>
+        </div>
+        <label class="settings-toggle"><input type="checkbox" id="settingAutoUpdate" checked><span></span></label>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Auto-cut</div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Pause threshold</div>
+          <div class="settings-row-hint">Minimum silence length to suggest a cut</div>
+        </div>
+        <div class="settings-segmented" id="settingPauseDur">
+          <button data-val="0.4">0.4s</button>
+          <button data-val="0.6" class="active">0.6s</button>
+          <button data-val="1.0">1.0s</button>
+          <button data-val="1.5">1.5s</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Silence sensitivity</div>
+          <div class="settings-row-hint">Lower = stricter (only quiet pauses count)</div>
+        </div>
+        <div class="settings-segmented" id="settingNoise">
+          <button data-val="-40">−40 dB</button>
+          <button data-val="-30" class="active">−30 dB</button>
+          <button data-val="-25">−25 dB</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Detect fillers / false starts</div>
+          <div class="settings-row-hint">Uses transcript — slower but smarter</div>
+        </div>
+        <label class="settings-toggle"><input type="checkbox" id="settingTranscript" checked><span></span></label>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Output</div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Render audio in animations</div>
+          <div class="settings-row-hint">Off by default — protects your ears</div>
+        </div>
+        <label class="settings-toggle"><input type="checkbox" id="settingAudio"><span></span></label>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Auto-open render in browser</div>
+          <div class="settings-row-hint">Pop the rendered file in Chrome</div>
+        </div>
+        <label class="settings-toggle"><input type="checkbox" id="settingAutoOpen"><span></span></label>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Data</div>
+      <div class="settings-actions">
+        <button class="settings-btn" id="settingClearHistory">Clear render history</button>
+        <button class="settings-btn danger" id="settingFactoryReset">Reset all settings</button>
+      </div>
+      <div class="settings-foot">v<span id="settingsVersion">2.1</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
+    </div>
+
+  </div>
 </div>
 
 <!-- Lightbox -->
@@ -1580,9 +2105,9 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12h8"/></svg>
         Overwrite
       </button>
-      <button class="mode-pill active" data-mode="overlay" type="button" title="Overlay — places on the lowest empty track above your footage">
+      <button class="mode-pill active" data-mode="overlay" type="button" title="Overlap — drops the rendered clip on the next empty track (V2, V3...) so it overlaps your existing footage in time">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="13" height="11" rx="1.5"/><rect x="7" y="4" width="13" height="11" rx="1.5"/></svg>
-        Overlay
+        Overlap
       </button>
       <button class="autocut-btn" id="autocutBtn" type="button" title="Auto-cut: detect pauses and false starts on the selected clip">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
@@ -1869,6 +2394,11 @@ async function applyAutoCuts(cuts) {
   try { return JSON.parse(raw); } catch { return { ok:false, error:'parse failed' }; }
 }
 
+async function undoTimes(n) {
+  const raw = await evalES('ccUndo(' + (parseInt(n, 10) || 1) + ')');
+  try { return JSON.parse(raw); } catch { return { ok:false, error:'parse failed' }; }
+}
+
 function formatSec(s) {
   if (typeof s !== 'number') return '—';
   const m = Math.floor(s / 60), sec = s - m * 60;
@@ -1876,27 +2406,38 @@ function formatSec(s) {
 }
 
 // Build the proposed-cuts review card inside the chat log
-function addAutoCutCard(clipInfo, cuts, totalCut) {
+function addAutoCutCard(clipInfo, cuts, totalCut, meta) {
   const wrap = makeMsg('claude', '');
   const card = document.createElement('div');
   card.className = 'autocut-card';
 
   const headerCutCount = cuts.length;
+  const transcribed = meta && meta.transcribed;
+  const methodBadge = transcribed
+    ? '<span style="font-size:10px;background:rgba(217,119,87,0.18);color:var(--accent);padding:1px 6px;border-radius:100px;margin-left:6px">transcript</span>'
+    : '<span style="font-size:10px;background:rgba(255,255,255,0.06);color:var(--text-faint);padding:1px 6px;border-radius:100px;margin-left:6px">silence-only</span>';
   card.innerHTML =
       '<div class="autocut-card-header">'
-    +   '<b>' + headerCutCount + '</b> cut' + (headerCutCount === 1 ? '' : 's') + ' proposed on <b>' + escapeHTML(clipInfo.name) + '</b>'
-    +   '<span style="margin-left:auto">would remove <b>' + totalCut.toFixed(1) + 's</b></span>'
+    +   '<b>' + headerCutCount + '</b> cut' + (headerCutCount === 1 ? '' : 's') + ' on <b>' + escapeHTML(clipInfo.name) + '</b>'
+    +   methodBadge
+    +   '<span style="margin-left:auto">−<b>' + totalCut.toFixed(1) + 's</b></span>'
     + '</div>'
+    + (meta && meta.summary ? '<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">' + escapeHTML(meta.summary) + '</div>' : '')
     + '<div class="autocut-list"></div>'
     + '<div class="autocut-actions">'
     +   '<button class="autocut-apply-all" type="button">Apply all</button>'
+    +   '<button class="autocut-undo" type="button" style="display:none">Undo</button>'
     +   '<button class="autocut-dismiss" type="button">Dismiss</button>'
     + '</div>';
+  // Tracks how many cuts the card has actually applied so Undo can reverse
+  // the exact count via Premiere's native Edit > Undo.
+  let appliedCount = 0;
 
   const list = card.querySelector('.autocut-list');
   cuts.forEach((c, i) => {
     const row = document.createElement('div');
-    row.className = 'autocut-row';
+    const kindCls = (c.kind && /^[a-z_]+$/i.test(c.kind)) ? 'kind-' + c.kind : 'kind-cut';
+    row.className = 'autocut-row ' + kindCls;
     row.dataset.idx = i;
     row.innerHTML =
         '<span class="autocut-row-time">' + formatSec(c.start) + ' → ' + formatSec(c.end) + '</span>'
@@ -1907,6 +2448,8 @@ function addAutoCutCard(clipInfo, cuts, totalCut) {
   });
 
   wrap.body.appendChild(card);
+
+  const undoBtn = card.querySelector('.autocut-undo');
 
   // Per-row Apply / Skip
   list.addEventListener('click', async (e) => {
@@ -1920,6 +2463,9 @@ function addAutoCutCard(clipInfo, cuts, totalCut) {
     if (r.ok && r.applied) {
       row.classList.add('applied');
       btn.textContent = 'cut';
+      appliedCount += r.applied;
+      undoBtn.style.display = '';
+      undoBtn.textContent = 'Undo';
     } else {
       btn.disabled = false; btn.textContent = 'Apply';
     }
@@ -1928,6 +2474,8 @@ function addAutoCutCard(clipInfo, cuts, totalCut) {
   // Apply all
   card.querySelector('.autocut-apply-all').addEventListener('click', async (e) => {
     e.target.disabled = true; e.target.textContent = 'Applying…';
+    // Clear any previous failure note so repeated clicks don't pile up
+    card.querySelectorAll('.autocut-fail-note').forEach(n => n.remove());
     const remaining = [];
     list.querySelectorAll('.autocut-row').forEach(r => {
       if (!r.classList.contains('applied')) remaining.push(cuts[+r.dataset.idx]);
@@ -1936,19 +2484,49 @@ function addAutoCutCard(clipInfo, cuts, totalCut) {
     if (r.ok && r.applied > 0) {
       e.target.textContent = 'Applied ' + r.applied;
       list.querySelectorAll('.autocut-row:not(.applied)').forEach(rr => rr.classList.add('applied'));
+      appliedCount += r.applied;
+      undoBtn.style.display = '';
+      undoBtn.textContent = 'Undo all';
     } else {
       e.target.disabled = false;
       e.target.textContent = 'Apply all';
-      // Surface the failure with debug info so we can see what's going on
       const note = document.createElement('div');
+      note.className = 'autocut-fail-note';
       note.style.cssText = 'margin-top:8px;padding:8px 10px;background:rgba(224,116,116,0.08);border:1px solid rgba(224,116,116,0.25);border-radius:6px;font-size:11px;color:var(--text-dim);white-space:pre-wrap';
       const dbg = (r.debug && r.debug.steps) ? r.debug.steps.join('\n') : '';
-      note.textContent = (r.error || 'No segments were removed.') + (dbg ? ('\n\n' + dbg) : '');
+      const hint = (!r.debug || !r.debug.steps) ? '\n\nTip: quit Premiere Pro fully and re-open it. ExtendScript (host.jsx) is cached per session — the auto-cut fix needs a fresh Premiere launch.' : '';
+      note.textContent = (r.error || 'No segments were removed.') + (dbg ? ('\n\n' + dbg) : '') + hint;
       card.appendChild(note);
     }
   });
 
   card.querySelector('.autocut-dismiss').addEventListener('click', () => wrap.wrap.remove());
+
+  // Undo — calls Premiere's Edit > Undo `appliedCount` times so the entire
+  // auto-cut session is reverted in one click.
+  undoBtn.addEventListener('click', async () => {
+    if (appliedCount < 1) return;
+    const orig = undoBtn.textContent;
+    undoBtn.disabled = true;
+    undoBtn.textContent = 'Undoing…';
+    const r = await undoTimes(appliedCount);
+    if (r.ok) {
+      undoBtn.textContent = 'Undone (' + r.count + ')';
+      // Reset row visual state so user could re-apply
+      list.querySelectorAll('.autocut-row.applied').forEach(rr => {
+        rr.classList.remove('applied');
+        const b = rr.querySelector('.autocut-row-btn[data-act="apply"]');
+        if (b) { b.disabled = false; b.textContent = 'Apply'; }
+      });
+      const applyAll = card.querySelector('.autocut-apply-all');
+      if (applyAll) { applyAll.disabled = false; applyAll.textContent = 'Apply all'; }
+      appliedCount = 0;
+      setTimeout(() => { undoBtn.style.display = 'none'; undoBtn.textContent = orig; undoBtn.disabled = false; }, 1800);
+    } else {
+      undoBtn.textContent = 'Undo failed';
+      setTimeout(() => { undoBtn.textContent = orig; undoBtn.disabled = false; }, 2000);
+    }
+  });
 }
 
 // Auto-Cut button click handler
@@ -1969,7 +2547,32 @@ async function runAutoCut() {
   btn.classList.add('busy'); btn.disabled = true;
   const placeholder = makeMsg('claude', thinkingHTML());
   const labelEl = placeholder.body.querySelector('.orbit-label');
-  if (labelEl) labelEl.textContent = 'Analysing audio';
+  if (labelEl) labelEl.textContent = 'Detecting silences';
+
+  // Estimate based on clip length — transcribe time scales roughly with audio
+  // duration. Conservative: ffmpeg ~10s + transcribe at ~0.4s per audio sec +
+  // analysis ~15s. Caps so very long clips don't get a wild estimate.
+  const dur = (typeof sel.duration === 'number' && sel.duration > 0) ? sel.duration : 60;
+  const estimateSec = Math.min(180, Math.max(20, Math.round(10 + dur * 0.4 + 15)));
+  const progressUI = makeProgressUI(placeholder.body, estimateSec);
+
+  // Live progress events from the bridge — ffmpeg/transcript/analyse stages
+  let progressES = null;
+  try {
+    progressES = new EventSource(BRIDGE + '/progress-stream');
+    progressES.addEventListener('progress', (ev) => {
+      try {
+        const { text, pct } = JSON.parse(ev.data);
+        if (text && labelEl) labelEl.textContent = text;
+        if (text && progressUI && progressUI.setStatus) progressUI.setStatus(text);
+        if (typeof pct === 'number' && progressUI && progressUI.setPct) progressUI.setPct(pct);
+      } catch {}
+    });
+    progressES.addEventListener('done', () => {
+      try { progressES.close(); } catch {}
+      progressES = null;
+    });
+  } catch {}
 
   try {
     const r = await fetch(BRIDGE + '/autocut', {
@@ -1978,6 +2581,9 @@ async function runAutoCut() {
       body: JSON.stringify({ clipPath: sel.path, clipDuration: sel.duration }),
     });
     const data = await r.json();
+    progressUI.complete();
+    await new Promise(res => setTimeout(res, 250));
+    progressUI.cleanup();
     placeholder.wrap.remove();
     if (data.error) {
       makeMsg('claude', '<p>Auto-cut error: ' + escapeHTML(data.error) + '</p>');
@@ -1987,11 +2593,13 @@ async function runAutoCut() {
       makeMsg('claude', '<p>No pauses or false starts detected. Nothing to cut.</p>');
       return;
     }
-    addAutoCutCard(sel, data.cuts, data.totalCut || 0);
+    addAutoCutCard(sel, data.cuts, data.totalCut || 0, { transcribed: !!data.transcribed, summary: data.summary });
   } catch (err) {
+    progressUI.cleanup();
     placeholder.wrap.remove();
     makeMsg('claude', '<p>Auto-cut error: ' + escapeHTML(err.message) + '</p>');
   } finally {
+    if (progressES) { try { progressES.close(); } catch {} }
     btn.classList.remove('busy'); btn.disabled = false;
   }
 }
@@ -2193,6 +2801,196 @@ historyBtn.addEventListener('click', () => {
 });
 document.getElementById('historyClose').addEventListener('click', closeHistory);
 renderHistoryBadge();
+
+// Verify host.jsx version matches panel version; show a mismatch warning.
+// On hot-reload the new host.jsx loads in-place and this check is re-run.
+// Single version tag — just shows the panel version. No jsx mismatch display.
+(function setVersion() {
+  const PANEL_VERSION = '2.2';
+  const tag = document.getElementById('versionTag');
+  if (tag) tag.textContent = PANEL_VERSION;
+  const sv = document.getElementById('settingsVersion');
+  if (sv) sv.textContent = PANEL_VERSION;
+})();
+
+/* ───── Settings — persistent prefs in localStorage ───── */
+const SETTINGS_KEY = 'claudeBridge.settings';
+const SETTINGS_DEFAULTS = {
+  theme: 'dark',
+  accent: 'coral',
+  bootIntro: true,
+  placement: 'overlay',
+  expand: 'light',
+  autoUpdate: true,
+  pauseDur: '0.6',
+  noise: '-30',
+  transcript: true,
+  audio: false,
+  autoOpen: false,
+};
+const ACCENT_PALETTES = {
+  coral:   { accent:'#d97757', accent2:'#e89a6c', hover:'#e88566', soft:'rgba(217,119,87,0.14)', line:'rgba(217,119,87,0.45)', glow:'rgba(217,119,87,0.55)' },
+  violet:  { accent:'#8b6dd9', accent2:'#a48de0', hover:'#9a7fe0', soft:'rgba(139,109,217,0.14)', line:'rgba(139,109,217,0.45)', glow:'rgba(139,109,217,0.55)' },
+  emerald: { accent:'#6fbf8a', accent2:'#89cfa1', hover:'#7fc998', soft:'rgba(111,191,138,0.14)', line:'rgba(111,191,138,0.45)', glow:'rgba(111,191,138,0.55)' },
+  amber:   { accent:'#e89a4e', accent2:'#f0b370', hover:'#eda864', soft:'rgba(232,154,78,0.14)',  line:'rgba(232,154,78,0.45)',  glow:'rgba(232,154,78,0.55)'  },
+  sky:     { accent:'#5eb6e8', accent2:'#7fc6ec', hover:'#73beea', soft:'rgba(94,182,232,0.14)',  line:'rgba(94,182,232,0.45)',  glow:'rgba(94,182,232,0.55)'  },
+};
+const THEME_BGS = {
+  dark:     { base:'#0d0d10', elevated:'rgba(24,24,28,0.72)' },
+  dim:      { base:'#16161a', elevated:'rgba(34,34,38,0.78)' },
+  midnight: { base:'#06060a', elevated:'rgba(14,14,18,0.85)' },
+};
+let userSettings = Object.assign({}, SETTINGS_DEFAULTS);
+try {
+  const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+  userSettings = Object.assign({}, SETTINGS_DEFAULTS, saved);
+} catch {}
+
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(userSettings)); } catch {}
+}
+function applySettings() {
+  try {
+    const root = document.documentElement.style;
+    // Accent palette swap
+    const p = ACCENT_PALETTES[userSettings.accent] || ACCENT_PALETTES.coral;
+    root.setProperty('--accent',       p.accent);
+    root.setProperty('--accent-2',     p.accent2);
+    root.setProperty('--accent-hover', p.hover);
+    root.setProperty('--accent-soft',  p.soft);
+    root.setProperty('--accent-line',  p.line);
+    root.setProperty('--accent-glow',  p.glow);
+    // Theme background swap
+    const t = THEME_BGS[userSettings.theme] || THEME_BGS.dark;
+    root.setProperty('--bg-base',     t.base);
+    root.setProperty('--bg-elevated', t.elevated);
+  } catch (e) { /* swallow — never let a setting break init */ }
+  // Default placement is applied AFTER activeMode + setMode are defined,
+  // via a microtask so we don't hit the TDZ for those let-bindings.
+  setTimeout(() => {
+    try {
+      if ((userSettings.placement === 'overwrite' || userSettings.placement === 'overlay')) {
+        if (typeof MODE_STORAGE !== 'undefined' && typeof setMode === 'function') {
+          const stored = localStorage.getItem(MODE_STORAGE);
+          if (!stored) setMode(userSettings.placement);
+        }
+      }
+    } catch (e) {}
+  }, 0);
+}
+
+function syncSettingsUI() {
+  // Segmented selectors
+  function setSeg(id, val) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === String(val)));
+  }
+  setSeg('settingTheme',     userSettings.theme);
+  setSeg('settingPlacement', userSettings.placement);
+  setSeg('settingExpand',    userSettings.expand);
+  setSeg('settingPauseDur',  userSettings.pauseDur);
+  setSeg('settingNoise',     userSettings.noise);
+  // Swatches
+  const sw = document.getElementById('settingAccent');
+  if (sw) sw.querySelectorAll('.sw').forEach(b => b.classList.toggle('active', b.dataset.val === userSettings.accent));
+  // Toggles
+  const toggles = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingTranscript: 'transcript', settingAudio: 'audio', settingAutoOpen: 'autoOpen' };
+  for (const id in toggles) {
+    const el = document.getElementById(id);
+    if (el) el.checked = !!userSettings[toggles[id]];
+  }
+}
+
+function bindSettingsHandlers() {
+  // Segmented controls
+  function bindSeg(id, key) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-val]');
+      if (!btn) return;
+      userSettings[key] = btn.dataset.val;
+      saveSettings();
+      syncSettingsUI();
+      applySettings();
+    });
+  }
+  bindSeg('settingTheme',     'theme');
+  bindSeg('settingPlacement', 'placement');
+  bindSeg('settingExpand',    'expand');
+  bindSeg('settingPauseDur',  'pauseDur');
+  bindSeg('settingNoise',     'noise');
+  // Swatches
+  const sw = document.getElementById('settingAccent');
+  if (sw) sw.addEventListener('click', (e) => {
+    const btn = e.target.closest('.sw[data-val]');
+    if (!btn) return;
+    userSettings.accent = btn.dataset.val;
+    saveSettings();
+    syncSettingsUI();
+    applySettings();
+  });
+  // Toggles
+  const toggleMap = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingTranscript: 'transcript', settingAudio: 'audio', settingAutoOpen: 'autoOpen' };
+  for (const id in toggleMap) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.addEventListener('change', () => { userSettings[toggleMap[id]] = el.checked; saveSettings(); });
+  }
+  // Action buttons
+  const clearHist = document.getElementById('settingClearHistory');
+  if (clearHist) clearHist.addEventListener('click', () => {
+    if (!confirm('Clear all render history? This cannot be undone.')) return;
+    try { localStorage.removeItem(HISTORY_KEY); } catch {}
+    if (typeof history !== 'undefined') { history.length = 0; renderHistoryBadge(); if (typeof renderHistory === 'function') renderHistory(); }
+    clearHist.textContent = 'Cleared';
+    setTimeout(() => { clearHist.textContent = 'Clear render history'; }, 1500);
+  });
+  const factoryReset = document.getElementById('settingFactoryReset');
+  if (factoryReset) factoryReset.addEventListener('click', () => {
+    if (!confirm('Reset all settings to defaults?')) return;
+    userSettings = Object.assign({}, SETTINGS_DEFAULTS);
+    saveSettings();
+    syncSettingsUI();
+    applySettings();
+  });
+}
+
+applySettings();
+bindSettingsHandlers();
+syncSettingsUI();
+
+// Open/close the settings panel
+const settingsPanel = document.getElementById('settingsPanel');
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsClose = document.getElementById('settingsClose');
+function openSettings()  { if (settingsPanel) settingsPanel.classList.add('show'); }
+function closeSettings() { if (settingsPanel) settingsPanel.classList.remove('show'); }
+if (settingsBtn)   settingsBtn.addEventListener('click', openSettings);
+if (settingsClose) settingsClose.addEventListener('click', closeSettings);
+
+// Boot intro — click anywhere on it to dismiss early; otherwise auto-hides
+// when the CSS animation ends (~1.8s). Then remove it from the DOM so it
+// never costs paint time again this session. Respects user setting.
+(function bootIntro() {
+  const el = document.getElementById('bootIntro');
+  if (!el) return;
+  // If user disabled the boot intro, kill it immediately
+  try {
+    const s = JSON.parse(localStorage.getItem('claudeBridge.settings') || '{}');
+    if (s.bootIntro === false) { el.remove(); return; }
+  } catch {}
+  function dismiss() {
+    el.style.transition = 'opacity 0.25s var(--ease)';
+    el.style.opacity = '0';
+    el.style.pointerEvents = 'none';
+    setTimeout(() => { try { el.remove(); } catch (e) {} }, 280);
+  }
+  el.addEventListener('click', dismiss);
+  // CSS animation completes around 1.0s — clean up the node a tick after
+  setTimeout(() => { try { el.remove(); } catch (e) {} }, 1100);
+})();
 
 /* ───── Reference attachment (multi-image, paste-aware) ───── */
 const refBar = document.getElementById('refBar');
@@ -2582,20 +3380,43 @@ if (_autocutBtn) _autocutBtn.addEventListener('click', runAutoCut);
 
 // Update button — asks the bridge to pull the latest panel + bridge from GitHub
 const _updateBtn = document.getElementById('updateBtn');
+function showUpdateToast(text, kind) {
+  let toast = document.getElementById('updateToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'updateToast';
+    toast.className = 'update-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = text;
+  toast.className = 'update-toast show ' + (kind || '');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { toast.className = 'update-toast'; }, 3500);
+}
 if (_updateBtn) {
   _updateBtn.addEventListener('click', async () => {
     _updateBtn.disabled = true;
-    const origTitle = _updateBtn.title;
-    _updateBtn.title = 'Checking…';
+    _updateBtn.classList.add('spinning');
+    showUpdateToast('Checking for updates…', 'pending');
     try {
       const r = await fetch(BRIDGE + '/update', { method: 'POST' });
       const data = await r.json();
-      _updateBtn.title = data.ok ? 'Up to date — bridge may need restart if anything changed' : ('Update failed: ' + (data.error || ''));
-      // The bridge logs to its terminal. If index.html changed, live-reload fires automatically.
+      if (data.ok) {
+        if (data.updated && data.updated.length) {
+          let msg = 'Updated: ' + data.updated.join(', ');
+          if (data.bridgeChanged) msg += ' · restart the bridge to apply';
+          showUpdateToast(msg, 'ok');
+        } else {
+          showUpdateToast('Already up to date', 'ok');
+        }
+      } else {
+        showUpdateToast('Update failed' + (data.error ? ': ' + data.error : ''), 'fail');
+      }
     } catch (e) {
-      _updateBtn.title = 'Update failed: ' + e.message;
+      showUpdateToast('Update failed: ' + e.message, 'fail');
     } finally {
-      setTimeout(() => { _updateBtn.title = origTitle; _updateBtn.disabled = false; }, 4000);
+      _updateBtn.classList.remove('spinning');
+      _updateBtn.disabled = false;
     }
   });
 }
@@ -2724,6 +3545,12 @@ const STEP_DURATIONS = {
   'Running command':          5,
   'Installing dependencies':  90,
   'Rendering video':          45,
+  // Auto-cut pipeline stages
+  'Detecting silences':       10,
+  'Parsing silences':         1,
+  'Transcribing audio':       30,
+  'Analysing transcript':     12,
+  'Double-checking cuts':     6,
   'Tool':                     3,    // generic fallback
 };
 // Steps we still expect to come after the current one. If we're at "Rendering
@@ -2836,6 +3663,9 @@ function makeProgressUI(thinkingBody, estimateSeconds) {
   const timer = setInterval(tick, 200);
   tick();
 
+  // External driver — when the bridge knows the real percentage it pushes
+  // it via SSE and the bar honors that value instead of the asymptotic curve.
+  let externalPct = null;
   return {
     complete() {
       if (completed) return;
@@ -2845,6 +3675,11 @@ function makeProgressUI(thinkingBody, estimateSeconds) {
     },
     cleanup() { clearInterval(timer); },
     setStatus,
+    setPct(p) {
+      if (typeof p !== 'number' || completed) return;
+      externalPct = Math.max(0, Math.min(100, p));
+      fill.style.width = externalPct.toFixed(1) + '%';
+    },
   };
 }
 function addReceipt(msgWrap, result) {
@@ -2858,7 +3693,7 @@ function addReceipt(msgWrap, result) {
   if (!result.ok) {
     sub = escapeHTML(result.error || 'failed');
   } else if (result.placed) {
-    const verb = result.mode === 'overwrite' ? 'Overwrote' : (result.mode === 'overlay' ? 'Overlayed on' : 'Inserted on');
+    const verb = result.mode === 'overwrite' ? 'Overwrote' : (result.mode === 'overlay' ? 'Overlapped on' : 'Inserted on');
     const at = (typeof result.seconds === 'number') ? ' @ ' + result.seconds.toFixed(2) + 's' : '';
     sub = verb + ' ' + (result.track || '?') + at;
   } else {
@@ -2961,7 +3796,7 @@ function addRenderPreview(msgWrap, absPath, prompt) {
       let statusText = 'ready';
       if (result && result.ok) {
         if (result.placed) {
-          const verb = result.mode === 'overwrite' ? 'overwrote' : (result.mode === 'overlay' ? 'overlayed on' : 'inserted on');
+          const verb = result.mode === 'overwrite' ? 'overwrote' : (result.mode === 'overlay' ? 'overlapped on' : 'inserted on');
           const at = (typeof result.seconds === 'number') ? ' @ ' + result.seconds.toFixed(2) + 's' : '';
           statusText = 'imported · ' + verb + ' ' + (result.track || '?') + at;
         } else {
@@ -3043,20 +3878,9 @@ refreshStatus();
 // Slower polling — every 4s was hammering Premiere's ExtendScript engine.
 setInterval(refreshStatus, 15000);
 
-/* CEP wheel-scroll fallback: some Premiere versions/Chromium builds don't
-   route mouse wheel to scrollable children unless we intercept explicitly. */
-function attachWheelScroll(el) {
-  el.addEventListener('wheel', (e) => {
-    const max = el.scrollHeight - el.clientHeight;
-    if (max <= 0) return; // no overflow, let it bubble
-    const before = el.scrollTop;
-    const next = Math.max(0, Math.min(max, before + e.deltaY));
-    el.scrollTop = next;
-    if (next !== before) e.preventDefault();
-  }, { passive: false });
-}
-attachWheelScroll(log);
-attachWheelScroll(input);
+/* Native wheel scroll only — the previous manual handler bypassed browser
+   smoothing and produced jumpy scroll on modern CEP. Modern Premiere panels
+   route the wheel correctly without intervention. */
 
 /* ───── Send flow ───── */
 let activeChatAbort = null;
@@ -3451,8 +4275,26 @@ chipsContainer.addEventListener('click', (e) => {
 <!-- Dev-only live-reload (TEMPORARY). Remove this script when shipping. -->
 <script>
 (function(){
-  var BRIDGE_URL = 'http://127.0.0.1:3737/dev/reload-stream';
+  var BRIDGE_HOST = 'http://127.0.0.1:3737';
+  var BRIDGE_URL  = BRIDGE_HOST + '/dev/reload-stream';
   var es = null;
+
+  // Hot-reload host.jsx — read fresh from disk, re-eval in the ExtendScript engine.
+  function reloadHostJsx() {
+    if (!window.__adobe_cep__ || !window.__adobe_cep__.evalScript) return;
+    var fs = null;
+    try { fs = (typeof require === 'function') ? require('fs') : (window.cep_node && window.cep_node.require && window.cep_node.require('fs')); } catch (e) {}
+    if (!fs) return;
+    var dir = '';
+    try { dir = window.__adobe_cep__.getSystemPath ? window.__adobe_cep__.getSystemPath('extension') : ''; } catch (e) {}
+    if (!dir) return;
+    try {
+      var jsxPath = dir + '/jsx/host.jsx';
+      var code = fs.readFileSync(jsxPath, 'utf8');
+      window.__adobe_cep__.evalScript(code, function () {});
+    } catch (e) {}
+  }
+
   function connect() {
     try {
       es = new EventSource(BRIDGE_URL);
@@ -3460,15 +4302,45 @@ chipsContainer.addEventListener('click', (e) => {
         try { if (window.__adobe_cep__ && window.__adobe_cep__.invalidateContents) window.__adobe_cep__.invalidateContents(); } catch (e) {}
         location.reload();
       });
+      es.addEventListener('jsx-reload', function () { reloadHostJsx(); });
       es.onerror = function () {
         try { es.close(); } catch (e) {}
-        setTimeout(connect, 1500);
+        setTimeout(connect, 600);
       };
     } catch (e) {
-      setTimeout(connect, 2000);
+      setTimeout(connect, 800);
     }
   }
   connect();
+
+  // Fallback poll — SSE in CEP's older Chromium sometimes silently stalls.
+  // Every 3s, hash the panel index.html (size+mtime) via the Node fs and if
+  // it's changed since we loaded, force a reload. Costs ~nothing.
+  (function pollFallback() {
+    var fs = null, dir = '';
+    try { fs = (typeof require === 'function') ? require('fs') : (window.cep_node && window.cep_node.require && window.cep_node.require('fs')); } catch (e) {}
+    try { dir = window.__adobe_cep__ && window.__adobe_cep__.getSystemPath ? window.__adobe_cep__.getSystemPath('extension') : ''; } catch (e) {}
+    if (!fs || !dir) return;
+    var indexPath = dir + '/index.html';
+    var jsxPath   = dir + '/jsx/host.jsx';
+    var lastIndexKey = null, lastJsxKey = null;
+    try { var s = fs.statSync(indexPath); lastIndexKey = s.size + ':' + s.mtimeMs; } catch (e) {}
+    try { var s2 = fs.statSync(jsxPath);  lastJsxKey   = s2.size + ':' + s2.mtimeMs; } catch (e) {}
+    setInterval(function () {
+      try {
+        var s = fs.statSync(indexPath);
+        var k = s.size + ':' + s.mtimeMs;
+        if (lastIndexKey && k !== lastIndexKey) { location.reload(); return; }
+        lastIndexKey = k;
+      } catch (e) {}
+      try {
+        var s2 = fs.statSync(jsxPath);
+        var k2 = s2.size + ':' + s2.mtimeMs;
+        if (lastJsxKey && k2 !== lastJsxKey) { reloadHostJsx(); lastJsxKey = k2; }
+        else lastJsxKey = k2;
+      } catch (e) {}
+    }, 1500);
+  })();
 })();
 </script>
 </body>

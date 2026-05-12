@@ -2,6 +2,10 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
+var HOST_JSX_VERSION = "1.8";
+
+function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
+
 function _ccSafe(fn) {
     try { return fn(); } catch (e) { return null; }
 }
@@ -317,15 +321,14 @@ function ccGetSelectedClip() {
     }
 }
 
-// Apply a list of cuts to the currently selected timeline clip. Each cut is
-// { start, end } in seconds relative to the SOURCE media (not the timeline).
-// Strategy: razor at each cut boundary via QE (which is the only reliable
-// razor API across PPro versions), then locate the freshly-split segment
-// and ripple-delete it. Cuts run reverse-time so earlier indices don't shift.
+// Apply a list of cuts and TRUE ripple-delete the gaps (close them up).
+// Strategy: set seq.inPoint + seq.outPoint per cut, then call QE's extract()
+// which removes the in/out range across all tracks and slides everything
+// after it leftward to close the gap. Cuts in reverse-time order so the
+// timeline indices for earlier cuts don't drift.
 function ccApplyAutoCuts(cutsJson) {
     var debug = { steps: [] };
     function note(s) { debug.steps.push(String(s)); }
-    function pad2(n) { return n < 10 ? "0" + n : "" + n; }
 
     try {
         if (typeof app === "undefined" || !app || !app.project) {
@@ -338,39 +341,17 @@ function ccApplyAutoCuts(cutsJson) {
         try { cuts = JSON.parse(cutsJson); } catch (e) { return JSON.stringify({ ok: false, error: "bad cuts json", debug: debug }); }
         if (!cuts || !cuts.length) return JSON.stringify({ ok: false, error: "no cuts", debug: debug });
 
-        // Re-find the selected clip (premiere may have re-indexed since last call)
+        // Resolve where the selected clip sits, so source-relative cut times
+        // can be translated to timeline-relative seconds.
         var selRaw = ccGetSelectedClip();
         var sel = JSON.parse(selRaw);
         if (!sel.ok) return selRaw;
-        note("sel: name=" + sel.name + " track=" + sel.track + " start=" + sel.timelineStart);
+        note("sel: name=" + sel.name + " track=" + sel.track + " timelineStart=" + sel.timelineStart);
 
         var inPt = (typeof sel.inPoint === "number") ? sel.inPoint : 0;
         var timelineStart = (typeof sel.timelineStart === "number") ? sel.timelineStart : 0;
 
-        // Frame rate for timecode conversion. Premiere stores it in ticks/sec
-        // where 1 second = 254016000000 ticks.
-        var fps = 30;
-        try {
-            var settings = seq.getSettings && seq.getSettings();
-            if (settings && settings.videoFrameRate && settings.videoFrameRate.ticks) {
-                fps = 254016000000 / Number(settings.videoFrameRate.ticks);
-            }
-        } catch (e) { note("fps fallback: " + e); }
-        if (!fps || fps < 1 || fps > 240) fps = 30;
-        note("fps=" + fps.toFixed(3));
-
-        function tc(sec) {
-            // Build HH:MM:SS:FF — QE razor accepts this format on PPro 2018+.
-            if (sec < 0) sec = 0;
-            var totalFrames = Math.round(sec * fps);
-            var ff = Math.floor(totalFrames % fps);
-            var ss = Math.floor(totalFrames / fps) % 60;
-            var mm = Math.floor(totalFrames / (fps * 60)) % 60;
-            var hh = Math.floor(totalFrames / (fps * 3600));
-            return pad2(hh) + ":" + pad2(mm) + ":" + pad2(ss) + ":" + pad2(ff);
-        }
-
-        // Enable QE so razor() is available
+        // Enable QE — extract() lives there
         var qeSeq = null;
         try {
             if (typeof app.enableQE === "function") app.enableQE();
@@ -378,73 +359,103 @@ function ccApplyAutoCuts(cutsJson) {
                 qeSeq = qe.project.getActiveSequence ? qe.project.getActiveSequence() : null;
             }
         } catch (e) { note("enableQE error: " + e); }
-        if (!qeSeq) {
-            return JSON.stringify({ ok: false, error: "QE unavailable — Premiere build doesn't expose qe.project.getActiveSequence", debug: debug });
-        }
+        if (!qeSeq) return JSON.stringify({ ok: false, error: "QE unavailable", debug: debug });
         note("QE sequence loaded");
 
-        // Sort cuts descending so we operate on later cuts first
-        cuts.sort(function (a, b) { return b.start - a.start; });
+        // Save user's existing in/out so we can restore at the end
+        var origIn = null, origOut = null;
+        try { origIn = (seq.getInPoint && seq.getInPoint()) || null; } catch (e) {}
+        try { origOut = (seq.getOutPoint && seq.getOutPoint()) || null; } catch (e) {}
+
+        // Sort cuts ascending — apply chronologically, start → finish. Each
+        // ripple-delete shifts everything after it leftward by its duration,
+        // so we accumulate a running offset and subtract it from later cuts.
+        cuts.sort(function (a, b) { return a.start - b.start; });
 
         var applied = 0, failed = 0;
-        var trackList = (sel.trackKind === "audio") ? seq.audioTracks : seq.videoTracks;
-        if (!trackList) return JSON.stringify({ ok: false, error: "no track list", debug: debug });
-
+        var shiftOffset = 0;
         for (var i = 0; i < cuts.length; i++) {
             var c = cuts[i];
             if (typeof c.start !== "number" || typeof c.end !== "number") { failed++; continue; }
-            var tStart = timelineStart + (c.start - inPt);
-            var tEnd   = timelineStart + (c.end   - inPt);
-            note("cut[" + i + "] tStart=" + tStart.toFixed(3) + " tEnd=" + tEnd.toFixed(3) + " (" + tc(tStart) + " → " + tc(tEnd) + ")");
+            // Original timeline positions, then subtract the cumulative ripple
+            // shift from all previously-applied cuts.
+            var tStart = (timelineStart + (c.start - inPt)) - shiftOffset;
+            var tEnd   = (timelineStart + (c.end   - inPt)) - shiftOffset;
+            if (tEnd <= tStart) { failed++; continue; }
+            note("cut[" + i + "] " + tStart.toFixed(3) + " → " + tEnd.toFixed(3) + " (" + (tEnd - tStart).toFixed(2) + "s)  shift=" + shiftOffset.toFixed(2));
 
-            var razored = false;
-            try {
-                // QE razor — second arg true would razor only selected, false = all
-                qeSeq.razor(tc(tStart), false);
-                qeSeq.razor(tc(tEnd), false);
-                razored = true;
-            } catch (e) {
-                note("qe razor failed: " + e + " — trying per-track");
-                // Per-track fallback: each QE track has its own razor
+            // Set sequence in/out — try several signatures because the API
+            // varies (seconds vs Time vs Time-string vs ticks).
+            var inOk = false, outOk = false;
+            try { seq.setInPoint(tStart);  inOk  = true; } catch (e) { note("setInPoint(num) failed: " + e); }
+            try { seq.setOutPoint(tEnd);   outOk = true; } catch (e) { note("setOutPoint(num) failed: " + e); }
+            if (!inOk || !outOk) {
+                // Try with Time objects
                 try {
-                    var qeTrack = (sel.trackKind === "audio")
-                        ? qeSeq.getAudioTrackAt(sel.trackIdx)
-                        : qeSeq.getVideoTrackAt(sel.trackIdx);
-                    if (qeTrack && qeTrack.razor) {
-                        qeTrack.razor(tc(tStart));
-                        qeTrack.razor(tc(tEnd));
-                        razored = true;
-                    }
-                } catch (e2) { note("per-track razor failed: " + e2); }
+                    var inT = new Time(); inT.seconds = tStart;
+                    var outT = new Time(); outT.seconds = tEnd;
+                    if (!inOk  && seq.setInPointAsTime)  { seq.setInPointAsTime(inT);   inOk  = true; }
+                    if (!outOk && seq.setOutPointAsTime) { seq.setOutPointAsTime(outT); outOk = true; }
+                } catch (e2) { note("setIn/OutPointAsTime failed: " + e2); }
             }
-            if (!razored) { failed++; continue; }
+            if (!inOk || !outOk) { failed++; note("could not set in/out points"); continue; }
 
-            // Find the newly-cut segment on the original track and remove it
-            var track = trackList[sel.trackIdx];
-            var clips = track && track.clips;
-            if (!clips) { failed++; continue; }
-
-            var deleted = false;
-            for (var k = 0; k < clips.numItems; k++) {
-                var cc = clips[k];
-                var cs = _ccSafe(function () { return cc.start && cc.start.seconds; });
-                var ce = _ccSafe(function () { return cc.end && cc.end.seconds; });
-                if (typeof cs !== "number" || typeof ce !== "number") continue;
-                if (cs >= tStart - 0.08 && ce <= tEnd + 0.08 && (ce - cs) > 0.05) {
-                    try {
-                        if (cc.remove) {
-                            cc.remove(true, true); // ripple, alignToVideo
-                            deleted = true;
-                            break;
-                        }
-                    } catch (e3) { note("remove failed: " + e3); }
-                }
+            // Now extract — removes the in/out range across all tracks and ripples
+            var extracted = false;
+            try {
+                if (qeSeq.extract) { qeSeq.extract(); extracted = true; note("  qeSeq.extract() ok"); }
+            } catch (e3) { note("qeSeq.extract failed: " + e3); }
+            if (!extracted) {
+                // Fallback to seq.extract() if QE didn't have it
+                try { if (seq.extract) { seq.extract(); extracted = true; note("  seq.extract() ok"); } }
+                catch (e4) { note("seq.extract failed: " + e4); }
             }
-            if (deleted) applied++; else { failed++; note("cut[" + i + "] no segment found in range"); }
+            if (extracted) {
+                applied++;
+                shiftOffset += (tEnd - tStart);
+            } else {
+                failed++;
+            }
         }
+
+        // Restore original in/out so user's range isn't clobbered
+        try {
+            if (origIn && seq.setInPointAsTime) seq.setInPointAsTime(origIn);
+            else if (origIn && typeof origIn === "number" && seq.setInPoint) seq.setInPoint(origIn);
+        } catch (e) {}
+        try {
+            if (origOut && seq.setOutPointAsTime) seq.setOutPointAsTime(origOut);
+            else if (origOut && typeof origOut === "number" && seq.setOutPoint) seq.setOutPoint(origOut);
+        } catch (e) {}
+
         return JSON.stringify({ ok: true, applied: applied, failed: failed, debug: debug });
     } catch (e) {
         return JSON.stringify({ ok: false, error: String(e), debug: debug });
+    }
+}
+
+// Trigger Premiere's Edit > Undo N times. Cleanest way to reverse auto-cut
+// since each extract() pushes its own undo step; we just call undo once per
+// applied cut. Menu function id 101 is "Edit > Undo" across PPro versions.
+function ccUndo(count) {
+    try {
+        var n = parseInt(count, 10);
+        if (!n || n < 1) n = 1;
+        if (n > 200) n = 200; // safety cap
+
+        if (typeof app === "undefined" || !app) {
+            return JSON.stringify({ ok: false, error: "no app" });
+        }
+        if (typeof app.menuFunctionId !== "function") {
+            return JSON.stringify({ ok: false, error: "menuFunctionId unavailable in this Premiere version" });
+        }
+        var done = 0;
+        for (var i = 0; i < n; i++) {
+            try { app.menuFunctionId(101); done++; } catch (e) { break; }
+        }
+        return JSON.stringify({ ok: true, count: done });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e) });
     }
 }
 
