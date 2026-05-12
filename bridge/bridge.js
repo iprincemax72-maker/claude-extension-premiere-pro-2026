@@ -28,6 +28,10 @@ function broadcastReload() {
   }, 120);
 }
 
+// Track the currently-running autocut claude subprocess so /autocut-cancel
+// can kill it cleanly. null when no autocut is in flight.
+let _activeAutocut = null;
+
 // Resolve an absolute path to ffmpeg — falls back to bare 'ffmpeg' if no
 // absolute path is found. Needed because the bridge may be auto-spawned by
 // CEP with a minimal PATH that doesn't include brew bins.
@@ -167,8 +171,36 @@ function transcriptAnalyse(clipPath, clipDuration, silenceCuts) {
     let stderr = '';
     let lineBuf = '';
     let finalReply = '';
+    let didResolve = false;
+
+    // Stash this proc as the active autocut so a cancel call can kill it
+    _activeAutocut = proc;
 
     proc.stderr.on('data', d => stderr += d);
+
+    // Hard timeout — Claude can hang on a stuck transcription tool. Kill the
+    // subprocess after 3 minutes and fall back to silence-only cuts.
+    const HARD_TIMEOUT_MS = 3 * 60 * 1000;
+    const killer = setTimeout(() => {
+      if (didResolve) return;
+      console.log('  [autocut] hard timeout — killing claude after ' + (HARD_TIMEOUT_MS/1000) + 's');
+      try { proc.kill('SIGKILL'); } catch {}
+      didResolve = true;
+      _activeAutocut = null;
+      resolve({ cuts: silenceCuts, transcribed: false, summary: 'Transcript timed out (3 min) — silence-only.' });
+    }, HARD_TIMEOUT_MS);
+
+    // Idle watchdog — if no stream-json event has arrived in 60s, claude is
+    // either hung or waiting on a tool that won't return. Kill it.
+    let lastActivity = Date.now();
+    const IDLE_TIMEOUT_MS = 90 * 1000;
+    const idleCheck = setInterval(() => {
+      if (didResolve) { clearInterval(idleCheck); return; }
+      if (Date.now() - lastActivity > IDLE_TIMEOUT_MS) {
+        console.log('  [autocut] idle ' + Math.round((Date.now() - lastActivity)/1000) + 's — killing claude');
+        try { proc.kill('SIGKILL'); } catch {}
+      }
+    }, 15000);
 
     // Step inside the 18-92% transcript-stage budget — each tool call bumps
     // the bar by a fixed amount, capped at 90% so we don't pretend to be done.
@@ -184,6 +216,7 @@ function transcriptAnalyse(clipPath, clipDuration, silenceCuts) {
     };
 
     proc.stdout.on('data', chunk => {
+      lastActivity = Date.now();
       lineBuf += chunk.toString();
       let nl;
       while ((nl = lineBuf.indexOf('\n')) >= 0) {
@@ -204,10 +237,14 @@ function transcriptAnalyse(clipPath, clipDuration, silenceCuts) {
     });
 
     proc.on('error', () => {
+      if (didResolve) return; didResolve = true;
+      clearTimeout(killer); clearInterval(idleCheck); _activeAutocut = null;
       resolve({ cuts: silenceCuts, transcribed: false, summary: 'Claude CLI unavailable — silence-only.' });
     });
 
     proc.on('close', () => {
+      if (didResolve) return;
+      clearTimeout(killer); clearInterval(idleCheck); _activeAutocut = null;
       // Parse Claude's reply as JSON. Tolerant: strict → code-fenced → first {…} block.
       let parsed = null;
       const reply = (finalReply || '').trim();
@@ -236,9 +273,11 @@ function transcriptAnalyse(clipPath, clipDuration, silenceCuts) {
       }
       if (!parsed || !Array.isArray(parsed.cuts)) {
         console.log('  [autocut] JSON parse failed — falling back to silence-only');
+        didResolve = true;
         resolve({ cuts: silenceCuts, transcribed: false, summary: 'Transcript step failed — silence-only.' });
         return;
       }
+      didResolve = true;
       // Sanitize cuts
       const safeClipDur = (typeof clipDuration === 'number' && clipDuration > 0) ? clipDuration : Number.MAX_SAFE_INTEGER;
       const cuts = parsed.cuts
@@ -908,6 +947,19 @@ const server = http.createServer((req, res) => {
   //    finds filler words / false starts / repeated takes
   // 3. Claude double-checks the proposed cuts against the transcript before
   //    returning the final list
+  // Cancel an in-flight autocut — kill the claude subprocess
+  if (req.method === 'POST' && req.url === '/autocut-cancel') {
+    let killed = false;
+    if (_activeAutocut) {
+      try { _activeAutocut.kill('SIGKILL'); killed = true; } catch {}
+      _activeAutocut = null;
+      broadcastProgressDone();
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, killed }));
+    return;
+  }
+
   if (req.method === 'POST' && req.url === '/autocut') {
     let body = '';
     req.on('data', c => body += c);
