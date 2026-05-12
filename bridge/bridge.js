@@ -87,9 +87,230 @@ function detectSilences(clipPath, clipDuration, onProgress) {
   });
 }
 
-// Ask Claude to transcribe the audio + analyse the transcript for filler
-// words, false starts, repeats. Combine with the pre-computed silence cuts.
-// Returns { cuts: [...], transcribed: bool, summary: string }.
+// Resolve whisper-cli binary + ggml model path. Both must exist for transcript
+// mode to work. Falls through several known locations.
+function resolveWhisper() {
+  const binCandidates  = ['/opt/homebrew/bin/whisper-cli', '/usr/local/bin/whisper-cli'];
+  const modelCandidates = [
+    '/opt/homebrew/share/whisper-cpp/ggml-base.bin',
+    '/usr/local/share/whisper-cpp/ggml-base.bin',
+    path.join(os.homedir(), '.cache/whisper/ggml-base.bin'),
+  ];
+  let bin = null, model = null;
+  for (const p of binCandidates)   { try { if (fs.existsSync(p)) { bin = p; break; } } catch {} }
+  for (const p of modelCandidates) { try { if (fs.existsSync(p)) { model = p; break; } } catch {} }
+  return { bin, model };
+}
+
+// Extract clip audio to a 16kHz mono WAV (whisper's preferred input), trimmed
+// to [inP, outP] of the source. Returns path to the temp wav.
+function extractAudioForWhisper(clipPath, inP, outP) {
+  return new Promise((resolve, reject) => {
+    const outPath = path.join(OUTPUT_DIR, '_autocut_audio_' + Date.now() + '.wav');
+    const args = [
+      '-y', '-ss', String(inP), '-to', String(outP),
+      '-i', clipPath,
+      '-ac', '1', '-ar', '16000',
+      outPath,
+    ];
+    const ff = spawn(FFMPEG_BIN, args);
+    let stderr = '';
+    ff.stderr.on('data', d => stderr += d.toString().slice(-2000));
+    const killer = setTimeout(() => { try { ff.kill('SIGKILL'); } catch {} reject(new Error('audio extract timeout')); }, 90000);
+    ff.on('error', e => { clearTimeout(killer); reject(e); });
+    ff.on('close', code => {
+      clearTimeout(killer);
+      if (code === 0 && fs.existsSync(outPath)) resolve(outPath);
+      else reject(new Error('ffmpeg extract exit ' + code + ': ' + stderr.slice(-300)));
+    });
+  });
+}
+
+// Run whisper-cli on a wav. Returns array of word-level segments:
+//   [{ start: 0.0, end: 0.5, text: "Hello" }, ...]
+// Hard timeout scales with clip duration (allow ~1s per second of audio + 30s).
+function runWhisper(wavPath, audioDuration) {
+  return new Promise((resolve, reject) => {
+    const { bin, model } = resolveWhisper();
+    if (!bin || !model) return reject(new Error('whisper-cli or model not installed'));
+
+    const outBase = wavPath.replace(/\.wav$/, '');
+    const args = [
+      '-m', model,
+      '-f', wavPath,
+      '-oj',           // JSON output
+      '-sow',          // split on word
+      '-ml', '1',      // max 1 segment per line — gives word-level timing
+      '-of', outBase,
+      '-t', '4',       // threads
+      '-pp',           // print progress
+      '-nt',           // no timestamps in stdout (we read JSON)
+    ];
+
+    const proc = spawn(bin, args);
+    let stderr = '';
+    proc.stderr.on('data', d => stderr += d.toString().slice(-2000));
+    proc.stdout.on('data', () => {}); // drain so it doesn't block
+
+    const cap = Math.min(15 * 60 * 1000, Math.max(60000, audioDuration * 1500 + 30000));
+    const killer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} reject(new Error('whisper timeout after ' + Math.round(cap/1000) + 's')); }, cap);
+
+    proc.on('error', e => { clearTimeout(killer); reject(e); });
+    proc.on('close', code => {
+      clearTimeout(killer);
+      const jsonPath = outBase + '.json';
+      if (code !== 0 || !fs.existsSync(jsonPath)) {
+        reject(new Error('whisper exit ' + code + ': ' + stderr.slice(-300)));
+        return;
+      }
+      try {
+        const j = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+        const segs = (j.transcription || []).map(s => {
+          // whisper-cli timestamps are in milliseconds inside `offsets`
+          const start = s.offsets && typeof s.offsets.from === 'number' ? s.offsets.from / 1000 : 0;
+          const end   = s.offsets && typeof s.offsets.to   === 'number' ? s.offsets.to   / 1000 : 0;
+          return { start, end, text: (s.text || '').trim() };
+        }).filter(s => s.text);
+        // Cleanup
+        try { fs.unlinkSync(jsonPath); } catch {}
+        try { fs.unlinkSync(wavPath);  } catch {}
+        resolve(segs);
+      } catch (e) {
+        reject(new Error('whisper json parse: ' + e.message));
+      }
+    });
+  });
+}
+
+// Ask Claude (small, fast call) to scan the transcript for fillers + false
+// starts. Claude doesn't need any tools — just reads text, returns JSON. So
+// no hanging on tool I/O. 60s hard cap. Used only when useTranscript is true.
+function analyseTranscriptWithClaude(transcript) {
+  return new Promise(resolve => {
+    if (!transcript || !transcript.length) return resolve({ cuts: [], summary: 'transcript empty' });
+
+    const transcriptText = transcript.map(s =>
+      '[' + s.start.toFixed(2) + '-' + s.end.toFixed(2) + '] ' + s.text
+    ).join('\n');
+
+    const userMsg = [
+      'Here is a word-level transcript of a talking-head clip. Each line is one word with its start-end in seconds.',
+      '',
+      transcriptText.slice(0, 12000), // cap so prompt stays small
+      '',
+      'Find UNWANTED spans I should cut out:',
+      '- FILLER words: "um", "uh", "like" (only as filler — not "like a cat"), "you know", "I mean", "sorta", "kinda", redundant "actually"/"basically".',
+      '- FALSE STARTS: speaker starts a phrase, stops, restarts. Cut the broken first attempt; keep the better take.',
+      '- SELF-CORRECTIONS: "I went— I came back." — cut the wrong half.',
+      '',
+      'For each cut, use the timestamps from the transcript. Be conservative — when unsure, skip.',
+      '',
+      'Output EXACTLY this JSON, nothing else (no prose, no fences, no commentary):',
+      '{"cuts":[{"start":2.30,"end":3.10,"kind":"filler","reason":"um"}],"summary":"Found 3 fillers and 1 false start."}',
+      '',
+      '"kind" must be: filler | false_start | mistake. start and end are seconds.',
+    ].join('\n');
+
+    const sysPrompt = 'You are an audio editing assistant. Return ONLY valid JSON. No tool use needed — just read the transcript and emit cut ranges.';
+
+    const args = [
+      '-p',
+      '--output-format', 'json',
+      '--permission-mode', 'bypassPermissions',
+      '--append-system-prompt', sysPrompt,
+      '--no-session-persistence',
+      userMsg,
+    ];
+
+    const proc = spawn('claude', args, { cwd: WORK_DIR, env: process.env });
+    let stdoutBuf = '';
+    proc.stdout.on('data', d => stdoutBuf += d.toString());
+    let stderrBuf = '';
+    proc.stderr.on('data', d => stderrBuf += d.toString());
+
+    let done = false;
+    const finish = (result) => { if (done) return; done = true; clearTimeout(killer); resolve(result); };
+    const killer = setTimeout(() => {
+      try { proc.kill('SIGKILL'); } catch {}
+      finish({ cuts: [], summary: 'analysis timed out (60s)' });
+    }, 60000);
+
+    proc.on('error', () => finish({ cuts: [], summary: 'claude unavailable' }));
+    proc.on('close', () => {
+      // Claude's json output mode wraps the assistant text in a top-level "result" field
+      let result = null;
+      try { const j = JSON.parse(stdoutBuf); result = j.result || j.text; } catch {}
+      if (!result) return finish({ cuts: [], summary: null });
+      let parsed = null;
+      try { parsed = JSON.parse(result); } catch {}
+      if (!parsed) {
+        const m = result.match(/\{[\s\S]*\}/);
+        if (m) { try { parsed = JSON.parse(m[0]); } catch {} }
+      }
+      if (!parsed || !Array.isArray(parsed.cuts)) return finish({ cuts: [], summary: null });
+      finish(parsed);
+    });
+  });
+}
+
+// Master transcript path — local whisper + claude analyze. Replaces the old
+// "Claude does everything" implementation that hung forever.
+async function transcriptCutsLocal(clipPath, clipDuration, clipIn, clipOut, silenceCuts) {
+  const audioDur = (clipOut - clipIn) || clipDuration || 60;
+  // 1. Extract audio chunk
+  broadcastProgress('Extracting audio', 20);
+  let wavPath;
+  try { wavPath = await extractAudioForWhisper(clipPath, clipIn, clipOut); }
+  catch (e) { console.log('  [autocut] audio extract failed: ' + e.message); return { cuts: silenceCuts, transcribed: false, summary: null }; }
+
+  // 2. Whisper transcribe
+  broadcastProgress('Transcribing (whisper)', 35);
+  let transcript;
+  try { transcript = await runWhisper(wavPath, audioDur); }
+  catch (e) {
+    console.log('  [autocut] whisper failed: ' + e.message);
+    try { fs.unlinkSync(wavPath); } catch {}
+    return { cuts: silenceCuts, transcribed: false, summary: null };
+  }
+  console.log('  [autocut] whisper transcribed ' + transcript.length + ' segments');
+
+  // 3. Claude analyses the transcript (no tool use — just text in, JSON out)
+  broadcastProgress('Finding fillers', 70);
+  const analysis = await analyseTranscriptWithClaude(transcript);
+  console.log('  [autocut] claude found ' + analysis.cuts.length + ' filler/false-start cuts');
+
+  // 4. Translate Claude's cuts (which are relative to clip start) back to
+  //    source-time, then merge with silence cuts.
+  const fillerCuts = analysis.cuts
+    .filter(c => typeof c.start === 'number' && typeof c.end === 'number' && c.end > c.start)
+    .map(c => ({
+      start: c.start + clipIn,   // whisper saw [clipIn, clipOut] audio, so 0 in transcript = clipIn in source
+      end:   c.end   + clipIn,
+      kind:  c.kind || 'filler',
+      reason: c.reason || c.kind || 'cut',
+    }));
+
+  // Merge silence + filler, sort by start. Drop overlaps (silence wins).
+  const merged = silenceCuts.concat(fillerCuts).sort((a, b) => a.start - b.start);
+  const deduped = [];
+  for (const c of merged) {
+    const last = deduped[deduped.length - 1];
+    if (last && c.start < last.end - 0.05) {
+      // overlap — extend last to cover
+      last.end = Math.max(last.end, c.end);
+    } else {
+      deduped.push({ ...c });
+    }
+  }
+
+  return {
+    cuts: deduped,
+    transcribed: true,
+    summary: analysis.summary ? (analysis.summary + ' + ' + silenceCuts.length + ' pauses.') : null,
+  };
+}
+
+// (legacy claude-does-everything path below — kept for fallback if needed)
 function transcriptAnalyse(clipPath, clipDuration, silenceCuts) {
   return new Promise(resolve => {
     const silenceJson = JSON.stringify(silenceCuts.map(c => ({
@@ -972,9 +1193,10 @@ const server = http.createServer((req, res) => {
           : 'No pauses detected.';
 
         if (useTranscript) {
-          // Opt-in transcript pass — Claude analyses for fillers / false starts
-          broadcastProgress('Transcribing audio', 25);
-          const analysisResult = await transcriptAnalyse(clipPath, clipDuration, silenceCuts);
+          // New local-whisper pipeline: bridge runs ffmpeg → whisper-cli →
+          // claude (analysis only, no tools). Hard timeouts at every step
+          // so it can't hang the way the old "claude does everything" path did.
+          const analysisResult = await transcriptCutsLocal(clipPath, clipDuration, inP, outP, silenceCuts);
           if (analysisResult.cuts && analysisResult.cuts.length) {
             finalCuts = analysisResult.cuts;
             transcribed = !!analysisResult.transcribed;
