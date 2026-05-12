@@ -28,6 +28,54 @@ function broadcastReload() {
   }, 120);
 }
 
+// Auto-transcode files Premiere Pro refuses (webm, vp8, vp9) to MP4 H.264.
+// Returns a path Premiere can definitely import. If the input is already an
+// MP4/MOV/PNG/GIF/JPG it's returned as-is (no work). Failed transcodes return
+// the original path so the user at least sees the original file.
+const PREMIERE_IMPORTABLE_EXTS = new Set([
+  '.mp4', '.mov', '.m4v', '.avi', '.mkv', '.mxf', '.mts',
+  '.png', '.jpg', '.jpeg', '.tif', '.tiff', '.gif', '.webp',
+  '.wav', '.mp3', '.aac', '.m4a',
+]);
+function ensurePremiereImportable(absPath) {
+  return new Promise(resolve => {
+    try {
+      if (!absPath || !fs.existsSync(absPath)) { resolve(absPath); return; }
+      const ext = path.extname(absPath).toLowerCase();
+      if (PREMIERE_IMPORTABLE_EXTS.has(ext)) { resolve(absPath); return; }
+      // Anything else — transcode to mp4
+      const outPath = absPath.replace(/\.[^.]+$/, '') + '.mp4';
+      broadcastProgress('Transcoding to mp4 (Premiere-compatible)');
+      console.log('  transcoding ' + path.basename(absPath) + ' → ' + path.basename(outPath));
+      const ff = spawn('ffmpeg', [
+        '-y', '-i', absPath,
+        '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+        '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac', '-b:a', '192k',
+        '-movflags', '+faststart',
+        outPath,
+      ]);
+      let stderrBuf = '';
+      ff.stderr.on('data', d => stderrBuf += d.toString().slice(-2000));
+      ff.on('error', e => {
+        console.error('  ffmpeg spawn failed:', e.message);
+        resolve(absPath);
+      });
+      ff.on('close', code => {
+        if (code === 0 && fs.existsSync(outPath)) {
+          console.log('  transcoded → ' + outPath);
+          resolve(outPath);
+        } else {
+          console.error('  ffmpeg exit ' + code + '\n' + stderrBuf.slice(-500));
+          resolve(absPath);
+        }
+      });
+    } catch (e) {
+      resolve(absPath);
+    }
+  });
+}
+
 // Real-time progress — bridge parses Claude's stream-json events and pushes
 // human-readable status lines ("Writing component", "Rendering frames", etc.)
 // over SSE so the panel can display what's actually happening.
@@ -181,7 +229,15 @@ Each user message may be prefixed with a [PREMIERE CONTEXT] block describing the
 
 When the user asks for motion graphics, intros, outros, lower thirds, transitions, animated logos, kinetic typography, callouts, countdowns, or any other rendered video element, you MUST:
 1. Build and render the result with the Remotion framework. If \`remotion-video-skill\` or \`remotion-best-practices\` skills are installed, use them — they have battle-tested patterns. If not, write Remotion code directly using your training knowledge (it's a React-based video framework: components, useCurrentFrame(), interpolate(), AbsoluteFill, Composition).
-2. Render the final file into ${OUTPUT_DIR} as MP4 (or PNG/GIF when more appropriate).
+2. Render the final file into ${OUTPUT_DIR}.
+
+OUTPUT FORMAT REQUIREMENTS (critical — Premiere can't import some formats):
+- For motion video → MP4 with H.264 codec. NEVER WebM, NEVER VP8/VP9 — Premiere Pro refuses these.
+- For looping animation with transparency → MOV with ProRes 4444 (alpha-capable) or animated PNG.
+- For still images → PNG.
+- The Remotion CLI flag is \`--codec h264\` for MP4 and \`--codec prores --prores-profile 4444\` for transparent MOV. Always pass an explicit \`--codec\` so it doesn't default to webm.
+- File extensions MUST match codec: h264 → .mp4, prores → .mov, png → .png. The panel parses the extension to decide how to import.
+
 3. Emit the import marker so the panel auto-imports it.
 
 AUDIO POLICY — NEVER include audio in rendered output. The user is a video editor who handles their own audio in Premiere; renders that ship with audio (especially loud auto-generated SFX or music) are unwanted and can damage hearing.
@@ -563,13 +619,25 @@ const server = http.createServer((req, res) => {
           return;
         }
         const reply = (finalReply || '').trim() || '(no response)';
-        const imports = [];
+        const rawImports = [];
         const re = /\[\[IMPORT:([^\]]+)\]\]/g;
         let m;
-        while ((m = re.exec(reply)) !== null) imports.push(m[1].trim());
+        while ((m = re.exec(reply)) !== null) rawImports.push(m[1].trim());
         console.log('< ' + String(reply).slice(0, 80));
-        if (imports.length) console.log('  imports: ' + imports.join(', '));
-        sendOk({ reply, imports });
+        if (rawImports.length) console.log('  imports: ' + rawImports.join(', '));
+
+        // Safety net — Premiere can't import .webm. Auto-transcode to .mp4
+        // (H.264 + AAC) before handing the path to the panel. Same for any
+        // other format Premiere refuses; we transcode all of them through here.
+        Promise.all(rawImports.map(p => ensurePremiereImportable(p)))
+          .then(safePaths => {
+            const imports = safePaths.filter(Boolean);
+            sendOk({ reply, imports });
+          })
+          .catch(err => {
+            console.error('transcode error:', err.message);
+            sendOk({ reply, imports: rawImports });
+          });
       });
     });
     return;
