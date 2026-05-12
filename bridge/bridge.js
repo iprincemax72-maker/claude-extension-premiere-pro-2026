@@ -28,12 +28,25 @@ function broadcastReload() {
   }, 120);
 }
 
+// Resolve an absolute path to ffmpeg — falls back to bare 'ffmpeg' if no
+// absolute path is found. Needed because the bridge may be auto-spawned by
+// CEP with a minimal PATH that doesn't include brew bins.
+function resolveFFmpeg() {
+  const candidates = ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/opt/local/bin/ffmpeg', '/usr/bin/ffmpeg', 'C:\\\\ffmpeg\\\\bin\\\\ffmpeg.exe'];
+  for (const p of candidates) {
+    try { if (fs.existsSync(p)) return p; } catch {}
+  }
+  return 'ffmpeg';
+}
+const FFMPEG_BIN = resolveFFmpeg();
+console.log('ffmpeg bin: ' + FFMPEG_BIN);
+
 // Run ffmpeg silencedetect and return parsed pause ranges.
 // `onProgress(0..1)` fires as ffmpeg's "time=" reports advance through the clip.
 function detectSilences(clipPath, clipDuration, onProgress) {
   return new Promise((resolve, reject) => {
     const args = ['-i', clipPath, '-af', 'silencedetect=noise=-30dB:d=0.6', '-f', 'null', '-'];
-    const ff = spawn('ffmpeg', args);
+    const ff = spawn(FFMPEG_BIN, args);
     let stderr = '';
     const timeRe = /time=([\d:.]+)/g;
     ff.stderr.on('data', d => {
@@ -265,7 +278,7 @@ function ensurePremiereImportable(absPath) {
       const outPath = absPath.replace(/\.[^.]+$/, '') + '.mp4';
       broadcastProgress('Transcoding to mp4 (Premiere-compatible)');
       console.log('  transcoding ' + path.basename(absPath) + ' → ' + path.basename(outPath));
-      const ff = spawn('ffmpeg', [
+      const ff = spawn(FFMPEG_BIN, [
         '-y', '-i', absPath,
         '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
         '-pix_fmt', 'yuv420p',

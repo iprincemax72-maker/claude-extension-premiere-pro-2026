@@ -1,40 +1,38 @@
-# CLAUDE.md — Agent install + operation guide
+# CLAUDE.md — Single source of truth (v2.5)
 
-> Hi Claude. The user wants you to install or work on **Claude Extension Premiere Pro 2026**. This file tells you exactly what to do, in order, with verification steps. Read it end-to-end before acting.
-
----
-
-## What this project is (in 30 seconds)
-
-A CEP panel that lets the user chat with Claude inside Adobe Premiere Pro and have AI-generated motion graphics (rendered via the Remotion skill) drop straight onto their timeline.
-
-```
-Premiere CEP Panel  ─HTTP─►  Local Node bridge  ─spawn─►  claude CLI
-   (UI + ExtendScript)        (localhost:3737)            (subscription)
-```
-
-Three parts:
-- **Panel** at `extension/com.claudebridge.panel/` — HTML/CSS/JS UI + `host.jsx` (ExtendScript for timeline operations)
-- **Bridge** at `bridge/bridge.js` — small Node HTTP server that spawns `claude -p` for each request
-- **Launchers** at `bridge/start.command` (macOS) and `bridge/start.bat` (Windows)
-
-The user runs on a **Claude Code subscription, not API key**. The bridge invokes the `claude` CLI as a subprocess so every call uses the user's existing OAuth-authenticated session. Do **not** suggest API-key paths unless the user explicitly asks.
+> Hi Claude. This is **Claude Extension Premiere Pro 2026** — a CEP panel that brings Claude inside Adobe Premiere Pro for AI-generated motion graphics + AI-powered video editing (auto-cut). The user runs on a **Claude Code subscription**, not an API key.
+>
+> Read this end-to-end before doing anything. It covers install, every feature, the architecture, every hard-won quirk, and the failure modes.
 
 ---
 
-## INSTALL — for AI agents (one prompt, end-to-end)
+## 30-second elevator pitch
 
-> **If you are an AI agent installing this for the user, follow this section literally. Do every step. Do not skip verification.** If a step fails, do the troubleshooting in that step before moving on. Do NOT improvise — every command here is here for a reason.
+A CEP panel docked in Premiere Pro 2024+ that does two main things:
 
-### Prerequisites the user must already have
+1. **Generate motion graphics from natural language** — chat with Claude, it writes a Remotion composition, renders an MP4, and the panel offers to drop it on your timeline.
+2. **Auto-cut talking-head clips** — point at a selected clip, the panel runs ffmpeg silencedetect + asks Claude to transcribe and find filler words / false starts, then ripple-deletes the cuts.
 
-- Adobe Premiere Pro 2024 or newer (panel targets 23+, tested on Premiere Pro 2026)
-- Internet connection (to install Node, Claude CLI, ffmpeg, and Remotion's npm deps on first render)
-- A Claude.ai paid plan (Pro or Max) — the bridge spawns the `claude` CLI and uses the user's existing OAuth session, NOT an API key
+Plus 60+ suggestion chips, settings panel with themes & accents, prompt expand, history, references, real-time progress, and an auto-spawning local bridge that never asks the user to open a terminal.
 
-If the user does NOT have Premiere installed yet, stop and tell them to install it first.
+```
+Premiere CEP Panel  ─HTTP─►  Local Node bridge  ─spawns─►  claude CLI (your subscription)
+   (UI + ExtendScript)        (localhost:3737)             ─spawns─►  ffmpeg (silence, transcode)
+   index.html + host.jsx                                   ─spawns─►  Remotion (motion graphics)
+```
 
-### Step 1. Clone the repo
+---
+
+## INSTALL — one-prompt agent playbook
+
+Prereqs the user must have:
+- Adobe Premiere Pro 2024 or newer (tested on Premiere Pro 2026)
+- Internet for first install
+- A Claude Code Pro or Max plan (the bridge spawns the `claude` CLI; no API key)
+
+**If you are an agent installing this on a fresh machine, follow these steps literally.**
+
+### Step 1 — Clone
 
 ```bash
 # macOS
@@ -48,12 +46,11 @@ cd $HOME ; git clone https://github.com/iprincemax72-maker/claude-extension-prem
 cd claude-extension-premiere-pro-2026
 ```
 
-If `git` is missing on Windows: `winget install -e --id Git.Git` and open a new shell.
-If on macOS: `xcode-select --install` (Apple's built-in dev tools include git).
+If git is missing: `winget install -e --id Git.Git` (Win) or `xcode-select --install` (Mac), then open a fresh shell.
 
-### Step 2. Run the auto-installer
+### Step 2 — Run the installer
 
-The installer will auto-install Node.js, Claude CLI, and ffmpeg if any are missing.
+**Tell the user to close Premiere Pro first.**
 
 ```bash
 # macOS
@@ -61,172 +58,267 @@ bash install.sh
 ```
 
 ```powershell
-# Windows — IMPORTANT: must be run with the bypass flag, otherwise PowerShell blocks it
+# Windows — must include the bypass flag
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-The installer is **idempotent** — safe to re-run if anything went sideways.
+Installer auto-installs **Node LTS**, **Claude Code CLI**, **ffmpeg**, copies the panel, drops the bridge into `~/PremiereClaude/`, pre-scaffolds a Remotion project + runs `npm install` (2–4 min), and places a Desktop launcher. Idempotent.
 
-### Step 3. Verify the bridge runs
+### Step 3 — Log into Claude (manual, you can't do this for the user)
 
-After the installer finishes, the user has a `Claude Bridge.command` (macOS) or `Claude Bridge.bat` (Windows) on their Desktop. Tell them to double-click it. A terminal window will pop up showing `Claude Bridge listening on port 3737`.
-
-Then verify from your AI shell:
-
-```bash
-# both OSes
-curl -s http://127.0.0.1:3737/ping
-# Expected output: {"ok":true,"session":"<uuid>","outputDir":"..."}
-```
-
-If `curl` returns nothing or "connection refused", the bridge isn't running. Common causes:
-- The user closed the terminal window — tell them to re-launch the desktop file
-- Port 3737 is in use — `lsof -ti tcp:3737 | xargs kill -9` (macOS) or `Get-NetTCPConnection -LocalPort 3737 | %{ Stop-Process -Id $_.OwningProcess -Force }` (Windows)
-
-### Step 4. Verify Claude CLI is authenticated
-
-```bash
-claude /doctor
-```
-
-Look for "logged in" / "authenticated" / "account:" in the output. If not authenticated:
+If the installer warns *"Claude CLI may not be logged in"*:
 
 ```bash
 claude /login
 ```
 
-This opens a browser tab; user clicks Allow. After they're back in the terminal, run `claude /doctor` again to confirm.
+Browser opens; user clicks Allow.
 
-### Step 5. Verify the panel loads in Premiere
+### Step 4 — Verify
 
 Tell the user to:
-1. Open Adobe Premiere Pro
-2. Window menu → Extensions → **Claude**
+1. Open Premiere Pro
+2. Window → Extensions → **Claude**
+3. The panel's status pill should go green within 1–2 seconds (bridge auto-spawns)
+4. Smoke test: type `Generate a 3 second logo intro that says HELLO in white on dark blue` and hit ↵
 
-If "Claude" doesn't appear in Extensions:
-- The user must restart Premiere completely (not just close the project)
-- If still missing, the panel folder didn't copy correctly. Re-run the installer.
+First render finishes in ~60s (Remotion is pre-installed, so `npm install` doesn't happen at render time).
 
-If the panel opens but says "Bridge offline" or the status pill is red:
-- The bridge isn't running. See Step 3.
+### Common install failures
 
-### Step 6. Smoke test
+| Symptom | Fix |
+|---|---|
+| Status pill stays red after panel opens | Bridge auto-spawn failed. Open `~/PremiereClaude/bridge.log` and check. Worst case: double-click `Claude Bridge.command` on the Desktop. |
+| `claude` not on PATH | Open a new shell, re-run installer. On Windows verify `npm config get prefix` is in PATH. |
+| Render fails with "ffmpeg not found" | `brew install ffmpeg` (Mac) or `winget install -e --id Gyan.FFmpeg` (Win) |
+| Panel doesn't appear in Window menu | `PlayerDebugMode` didn't apply or panel folder didn't copy. Re-run installer. |
+| First render takes 5+ minutes | Remotion's `npm install` ran at render time. Check `~/PremiereClaude/remotion-intro/node_modules/remotion` exists. If not: `cd ~/PremiereClaude/remotion-intro && npm install`. |
+| "5-hour usage limit reached" | User burned through Claude Code plan quota. Wait or upgrade plan. |
 
-Tell the user to type into the panel: `Generate a 3 second logo intro that says HELLO in white on dark blue`
+---
 
-The pre-scaffolded Remotion project means first render is ~60s, not 3–5 min. If `~/PremiereClaude/remotion-intro/node_modules/remotion` doesn't exist (installer's npm install failed), the first render falls back to installing — that's when you'd see 3–5 min.
+## ARCHITECTURE
 
-### Optional: Remotion best-practice skills
+### Three components
 
-If the user wants higher-quality Remotion output, you can install community skills like `remotion-video-skill` and `remotion-best-practices`. The bridge's system prompt tells Claude to use them if available, and falls back to direct Remotion code (from training knowledge) if not. **Plain installs work fine without these skills.**
+```
+extension/com.claudebridge.panel/
+  index.html         # Entire UI: HTML + inline CSS + inline JS (~95k lines)
+  CSXS/manifest.xml  # CEP manifest, hosts PPRO 23+
+  jsx/host.jsx       # ExtendScript bridge between panel JS and Premiere
 
-### Common install failures and fixes
+bridge/
+  bridge.js                # Node HTTP server on localhost:3737
+  start.command            # macOS Desktop launcher (backup; auto-spawn is primary)
+  start.bat                # Windows Desktop launcher (backup)
+  remotion-template/       # Pre-scaffolded Remotion project the installer copies
+    package.json           # to ~/PremiereClaude/remotion-intro/ + runs npm install
+    src/Root.tsx           # Claude adds new compositions to src/ and registers
+    src/HelloWorld.tsx     # them in Root.tsx
+    src/index.ts
+    tsconfig.json
+    remotion.config.ts
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `node` not found after install | New PATH not loaded | Open a fresh shell and re-run installer |
-| `claude` not found after install | Same — npm global bin not on PATH | Open fresh shell. On Windows, also try: `npm config get prefix` and ensure that path is in PATH |
-| Installer says winget/brew missing | OS package manager not installed | Win: install App Installer from MS Store. Mac: install Homebrew at https://brew.sh |
-| Panel doesn't show in Premiere | PlayerDebugMode didn't apply, or panel folder didn't copy | Re-run installer; check `%APPDATA%\Adobe\CEP\extensions\com.claudebridge.panel\index.html` (Win) or `~/Library/Application Support/Adobe/CEP/extensions/com.claudebridge.panel/index.html` (Mac) exists |
-| Render fails with "ffmpeg not found" | Remotion can't find ffmpeg | Install ffmpeg manually: `brew install ffmpeg` (Mac) or `winget install -e --id Gyan.FFmpeg` (Win) |
-| First render times out / takes forever | Remotion is doing initial `npm install` | Look at `~/PremiereClaude/bridge.log` — if it shows `npm install` running, just wait. 3–5 min is normal first time. |
-| `claude` CLI hits 5-hour usage limit | User burned through their plan quota | Wait or upgrade plan. Bridge will report errors back to panel. |
-
-### Manual install (only if the auto-installer hard-fails)
-
-<details>
-<summary>Click to expand manual steps</summary>
-
-#### Step 1. Install dependencies
-
-**macOS:**
-```bash
-brew install node ffmpeg
-npm install -g @anthropic-ai/claude-code
-claude /login
+install.sh    # macOS auto-installer
+install.ps1   # Windows auto-installer
+README.md     # User-facing
+CLAUDE.md     # This file — agent-facing
 ```
 
-**Windows:**
-```powershell
-winget install -e --id OpenJS.NodeJS.LTS
-winget install -e --id Gyan.FFmpeg
-# open a NEW PowerShell window so PATH refreshes
-npm install -g "@anthropic-ai/claude-code"
-claude /login
+### Runtime locations after install
+
+- `~/PremiereClaude/bridge.js` — the running bridge
+- `~/PremiereClaude/remotion-intro/` — pre-scaffolded Remotion project; Claude writes new components into `src/` and registers them in `Root.tsx`
+- `~/PremiereClaude/output/` — rendered files, pasted images, ffmpeg keyframes
+- `~/PremiereClaude/bridge.log` — bridge stdout/stderr
+- `~/Library/Application Support/Adobe/CEP/extensions/com.claudebridge.panel/` (macOS) — installed panel
+- `%APPDATA%\Adobe\CEP\extensions\com.claudebridge.panel\` (Windows) — installed panel
+
+### Bridge endpoints (`bridge/bridge.js`)
+
+| Endpoint | Method | Body | Returns |
+|---|---|---|---|
+| `/ping` | GET | — | `{ok, session, outputDir}` |
+| `/chat` | POST | `{message, context}` | `{reply, imports[]}` — spawns `claude -p`, streams tool events to SSE |
+| `/complete` | POST | `{prefix}` | `{completion}` — inline autocomplete |
+| `/expand` | POST | `{prompt, level}` | `{expanded}` — light / medium / heavy |
+| `/autocut` | POST | `{clipPath, clipDuration}` | `{cuts[], totalCut, transcribed, summary, method}` |
+| `/update` | POST | — | `{ok, updated[], bridgeChanged, premiereRestartNeeded}` — pulls from GitHub raw |
+| `/preview/<file>` | GET | — | Streams a file from `~/PremiereClaude/output/` with byte-range support |
+| `/panel` | GET | — | Serves `index.html` for dev-mode preview in Chrome |
+| `/dev/reload-stream` | GET | — | SSE — pushes `reload` + `jsx-reload` events when files change |
+| `/progress-stream` | GET | — | SSE — pushes `{ text, pct }` per work-stage event |
+
+### ExtendScript functions (`extension/com.claudebridge.panel/jsx/host.jsx`)
+
+Every function returns a JSON string. Every operation wrapped in try/catch — Premiere is fragile.
+
+- `ccGetContext()` → project name, sequence name, playhead seconds, selected clips
+- `ccImportToTimeline(path, mode)` — `mode` is `overwrite` or `overlay`. Imports the file, finds `ProjectItem`, places on the right track.
+- `ccOpenInSource(path)` — loads file in Premiere's Source Monitor (`app.sourceMonitor.openProjectItem`)
+- `ccImportFile(path)` — bin import only, no timeline placement (legacy fallback)
+- `ccGetSelectedClip()` — walks video then audio tracks, returns the selected clip's source path, duration, in/out points, timeline position
+- `ccApplyAutoCuts(cutsJson)` — applies a list of `{start, end}` cuts using QE's `extract()` (in/out + extract). Cuts run chronologically with a cumulative shift offset so ripple-deletes don't drift. Cumulative ripple math: every applied cut subtracts its duration from later cuts' timeline positions.
+- `ccUndo(count)` — probes multiple undo APIs: `app.menuFunctionId(101/16/7/0xA01)`, `app.executeCommand("Undo")`, OS-level Cmd+Z / Ctrl+Z via osascript / PowerShell SendKeys as last resort
+- `ccMaximizeFrame()` — toggles the panel's frame-maximize for the backtick (`` ` ``) shortcut
+- `ccVersion()` — returns `{ok, version}` so the panel can sanity-check jsx hot-reload took effect
+
+---
+
+## FEATURES (v2.5)
+
+### Auto-spawning bridge
+
+**The user never sees a terminal.** When the panel mounts:
+1. Pings `localhost:3737`
+2. If alive → status pill goes green
+3. If dead → spawns `node ~/PremiereClaude/bridge.js` detached, logs to `~/PremiereClaude/bridge.log`. Tries `/usr/local/bin/node`, `/opt/homebrew/bin/node`, then PATH `node`.
+4. Polls `/ping` every 500ms for up to 10s
+5. Goes green when ping succeeds; falls back to "run Claude Bridge.command" hint if 10s passes
+
+Bridge stays alive across panel opens/closes — only dies on reboot or manual kill.
+
+The Desktop launcher (`Claude Bridge.command` / `Claude Bridge.bat`) is now a **fallback**, not the primary entry.
+
+### Auto-update
+
+On every bridge launch (unless `CLAUDE_BRIDGE_NO_UPDATE=1` is set), the bridge fetches the latest `index.html`, `host.jsx`, `manifest.xml`, and `bridge.js` from GitHub raw. Diffs against on-disk; overwrites only if changed.
+
+**Critical caveat for development:** when developing locally, set `CLAUDE_BRIDGE_NO_UPDATE=1` in the env before spawning, otherwise auto-update will overwrite your local edits with the older GitHub version.
+
+A small ↻ button in the panel header triggers `/update` manually. Toast feedback: *"Updated: panel UI, ExtendScript"* / *"Already up to date"* / *"Update failed: ..."*.
+
+### Chat + render flow
+
+1. User types prompt → `POST /chat` with `{message, context: {sequenceName, playhead, selectedClips, …}}`
+2. Bridge spawns `claude -p --output-format stream-json --verbose --permission-mode bypassPermissions --append-system-prompt <SYSTEM_PROMPT> --no-session-persistence <message>`
+3. **Each chat call is a fresh Claude invocation** (no session resume). Iteration context is passed explicitly via the Changes button.
+4. Bridge parses Claude's stream-json events; each tool_use block becomes a human-readable status pushed to `/progress-stream` SSE (`Reading Root.tsx`, `Writing X.tsx`, `Rendering video`, etc.)
+5. Final assistant text is collected
+6. Bridge extracts `[[IMPORT:/abs/path]]` markers from the reply
+7. **Premiere-importable safety net**: any file with an extension not in the allowlist (mp4, mov, m4v, avi, mkv, mxf, mts, png, jpg, jpeg, tif, tiff, gif, webp, wav, mp3, aac, m4a) gets ffmpeg-transcoded to MP4 H.264 + AAC + faststart before being sent to the panel. This catches Claude accidentally rendering WebM (which Premiere refuses).
+8. Panel renders a "Render Preview" card with **Import to Timeline / Preview / Changes** buttons. **Nothing auto-imports.**
+9. *Import* uses `ccImportToTimeline(path, mode)` and shows a receipt. *Preview* opens in Premiere's Source Monitor. *Changes* sets silent iteration context.
+
+### Changes button (iteration)
+
+Click *Changes* on a render card (or in History → Changes). A small coral chip appears above the composer: *"Iterating on filename.mp4ㅤ×"*. User types just their tweak ("make the bell red"). On send, the panel invisibly prepends:
+
+```
+Make a new version of a previous render.
+Original prompt: "<original>"
+Previous file: <abspath>
+Change: <user tweak>
 ```
 
-#### Step 2. Enable unsigned CEP extensions
+System prompt tells Claude: when this prefix appears, find the existing component and modify it minimally instead of designing fresh.
 
-**macOS:** `for v in 8 9 10 11 12; do defaults write "com.adobe.CSXS.$v" PlayerDebugMode 1; done`
-**Windows:**
-```powershell
-8..12 | % { New-Item -Path "HKCU:\Software\Adobe\CSXS.$_" -Force | Out-Null; New-ItemProperty -Path "HKCU:\Software\Adobe\CSXS.$_" -Name PlayerDebugMode -Value 1 -PropertyType String -Force | Out-Null }
-```
+Without the Changes button, every prompt is a clean creative slate — different colors, layout, motion.
 
-#### Step 3. Copy the panel
+### Auto-cut (v2.4 pipeline)
 
-**macOS:**
-```bash
-mkdir -p ~/Library/Application\ Support/Adobe/CEP/extensions/
-cp -R extension/com.claudebridge.panel ~/Library/Application\ Support/Adobe/CEP/extensions/
-```
+User selects a clip in the timeline → clicks **Auto-Cut**:
 
-**Windows:**
-```powershell
-$dest = "$env:APPDATA\Adobe\CEP\extensions"
-New-Item -ItemType Directory -Force -Path $dest | Out-Null
-Copy-Item -Recurse -Force extension\com.claudebridge.panel $dest\
-```
+**Stage 1: ffmpeg silencedetect** — Bridge runs `ffmpeg -i <clip> -af silencedetect=noise=-30dB:d=0.6`. Stderr `time=HH:MM:SS` is parsed in real time to drive the progress bar 2% → 14%.
 
-#### Step 4. Drop the bridge + launcher
+**Stage 2: Claude transcribes + analyses** — Bridge spawns `claude -p` with a strict prompt that requires:
+1. **Transcribe** using `asr-transcribe-to-text` skill → `whisper-cli` → `faster-whisper` → ffmpeg-extract + STT, in that order. Only set `transcribed: false` if all four fail.
+2. **Find** filler words (`um`, `uh`, `like` as filler, `you know`, `I mean`, `sorta`, `kinda`), false starts (speaker restarts a sentence — cut the first attempt), and self-corrections.
+3. **Merge** with the pre-computed silence cuts.
+4. **Double-check** — drop cuts that orphan partial words or remove meaningful content. Conservative.
+5. **Sort** by start time.
+6. **Output ONLY JSON** with the exact shape:
+   ```json
+   {
+     "transcribed": true,
+     "cuts": [
+       { "start": 2.30, "end": 3.10, "kind": "silence", "reason": "long pause (0.8s)" },
+       { "start": 5.20, "end": 5.62, "kind": "filler",  "reason": "um" }
+     ],
+     "summary": "Found 6 pauses, 4 fillers. Would remove 9.8s."
+   }
+   ```
 
-**macOS:**
-```bash
-mkdir -p ~/PremiereClaude/output
-cp bridge/bridge.js ~/PremiereClaude/
-cp bridge/start.command ~/Desktop/"Claude Bridge.command"
-chmod +x ~/Desktop/"Claude Bridge.command"
-```
+Bridge parses tolerantly — strict JSON first, then ``` json fence, then expanding {...} substring search. Logs reply length + first 200 chars to bridge.log for debugging.
 
-**Windows:**
-```powershell
-$pc = "$env:USERPROFILE\PremiereClaude"
-New-Item -ItemType Directory -Force -Path "$pc\output" | Out-Null
-Copy-Item -Force bridge\bridge.js $pc\
-Copy-Item -Force bridge\start.bat "$([Environment]::GetFolderPath('Desktop'))\Claude Bridge.bat"
-```
+**Stage 3: Panel shows the cuts card** — each row color-coded by kind (gray silence, coral filler, red false_start, orange mistake). Per-row Apply/Skip or "Apply all". Header shows a `transcript` badge if Claude transcribed, `silence-only` if it fell back.
 
-</details>
+**Stage 4: ccApplyAutoCuts** — Sets `seq.setInPoint(tStart) + seq.setOutPoint(tEnd)` then calls `qeSeq.extract()` (Quick Edit — `app.enableQE()`). Extract ripple-deletes the in/out range across **all tracks**, closing the gap. Cuts run chronologically with a `shiftOffset` accumulator — each applied cut adds its duration to the offset, and later cuts subtract that offset from their original timeline positions so ripples don't drift.
 
-### What to tell the user when everything is verified
+**Stage 5: Undo button** — After cuts apply, an Undo button appears in the card. It calls `ccUndo(appliedCount)` which presses Premiere's native Edit > Undo once per applied cut — full session reversed in one click. Premiere's regular Cmd+Z still works too.
 
-> "Installed and tested. Double-click **Claude Bridge.command** (macOS) or **Claude Bridge.bat** (Windows) on your Desktop whenever you want to use it, then open Premiere → Window → Extensions → Claude. The first render takes 3–5 minutes while Remotion installs; after that, 30–60s per render."
+### Settings panel
+
+Click the ⚙ gear icon in the header. Slide-up panel with:
+
+**Appearance**
+- Theme: Dark / Dim / Midnight
+- Accent color: Coral / Violet / Emerald / Amber / Sky (live CSS variable swap)
+- Show boot intro toggle
+
+**Behavior**
+- Default placement: Overwrite / Overlap
+- Default expand level: Low / Mid / High
+- Auto-check for updates toggle
+
+**Auto-cut**
+- Pause threshold: 0.4 / 0.6 / 1.0 / 1.5 s
+- Silence sensitivity: −40 / −30 / −25 dB
+- Detect fillers / false starts toggle (transcript mode on/off)
+
+**Output**
+- Render audio in animations toggle (off by default — `AUDIO POLICY` in system prompt)
+- Auto-open render in browser toggle
+
+**Data**
+- Clear render history
+- Factory reset
+
+All persisted to `localStorage.claudeBridge.settings`. Accent/theme apply instantly.
+
+### Live-reload (dev convenience)
+
+Bridge watches `index.html` and `host.jsx` via `fs.watch`. When either changes, pushes an SSE event:
+- `reload` event → panel calls `location.reload()` (full refresh)
+- `jsx-reload` event → panel reads `host.jsx` fresh from disk and `evalScript`s it in place. **No Premiere restart needed for jsx changes.**
+
+There's also a polling fallback (every 1.5s, reads stat size+mtime) in case SSE silently stalls in CEP's older Chromium.
+
+### Keyboard shortcuts
+
+| Key | Action |
+|---|---|
+| ↵ | Send |
+| ⇧↵ | New line |
+| ⇥ | Accept ghost-text autocomplete |
+| ⇧V | Paste **text** at cursor |
+| ⇧B | Paste **image** as reference |
+| ⇧C | Copy selected text (anywhere) or input value |
+| ` (backtick) | Toggle Premiere "Maximize Frame" for the panel |
+| Esc | Cancel current request / close lightbox / close history |
 
 ---
 
 ## OPERATING the system
 
-### Starting the bridge
-
-**Always tell the user to launch the desktop file themselves.** Do NOT try to `spawn` `node bridge.js` from inside the CEP panel — that path was tried and failed in the user's CEP build (sandbox restriction). The launcher must be a separate process the user owns.
-
-### Restarting the bridge after editing `bridge.js`
+### Restart the bridge after editing `bridge.js`
 
 ```bash
 # macOS
-lsof -ti tcp:3737 | xargs kill -9 2>/dev/null
-node ~/PremiereClaude/bridge.js
+lsof -ti tcp:3737 | xargs kill 2>/dev/null; CLAUDE_BRIDGE_NO_UPDATE=1 node ~/PremiereClaude/bridge.js
 ```
 
 ```powershell
 # Windows
 for /f "tokens=5" %a in ('netstat -ano ^| findstr :3737 ^| findstr LISTENING') do taskkill /F /PID %a
-node "$env:USERPROFILE\PremiereClaude\bridge.js"
+$env:CLAUDE_BRIDGE_NO_UPDATE=1; node "$env:USERPROFILE\PremiereClaude\bridge.js"
 ```
 
-### Reloading the panel after editing `index.html` / `host.jsx`
+(In dev mode you basically always want `CLAUDE_BRIDGE_NO_UPDATE=1` — see the auto-update warning below.)
 
-User must close the panel and reopen it (Window → Extensions → Claude). For ExtendScript changes (`host.jsx`), they often need to **restart Premiere** because Premiere caches `.jsx` for the session.
+### Reload the panel after editing `index.html` / `host.jsx`
+
+Live-reload usually handles this. If it doesn't fire, manually close + re-open the panel (Window → Extensions → Claude, click to toggle).
 
 ### Health check
 
@@ -237,130 +329,97 @@ curl -s http://127.0.0.1:3737/ping
 
 ---
 
-## Bridge endpoints (`bridge/bridge.js`)
-
-| Endpoint | Method | Body | Returns |
-|----------|--------|------|---------|
-| `/ping` | GET | — | `{ok, session, outputDir}` |
-| `/chat` | POST | `{message, context}` | `{reply, imports[]}` — plain JSON, NOT streaming |
-| `/complete` | POST | `{prefix}` | `{completion}` — for autocomplete (Haiku, no session persistence) |
-| `/expand` | POST | `{prompt, level: 'light'\|'medium'\|'heavy'}` | `{expanded}` — uses Opus by default |
-
-All endpoints kill the spawned `claude` subprocess on `req.on('aborted')` for cancellation support.
-
----
-
-## ExtendScript functions (`extension/com.claudebridge.panel/jsx/host.jsx`)
-
-Every function returns a JSON string. Wrap every operation in try/catch — Premiere is fragile.
-
-- `ccGetContext()` → project name, sequence name, playhead seconds, selected clips
-- `ccImportToTimeline(path, mode)` — `mode` is `'insert'`, `'overwrite'`, or `'overlay'`. Imports the file, finds the `ProjectItem`, places on the right track.
-- `ccOpenInSource(path)` — loads file in Premiere's Source Monitor (`app.sourceMonitor.openProjectItem`)
-- `ccImportFile(path)` — bin import only, no timeline placement (legacy fallback)
-
----
-
-## Hard performance limits (DO NOT promise faster than these)
-
-The Claude CLI cold-starts every spawn (~6-8s, unavoidable without `--bare` mode + API key). So:
-
-| Operation | Wall time |
-|---|---|
-| Simple chat reply | 6-8s |
-| Inline autocomplete | 7-10s after pause |
-| Light prompt expand | ~10s |
-| Medium expand | ~13s |
-| Heavy expand | ~25-30s |
-| First Remotion render | 3-5 minutes (`npm install` dominates) |
-| Subsequent renders | 30-60s |
-
-**Streaming progress does not work in CEP.** CEP's older Chromium buffers fetch responses. Don't try `stream-json` — it was tried and reverted. The panel uses an **estimated progress bar** (`(1 − e^−t/T) × 92%`) instead.
-
----
-
-## When working on the project
+## HARD-WON KNOWLEDGE (don't relearn these)
 
 ### Things that crash Premiere — avoid
 
-- `backdrop-filter`, animated radial gradients with `filter: blur()`, GPU-heavy CSS
-- `evalScript` polling faster than ~10s
-- Unwrapped ExtendScript operations (every single `.children`, `.numItems`, etc. must be in try/catch)
-- `new Time()` constructor (not in all PPro versions)
-- Recursive bin walks without depth limits
+- `backdrop-filter`, animated radial gradients with `filter: blur()`, GPU-heavy CSS — was crashing PPro under load. Halo + breath animations on the empty-state logo specifically were eating frames.
+- `evalScript` polling faster than ~10s — was hammering ExtendScript engine and triggering crashes. Set to 15s now.
+- Unwrapped ExtendScript operations — every `.children`, `.numItems`, etc. must be in try/catch. We have a `_ccSafe(fn)` helper.
+- `new Time()` constructor — not in all PPro versions. We avoid it.
+- Recursive bin walks without depth limits.
 
-### Things that work reliably
+### Things that DON'T work (and why) — do not reattempt without reason
 
-- `claude -p --resume <SESSION_ID>` for chat continuity
-- `--append-system-prompt <text>` for project-specific behavior
-- `--permission-mode bypassPermissions` for unattended Remotion installs/renders
-- Plain JSON `/chat` (NOT streaming)
-- Defensive ExtendScript with `_ccSafe(fn)` helpers
+- **`stream-json` in /chat with streamed body to the panel** — CEP's older Chromium buffers fetch responses; the panel gets the whole reply at the end anyway. We stream tool events server-side via SSE to drive progress, but the actual chat reply is plain JSON.
+- **In-panel spawn of `node bridge.js` was historically flaky** — v2.5 retries it and it works on modern CEP. Don't undo the auto-spawn without testing.
+- **Claude CLI warm pool** — claude has a hardcoded 3s stdin timeout; pre-spawned processes die before we feed input. One-shot spawns only.
+- **`req.on('close')` to kill the proc** — fires on normal request end in modern Node, kills the running spawn early. Use `req.on('aborted')` instead.
+- **Plain Cmd+V auto-imports image** — old paste handler called `preventDefault` whenever clipboard had image, blocking text paste. Plain paste is now always text; image attach is Shift+B.
+- **`seq.razor(timeNumber, ...)`** — silently no-ops in modern Premiere because razor wants a Time object or timecode string. Use QE razor / extract instead.
+- **`seq.razor` per track + clip.remove(true, true)** — fragile, only works on one track, sometimes matches wrong clip. Use `seq.setInPoint` + `seq.setOutPoint` + `qeSeq.extract()` for true cross-track ripple-delete.
+- **CSS `scroll-behavior: smooth` on the log container** — in CEP's older Chromium, this animates every wheel tick instead of only programmatic scrolls. Makes scrolling feel laggy. Removed.
+- **Custom JS wheel handler** — `el.scrollTop = before + e.deltaY` bypasses browser smoothing. Choppy. Removed in favor of native wheel.
 
----
+### Things to be careful about
 
-## File layout
-
-```
-.
-├── README.md                       # User-facing install + usage
-├── CLAUDE.md                       # This file
-├── LICENSE                         # MIT
-├── .gitignore
-├── bridge/
-│   ├── bridge.js                   # Node HTTP server
-│   ├── start.command               # macOS launcher (double-click)
-│   └── start.bat                   # Windows launcher (double-click)
-└── extension/
-    └── com.claudebridge.panel/
-        ├── index.html              # Entire UI (HTML + inline CSS + inline JS)
-        ├── CSXS/manifest.xml       # CEP manifest, hosts PPRO 23+
-        └── jsx/host.jsx            # ExtendScript bridge
-```
-
-User's runtime locations (after install):
-- `~/PremiereClaude/bridge.js` — running bridge
-- `~/PremiereClaude/output/` — rendered files, pasted images, ffmpeg keyframes
-- `~/PremiereClaude/bridge.log` — bridge stdout/stderr
-- `~/Library/Application Support/Adobe/CEP/extensions/com.claudebridge.panel/` (macOS)
-- `%APPDATA%\Adobe\CEP\extensions\com.claudebridge.panel\` (Windows)
+- **Auto-update can clobber local edits.** If you're editing local files while developing, run the bridge with `CLAUDE_BRIDGE_NO_UPDATE=1`. The bridge fetches the latest from GitHub raw on every launch — if GitHub is behind your local, you lose work.
+- **Disk space matters.** Bridge can't write rendered files if root volume is full. ffmpeg silently fails. Renders end up zero-byte. Keep `~/PremiereClaude/output/` clean — old MOVs add up fast (renders can be 100-300 MB).
+- **CEP textareas eat keystrokes.** Backtick fullscreen, paste shortcuts — all need capture-phase document listeners that preventDefault and forward via ExtendScript.
 
 ---
 
-## User collaboration style
+## SYSTEM PROMPT (what Claude sees on `/chat`)
 
-The user is a **freelance video editor doing short-form social content**. Casual, direct, swears occasionally. Imperfect English in messages — translate intent generously, don't ask for clarification when you can guess.
+The relevant bits Claude is told:
 
-- Action over analysis. Build, don't deliberate.
-- No filler ("Sure, I'll help…" is forbidden). State what you're doing in one line, then do it.
-- Hates broken features. If something can't work robustly, say so up front and offer a workaround.
-- Don't create extra docs/READMEs unless explicitly asked.
-- Wants to see things WORK over polish.
-- OK with bold suggestions — they'll redirect if it's wrong.
+- It's inside an Adobe Premiere Pro panel; user messages may be prefixed with `[PREMIERE CONTEXT]` describing the project, sequence, playhead, selected clips.
+- For motion-graphics requests, **build with Remotion**. If `remotion-video-skill` / `remotion-best-practices` skills are installed, use them. Otherwise write Remotion code directly (React framework: `useCurrentFrame`, `interpolate`, `AbsoluteFill`, `<Composition>`).
+- Render into `~/PremiereClaude/output/`.
+- **Output format requirements** — must be Premiere-importable. MP4 with H.264 for motion, MOV with ProRes 4444 for transparency, PNG for stills. **Never WebM / VP8 / VP9** — Premiere refuses these. Always pass `--codec h264` to Remotion.
+- **Audio policy** — renders are SILENT by default. No `<Audio>`, no SFX, no music, no stingers. Only add audio if user explicitly says "with audio" — and keep peaks below −20 dBFS.
+- **References** — `[REFERENCE: /abs/path]` lines in the message mean: Read images directly, ffmpeg-extract a frame from videos, mirror colors/typography/composition in the design.
+- **Pre-scaffolded Remotion project** at `~/PremiereClaude/remotion-intro/` — don't run `npx create-video`, reuse it. Add new components in `src/`, register in `Root.tsx`. Render with `npx remotion render src/index.ts <CompositionId> ~/PremiereClaude/output/<filename>.mp4 --codec h264`.
+- **Project reuse policy** — reuse the project shell (deps, node_modules, fonts). **Do NOT reuse components or styles** from prior renders. Treat every prompt as a fresh creative slate. Create components with unique names (timestamp suffix or descriptive). Only exception: when message starts with "Make a new version of a previous render." — that's iteration; find the existing component and modify minimally.
+- Emit `[[IMPORT:/abs/path]]` marker so the panel auto-handles the result.
 
 ---
 
-## Common user complaints — quick triage
+## VERSION HISTORY (recent)
+
+- **2.5** — Auto-spawn bridge from the panel; no more Desktop launcher needed
+- **2.4** — Robust undo (probes menuFunctionId / executeCommand / OS keystrokes); fixed premature "Done" flash; beefier transcript prompt
+- **2.3** — Progress bar monotonic floor; asymptotic curve disabled once bridge takes over
+- **2.2** — Live-reload polling fallback; halved boot intro
+- **2.1** — Settings panel (themes, accent, autocut config, toggles)
+- **2.0** — Old intro restored after the BMS experiment was rejected
+- **1.9** — BookMyShow-style intro (later reverted)
+- **1.8** — Chronological auto-cut with cumulative offset
+- **1.7** — "Overlay" → "Overlap"
+- **1.6** — Settings + boot intro + repo updates
+- **1.5** — Live status updates via SSE; FPS lag fixed (removed halo/breath); native wheel scroll
+- **1.4** — Removed jsx mismatch version tag
+- **1.3** — Auto-cut real progress percentages from bridge
+- **1.2** — Auto-cut transcript pipeline (silence + Claude analyse + double-check)
+- **1.1** — Auto-cut MVP (silence-only) + Apply All + Undo button
+
+---
+
+## USER COLLABORATION STYLE
+
+- **Freelance video editor doing short-form social content.** Casual, direct, swears occasionally. Imperfect English — translate intent generously; don't ask for clarification when you can guess.
+- **Action over analysis.** Build, don't deliberate.
+- **No filler.** "Sure, I'll help…" is forbidden. State what you're doing in one line, then do it.
+- **Hates broken features.** If something can't work robustly, say so up front and offer a workaround.
+- **Wants to see things WORK over polish.**
+- **OK with bold suggestions** — will redirect if it's wrong.
+
+---
+
+## QUICK TRIAGE TABLE
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| "Bridge offline" | Bridge process not running | Run `Claude Bridge.command` / `Claude Bridge.bat` |
-| "Stuck on Working" | First-time Remotion render — `npm install` + render takes 3-5 min on first call | Tell user to wait; check `~/PremiereClaude/bridge.log` |
-| Premiere crashes | Heavy CSS in panel OR fragile ExtendScript | Strip GPU effects, wrap ExtendScript in try/catch |
-| "Can't paste text" | Old paste handler called preventDefault on image clipboards (already fixed) | Verify `paste` handler in `index.html` doesn't call `preventDefault` |
-| "Cmd+V doesn't work" | Premiere captures Cmd+V | Use Shift+V (image) or Shift+B (text) |
-| Capital V/B doesn't type | Reserved for Shift+V/B paste | User uses Caps Lock |
+| Status pill red, "Bridge offline · starting…" stuck | Node not on PATH or bridge.log shows error | Check `~/PremiereClaude/bridge.log`. Verify `node` works. Fall back to Desktop launcher. |
+| "Stuck on Working" | First-time Remotion render — `npm install` running | Should not happen since installer pre-runs it. Check `~/PremiereClaude/remotion-intro/node_modules/remotion` exists. |
+| Panel doesn't appear in Window menu | PlayerDebugMode not set or panel didn't copy | Re-run installer. Restart Premiere. |
+| "Apply all" returns "Applied 0" | host.jsx outdated (hot-reload didn't fire) | Close + reopen the panel. Verify version tag matches `host.jsx`'s `HOST_JSX_VERSION`. |
+| Render fails with "file not supported" in Premiere import | Claude rendered WebM/VP9 | Should be caught by `ensurePremiereImportable()` transcode safety net. If not, check ffmpeg is installed. |
+| Cuts go to wrong timestamps | Source-to-timeline translation broken (clip has trim) | `ccGetSelectedClip()` returns `inPoint`, `timelineStart` — `ccApplyAutoCuts` translates each cut. Check the trace in panel's debug pane. |
+| Premiere crashes on heavy renders | Heavy CSS or fragile ExtendScript | Restart Premiere. Try simpler prompts. |
+| Settings button doesn't open the panel | JS error in settings init halted before listener attached | Check Chrome devtools console (or load `http://localhost:3737/panel` in real Chrome to see errors clearly). |
+| Bridge auto-update overwrote local changes | Auto-update enabled while developing locally | Set `CLAUDE_BRIDGE_NO_UPDATE=1` in the env before spawning bridge. |
 
 ---
 
-## What's not yet built (open follow-ups)
-
-These were proposed and the user hasn't said yes yet — feel free to suggest them again:
-
-1. **Use current frame as reference** — one-click button to grab the program-monitor frame at playhead via ExtendScript and auto-attach it
-2. **Iterate / Adjust on last render** — receipt grows an `Adjust` button that pre-fills `[Adjusting last render at /path/...]` and tells Claude to reuse the existing Remotion project
-3. **Auto-caption a selected audio clip** — local whisper.cpp transcription + animated TikTok-style captions on V2
-
----
-
-*This file is the source of truth for AI agents working on this project. If you change architecture or behavior, update this file in the same commit.*
+*This file is the single source of truth. If you change architecture or add a feature, update this file in the same commit.*
