@@ -108,7 +108,15 @@
     font-weight: 600;
     font-size: 13px;
     letter-spacing: -0.2px;
+    cursor: pointer;
+    padding: 4px 8px 4px 4px;
+    border-radius: 8px;
+    transition: background 0.2s var(--ease);
+    user-select: none;
   }
+  .brand:hover { background: rgba(255, 255, 255, 0.04); }
+  .brand:active { background: rgba(255, 255, 255, 0.07); }
+  .brand:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px; }
   .brand-dot {
     position: relative;
     width: 22px; height: 22px;
@@ -189,10 +197,10 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    height: 100%;
+    justify-content: flex-start;
+    min-height: 100%;
     text-align: center;
-    padding: 20px 10px 40px;
+    padding: 28px 10px 40px;
     gap: 14px;
   }
   .empty-logo {
@@ -251,14 +259,59 @@
     line-height: 1.55;
     animation: fadeUp 0.7s var(--ease-out) 0.18s backwards;
   }
+  .empty-search-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 360px;
+    margin-top: 4px;
+    animation: fadeUp 0.7s var(--ease-out) 0.22s backwards;
+  }
+  .empty-search-icon {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 13px; height: 13px;
+    color: var(--text-faint);
+    pointer-events: none;
+  }
+  .empty-search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px 12px 9px 32px;
+    background: rgba(20, 20, 24, 0.6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    outline: none;
+    transition: border-color 0.3s var(--ease), background 0.3s var(--ease), box-shadow 0.4s var(--ease);
+  }
+  .empty-search::placeholder { color: var(--text-faint); }
+  .empty-search:focus {
+    border-color: var(--accent-line);
+    background: rgba(20, 20, 24, 0.85);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+  .empty-no-match {
+    color: var(--text-faint);
+    font-size: 12px;
+    font-style: italic;
+    margin-top: 6px;
+  }
   .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 5px;
+    gap: 6px;
     justify-content: center;
     margin-top: 8px;
-    max-width: 300px;
+    width: 100%;
+    max-width: 100%;
+    padding: 0 6px;
+    box-sizing: border-box;
   }
+  .chip.hidden { display: none; }
   .chip {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -437,6 +490,14 @@
     font-size: 11px;
     color: var(--text-faint);
     font-variant-numeric: tabular-nums;
+  }
+  .thinking-eta {
+    font-size: 10.5px;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    padding-left: 8px;
+    border-left: 1px solid var(--border-soft);
+    margin-left: 4px;
   }
   .progress-bar {
     margin-top: 10px;
@@ -974,6 +1035,100 @@
   .mode-pill.active:hover { transform: translateY(-1px); }
   .mode-pill:active { transform: scale(0.96); transition-duration: 0.1s; }
 
+  /* Auto-Cut button — sits in the mode-bar next to placement pills */
+  .autocut-btn {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    color: var(--text-dim);
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.2s var(--ease), border-color 0.2s var(--ease), background 0.2s var(--ease);
+  }
+  .autocut-btn svg { width: 12px; height: 12px; }
+  .autocut-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.04); }
+  .autocut-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .autocut-btn.busy { color: var(--accent); border-color: var(--accent-line); }
+
+  /* Auto-Cut review card — list of proposed cuts, each with Apply / Skip */
+  .autocut-card {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: rgba(20, 20, 24, 0.55);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    animation: receiptIn 0.55s var(--spring) backwards;
+  }
+  .autocut-card-header {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .autocut-card-header b { color: var(--text); font-weight: 600; }
+  .autocut-list {
+    display: flex; flex-direction: column; gap: 4px;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  .autocut-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px;
+    background: rgba(0,0,0,0.18);
+    border-radius: 7px;
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .autocut-row.applied { opacity: 0.5; }
+  .autocut-row.applied .autocut-row-time { text-decoration: line-through; }
+  .autocut-row-time { color: var(--text); min-width: 110px; }
+  .autocut-row-reason { color: var(--text-dim); flex: 1; }
+  .autocut-row-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 10.5px;
+    cursor: pointer;
+  }
+  .autocut-row-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+  .autocut-actions {
+    display: flex; gap: 6px;
+    margin-top: 10px;
+  }
+  .autocut-apply-all {
+    flex: 1;
+    padding: 7px 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border: none;
+    border-radius: 7px;
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.2s var(--ease);
+  }
+  .autocut-apply-all:hover { filter: brightness(1.08); }
+  .autocut-apply-all:disabled { opacity: 0.5; cursor: not-allowed; }
+  .autocut-dismiss {
+    padding: 7px 12px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text-dim);
+    font-size: 11.5px;
+    cursor: pointer;
+  }
+  .autocut-dismiss:hover { color: var(--text); }
+
   /* ───── REFERENCE BAR ───── */
   .ref-bar {
     display: flex;
@@ -1344,7 +1499,7 @@
 <div class="aurora"><div class="blob"></div></div>
 
 <div class="header">
-  <div class="brand">
+  <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
   </div>
@@ -1394,7 +1549,12 @@
     <div class="empty-logo">C</div>
     <h1>Your editing copilot</h1>
     <p>Ask for motion graphics, intros, or lower thirds. They render and land in your project bin.</p>
+    <div class="empty-search-wrap">
+      <svg class="empty-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input class="empty-search" id="emptySearch" type="text" placeholder="Search suggestions…" autocomplete="off" spellcheck="false">
+    </div>
     <div class="chips" id="chips"></div>
+    <div class="empty-no-match" id="emptyNoMatch" style="display:none">No matches</div>
   </div>
 </div>
 
@@ -1409,6 +1569,10 @@
       <button class="mode-pill active" data-mode="overlay" type="button" title="Overlay — places on the lowest empty track above your footage">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="13" height="11" rx="1.5"/><rect x="7" y="4" width="13" height="11" rx="1.5"/></svg>
         Overlay
+      </button>
+      <button class="autocut-btn" id="autocutBtn" type="button" title="Auto-cut: detect pauses and false starts on the selected clip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+        Auto-Cut
       </button>
     </div>
     <div class="ref-bar" id="refBar"></div>
@@ -1457,6 +1621,7 @@
 const BRIDGE = 'http://127.0.0.1:3737';
 const log = document.getElementById('log');
 const empty = document.getElementById('empty');
+const _emptyHTML = empty ? empty.outerHTML : ''; // snapshot for "new chat" restore
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send');
 const statusEl = document.getElementById('status');
@@ -1486,37 +1651,163 @@ const isWindows = _platform === 'win32';
 
 /* ───── Editor-friendly prompt library (used for chips + ghost autocomplete) ───── */
 const SUGGESTIONS = [
+  // Intros / outros / titles
   ['3s logo intro',     'Make a 3 second logo intro that says CRUXDEV in white on a deep blue gradient'],
-  ['Lower third',       'Create a sleek animated lower third with a name and title field'],
-  ['5→1 countdown',     'Generate a clean 5 to 1 countdown with big white numerals on a dark background'],
-  ['Subscribe pop',     'Make a smooth animated subscribe button popping in over a transparent background'],
+  ['Title card',        'Make a chapter title card that fades in, holds for 2 seconds, then fades out'],
   ['Kinetic intro',     'Create a kinetic typography intro for my podcast with the word PODCAST animating in'],
   ['End card',          'Generate a YouTube end card with a subscribe button and a next-video tile'],
+  ['Outro screen',      'Create a clean outro screen with "Thanks for watching" and a subscribe prompt'],
+
+  // Captions / text emphasis (huge for short-form)
   ['Caption pop',       'Make a TikTok-style caption that pops in word by word with a slight bounce'],
-  ['Glitch transition', 'Create a 1 second glitch transition I can place between two clips'],
-  ['Title card',        'Make a chapter title card that fades in, holds for 2 seconds, then fades out'],
-  ['Arrow callout',     'Generate an animated arrow that points at a UI element, with a slight bounce loop'],
-  ['Film grain',        'Make a 5 second film grain overlay loop on a transparent background'],
+  ['Word-by-word',      'Generate centered word-by-word captions with a punchy spring animation, white text with black stroke'],
+  ['Type-on text',      'Make text typing on character by character with a blinking cursor'],
+  ['Highlight marker',  'Generate a yellow highlight marker drawing under text from left to right'],
+  ['Scribble underline','Make a hand-drawn scribble underline animating across the bottom of a word'],
+  ['Shake emphasis',    'Create a quick shake-and-zoom emphasis on a centered word for 0.6 seconds'],
+  ['Quote card',        'Make a centered quote card with bold serif typography on a soft cream background, fade in'],
+
+  // Lower thirds / labels
+  ['Lower third',       'Create a sleek animated lower third with a name and title field'],
+  ['Name tag',          'Generate a minimal name tag with avatar circle and role text, sliding in from the left'],
+  ['Tag chip',          'Make a small rounded tag chip popping in with subtle bounce, like a hashtag label'],
+
+  // Social UI mocks
+  ['iMessage bubble',   'Create an iPhone iMessage bubble with text typing in then sending, with read receipt'],
+  ['DM notification',   'Make an Instagram DM-style notification banner sliding in from the top with sender + preview'],
+  ['Like burst',        'Generate a heart-like burst animation popping out from screen center with little hearts flying out'],
+  ['Subscribe pop',     'Make a smooth animated subscribe button popping in over a transparent background'],
+  ['Subscribe + bell',  'Create a YouTube subscribe-then-bell click sequence with cursor and ripple effect'],
+  ['Live indicator',    'Generate a red LIVE dot pulsing with the word LIVE next to it, top corner badge'],
+  ['Hashtag pop',       'Make an animated hashtag chip popping in with a soft glow'],
+  ['Comment overlay',   'Create a TikTok-style comment overlay sliding up from the bottom with avatar and text'],
+
+  // Counters / data
   ['Stat counter',      'Create a stat counter that animates from 0 to 1000 with comma separators'],
-  ['Star rating',       'Generate a star rating animation that fills from 0 to 5 stars'],
-  ['Particles bg',      'Make a slow floating particles background loop, dark and minimal'],
-  ['Toast popup',       'Create an iOS-style notification toast that slides down then fades'],
-  ['Progress ring',     'Make a circular progress ring animating from 0 to 100 percent'],
-  ['Price reveal',      'Generate a price tag reveal animation, the price flips into view with depth'],
-  ['Split reveal',      'Create a vertical split-screen reveal transition'],
+  ['Money counter',     'Generate a money counter ticking from $0 to $10,000 with bold green typography'],
+  ['Day counter',       'Make a "Day 1 → Day 30" transition card with bold typography flipping over'],
+  ['Score counter',     'Create a 0 to 100 percent score counter with smooth ease-out'],
+  ['Star rating',       'Generate a star rating animation that fills from 0 to 5 stars one by one'],
+  ['Vote bar',          'Make a poll-style vote bar filling 0 to 75 percent with the percentage label'],
+  ['Step indicator',    'Generate a 3-step progress indicator showing step 1 of 3, 2 of 3, 3 of 3'],
+  ['Progress ring',     'Make a circular progress ring animating from 0 to 100 percent with center percentage label'],
+  ['Loading bar',       'Create a horizontal loading bar filling from 0 to 100% with smooth gradient'],
+  ['5→1 countdown',     'Generate a clean 5 to 1 countdown with big white numerals on a dark background'],
+
+  // Comparisons / explainers
+  ['Versus card',       'Create a versus comparison card with two options side by side, bold labels and a center "VS"'],
+  ['Pros vs cons',      'Generate a 2-column pros vs cons list with green checkmarks on the left and red X on the right'],
+  ['Definition card',   'Make a dictionary-style definition card with the word, phonetic spelling, and meaning, sliding in'],
+  ['Question card',     'Generate a bold question card asking the question with a clean gradient background'],
+  ['Bullet list',       'Make an animated 3-point bullet list that reveals each item with a check mark'],
+  ['Tip card',          'Create a "PRO TIP" card with a lightbulb icon and a single-line tip text'],
+  ['Pop quiz',          'Generate a "POP QUIZ" question card with 4 lettered answer options A B C D'],
+
+  // Banners / breaking
+  ['News ticker',       'Make a bottom news ticker scrolling text right to left with a colored prefix label'],
+  ['Breaking banner',   'Create a "BREAKING NEWS" red banner sliding in from the bottom with a headline'],
+  ['CTA banner',        'Generate a sleek animated banner that says LIKE AND SUBSCRIBE with a soft glow'],
+  ['Watermark',         'Make a subtle bottom-right watermark with a channel name fading in and looping gently'],
+
+  // Callouts / pointers
+  ['Arrow callout',     'Generate an animated arrow that points at a UI element with a slight bounce loop'],
+  ['Circle highlight',  'Make an animated circle drawing around an object to highlight it'],
+  ['Spotlight',         'Create a soft spotlight sweeping across the frame from left to right'],
+  ['Stamp APPROVED',    'Generate a red rubber-stamp APPROVED slamming down at an angle with shake'],
+
+  // Transitions
+  ['Glitch transition', 'Create a 1 second glitch transition I can place between two clips'],
   ['Swipe transition',  'Make a clean horizontal swipe transition between two clips'],
-  ['CTA banner',        'Create a sleek animated banner that says LIKE AND SUBSCRIBE with a glow'],
+  ['Split reveal',      'Create a vertical split-screen reveal transition'],
+  ['Match cut zoom',    'Generate a smooth match-cut transition zooming into a circle and out the other side'],
+  ['Light leak',        'Create a warm orange light leak flash transition, half a second'],
+  ['Diagonal wipe',     'Make a clean diagonal wipe transition with a thin accent line at the edge'],
+
+  // Overlays / textures / loops
+  ['Film grain',        'Make a 5 second film grain overlay loop on a transparent background'],
+  ['Particles bg',      'Generate a slow floating particles background loop, dark and minimal'],
+  ['Bokeh loop',        'Create a slow soft-bokeh circles background loop in warm tones'],
+  ['Confetti burst',    'Generate a celebration confetti burst from the bottom rising up and fading'],
+  ['Rain overlay',      'Make a subtle rain particle overlay loop on transparent background'],
+  ['Snow overlay',      'Generate a gentle falling snow loop on transparent background'],
+
+  // Frames / decorative
+  ['Toast popup',       'Create an iOS-style notification toast that slides down then fades'],
+  ['Polaroid frame',    'Make a polaroid photo frame falling into view with a slight rotation and shadow'],
+  ['Price reveal',      'Generate a price tag reveal animation where the price flips into view with depth'],
+  ['Bookmark fold',     'Create an animated corner bookmark fold revealing with a soft shadow'],
 ];
 
 /* Render chips on the empty state */
-SUGGESTIONS.forEach(([label, prompt], i) => {
-  const c = document.createElement('div');
-  c.className = 'chip';
-  c.dataset.prompt = prompt;
-  c.textContent = label;
-  c.style.animationDelay = (0.28 + (i % 12) * 0.04) + 's';
-  chipsContainer.appendChild(c);
+function renderChips(container) {
+  if (!container) return;
+  container.innerHTML = '';
+  SUGGESTIONS.forEach(([label, prompt], i) => {
+    const c = document.createElement('div');
+    c.className = 'chip';
+    c.dataset.prompt = prompt;
+    c.dataset.haystack = (label + ' ' + prompt).toLowerCase();
+    c.textContent = label;
+    c.style.animationDelay = (0.28 + (i % 12) * 0.04) + 's';
+    container.appendChild(c);
+  });
+}
+renderChips(chipsContainer);
+
+/* Live-filter chips as the user types in the empty-state search box.
+   Event-delegated on #log so the handler still fires after resetToHome
+   re-mounts the empty state from its HTML snapshot. */
+function filterChips(query) {
+  const q = (query || '').trim().toLowerCase();
+  const chipsEl = document.getElementById('chips');
+  const noMatch = document.getElementById('emptyNoMatch');
+  if (!chipsEl) return;
+  let shown = 0;
+  chipsEl.querySelectorAll('.chip').forEach(c => {
+    const hit = !q || (c.dataset.haystack || '').indexOf(q) >= 0;
+    c.classList.toggle('hidden', !hit);
+    if (hit) shown++;
+  });
+  if (noMatch) noMatch.style.display = shown === 0 ? '' : 'none';
+}
+log.addEventListener('input', (e) => {
+  if (e.target && e.target.id === 'emptySearch') filterChips(e.target.value);
 });
+// Esc inside the search box clears it
+log.addEventListener('keydown', (e) => {
+  if (e.target && e.target.id === 'emptySearch' && e.key === 'Escape') {
+    e.target.value = '';
+    filterChips('');
+    e.stopPropagation();
+  }
+});
+
+/* "Claude" header brand → reset to home (new chat). Clears all messages,
+   restores the empty state with chips, cancels in-flight requests, drops
+   composer state. */
+function resetToHome() {
+  // Cancel any in-flight chat
+  try { if (activeChatAbort) activeChatAbort.abort(); } catch {}
+  // Clear chat log entirely; restore the empty state
+  log.innerHTML = _emptyHTML;
+  // Re-render chips in the freshly inserted empty container
+  const freshChips = document.getElementById('chips');
+  if (freshChips) renderChips(freshChips);
+  // Drop composer state
+  input.value = '';
+  autosize && autosize();
+  clearGhost && clearGhost();
+  if (typeof clearReferences === 'function') clearReferences();
+  if (typeof setIterationContext === 'function') setIterationContext(null);
+  input.focus();
+}
+const brandHomeEl = document.getElementById('brandHome');
+if (brandHomeEl) {
+  brandHomeEl.addEventListener('click', resetToHome);
+  brandHomeEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); resetToHome(); }
+  });
+}
 
 /* ───── ExtendScript bridge ───── */
 let _esBusy = false;
@@ -1551,6 +1842,133 @@ async function importIntoPremiere(absPath, mode) {
 async function maximizeFrame() {
   const raw = await evalES('ccMaximizeFrame()');
   try { return JSON.parse(raw); } catch { return { ok:false }; }
+}
+
+async function getSelectedClipInfo() {
+  const raw = await evalES('ccGetSelectedClip()');
+  try { return JSON.parse(raw); } catch { return { ok:false, error:'parse failed' }; }
+}
+
+async function applyAutoCuts(cuts) {
+  const json = JSON.stringify(cuts).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const raw = await evalES('ccApplyAutoCuts("' + json + '")');
+  try { return JSON.parse(raw); } catch { return { ok:false, error:'parse failed' }; }
+}
+
+function formatSec(s) {
+  if (typeof s !== 'number') return '—';
+  const m = Math.floor(s / 60), sec = s - m * 60;
+  return m + ':' + (sec < 10 ? '0' : '') + sec.toFixed(1);
+}
+
+// Build the proposed-cuts review card inside the chat log
+function addAutoCutCard(clipInfo, cuts, totalCut) {
+  const wrap = makeMsg('claude', '');
+  const card = document.createElement('div');
+  card.className = 'autocut-card';
+
+  const headerCutCount = cuts.length;
+  card.innerHTML =
+      '<div class="autocut-card-header">'
+    +   '<b>' + headerCutCount + '</b> cut' + (headerCutCount === 1 ? '' : 's') + ' proposed on <b>' + escapeHTML(clipInfo.name) + '</b>'
+    +   '<span style="margin-left:auto">would remove <b>' + totalCut.toFixed(1) + 's</b></span>'
+    + '</div>'
+    + '<div class="autocut-list"></div>'
+    + '<div class="autocut-actions">'
+    +   '<button class="autocut-apply-all" type="button">Apply all</button>'
+    +   '<button class="autocut-dismiss" type="button">Dismiss</button>'
+    + '</div>';
+
+  const list = card.querySelector('.autocut-list');
+  cuts.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'autocut-row';
+    row.dataset.idx = i;
+    row.innerHTML =
+        '<span class="autocut-row-time">' + formatSec(c.start) + ' → ' + formatSec(c.end) + '</span>'
+      + '<span class="autocut-row-reason">' + escapeHTML(c.reason || '') + '</span>'
+      + '<button class="autocut-row-btn" data-act="apply">Apply</button>'
+      + '<button class="autocut-row-btn" data-act="skip">Skip</button>';
+    list.appendChild(row);
+  });
+
+  wrap.body.appendChild(card);
+
+  // Per-row Apply / Skip
+  list.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.autocut-row-btn');
+    if (!btn) return;
+    const row = btn.closest('.autocut-row');
+    const idx = +row.dataset.idx;
+    if (btn.dataset.act === 'skip') { row.remove(); return; }
+    btn.disabled = true; btn.textContent = '…';
+    const r = await applyAutoCuts([cuts[idx]]);
+    if (r.ok && r.applied) {
+      row.classList.add('applied');
+      btn.textContent = 'cut';
+    } else {
+      btn.disabled = false; btn.textContent = 'Apply';
+    }
+  });
+
+  // Apply all
+  card.querySelector('.autocut-apply-all').addEventListener('click', async (e) => {
+    e.target.disabled = true; e.target.textContent = 'Applying…';
+    const remaining = [];
+    list.querySelectorAll('.autocut-row').forEach(r => {
+      if (!r.classList.contains('applied')) remaining.push(cuts[+r.dataset.idx]);
+    });
+    const r = await applyAutoCuts(remaining);
+    e.target.textContent = r.ok ? ('Applied ' + r.applied) : 'Failed';
+    list.querySelectorAll('.autocut-row:not(.applied)').forEach(rr => rr.classList.add('applied'));
+  });
+
+  card.querySelector('.autocut-dismiss').addEventListener('click', () => wrap.wrap.remove());
+}
+
+// Auto-Cut button click handler
+async function runAutoCut() {
+  const btn = document.getElementById('autocutBtn');
+  if (!btn || btn.disabled) return;
+  const sel = await getSelectedClipInfo();
+  if (!sel.ok) {
+    makeMsg('claude', '<p style="color:var(--text-dim);font-style:italic">Auto-cut needs a clip selected in the timeline. ' + (sel.error ? escapeHTML(sel.error) : '') + '</p>');
+    return;
+  }
+  if (!sel.path) {
+    makeMsg('claude', '<p style="color:var(--text-dim);font-style:italic">Couldn\'t find the source media path for that clip.</p>');
+    return;
+  }
+  clearEmpty();
+  makeMsg('you', '<p>Auto-cut <b>' + escapeHTML(sel.name) + '</b></p>');
+  btn.classList.add('busy'); btn.disabled = true;
+  const placeholder = makeMsg('claude', thinkingHTML());
+  const labelEl = placeholder.body.querySelector('.orbit-label');
+  if (labelEl) labelEl.textContent = 'Analysing audio';
+
+  try {
+    const r = await fetch(BRIDGE + '/autocut', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clipPath: sel.path, clipDuration: sel.duration }),
+    });
+    const data = await r.json();
+    placeholder.wrap.remove();
+    if (data.error) {
+      makeMsg('claude', '<p>Auto-cut error: ' + escapeHTML(data.error) + '</p>');
+      return;
+    }
+    if (!data.cuts || !data.cuts.length) {
+      makeMsg('claude', '<p>No pauses or false starts detected. Nothing to cut.</p>');
+      return;
+    }
+    addAutoCutCard(sel, data.cuts, data.totalCut || 0);
+  } catch (err) {
+    placeholder.wrap.remove();
+    makeMsg('claude', '<p>Auto-cut error: ' + escapeHTML(err.message) + '</p>');
+  } finally {
+    btn.classList.remove('busy'); btn.disabled = false;
+  }
 }
 
 async function previewInSource(absPath) {
@@ -2134,6 +2552,8 @@ document.getElementById('modeBar').addEventListener('click', (e) => {
   if (!btn) return;
   setMode(btn.dataset.mode);
 });
+const _autocutBtn = document.getElementById('autocutBtn');
+if (_autocutBtn) _autocutBtn.addEventListener('click', runAutoCut);
 // Sync UI to whatever was loaded from storage
 setMode(activeMode);
 
@@ -2236,9 +2656,54 @@ function thinkingHTML() {
     +   '<span class="orbit"><span class="orbit-dot"></span><span class="orbit-dot"></span><span class="orbit-dot"></span></span>'
     +   '<span class="orbit-label">Working</span>'
     +   '<span class="thinking-elapsed"></span>'
+    +   '<span class="thinking-eta"></span>'
     + '</div>'
     + '<div class="progress-bar"><div class="progress-bar-fill"></div></div>'
     + '</div>';
+}
+
+// Typical duration per status — used to predict the rest of the run when the
+// current step is known. Numbers are rough; they're aimed at being honest
+// rather than exact, and they shift as the bridge sends new status events.
+const STEP_DURATIONS = {
+  'Thinking':                 8,
+  'Reading reference image':  4,
+  'Extracting reference frame': 5,
+  'Running ffmpeg':           4,
+  'Reading':                  2,    // matches "Reading <file>"
+  'Writing':                  4,    // matches "Writing <file>"
+  'Editing':                  3,    // matches "Editing <file>"
+  'Searching project':        2,
+  'Searching code':           2,
+  'Fetching reference':       6,
+  'Running command':          5,
+  'Installing dependencies':  90,
+  'Rendering video':          45,
+  'Tool':                     3,    // generic fallback
+};
+// Steps we still expect to come after the current one. If we're at "Rendering
+// video", we're done after; if we're at "Reading reference image", we still
+// have to write code + register + render.
+function remainingAfter(status) {
+  const order = ['Thinking', 'Reading reference image', 'Extracting reference frame',
+                 'Reading', 'Writing', 'Editing', 'Rendering video'];
+  let idx = order.findIndex(s => status === s || status.startsWith(s + ' '));
+  if (idx === -1) return 30; // unknown — assume some work left
+  // Sum durations of typical remaining steps from idx+1 onward
+  let total = 0;
+  for (let i = idx + 1; i < order.length; i++) {
+    total += STEP_DURATIONS[order[i]] || 4;
+  }
+  return total;
+}
+function durationFor(status) {
+  if (!status) return 8;
+  // Try exact key, then prefix-based key (e.g. "Reading Root.tsx" → "Reading")
+  if (STEP_DURATIONS[status] != null) return STEP_DURATIONS[status];
+  for (const k of Object.keys(STEP_DURATIONS)) {
+    if (status.startsWith(k + ' ') || status.startsWith(k + ':')) return STEP_DURATIONS[k];
+  }
+  return STEP_DURATIONS['Tool'] || 4;
 }
 
 function formatDuration(sec) {
@@ -2280,20 +2745,47 @@ function makeProgressUI(thinkingBody, estimateSeconds) {
   const fill = thinkingBody.querySelector('.progress-bar-fill');
   const bar = thinkingBody.querySelector('.progress-bar');
   const elapsedEl = thinkingBody.querySelector('.thinking-elapsed');
+  const etaEl = thinkingBody.querySelector('.thinking-eta');
   const start = Date.now();
   let completed = false;
-  // Time constant for the bar's asymptotic fill — not shown to the user.
-  // The bar still creeps forward so it doesn't look frozen between status
-  // updates, but no fake countdown is displayed.
-  const T = Math.max(8, estimateSeconds || 30);
   const CAP = 92;
+
+  // Step-aware ETA — resets the "deadline" each time the status changes to
+  // (now + duration_for_current_step + duration_of_steps_likely_to_follow).
+  let stepStart = Date.now();
+  let stepDuration = STEP_DURATIONS['Thinking'];
+  let stepRemainingAfter = remainingAfter('Thinking');
+  let currentStatus = 'Thinking';
+
+  function setStatus(text) {
+    if (!text || text === currentStatus) return;
+    currentStatus = text;
+    stepStart = Date.now();
+    stepDuration = durationFor(text);
+    stepRemainingAfter = remainingAfter(text);
+  }
 
   function tick() {
     if (completed) return;
     const sec = (Date.now() - start) / 1000;
     const s = Math.floor(sec);
     if (s >= 1) elapsedEl.textContent = (s < 60) ? s + 's' : (Math.floor(s / 60) + 'm ' + (s % 60) + 's');
-    const pct = (1 - Math.exp(-sec / T)) * CAP;
+
+    // ETA = (time left in this step) + (duration of remaining steps)
+    const stepElapsed = (Date.now() - stepStart) / 1000;
+    const stepLeft = Math.max(0, stepDuration - stepElapsed);
+    const totalLeft = stepLeft + stepRemainingAfter;
+    if (etaEl) {
+      if (totalLeft > 1) {
+        etaEl.textContent = '~' + formatDuration(totalLeft) + ' left';
+      } else {
+        etaEl.textContent = 'finishing up';
+      }
+    }
+
+    // Progress bar — use total elapsed vs. total estimated
+    const totalEstimate = stepDuration + stepRemainingAfter + (stepStart - start) / 1000 || 30;
+    const pct = (1 - Math.exp(-sec / Math.max(8, totalEstimate))) * CAP;
     fill.style.width = Math.min(pct, CAP).toFixed(1) + '%';
   }
   const timer = setInterval(tick, 200);
@@ -2306,7 +2798,8 @@ function makeProgressUI(thinkingBody, estimateSeconds) {
       bar.classList.add('complete');
       fill.style.width = '100%';
     },
-    cleanup() { clearInterval(timer); }
+    cleanup() { clearInterval(timer); },
+    setStatus,
   };
 }
 function addReceipt(msgWrap, result) {
@@ -2650,6 +3143,7 @@ async function sendMessage() {
       try {
         const { text } = JSON.parse(ev.data);
         if (text && labelEl) labelEl.textContent = text;
+        if (text && progressUI && progressUI.setStatus) progressUI.setStatus(text);
       } catch {}
     });
     progressES.addEventListener('done', () => {

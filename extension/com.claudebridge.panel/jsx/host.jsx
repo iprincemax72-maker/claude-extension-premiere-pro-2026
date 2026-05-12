@@ -245,6 +245,153 @@ function ccImportFile(path) {
     }
 }
 
+// Return info about the currently selected timeline clip — its source media
+// path, duration, in/out points, and track. The panel needs the source path
+// to ffmpeg the audio for silence detection.
+function ccGetSelectedClip() {
+    try {
+        if (typeof app === "undefined" || !app || !app.project) {
+            return JSON.stringify({ ok: false, error: "no project" });
+        }
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) return JSON.stringify({ ok: false, error: "no active sequence" });
+        var found = null;
+        var trackKind = null;
+        var trackIdx = -1;
+
+        // Walk video tracks first, then audio tracks, find first selected clip
+        var checkTrack = function (track, kind, idx) {
+            var clips = _ccSafe(function () { return track.clips; });
+            if (!clips) return;
+            for (var i = 0; i < clips.numItems; i++) {
+                var c = _ccSafe(function () { return clips[i]; });
+                if (c && c.isSelected && c.isSelected()) {
+                    found = c; trackKind = kind; trackIdx = idx; return;
+                }
+            }
+        };
+
+        var vTracks = _ccSafe(function () { return seq.videoTracks; });
+        if (vTracks) {
+            for (var v = 0; v < vTracks.numTracks && !found; v++) {
+                checkTrack(vTracks[v], "video", v);
+            }
+        }
+        if (!found) {
+            var aTracks = _ccSafe(function () { return seq.audioTracks; });
+            if (aTracks) {
+                for (var a = 0; a < aTracks.numTracks && !found; a++) {
+                    checkTrack(aTracks[a], "audio", a);
+                }
+            }
+        }
+        if (!found) return JSON.stringify({ ok: false, error: "no clip selected" });
+
+        var pi = _ccSafe(function () { return found.projectItem; });
+        var path = "";
+        if (pi) {
+            path = _ccSafe(function () { return pi.getMediaPath && pi.getMediaPath(); }) || "";
+        }
+
+        var clipStart = _ccSafe(function () { return found.start && found.start.seconds; });
+        var clipEnd   = _ccSafe(function () { return found.end && found.end.seconds; });
+        var clipInPt  = _ccSafe(function () { return found.inPoint && found.inPoint.seconds; });
+        var clipOutPt = _ccSafe(function () { return found.outPoint && found.outPoint.seconds; });
+        var clipDur   = (typeof clipEnd === "number" && typeof clipStart === "number") ? (clipEnd - clipStart) : null;
+
+        return JSON.stringify({
+            ok: true,
+            name: found.name || "",
+            path: path,
+            track: trackKind + (trackIdx + 1),
+            trackKind: trackKind,
+            trackIdx: trackIdx,
+            timelineStart: clipStart,
+            timelineEnd: clipEnd,
+            inPoint: clipInPt,
+            outPoint: clipOutPt,
+            duration: clipDur,
+        });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e) });
+    }
+}
+
+// Apply a list of cuts to the currently selected timeline clip. Each cut is
+// { start, end } in seconds relative to the SOURCE media (not the timeline).
+// Strategy: razor the clip at each cut boundary, ripple-delete the segment.
+// Done in reverse-time order so earlier cut indices don't shift.
+function ccApplyAutoCuts(cutsJson) {
+    try {
+        if (typeof app === "undefined" || !app || !app.project) {
+            return JSON.stringify({ ok: false, error: "no project" });
+        }
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) return JSON.stringify({ ok: false, error: "no active sequence" });
+
+        var cuts;
+        try { cuts = JSON.parse(cutsJson); } catch (e) { return JSON.stringify({ ok: false, error: "bad cuts json" }); }
+        if (!cuts || !cuts.length) return JSON.stringify({ ok: false, error: "no cuts" });
+
+        // Find the currently selected clip again (Premiere may have re-indexed)
+        var selRaw = ccGetSelectedClip();
+        var sel = JSON.parse(selRaw);
+        if (!sel.ok) return selRaw;
+
+        var inPt = (typeof sel.inPoint === "number") ? sel.inPoint : 0;
+        var timelineStart = (typeof sel.timelineStart === "number") ? sel.timelineStart : 0;
+
+        // Sort cuts descending so we cut from the END first, preserving the
+        // earlier indices' timeline positions through the ripple deletes.
+        cuts.sort(function (a, b) { return b.start - a.start; });
+
+        var applied = 0;
+        var failed = 0;
+        for (var i = 0; i < cuts.length; i++) {
+            var c = cuts[i];
+            if (typeof c.start !== "number" || typeof c.end !== "number") { failed++; continue; }
+            // Translate source-relative seconds to timeline-relative seconds
+            var tStart = timelineStart + (c.start - inPt);
+            var tEnd   = timelineStart + (c.end   - inPt);
+
+            var ok = _ccSafe(function () {
+                // Razor at the two boundaries, then ripple-delete the middle
+                if (seq.razor) seq.razor(tStart, true, true);
+                if (seq.razor) seq.razor(tEnd, true, true);
+                return true;
+            });
+            if (!ok) { failed++; continue; }
+
+            // After razoring, find the segment whose timelineStart >= tStart and
+            // timelineEnd <= tEnd, on the same track, and delete it.
+            var trackList = (sel.trackKind === "audio") ? seq.audioTracks : seq.videoTracks;
+            var track = _ccSafe(function () { return trackList[sel.trackIdx]; });
+            if (!track) { failed++; continue; }
+            var clips = _ccSafe(function () { return track.clips; });
+            if (!clips) { failed++; continue; }
+
+            var deleted = false;
+            for (var k = 0; k < clips.numItems; k++) {
+                var cc = clips[k];
+                var cs = _ccSafe(function () { return cc.start && cc.start.seconds; });
+                var ce = _ccSafe(function () { return cc.end && cc.end.seconds; });
+                if (typeof cs === "number" && typeof ce === "number" &&
+                    cs >= tStart - 0.05 && ce <= tEnd + 0.05) {
+                    var rip = _ccSafe(function () {
+                        if (cc.remove) { cc.remove(true, true); return true; }
+                        return false;
+                    });
+                    if (rip) { deleted = true; break; }
+                }
+            }
+            if (deleted) applied++; else failed++;
+        }
+        return JSON.stringify({ ok: true, applied: applied, failed: failed });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e) });
+    }
+}
+
 // Toggle the panel's frame maximize state (same as Premiere's default backtick
 // shortcut). CEP textareas eat backtick before Premiere sees it, so the panel
 // JS forwards the keystroke through ExtendScript instead.

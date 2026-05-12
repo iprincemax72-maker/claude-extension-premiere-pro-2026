@@ -575,6 +575,78 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Auto-cut endpoint — bridge runs ffmpeg silencedetect on the source media,
+  // optionally invokes claude to scan the transcript for false starts / repeats,
+  // and returns a structured list of cut suggestions.
+  if (req.method === 'POST' && req.url === '/autocut') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      let payload;
+      try { payload = JSON.parse(body); }
+      catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+      const { clipPath, clipDuration } = payload;
+      if (!clipPath) { res.writeHead(400); res.end('{"error":"missing clipPath"}'); return; }
+      if (!fs.existsSync(clipPath)) { res.writeHead(404); res.end('{"error":"file not found"}'); return; }
+
+      broadcastProgress('Detecting silences');
+
+      // Run ffmpeg silencedetect — gives us "silence_start" and "silence_end" lines
+      // in stderr. Conservative defaults: noise -30dB, min 0.6s duration.
+      const silenceArgs = ['-i', clipPath, '-af', 'silencedetect=noise=-30dB:d=0.6', '-f', 'null', '-'];
+      const ff = spawn('ffmpeg', silenceArgs);
+      let ffStderr = '';
+      ff.stderr.on('data', d => ffStderr += d.toString());
+      ff.on('error', err => {
+        try { res.writeHead(500); res.end(JSON.stringify({ error: 'ffmpeg failed: ' + err.message })); } catch {}
+        broadcastProgressDone();
+      });
+      ff.on('close', () => {
+        broadcastProgress('Parsing silences');
+        const cuts = [];
+        const re = /silence_start:\s*([\d.]+)|silence_end:\s*([\d.]+)\s*\|\s*silence_duration:\s*([\d.]+)/g;
+        let lastStart = null;
+        let m;
+        while ((m = re.exec(ffStderr)) !== null) {
+          if (m[1] !== undefined) {
+            lastStart = parseFloat(m[1]);
+          } else if (m[2] !== undefined && lastStart !== null) {
+            const end = parseFloat(m[2]);
+            const dur = parseFloat(m[3]);
+            cuts.push({
+              start: lastStart,
+              end: end,
+              duration: dur,
+              kind: 'silence',
+              reason: 'long pause (' + dur.toFixed(1) + 's)',
+            });
+            lastStart = null;
+          }
+        }
+
+        // Cap and clamp — never propose a cut beyond the clip
+        let totalCut = 0;
+        const safeClipDuration = (typeof clipDuration === 'number' && clipDuration > 0) ? clipDuration : Number.MAX_SAFE_INTEGER;
+        const filtered = cuts.filter(c => c.end <= safeClipDuration + 0.5);
+        for (const c of filtered) totalCut += c.duration;
+
+        broadcastProgressDone();
+        try {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            cuts: filtered,
+            totalCut,
+            method: 'ffmpeg-silencedetect',
+            note: 'Pauses ≥0.6s at -30dB. Transcript-based repeat detection coming next.',
+          }));
+        } catch {}
+      });
+
+      req.on('aborted', () => { try { ff.kill('SIGKILL'); } catch {} });
+    });
+    return;
+  }
+
   res.writeHead(404); res.end();
 });
 
