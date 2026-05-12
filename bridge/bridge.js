@@ -851,10 +851,12 @@ const server = http.createServer((req, res) => {
       let stderr = '';
       let lineBuf = '';
       let finalReply = '';
+      let lastActivity = Date.now();
 
       proc.stderr.on('data', d => stderr += d);
 
       proc.stdout.on('data', chunk => {
+        lastActivity = Date.now();
         lineBuf += chunk.toString();
         let nl;
         while ((nl = lineBuf.indexOf('\n')) >= 0) {
@@ -883,19 +885,44 @@ const server = http.createServer((req, res) => {
       });
 
       let chatDone = false;
+
+      // Idle watchdog — if Claude emits no stream-json events for 3 minutes,
+      // kill it. Catches the "0% CPU forever" hang. 3 min is generous so a
+      // legitimate long render isn't interrupted while the actual ffmpeg /
+      // remotion subprocess is running (those emit no claude events).
+      const IDLE_TIMEOUT_MS = 3 * 60 * 1000;
+      const idleCheck = setInterval(() => {
+        if (chatDone) { clearInterval(idleCheck); return; }
+        const idle = Date.now() - lastActivity;
+        if (idle > IDLE_TIMEOUT_MS) {
+          console.log('  [chat] idle ' + Math.round(idle/1000) + 's — killing claude');
+          try { proc.kill('SIGKILL'); } catch {}
+        }
+      }, 30000);
+
+      // Hard timeout — chat can't ever take more than 10 minutes
+      const HARD_TIMEOUT_MS = 10 * 60 * 1000;
+      const hardKiller = setTimeout(() => {
+        if (chatDone) return;
+        console.log('  [chat] hard timeout — killing claude');
+        try { proc.kill('SIGKILL'); } catch {}
+      }, HARD_TIMEOUT_MS);
+
       const sendErr = (m) => {
         if (chatDone) return; chatDone = true;
+        clearInterval(idleCheck); clearTimeout(hardKiller);
         broadcastProgressDone();
         try { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: m })); } catch {}
       };
       const sendOk = (obj) => {
         if (chatDone) return; chatDone = true;
+        clearInterval(idleCheck); clearTimeout(hardKiller);
         broadcastProgressDone();
         try { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); } catch {}
       };
 
       req.on('aborted', () => {
-        if (!chatDone) { try { proc.kill('SIGKILL'); } catch {} chatDone = true; broadcastProgressDone(); }
+        if (!chatDone) { try { proc.kill('SIGKILL'); } catch {} chatDone = true; clearInterval(idleCheck); clearTimeout(hardKiller); broadcastProgressDone(); }
       });
 
       proc.on('error', err => {
