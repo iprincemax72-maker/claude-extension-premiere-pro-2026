@@ -932,7 +932,7 @@ const server = http.createServer((req, res) => {
       let payload;
       try { payload = JSON.parse(body); }
       catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
-      const { clipPath, clipDuration, useTranscript } = payload;
+      const { clipPath, clipDuration, clipIn, clipOut, useTranscript } = payload;
       if (!clipPath) { res.writeHead(400); res.end('{"error":"missing clipPath"}'); return; }
       if (!fs.existsSync(clipPath)) { res.writeHead(404); res.end('{"error":"file not found"}'); return; }
 
@@ -940,10 +940,30 @@ const server = http.createServer((req, res) => {
         // Silence-only by default. Fast, reliable, doesn't involve Claude.
         // useTranscript is opt-in from Settings (false until user enables it).
         broadcastProgress('Detecting silences', 5);
-        const silenceCuts = await detectSilences(clipPath, clipDuration, (p) => {
-          // ffmpeg progress 0..1 → 5..95% in silence-only mode
+        const allSilences = await detectSilences(clipPath, clipDuration, (p) => {
           broadcastProgress('Detecting silences', 5 + p * 90);
         });
+
+        // CRITICAL — ffmpeg scans the whole source media, but the clip on the
+        // timeline only uses [clipIn, clipOut]. Silences outside that range
+        // are NOT cuts to apply; they map to content that isn't even on the
+        // timeline, and applying them would ripple-delete the wrong things.
+        const inP  = (typeof clipIn  === 'number') ? clipIn  : 0;
+        const outP = (typeof clipOut === 'number') ? clipOut : Number.MAX_SAFE_INTEGER;
+        const silenceCuts = allSilences
+          .map(c => {
+            // Clip the silence to the [inP, outP] window
+            const start = Math.max(c.start, inP);
+            const end   = Math.min(c.end,   outP);
+            if (end - start < 0.3) return null;  // sliver — skip
+            const dur = end - start;
+            return {
+              start, end, duration: dur, kind: 'silence',
+              reason: 'long pause (' + dur.toFixed(1) + 's)',
+            };
+          })
+          .filter(Boolean);
+        console.log('  [autocut] silences in source: ' + allSilences.length + ', within clip [' + inP.toFixed(2) + ',' + outP.toFixed(2) + ']: ' + silenceCuts.length);
 
         let finalCuts = silenceCuts;
         let transcribed = false;

@@ -1885,7 +1885,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">3.4</span>
+    <span class="version-tag" id="versionTag">3.5</span>
   </div>
   <div style="display:flex;align-items:center">
     <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
@@ -2650,7 +2650,15 @@ async function runAutoCut() {
     const r = await fetch(BRIDGE + '/autocut', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clipPath: sel.path, clipDuration: sel.duration, useTranscript }),
+      body: JSON.stringify({
+        clipPath: sel.path,
+        clipDuration: sel.duration,
+        // Source-relative in/out so the bridge can filter silences to ONLY the
+        // portion of the source file that's actually used on the timeline.
+        clipIn:  (typeof sel.inPoint  === 'number') ? sel.inPoint  : 0,
+        clipOut: (typeof sel.outPoint === 'number') ? sel.outPoint : (sel.duration || 1e9),
+        useTranscript,
+      }),
     });
     const data = await r.json();
     progressUI.complete();
@@ -2880,7 +2888,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '3.4';
+  const PANEL_VERSION = '3.5';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
