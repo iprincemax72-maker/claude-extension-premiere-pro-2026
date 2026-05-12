@@ -1153,7 +1153,9 @@ const server = http.createServer((req, res) => {
       let payload;
       try { payload = JSON.parse(body); }
       catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
-      const { clipPath, clipDuration, clipIn, clipOut, useTranscript } = payload;
+      const { clipPath, clipDuration, clipIn, clipOut, useTranscript, includeSilence } = payload;
+      // includeSilence defaults to true for backwards compat with older panels
+      const wantSilence = (includeSilence === undefined) ? true : !!includeSilence;
       if (!clipPath) { res.writeHead(400); res.end('{"error":"missing clipPath"}'); return; }
       if (!fs.existsSync(clipPath)) { res.writeHead(404); res.end('{"error":"file not found"}'); return; }
 
@@ -1186,17 +1188,20 @@ const server = http.createServer((req, res) => {
           .filter(Boolean);
         console.log('  [autocut] silences in source: ' + allSilences.length + ', within clip [' + inP.toFixed(2) + ',' + outP.toFixed(2) + ']: ' + silenceCuts.length);
 
-        let finalCuts = silenceCuts;
+        // Honor includeSilence — if user only wants repeats, drop silence cuts
+        // but still keep them around for the transcript-merge logic.
+        let finalCuts = wantSilence ? silenceCuts : [];
         let transcribed = false;
-        let summary = silenceCuts.length
+        let summary = (wantSilence && silenceCuts.length)
           ? ('Found ' + silenceCuts.length + ' pauses. Cutting ' + silenceCuts.reduce((s,c) => s + (c.end-c.start), 0).toFixed(1) + 's total.')
-          : 'No pauses detected.';
+          : (wantSilence ? 'No pauses detected.' : null);
 
         if (useTranscript) {
           // New local-whisper pipeline: bridge runs ffmpeg → whisper-cli →
-          // claude (analysis only, no tools). Hard timeouts at every step
-          // so it can't hang the way the old "claude does everything" path did.
-          const analysisResult = await transcriptCutsLocal(clipPath, clipDuration, inP, outP, silenceCuts);
+          // claude (analysis only). Pass the silence set we want included so
+          // they're merged into the final cut list.
+          const baseSilences = wantSilence ? silenceCuts : [];
+          const analysisResult = await transcriptCutsLocal(clipPath, clipDuration, inP, outP, baseSilences);
           if (analysisResult.cuts && analysisResult.cuts.length) {
             finalCuts = analysisResult.cuts;
             transcribed = !!analysisResult.transcribed;
