@@ -15,18 +15,10 @@ const PANEL_DIR = (process.platform === 'win32')
   : path.join(os.homedir(), 'Library', 'Application Support', 'Adobe', 'CEP', 'extensions', 'com.claudebridge.panel');
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
-// Live-reload — fs.watch on the panel index, broadcasts to any open SSE client
-const devReloadClients = new Set();
-let _reloadDebounce = null;
-function broadcastReload() {
-  if (_reloadDebounce) return;
-  _reloadDebounce = setTimeout(() => {
-    _reloadDebounce = null;
-    for (const c of devReloadClients) {
-      try { c.write('event: reload\ndata: 1\n\n'); } catch {}
-    }
-  }, 120);
-}
+// Dev-mode live-reload removed — was causing the bridge to degrade after
+// SSE clients accumulated (claude spawns hung after a few minutes of panel
+// uptime). Production panels reload manually via Window → Extensions →
+// Claude when needed.
 
 // Track the currently-running autocut claude subprocess so /autocut-cancel
 // can kill it cleanly. null when no autocut is in flight.
@@ -406,31 +398,7 @@ function toolUseToStatus(block) {
   if (name)                 return 'Tool: ' + name;
   return null;
 }
-try {
-  const watchTarget = path.join(PANEL_DIR, 'index.html');
-  if (fs.existsSync(watchTarget)) {
-    fs.watch(watchTarget, { persistent: false }, () => broadcastReload());
-  }
-} catch (e) { console.error('live-reload watcher failed:', e.message); }
-
-// Hot-reload host.jsx — when the ExtendScript file changes, push a separate
-// event so the panel can re-evaluate the jsx in place without closing.
-let _jsxReloadDebounce = null;
-function broadcastJsxReload() {
-  if (_jsxReloadDebounce) return;
-  _jsxReloadDebounce = setTimeout(() => {
-    _jsxReloadDebounce = null;
-    for (const c of devReloadClients) {
-      try { c.write('event: jsx-reload\ndata: 1\n\n'); } catch {}
-    }
-  }, 120);
-}
-try {
-  const jsxTarget = path.join(PANEL_DIR, 'jsx', 'host.jsx');
-  if (fs.existsSync(jsxTarget)) {
-    fs.watch(jsxTarget, { persistent: false }, () => broadcastJsxReload());
-  }
-} catch (e) { console.error('jsx watcher failed:', e.message); }
+// fs.watch and jsx hot-reload removed along with the dev SSE.
 
 
 const COMPLETION_SYSTEM = `You are an inline autocomplete running inside an Adobe Premiere Pro extension panel. The user is mid-sentence, writing a natural-language request for AI-generated motion graphics, transitions, intros, lower thirds, callouts, or any other video element.
@@ -571,37 +539,7 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  // Dev mode — serve the panel UI in Chrome at http://localhost:3737/panel
-  // so the user can iterate on index.html without reloading Premiere Pro.
-  // CEP-only features (timeline import, source monitor) won't work in Chrome,
-  // but chat / expand / autocomplete / preview all do.
-  if (req.method === 'GET' && (req.url === '/panel' || req.url === '/panel/' || req.url.startsWith('/panel?'))) {
-    try {
-      const indexPath = path.join(PANEL_DIR, 'index.html');
-      if (!fs.existsSync(indexPath)) { res.writeHead(404); res.end('panel not found at ' + PANEL_DIR); return; }
-      res.writeHead(200, {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-      });
-      res.end(fs.readFileSync(indexPath));
-    } catch (e) { res.writeHead(500); res.end('error: ' + e.message); }
-    return;
-  }
-
-  // SSE stream that pushes a 'reload' event whenever index.html changes on
-  // disk. The dev-mode tab listens to this and refreshes automatically.
-  if (req.method === 'GET' && req.url === '/dev/reload-stream') {
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    });
-    res.write(': connected\n\n');
-    const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 25000);
-    devReloadClients.add(res);
-    req.on('close', () => { clearInterval(ping); devReloadClients.delete(res); });
-    return;
-  }
+  // (dev /panel and /dev/reload-stream removed)
 
   // Real-time progress channel — panel subscribes when sending /chat so the
   // "Working" indicator can swap in to "Writing component", "Rendering video",
