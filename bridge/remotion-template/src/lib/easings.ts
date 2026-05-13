@@ -40,15 +40,37 @@ export const EASE = {
 
   // Cinematic — slow start, slow end, smooth middle. Premium feel.
   cinematic: Easing.bezier(0.65, 0, 0.35, 1),
+
+  // ─── TRENDING 2025-2026 ───
+
+  // TikTok punch — almost instant, hits like a frame-1 cut.
+  // For caption pops, beat hits, jump-scare reveals.
+  tiktokPunch: Easing.bezier(0.18, 0.89, 0.32, 1.27),
+
+  // Liquid flow — for morphs, blob transitions, organic motion.
+  liquidFlow: Easing.bezier(0.83, 0, 0.17, 1),
+
+  // Exponential out — extreme slowdown at the end, premium product feel.
+  // Use for hero text in product launch / luxury content.
+  expoOut: Easing.bezier(0.16, 1, 0.1, 1),
+
+  // Elastic — strong rubber-band overshoot. Sticker slams, "WOW" reveals.
+  elastic: Easing.bezier(0.5, -0.5, 0.1, 1.5),
+
+  // Drag — heavy easing-in, feels like the object resisted before flying.
+  // Use for kinetic-type drops where the word "falls" with weight.
+  drag: Easing.bezier(0.95, 0.05, 0.2, 0.9),
 };
 
 // Standard durations (in frames at 30fps). Use these instead of magic numbers.
 // At 60fps, double them.
 export const FRAMES = {
-  micro:  6,    // 0.2s — emoji bounce
-  short:  9,    // 0.3s — punchy text drop
+  micro:  6,    // 0.2s — emoji bounce, beat hit
+  short:  9,    // 0.3s — punchy text drop, TikTok caption
   base:   15,   // 0.5s — most things
   medium: 24,   // 0.8s — hero reveal
   long:   36,   // 1.2s — slow cinematic
   hold:   45,   // 1.5s — pause holds
+  beat:   18,   // 0.6s — one beat at 100bpm
+  whip:   8,    // 0.27s — whip pan transition
 };

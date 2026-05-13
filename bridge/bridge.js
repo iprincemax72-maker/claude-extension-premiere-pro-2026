@@ -24,6 +24,10 @@ fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 // can kill it cleanly. null when no autocut is in flight.
 let _activeAutocut = null;
 
+// AUTO EDIT — handle for the currently-running pipeline so /autoedit-cancel
+// can kill it. Holds { children: Set<ChildProcess>, aborted: bool }.
+let _activeAutoedit = null;
+
 // Resolve an absolute path to ffmpeg — falls back to bare 'ffmpeg' if no
 // absolute path is found. Needed because the bridge may be auto-spawned by
 // CEP with a minimal PATH that doesn't include brew bins.
@@ -185,33 +189,67 @@ function runWhisper(wavPath, audioDuration) {
 // Ask Claude (small, fast call) to scan the transcript for fillers + false
 // starts. Claude doesn't need any tools — just reads text, returns JSON. So
 // no hanging on tool I/O. 60s hard cap. Used only when useTranscript is true.
-function analyseTranscriptWithClaude(transcript) {
+function analyseTranscriptWithClaude(transcript, opts) {
+  opts = opts || {};
+  const findFillers = (opts.findFillers !== undefined) ? !!opts.findFillers : true;
+  const findRepeats = (opts.findRepeats !== undefined) ? !!opts.findRepeats : true;
+
   return new Promise(resolve => {
     if (!transcript || !transcript.length) return resolve({ cuts: [], summary: 'transcript empty' });
+    if (!findFillers && !findRepeats) return resolve({ cuts: [], summary: 'nothing requested' });
 
     const transcriptText = transcript.map(s =>
       '[' + s.start.toFixed(2) + '-' + s.end.toFixed(2) + '] ' + s.text
     ).join('\n');
 
+    // Build the "what to look for" section based on user opt-ins. Strong,
+    // example-driven phrasing — especially for partial-word false starts
+    // which the old prompt missed ("maybe it was th-" → "maybe it was the fear").
+    const lookFor = [];
+    if (findFillers) {
+      lookFor.push(
+        'FILLER words to remove:',
+        '  - "um", "uh", "uhh", "umm", "er"',
+        '  - "like" when used as a verbal tic (NOT "like a cat" — that\'s a real word)',
+        '  - "you know", "I mean", "sorta", "kinda"',
+        '  - "actually" / "basically" / "literally" when used redundantly',
+        '  Cut a filler the moment you spot it. Include the trailing breath/pause if any.'
+      );
+    }
+    if (findRepeats) {
+      lookFor.push(
+        'REPEATED SENTENCES, FALSE STARTS, AND SELF-CORRECTIONS to remove:',
+        '  These are the MOST IMPORTANT cuts. Be AGGRESSIVE about catching them.',
+        '  - PARTIAL-WORD false start: "maybe it was th-" then "maybe it was the fear" → CUT "maybe it was th-".',
+        '    Watch for words that whisper transcribed as truncated stems: "th", "wha", "becau", "som", "rememb", short fragments ending in a consonant before the speaker restarts.',
+        '  - PHRASE REDO: "I went to the store — I went to the grocery store" → CUT the first version, keep the more complete second.',
+        '  - SELF-CORRECTION: "the red car, no, the blue car" → CUT "the red car, no,".',
+        '  - REPEATED FILLER PHRASES: "so, so the thing is" → CUT the first "so,".',
+        '  - HESITATION RESTART: speaker says a word, pauses 0.5s+, then says it again. CUT the first attempt.',
+        '  - When in doubt about whether a fragment is a false start, LOOK at the next sentence. If the speaker is restating a similar phrase, the first one IS a false start — CUT IT.',
+        '  Cuts should INCLUDE the partial fragment AND the pause/breath that follows it, up until the speaker resumes.'
+      );
+    }
+
     const userMsg = [
       'Here is a word-level transcript of a talking-head clip. Each line is one word with its start-end in seconds.',
       '',
-      transcriptText.slice(0, 12000), // cap so prompt stays small
+      transcriptText.slice(0, 16000), // bumped cap — longer clips need full context
       '',
-      'Find UNWANTED spans I should cut out:',
-      '- FILLER words: "um", "uh", "like" (only as filler — not "like a cat"), "you know", "I mean", "sorta", "kinda", redundant "actually"/"basically".',
-      '- FALSE STARTS: speaker starts a phrase, stops, restarts. Cut the broken first attempt; keep the better take.',
-      '- SELF-CORRECTIONS: "I went— I came back." — cut the wrong half.',
+      'Find UNWANTED spans to cut out:',
       '',
-      'For each cut, use the timestamps from the transcript. Be conservative — when unsure, skip.',
+      ...lookFor,
+      '',
+      'For each cut, use the timestamps shown in the transcript (be generous on the END to include the breath/pause).',
+      'It is BETTER to cut a slightly-too-long span than to leave a stutter in. Lean toward MORE cuts, not fewer.',
       '',
       'Output EXACTLY this JSON, nothing else (no prose, no fences, no commentary):',
-      '{"cuts":[{"start":2.30,"end":3.10,"kind":"filler","reason":"um"}],"summary":"Found 3 fillers and 1 false start."}',
+      '{"cuts":[{"start":2.30,"end":3.10,"kind":"false_start","reason":"truncated word \'th-\' before restart"}],"summary":"Found 3 fillers and 5 false starts."}',
       '',
       '"kind" must be: filler | false_start | mistake. start and end are seconds.',
     ].join('\n');
 
-    const sysPrompt = 'You are an audio editing assistant. Return ONLY valid JSON. No tool use needed — just read the transcript and emit cut ranges.';
+    const sysPrompt = 'You are an audio editing assistant. Return ONLY valid JSON. No tool use — just read the transcript and emit cut ranges. Be AGGRESSIVE about catching false starts and self-corrections; the user is editing a talking-head video and wants a clean final cut.';
 
     const args = [
       '-p',
@@ -255,29 +293,53 @@ function analyseTranscriptWithClaude(transcript) {
 
 // Master transcript path — local whisper + claude analyze. Replaces the old
 // "Claude does everything" implementation that hung forever.
-async function transcriptCutsLocal(clipPath, clipDuration, clipIn, clipOut, silenceCuts, reqId) {
+async function transcriptCutsLocal(clipPath, clipDuration, clipIn, clipOut, silenceCuts, reqId, opts) {
+  opts = opts || {};
+  const findFillers = (opts.findFillers !== undefined) ? !!opts.findFillers : true;
+  const findRepeats = (opts.findRepeats !== undefined) ? !!opts.findRepeats : true;
+  const log = opts.log || (() => {});
+
   const audioDur = (clipOut - clipIn) || clipDuration || 60;
   // 1. Extract audio chunk
   broadcastProgress('Extracting audio', 20, reqId);
   let wavPath;
   try { wavPath = await extractAudioForWhisper(clipPath, clipIn, clipOut); }
-  catch (e) { console.log('  [autocut] audio extract failed: ' + e.message); return { cuts: silenceCuts, transcribed: false, summary: null }; }
+  catch (e) {
+    log(`audio extract failed: ${e.message}`);
+    console.log('  [autocut] audio extract failed: ' + e.message);
+    return { cuts: silenceCuts, transcribed: false, summary: null };
+  }
 
   // 2. Whisper transcribe
   broadcastProgress('Transcribing (whisper)', 35, reqId);
   let transcript;
   try { transcript = await runWhisper(wavPath, audioDur); }
   catch (e) {
+    log(`whisper failed: ${e.message}`);
     console.log('  [autocut] whisper failed: ' + e.message);
     try { fs.unlinkSync(wavPath); } catch {}
     return { cuts: silenceCuts, transcribed: false, summary: null };
   }
   console.log('  [autocut] whisper transcribed ' + transcript.length + ' segments');
+  log(`whisper produced ${transcript.length} segments (word-level)`);
+  // Dump the transcript so we can see exactly what Claude saw. Limit lines.
+  for (let i = 0; i < Math.min(transcript.length, 500); i++) {
+    const s = transcript[i];
+    log(`  wd[${i}] ${s.start.toFixed(2)}-${s.end.toFixed(2)}: ${s.text}`);
+  }
 
   // 3. Claude analyses the transcript (no tool use — just text in, JSON out)
-  broadcastProgress('Finding fillers', 70, reqId);
-  const analysis = await analyseTranscriptWithClaude(transcript);
+  const progressLabel = findFillers && findRepeats ? 'Finding fillers + repeats'
+                     : findRepeats ? 'Finding repeats / false starts'
+                     :               'Finding fillers';
+  broadcastProgress(progressLabel, 70, reqId);
+  const analysis = await analyseTranscriptWithClaude(transcript, { findFillers, findRepeats });
   console.log('  [autocut] claude found ' + analysis.cuts.length + ' filler/false-start cuts');
+  log(`Claude returned ${analysis.cuts.length} transcript cuts. summary=${analysis.summary || '(none)'}`);
+  for (let i = 0; i < analysis.cuts.length; i++) {
+    const c = analysis.cuts[i];
+    log(`  cl[${i}] ${(c.start || 0).toFixed(2)}-${(c.end || 0).toFixed(2)} kind=${c.kind || '?'} reason=${(c.reason || '').slice(0, 100)}`);
+  }
 
   // 4. Translate Claude's cuts (which are relative to clip start) back to
   //    source-time, then merge with silence cuts.
@@ -559,6 +621,280 @@ function ensurePremiereImportable(absPath) {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  AUTO EDIT — pipeline helpers
+// ═══════════════════════════════════════════════════════════════════════
+
+// Send sentence-level transcript to Claude and ask for a JSON list of
+// "moments" — points in the video that deserve a motion graphic. Returns
+// an array of Moment objects (see schema above the /autoedit endpoint).
+function detectMoments(sentences, density, styleOverride, reqId, log) {
+  return new Promise((resolve) => {
+    const targetCount = density === 'sparse' ? Math.max(3, Math.floor(sentences.length / 18))
+                      : density === 'dense'  ? Math.max(8, Math.floor(sentences.length / 6))
+                      :                        Math.max(5, Math.floor(sentences.length / 10));
+
+    // Cap the prompt size — Claude struggles with very long transcripts AND
+    // the 0%-CPU hang risk goes up the bigger the prompt. For >600-sentence
+    // transcripts we sample down: keep every Nth sentence so coverage is
+    // even across the full video. The exact text gets trimmed but timestamps
+    // are still real, so the moments land at the right spots.
+    const MAX_SENTS = 600;
+    let sentsForPrompt = sentences;
+    if (sentences.length > MAX_SENTS) {
+      const stride = Math.ceil(sentences.length / MAX_SENTS);
+      sentsForPrompt = sentences.filter((_, i) => i % stride === 0);
+      log && log(`transcript ${sentences.length} sentences → sampled to ${sentsForPrompt.length} (stride ${stride}) for Claude`);
+    }
+    const transcriptForClaude = sentsForPrompt.map(s =>
+      `[${s.i}] ${s.startSec.toFixed(1)}s-${s.endSec.toFixed(1)}s: ${s.text}`
+    ).join('\n');
+
+    const system = [
+      'You are a motion-graphics editor reviewing a transcript of a video clip.',
+      'You decide where on-screen text/graphics would HELP the viewer — not where to flex.',
+      '',
+      'Output a JSON array of "moments". Each moment is an opportunity for a motion graphic.',
+      'Each moment is an object: { id, type, startSec, endSec, label, payload, confidence }',
+      '',
+      'Moment types (pick the BEST fit; do not stretch to fit):',
+      '  - stat       : a specific number/percentage/measurement was stated. payload: { number: "43%", subject: "growth" }',
+      '  - quote      : a thesis/punchline/memorable line. payload: { text: "the quote", attribution: "Speaker name or empty" }',
+      '  - name       : a person\'s name is introduced. payload: { name: "Jane Doe", subtitle: "role or empty" }',
+      '  - list       : the speaker enumerates 2-5 items. payload: { items: ["one", "two", "three"] }',
+      '  - callout    : a single emphasis word/phrase deserves a sticker badge. payload: { text: "KEY POINT" }',
+      '  - question   : a rhetorical question the speaker poses. payload: { text: "the question" }',
+      '  - section    : a topic shift / new chapter. payload: { title: "what comes next" }',
+      '  - fact       : a supporting fact worth a small side card. payload: { text: "the fact" }',
+      '',
+      'RULES:',
+      '  1. Do NOT add motion graphics to every sentence. Most sentences should NOT become moments.',
+      '  2. Aim for ~' + targetCount + ' moments total across the whole transcript.',
+      '  3. confidence is 0..1. Only include moments with confidence >= 0.6.',
+      '  4. startSec/endSec must come directly from the timestamps in the transcript I gave you.',
+      '  5. id is a short unique string like "m1", "m2", etc.',
+      '  6. label is a 2-6 word human description for logs.',
+      '  7. The audio plays normally underneath — the graphic SUPPORTS the speech, doesn\'t replace it.',
+      '  8. Return ONLY the JSON array. No prose, no markdown fences, no commentary.',
+    ].join('\n');
+
+    const user = 'TRANSCRIPT (sentence index, time range, text):\n' + transcriptForClaude;
+    const fullPrompt = system + '\n\n' + user;
+
+    let stdout = '';
+    let stderr = '';
+    // Resolve claude: use $CLAUDE_CLI if set, otherwise bare 'claude' so the
+    // shell PATH does the lookup (CEP minimal PATH gets extended below).
+    const claudePath = process.env.CLAUDE_CLI || 'claude';
+    const extendedPath = [
+      process.env.PATH || '',
+      '/Users/anshdhakad/.local/bin',
+      '/opt/homebrew/bin',
+      '/usr/local/bin',
+    ].filter(Boolean).join(':');
+    const proc = spawn(claudePath, ['-p', fullPrompt, '--output-format', 'text'], {
+      env: { ...process.env, PATH: extendedPath },
+      cwd: WORK_DIR,
+    });
+    if (_activeAutoedit) _activeAutoedit.children.add(proc);
+
+    // Hard timeout based on transcript length — 60s + 1s per 10 sentences.
+    const timeoutMs = 60000 + Math.min(120000, sentences.length * 100);
+    const killer = setTimeout(() => {
+      log(`moments HARD TIMEOUT (${timeoutMs}ms) — killing claude`);
+      try { proc.kill('SIGKILL'); } catch {}
+    }, timeoutMs);
+
+    // Idle watchdog — if claude produces no stdout/stderr for IDLE_MS, it's
+    // hung at 0% CPU (the known claude CLI bug). Kill it so the request can
+    // recover instead of dangling forever.
+    const IDLE_MS = 60000;
+    let lastOutputAt = Date.now();
+    const idleCheck = setInterval(() => {
+      if (Date.now() - lastOutputAt > IDLE_MS) {
+        log(`moments IDLE WATCHDOG — no output for ${IDLE_MS}ms, killing claude (hang detected)`);
+        try { proc.kill('SIGKILL'); } catch {}
+        clearInterval(idleCheck);
+      }
+    }, 5000);
+
+    proc.stdout.on('data', d => { stdout += d; lastOutputAt = Date.now(); });
+    proc.stderr.on('data', d => { stderr += d; lastOutputAt = Date.now(); });
+    proc.on('close', () => {
+      clearInterval(idleCheck);
+      clearTimeout(killer);
+      if (_activeAutoedit) _activeAutoedit.children.delete(proc);
+      log('moments stdout chars: ' + stdout.length);
+      if (stderr) log('moments stderr: ' + stderr.slice(-500));
+      // Strip any markdown fences or pre-amble Claude might have added
+      const cleaned = stdout
+        .replace(/^[\s\S]*?(\[)/, '$1')         // drop everything before first [
+        .replace(/(\])[\s\S]*$/, '$1')          // drop everything after last ]
+        .trim();
+      let parsed = [];
+      try { parsed = JSON.parse(cleaned); } catch (e) {
+        log('moments parse fail: ' + e.message);
+        log('moments cleaned snippet: ' + cleaned.slice(0, 500));
+      }
+      if (!Array.isArray(parsed)) parsed = [];
+      // Sanity filter
+      parsed = parsed.filter(m =>
+        m && typeof m === 'object'
+        && typeof m.type === 'string'
+        && typeof m.startSec === 'number'
+        && typeof m.endSec === 'number'
+        && m.startSec < m.endSec
+        && m.endSec - m.startSec < 30
+        && (m.confidence == null || m.confidence >= 0.6)
+      );
+      resolve(parsed);
+    });
+    proc.on('error', (e) => { log('moments spawn err: ' + e.message); clearTimeout(killer); resolve([]); });
+  });
+}
+
+// Anti-collision + density cap. Sorts moments by start time, drops anything
+// that lands within `minGapSec` of the previous kept moment, then caps the
+// total to `maxPerMin × clipMinutes`.
+function spaceMoments(moments, minGapSec, maxPerMin, totalDurSec) {
+  const sorted = [...moments].sort((a, b) => a.startSec - b.startSec);
+  const kept = [];
+  let lastEnd = -Infinity;
+  for (const m of sorted) {
+    if (m.startSec - lastEnd < minGapSec) continue;
+    kept.push(m);
+    lastEnd = m.endSec;
+  }
+  const cap = Math.max(1, Math.floor((totalDurSec / 60) * maxPerMin));
+  if (kept.length <= cap) return kept;
+  // Drop the lowest-confidence ones until we're at the cap.
+  return kept
+    .map(m => ({ ...m, _conf: typeof m.confidence === 'number' ? m.confidence : 0.7 }))
+    .sort((a, b) => b._conf - a._conf)
+    .slice(0, cap)
+    .sort((a, b) => a.startSec - b.startSec)
+    .map(({ _conf, ...rest }) => rest);
+}
+
+// Map a moment type + index → a recommended trend pack name. Rotates across
+// moments so adjacent graphics don't share a style.
+function momentTypeToTrendPack(type, idx) {
+  const rotations = {
+    stat:    ['statSlam', 'editorialBrutalist', 'newsTicker'],
+    quote:   ['editorialBrutalist', 'mochaLuxury', 'darkAcademia'],
+    name:    ['newsTicker', 'editorialBrutalist'],
+    list:    ['tiktokKineticCaption', 'editorialBrutalist'],
+    callout: ['confettiHype', 'glitchHype', 'tiktokKineticCaption'],
+    question:['editorialBrutalist', 'darkAcademia'],
+    section: ['editorialBrutalist', 'mochaLuxury'],
+    fact:    ['tiktokKineticCaption', 'mochaLuxury'],
+  };
+  const list = rotations[type] || ['tiktokKineticCaption'];
+  return list[idx % list.length];
+}
+
+// Render each moment as its own short MP4 by calling remotion render with
+// the AutoEditMoment composition and JSON-encoded props. Returns an array
+// of { ok, file, atSec, type, label, durationSec, reason? } in moment order.
+function renderMomentsParallel(moments, reqId, log, onProgress) {
+  const MAX_INFLIGHT = 4;
+  const REMOTION_DIR = path.join(WORK_DIR, 'remotion-intro');
+  const cacheDir = path.join(OUTPUT_DIR, 'cache');
+  try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
+
+  const tasks = moments.map((m, idx) => {
+    // Duration: a touch longer than the speech window, capped 2.5..6s.
+    const speechDur = Math.max(0.5, m.endSec - m.startSec);
+    const durationSec = Math.min(6, Math.max(2.5, speechDur + 0.6));
+    const durationFrames = Math.floor(durationSec * 30); // assume 30fps comp
+    // Hash for caching
+    const propsJson = JSON.stringify({ moment: m, durationFrames });
+    const hash = crypto.createHash('md5').update(propsJson).digest('hex').slice(0, 10);
+    const outFile = path.join(cacheDir, `ae_${reqId.slice(0, 8)}_${idx}_${hash}.mp4`);
+    return { idx, moment: m, propsJson, outFile, durationSec, durationFrames };
+  });
+
+  let done = 0;
+  const total = tasks.length;
+  const results = new Array(total);
+
+  function runOne(task) {
+    return new Promise((resolve) => {
+      if (fs.existsSync(task.outFile)) {
+        log(`render[${task.idx}] cache hit ${task.moment.type}`);
+        results[task.idx] = {
+          ok: true, file: task.outFile, atSec: task.moment.startSec,
+          type: task.moment.type, label: task.moment.label || '',
+          durationSec: task.durationSec, trendPack: task.moment.trendPack,
+        };
+        done++; if (onProgress) onProgress(done, total);
+        resolve();
+        return;
+      }
+
+      const propsArg = '--props=' + task.propsJson;
+      const args = [
+        'remotion', 'render', 'src/index.ts', 'AutoEditMoment',
+        task.outFile, propsArg,
+        '--codec', 'h264',
+        '--log', 'error',
+        '--frames', `0-${task.durationFrames - 1}`,
+      ];
+      const proc = spawn('npx', args, { cwd: REMOTION_DIR, env: process.env });
+      if (_activeAutoedit) _activeAutoedit.children.add(proc);
+
+      const HARD_TIMEOUT_MS = 60000;
+      let killed = false;
+      const killer = setTimeout(() => { killed = true; try { proc.kill('SIGKILL'); } catch {} }, HARD_TIMEOUT_MS);
+
+      let errBuf = '';
+      proc.stderr.on('data', d => { errBuf += d; });
+      proc.on('close', (code) => {
+        clearTimeout(killer);
+        if (_activeAutoedit) _activeAutoedit.children.delete(proc);
+        if (code === 0 && fs.existsSync(task.outFile)) {
+          log(`render[${task.idx}] ok ${task.moment.type} -> ${task.outFile}`);
+          results[task.idx] = {
+            ok: true, file: task.outFile, atSec: task.moment.startSec,
+            type: task.moment.type, label: task.moment.label || '',
+            durationSec: task.durationSec, trendPack: task.moment.trendPack,
+          };
+        } else {
+          const reason = killed ? 'timeout' : `exit ${code}`;
+          log(`render[${task.idx}] fail ${reason} stderr=${errBuf.slice(-400)}`);
+          results[task.idx] = {
+            ok: false, atSec: task.moment.startSec, type: task.moment.type,
+            label: task.moment.label || '', reason,
+          };
+        }
+        done++; if (onProgress) onProgress(done, total);
+        resolve();
+      });
+      proc.on('error', (e) => {
+        clearTimeout(killer);
+        if (_activeAutoedit) _activeAutoedit.children.delete(proc);
+        log(`render[${task.idx}] spawn err ${e.message}`);
+        results[task.idx] = { ok: false, atSec: task.moment.startSec, type: task.moment.type, label: task.moment.label || '', reason: e.message };
+        done++; if (onProgress) onProgress(done, total);
+        resolve();
+      });
+    });
+  }
+
+  // Pool: keep up to MAX_INFLIGHT promises in flight at any time.
+  return new Promise((resolveAll) => {
+    let next = 0;
+    let active = 0;
+    function pump() {
+      while (active < MAX_INFLIGHT && next < tasks.length) {
+        const t = tasks[next++]; active++;
+        runOne(t).then(() => { active--; if (next < tasks.length) pump(); else if (active === 0) resolveAll(results); });
+      }
+    }
+    if (!tasks.length) resolveAll([]); else pump();
+  });
+}
+
 // Real-time progress — bridge parses Claude's stream-json events and pushes
 // human-readable status lines ("Writing component", "Rendering frames", etc.)
 // over SSE so the panel can display what's actually happening.
@@ -758,30 +1094,140 @@ The project has a curated style library at ${WORK_DIR}/remotion-intro/src/lib/ �
 
   // src/lib/palettes.ts — named color palettes
   import { palettes, type PaletteName } from '../lib/palettes';
-  // Available: modernDark, warmCinema, playfulPunch, techBlue, editorialLight, vibrantNight
-  // Pick based on prompt vibe; default modernDark.
-  const p = palettes.modernDark;
-  // Then use p.bg, p.fg, p.accent, p.accent2, p.muted, p.shadow
+  // Classic: modernDark, warmCinema, playfulPunch, techBlue, editorialLight, vibrantNight
+  // Trending 2025-26: bratLime, coquetteCream, chromeY2K, mochaMousse, darkAcademia,
+  //                   sunsetVapor, noirHC, sageMatcha, reelsGradient
+  // Pick the closest match to the prompt vibe. Default modernDark.
 
   // src/lib/easings.ts — named bezier curves (use INSTEAD of raw cubic-bezier())
   import { EASE, FRAMES } from '../lib/easings';
-  // EASE.standard | hero | snap | spring | bouncy | whip | linear | anticipate | cinematic
-  // FRAMES.micro (6) | short (9) | base (15) | medium (24) | long (36) | hold (45)
+  // EASE: standard, hero, snap, spring, bouncy, whip, linear, anticipate, cinematic,
+  //       tiktokPunch, liquidFlow, expoOut, elastic, drag
+  // FRAMES: micro(6), short(9), base(15), medium(24), long(36), hold(45), beat(18), whip(8)
 
-  // src/lib/typography.ts — typographic recipes + TikTok-caption preset
-  import { TYPE, TIKTOK_CAPTION } from '../lib/typography';
-  // TYPE.titleHero | titleMd | body | caption | mono | editorial
+  // src/lib/typography.ts — typographic recipes + caption presets
+  import { TYPE, TIKTOK_CAPTION, KARAOKE_CAPTION, SOFT_CAPTION,
+           HIGHLIGHT_BAR_STYLE, CHROME_TEXT_STYLE, GLITCH_LAYERS } from '../lib/typography';
+  // TYPE: titleHero, titleMd, body, caption, mono, editorial,
+  //       bratLockup, coquetteTitle, brutalistLabel, y2kCaption, lyric, editorialXl
 
-  // src/lib/motion.ts — reusable motion helpers
-  import { popIn, fadeIn, slideUp, slideIn, staggered, fadeOut, shake, pulse, useSpring } from '../lib/motion';
-  // Use these instead of writing interpolate() from scratch.
+  // src/lib/motion.ts — reusable motion helpers (returns CURRENT value at frame)
+  import { popIn, fadeIn, slideUp, slideIn, staggered, fadeOut, shake, pulse, useSpring,
+           wordPop, typewriter, highlighter, glitch, whipPan, zoomPunch, breathe, wiggle,
+           screenShake, swipeReveal, irisWipe, dropAndSettle, blurIn, beatPulse,
+           kerningIn, counter } from '../lib/motion';
 
-Rules for using the library:
-- ALWAYS import palette + easings + at least one helper. Don't hard-code colors or write your own cubic-bezier.
-- If the user asks for "warm" / "cinematic" → warmCinema palette. "Tech" / "SaaS" → techBlue. "Fun" / "punchy" / "TikTok" → playfulPunch. "Editorial" / "minimal" → editorialLight. "Music" / "party" → vibrantNight. Otherwise modernDark.
-- For text: pick a TYPE recipe close to your need, override fontSize if needed. For TikTok-style captions use TIKTOK_CAPTION as the base.
-- For motion: prefer popIn / slideUp / staggered over raw interpolate. Use FRAMES constants for durations.
-- The library is intentionally small. If you need a primitive that's not there, write it inline in the component — don't add to the library.
+  // src/lib/effects.tsx — drop-in overlay components
+  import { FilmGrain, Vignette, ChromaticAberration, Scanlines, LightLeak, GlowHalo,
+           SparkleField, GradientMesh, SpeedLines, Grid, Confetti } from '../lib/effects';
+
+  // src/lib/transitions.ts — scene-to-scene boundary transitions
+  import { whipPanTransition, zoomPunchTransition, glitchCutTransition, irisWipeTransition,
+           slideMorphTransition, pushTransition, flashCutTransition } from '../lib/transitions';
+
+  // src/lib/layouts.tsx — composition primitives
+  import { BentoGrid, BentoCell, Split, LowerThird, Pip, CardStack, StickyBadge,
+           ProgressBar, CaptionBox } from '../lib/layouts';
+
+  // src/lib/trends.ts — NAMED STYLE PACKS — bundles of palette+type+motion+effects.
+  // Read TRENDS to see all packs. Pick by keyword match to the user's prompt.
+  import { TRENDS, type TrendName } from '../lib/trends';
+
+TREND PACKS (composed recipes — pick one based on user's prompt keywords):
+  - tiktokKineticCaption — DEFAULT. Word-by-word pops for talking-head/podcast clips.
+  - bratPunch           — "brat" / "lime" / "club" / "ironic" / lowercase Arial on lime.
+  - coquetteRibbon      — "soft" / "pink" / "girly" / pastel + italic serif + sparkles.
+  - chromeY2K           — "y2k" / "chrome" / "retro" / silver gradient text + grid floor.
+  - vaporwaveSunset     — "synthwave" / "80s" / "neon" / magenta-teal gradient + grid.
+  - editorialBrutalist  — "brutalist" / "minimal" / "magazine" / massive uppercase b/w.
+  - mochaLuxury         — "warm" / "cozy" / "coffee" / Pantone 2025 mocha + slow easings.
+  - darkAcademia        — "vintage" / "literary" / "moody" / oxblood + italic serif.
+  - sageWellness        — "calm" / "wellness" / "morning" / sage green + slow motion.
+  - karaokePop          — "lyric" / "song" / "beat" / yellow karaoke highlight per word.
+  - statSlam            — "stat" / "data" / "launch" / number reveal + bento grid.
+  - newsTicker          — "news" / "sports" / "breaking" / ticker strip + lower third.
+  - glitchHype          — "glitch" / "cyber" / "gaming" / RGB-split + scanlines + shake.
+  - confettiHype        — "celebrate" / "win" / "drop" / confetti burst + bouncy text.
+  - reelsStory          — "instagram" / "reel" / "story" / IG gradient + soft motion.
+
+DESIGN PRINCIPLES — read these BEFORE picking helpers (the difference between
+AI-slop and something a real motion designer would ship):
+
+  1. ONE clear idea per render. Not three. Pick the single thing the eye should
+     do: read a line, watch a number count up, see one logo land. Build around
+     that. Cut everything that competes with it.
+  2. RESTRAINT beats stacking. A human designer picks 1 motion helper + maybe
+     1 effect overlay. They do NOT use wordPop + glitch + zoomPunch + grain +
+     vignette + sparkles on the same shot. If you're tempted to add a fifth
+     thing, delete one of the first four.
+  3. HOLD frames. Real videos let things SIT. After a word lands, give it
+     8-15 frames of stillness before the next move. Constant motion is the
+     #1 AI tell.
+  4. ASYMMETRY. Real designers offset things slightly. 50/50 center is rare.
+     Use rule-of-thirds, top-left/bottom-right placement, generous whitespace.
+  5. ONE accent color in a shot. A palette has 5 colors so you can CHOOSE one,
+     not so you can use all five at once. Background + foreground + one
+     accent = three colors max in any frame.
+  6. SLOW down. Default to EASE.expoOut / EASE.cinematic / EASE.hero. Use
+     tiktokPunch / elastic / bouncy SPARINGLY — once per render, on the hero
+     moment only.
+  7. TYPE that just says the thing. If the hero word is "BULLY", don't glitch
+     it + chrome it + stagger it. Pick ONE treatment. The word is doing the
+     work.
+  8. FRAMES.long (36) and FRAMES.hold (45) exist on purpose — USE them for
+     reveals, not FRAMES.short.
+
+How to compose a render (the actual workflow):
+- TREND PACKS are a STARTING POINT, not a checklist. Pick the closest pack,
+  then USE 1-2 of its suggested motion helpers — never all four. Same for
+  effects: 0 or 1, almost never two.
+- For 90% of prompts → tiktokKineticCaption pack: TIKTOK_CAPTION + wordPop +
+  one palette. Don't add anything else unless the prompt calls for it.
+- Effects are condiments. Grain at 0.06 max. Vignette at 0.3 max. If the
+  user didn't ask for "moody" / "film" / "vintage" — skip them entirely.
+- Sparkles only when the prompt literally says coquette / magical / luxury.
+- Glitch only when the prompt says glitch / cyber / hack. ONE glitch burst
+  per render, max 8 frames.
+- Confetti only when the prompt says celebrate / win / launch / drop.
+- Transitions between scenes (Series) — use a *Transition helper, but only
+  one type per render. Don't whip-pan into a glitch-cut into a zoom-punch.
+
+Hard rules:
+- NEVER hard-code colors. Always pull from a palette.
+- NEVER write raw cubic-bezier(). Always use EASE.* names.
+- .tsx imports: effects.tsx and layouts.tsx export JSX; the rest are .ts.
+- If a primitive you need isn't in the library, write it inline. Don't grow
+  the library mid-render.
+
+GOOD EXAMPLE — restrained BRAT (one idea: type lands tight on lime, holds, done):
+
+  import { palettes } from '../lib/palettes';
+  import { EASE, FRAMES } from '../lib/easings';
+  import { TYPE } from '../lib/typography';
+  import { kerningIn, fadeIn } from '../lib/motion';
+
+  const p = palettes.bratLime;
+  // ONE word. ONE motion (kerning closes from 30 → 0). Holds for FRAMES.hold.
+  // No effects layer. No staggered words. No rotation jitter. No grain.
+  return (
+    <AbsoluteFill style={{ background: p.bg, display:'flex', alignItems:'center', justifyContent:'flex-start', paddingLeft: 80 }}>
+      <span style={{
+        ...TYPE.bratLockup,
+        color: p.fg,
+        letterSpacing: kerningIn(frame, { start: 0, dur: FRAMES.medium, from: 30, to: -8 }),
+        opacity: fadeIn(frame, { start: 0, dur: FRAMES.short }),
+      }}>brat</span>
+    </AbsoluteFill>
+  );
+
+BAD EXAMPLE (what NOT to do — every helper at once, no breathing room):
+
+  // Don't: wordPop + glitch + zoomPunch + grain + vignette + sparkles all
+  // wrestling for attention. Eye doesn't know where to land. Screams AI.
+
+If the prompt is more complex (e.g. "podcast clip caption that builds excitement"),
+THEN add: wordPop on the words, ONE zoomPunch on the hero word at FRAMES.medium,
+and stop. Don't reach for glitch and grain because they're in the library.
 
 Style: terse. The user is editing in Premiere, not reading docs. One or two sentences plus the import marker is the goal. Skip preamble like "Sure, I'll help…".`;
 
@@ -814,6 +1260,26 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, session: SESSION_ID, outputDir: OUTPUT_DIR }));
+    return;
+  }
+
+  // Panel auto-reload — returns the mtime of the panel's index.html. The
+  // panel polls this every 5s; if mtime changes, the panel reloads itself.
+  // Single-shot fetch, no persistent connection — safe replacement for the
+  // dev SSE we ripped out in v3.3.
+  if (req.method === 'GET' && req.url === '/version') {
+    try {
+      const panelPath = path.join(
+        process.env.HOME || '',
+        'Library/Application Support/Adobe/CEP/extensions/com.claudebridge.panel/index.html'
+      );
+      const st = fs.statSync(panelPath);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ mtime: st.mtimeMs, session: SESSION_ID }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(e.message || e) }));
+    }
     return;
   }
 
@@ -1203,12 +1669,21 @@ const server = http.createServer((req, res) => {
       let payload;
       try { payload = JSON.parse(body); }
       catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
-      const { clipPath, clipDuration, clipIn, clipOut, useTranscript, includeSilence } = payload;
+      const { clipPath, clipDuration, clipIn, clipOut, useTranscript, includeSilence, findFillers, findRepeats } = payload;
       const reqId = payload.reqId || crypto.randomUUID();
       // includeSilence defaults to true for backwards compat with older panels
       const wantSilence = (includeSilence === undefined) ? true : !!includeSilence;
+      // Granular flags (new). If neither granular flag is set, fall back to
+      // the legacy `useTranscript` bool meaning "find both".
+      const wantFillers = (findFillers !== undefined) ? !!findFillers : !!useTranscript;
+      const wantRepeats = (findRepeats !== undefined) ? !!findRepeats : !!useTranscript;
+      const wantTranscript = wantFillers || wantRepeats;
       if (!clipPath) { res.writeHead(400); res.end('{"error":"missing clipPath"}'); return; }
       if (!fs.existsSync(clipPath)) { res.writeHead(404); res.end('{"error":"file not found"}'); return; }
+
+      const logPath = path.join(OUTPUT_DIR, `autocut-${reqId}.log`);
+      const log = (s) => { try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${s}\n`); } catch {} };
+      log(`AUTOCUT start clip=${clipPath} clipDuration=${clipDuration} clipIn=${clipIn} clipOut=${clipOut} silence=${wantSilence} fillers=${wantFillers} repeats=${wantRepeats}`);
 
       try {
         // Silence-only by default. Fast, reliable, doesn't involve Claude.
@@ -1217,6 +1692,11 @@ const server = http.createServer((req, res) => {
         const allSilences = await detectSilences(clipPath, clipDuration, (p) => {
           broadcastProgress('Detecting silences', 5 + p * 90, reqId);
         });
+        log(`ffmpeg silencedetect returned ${allSilences.length} silences across full source media`);
+        for (let i = 0; i < Math.min(allSilences.length, 20); i++) {
+          const s = allSilences[i];
+          log(`  raw[${i}] ${s.start.toFixed(2)}s -> ${s.end.toFixed(2)}s (${(s.end - s.start).toFixed(2)}s)`);
+        }
 
         // CRITICAL — ffmpeg scans the whole source media, but the clip on the
         // timeline only uses [clipIn, clipOut]. Silences outside that range
@@ -1224,6 +1704,7 @@ const server = http.createServer((req, res) => {
         // timeline, and applying them would ripple-delete the wrong things.
         const inP  = (typeof clipIn  === 'number') ? clipIn  : 0;
         const outP = (typeof clipOut === 'number') ? clipOut : Number.MAX_SAFE_INTEGER;
+        log(`clip used range in source: [${inP.toFixed(3)}, ${outP.toFixed(3)}] (${(outP - inP).toFixed(2)}s on timeline)`);
         const silenceCuts = allSilences
           .map(c => {
             // Clip the silence to the [inP, outP] window
@@ -1237,6 +1718,11 @@ const server = http.createServer((req, res) => {
             };
           })
           .filter(Boolean);
+        log(`silenceCuts after clamp to clip range: ${silenceCuts.length}`);
+        for (let i = 0; i < Math.min(silenceCuts.length, 30); i++) {
+          const s = silenceCuts[i];
+          log(`  cut[${i}] source ${s.start.toFixed(2)}->${s.end.toFixed(2)} (${s.duration.toFixed(2)}s)`);
+        }
         console.log('  [autocut] silences in source: ' + allSilences.length + ', within clip [' + inP.toFixed(2) + ',' + outP.toFixed(2) + ']: ' + silenceCuts.length);
 
         // Honor includeSilence — if user only wants repeats, drop silence cuts
@@ -1247,31 +1733,227 @@ const server = http.createServer((req, res) => {
           ? ('Found ' + silenceCuts.length + ' pauses. Cutting ' + silenceCuts.reduce((s,c) => s + (c.end-c.start), 0).toFixed(1) + 's total.')
           : (wantSilence ? 'No pauses detected.' : null);
 
-        if (useTranscript) {
-          // New local-whisper pipeline: bridge runs ffmpeg → whisper-cli →
-          // claude (analysis only). Pass the silence set we want included so
-          // they're merged into the final cut list.
+        if (wantTranscript) {
+          // Local-whisper pipeline: ffmpeg → whisper-cli → claude (text in,
+          // JSON out). What Claude looks for is governed by `wantFillers` and
+          // `wantRepeats` so the user can opt into them independently.
+          log(`running transcript analysis — fillers=${wantFillers} repeats=${wantRepeats}`);
           const baseSilences = wantSilence ? silenceCuts : [];
-          const analysisResult = await transcriptCutsLocal(clipPath, clipDuration, inP, outP, baseSilences, reqId);
+          const analysisResult = await transcriptCutsLocal(
+            clipPath, clipDuration, inP, outP, baseSilences, reqId,
+            { findFillers: wantFillers, findRepeats: wantRepeats, log }
+          );
+          log(`transcript result: ${analysisResult ? JSON.stringify({ transcribed: analysisResult.transcribed, cuts: (analysisResult.cuts || []).length, summary: analysisResult.summary }) : 'null'}`);
           if (analysisResult.cuts && analysisResult.cuts.length) {
             finalCuts = analysisResult.cuts;
             transcribed = !!analysisResult.transcribed;
             summary = analysisResult.summary || summary;
+          } else {
+            log(`transcript step returned 0 cuts — falling back to silence-only`);
           }
+        }
+        // Full dump of the final cut list so the log is enough to diagnose
+        // any "didn't cut X" complaint.
+        log(`==== FINAL CUT LIST (${finalCuts.length} cuts) ====`);
+        for (let i = 0; i < finalCuts.length; i++) {
+          const c = finalCuts[i];
+          log(`  [${i}] ${c.start.toFixed(2)}->${c.end.toFixed(2)} (${(c.end - c.start).toFixed(2)}s) kind=${c.kind || '?'} reason=${(c.reason || '').slice(0, 80)}`);
         }
 
         let totalCut = 0;
         for (const c of finalCuts) totalCut += (c.end - c.start);
+        log(`FINAL: ${finalCuts.length} cuts totalling ${totalCut.toFixed(2)}s, method=${transcribed ? 'silence+transcript' : 'silence-only'}`);
 
         broadcastProgressDone(reqId);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-          reqId, cuts: finalCuts, totalCut, transcribed, summary,
+          reqId, cuts: finalCuts, totalCut, transcribed, summary, logFile: logPath,
           method: transcribed ? 'silence+transcript' : 'silence-only',
         }));
       } catch (e) {
+        log(`ERROR ${e.message || e}`);
         broadcastProgressDone(reqId);
-        try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e), reqId })); } catch {}
+        try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e), reqId, logFile: logPath })); } catch {}
+      }
+    });
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  AUTO EDIT — read transcript, identify key moments, generate motion
+  //  graphics, return list of {file, atSec, type, track} for the panel to
+  //  drop on the timeline.
+  //
+  //  Moment schema (the contract between Claude and the renderer):
+  //    {
+  //      id: string,                          // uuid
+  //      type: 'stat'|'quote'|'name'|'list'|'callout'|'question'|'section'|'fact',
+  //      startSec: number,                    // when the underlying speech starts
+  //      endSec: number,                      // when it ends
+  //      label: string,                       // short human description
+  //      payload: object,                     // template-specific fields
+  //      trendPack: string,                   // optional override
+  //      confidence: number                   // 0..1
+  //    }
+  // ═══════════════════════════════════════════════════════════════════════
+
+  if (req.method === 'POST' && req.url === '/autoedit-cancel') {
+    let killed = 0;
+    if (_activeAutoedit) {
+      _activeAutoedit.aborted = true;
+      for (const c of _activeAutoedit.children) {
+        try { c.kill('SIGKILL'); killed++; } catch {}
+      }
+      _activeAutoedit.children.clear();
+      broadcastProgressDone();
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, killed }));
+    return;
+  }
+
+  if (req.method === 'POST' && req.url === '/autoedit') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      let payload;
+      try { payload = JSON.parse(body); }
+      catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+
+      const {
+        clipPath,
+        clipDuration,
+        clipIn,
+        clipOut,
+        density = 'moderate',       // sparse | moderate | dense
+        styleOverride = 'auto',     // 'auto' | trend pack name
+        premiereCaptions = null,    // [{ startSec, endSec, text }] in source-media time, from Premiere's captions
+      } = payload;
+      const reqId = payload.reqId || crypto.randomUUID();
+
+      if (!clipPath) { res.writeHead(400); res.end('{"error":"missing clipPath"}'); return; }
+      if (!fs.existsSync(clipPath)) { res.writeHead(404); res.end('{"error":"file not found"}'); return; }
+
+      _activeAutoedit = { children: new Set(), aborted: false };
+      const logPath = path.join(OUTPUT_DIR, `autoedit-${reqId}.log`);
+      const log = (s) => { try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${s}\n`); } catch {} };
+
+      try {
+        const inP  = (typeof clipIn  === 'number') ? clipIn  : 0;
+        const outP = (typeof clipOut === 'number') ? clipOut : (clipDuration || 600);
+        const totalDur = outP - inP;
+
+        log(`AUTO EDIT start clip=${clipPath} in=${inP} out=${outP} dur=${totalDur} density=${density} style=${styleOverride} premiereCaptions=${premiereCaptions ? premiereCaptions.length : 'null'}`);
+
+        // ── Preflight ─────────────────────────────────────────────────────
+        if (totalDur < 30) {
+          broadcastProgressDone(reqId);
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: 'Clip is too short (need at least 30s)', reqId }));
+          _activeAutoedit = null;
+          return;
+        }
+
+        // ── 1. Get transcript. Prefer Premiere's own captions (instant) ───
+        //      and only fall back to whisper (~30-60s) if they're missing.
+        let sentences;
+        if (Array.isArray(premiereCaptions) && premiereCaptions.length >= 3) {
+          log(`using Premiere captions: ${premiereCaptions.length} sentences`);
+          broadcastProgress('Using Premiere captions', 15, reqId);
+          sentences = premiereCaptions
+            .filter(s => s && typeof s.startSec === 'number' && typeof s.endSec === 'number' && s.text && s.startSec >= inP - 0.5 && s.endSec <= outP + 0.5)
+            .map((s, i) => ({ i, startSec: s.startSec, endSec: s.endSec, text: String(s.text).trim() }))
+            .filter(s => s.text.length > 0);
+          log(`normalised from captions: ${sentences.length} sentence units`);
+        } else {
+          // Whisper fallback
+          broadcastProgress('Extracting audio', 5, reqId);
+          if (_activeAutoedit.aborted) throw new Error('cancelled');
+          const wavPath = await extractAudioForWhisper(clipPath, inP, outP);
+
+          broadcastProgress('Transcribing with whisper', 12, reqId);
+          if (_activeAutoedit.aborted) throw new Error('cancelled');
+          const transcriptRaw = await runWhisper(wavPath, totalDur);
+          log(`whisper transcript: ${(transcriptRaw || []).length} segments`);
+
+          if (!transcriptRaw || transcriptRaw.length < 3) {
+            broadcastProgressDone(reqId);
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'Couldn\'t hear much speech in this clip', reqId }));
+            _activeAutoedit = null;
+            return;
+          }
+          sentences = transcriptRaw.map((seg, i) => ({
+            i,
+            startSec: inP + (seg.offsets?.from || 0) / 1000,
+            endSec:   inP + (seg.offsets?.to   || 0) / 1000,
+            text:     (seg.text || '').trim(),
+          })).filter(s => s.text.length > 0);
+          log(`normalised from whisper: ${sentences.length} sentence units`);
+        }
+
+        if (sentences.length < 3) {
+          broadcastProgressDone(reqId);
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: 'Not enough speech in this clip', reqId }));
+          _activeAutoedit = null;
+          return;
+        }
+
+        // ── 3. Ask Claude to identify moments ─────────────────────────────
+        broadcastProgress('Finding key moments', 28, reqId);
+        if (_activeAutoedit.aborted) throw new Error('cancelled');
+        const moments = await detectMoments(sentences, density, styleOverride, reqId, log);
+        log(`moments raw: ${moments.length}`);
+
+        // ── 4. Anti-collision + spacing ───────────────────────────────────
+        const minGapSec = density === 'sparse' ? 8 : density === 'dense' ? 2 : 4;
+        const maxPerMin = density === 'sparse' ? 3 : density === 'dense' ? 10 : 6;
+        const filtered  = spaceMoments(moments, minGapSec, maxPerMin, totalDur);
+        log(`moments after spacing: ${filtered.length}`);
+
+        if (!filtered.length) {
+          broadcastProgressDone(reqId);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, reqId, applied: [], skipped: [], summary: 'No suitable moments found.' }));
+          _activeAutoedit = null;
+          return;
+        }
+
+        // ── 5. Pick trend pack per moment (with rotation for variety) ─────
+        const PACK_ROTATION = ['tiktokKineticCaption', 'editorialBrutalist', 'modernDark-soft'];
+        for (let i = 0; i < filtered.length; i++) {
+          if (styleOverride && styleOverride !== 'auto') filtered[i].trendPack = styleOverride;
+          else if (!filtered[i].trendPack) filtered[i].trendPack = momentTypeToTrendPack(filtered[i].type, i);
+        }
+
+        // ── 6. Render each moment as its own short MP4 ────────────────────
+        broadcastProgress('Rendering motion graphics', 40, reqId);
+        const renderResults = await renderMomentsParallel(filtered, reqId, log, (done, total) => {
+          const pct = 40 + Math.floor((done / total) * 50);
+          broadcastProgress(`Rendering motion graphics (${done}/${total})`, pct, reqId);
+        });
+
+        const applied = renderResults.filter(r => r.ok);
+        const skipped = renderResults.filter(r => !r.ok);
+        log(`render done: ok=${applied.length} skipped=${skipped.length}`);
+
+        broadcastProgressDone(reqId);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true,
+          reqId,
+          applied,
+          skipped,
+          summary: `${applied.length}/${filtered.length} graphics ready` + (skipped.length ? ` (${skipped.length} skipped)` : ''),
+          logFile: logPath,
+        }));
+      } catch (e) {
+        log(`ERROR ${e.message}`);
+        broadcastProgressDone(reqId);
+        try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e), reqId, logFile: logPath })); } catch {}
+      } finally {
+        _activeAutoedit = null;
       }
     });
     return;

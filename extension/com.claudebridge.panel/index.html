@@ -1171,6 +1171,19 @@
   /* Disable siblings while one is loading so the user can't double-fire */
   .expand-group.busy .expand-btn:not(.loading) { opacity: 0.3; pointer-events: none; }
 
+  /* Auto-suggested level — subtle background + 1px ring. Doesn't fight the
+     intensity color scale. Pulses once when the recommendation changes. */
+  .expand-btn.recommended {
+    background: rgba(217, 119, 87, 0.10);
+    box-shadow: 0 0 0 1px rgba(217, 119, 87, 0.38);
+  }
+  .expand-btn.recommended[data-level="light"]  { color: rgba(217, 119, 87, 0.85); }
+  .expand-btn.recommended.flash { animation: recommendPulse 0.55s var(--ease-out); }
+  @keyframes recommendPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(217, 119, 87, 0.55); background: rgba(217, 119, 87, 0.22); }
+    100% { box-shadow: 0 0 0 1px rgba(217, 119, 87, 0.38); background: rgba(217, 119, 87, 0.10); }
+  }
+
   /* Brief flash when the input gets a fresh expansion */
   @keyframes expandFlash {
     0%   { box-shadow: 0 0 0 0 var(--accent-soft), 0 8px 24px rgba(217, 119, 87, 0.0); }
@@ -1439,6 +1452,23 @@
     transition: color 0.12s var(--ease-out), border-color 0.12s var(--ease-out);
   }
   .autocut-modal-cancel:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+  /* AUTO EDIT progress card */
+  .autoedit-progress {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0;
+  }
+  .ae-spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(217, 119, 87, 0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: aeSpin 0.9s linear infinite;
+    flex-shrink: 0;
+  }
+  .ae-text { font-size: 13px; color: var(--fg); }
+  @keyframes aeSpin { to { transform: rotate(360deg); } }
+  .autocut-btn.busy { opacity: 0.6; cursor: wait; }
+
   .autocut-modal-go {
     flex: 2;
     padding: 9px;
@@ -2004,7 +2034,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">4.0</span>
+    <span class="version-tag" id="versionTag">4.8</span>
   </div>
   <div style="display:flex;align-items:center">
     <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
@@ -2046,17 +2076,62 @@
       </div>
     </label>
 
+    <label class="autocut-opt" data-opt="fillers">
+      <input type="checkbox" id="optFillers">
+      <div class="autocut-opt-text">
+        <div class="autocut-opt-name">Filler words</div>
+        <div class="autocut-opt-desc">"um", "uh", "like", "you know", "I mean". Transcribes audio — slower (~30-90s).</div>
+      </div>
+    </label>
+
     <label class="autocut-opt" data-opt="repeats">
       <input type="checkbox" id="optRepeats">
       <div class="autocut-opt-text">
-        <div class="autocut-opt-name">Filler &amp; repeats</div>
-        <div class="autocut-opt-desc">"um", "uh", false starts, repeated takes. Transcribes audio — slower (~30-90s) but smarter.</div>
+        <div class="autocut-opt-name">Repeated sentences &amp; words</div>
+        <div class="autocut-opt-desc">False starts ("maybe it was th- maybe it was the fear"), self-corrections, redo takes. Transcribes audio.</div>
       </div>
     </label>
 
     <div class="autocut-modal-actions">
       <button id="autocutModalCancel" type="button" class="autocut-modal-cancel">Cancel</button>
       <button id="autocutModalGo" type="button" class="autocut-modal-go">Cut</button>
+    </div>
+  </div>
+</div>
+
+<!-- AUTO EDIT Modal -->
+<div class="autocut-modal" id="autoeditModal">
+  <div class="autocut-modal-card">
+    <div class="autocut-modal-title">Auto-Edit this clip</div>
+    <div class="autocut-modal-subtitle">I'll read the speech, find the key beats, and drop motion graphics on V2 / V3 at the right times.</div>
+
+    <label class="autocut-opt" data-opt="density-sparse">
+      <input type="radio" name="aeDensity" id="aeDensitySparse" value="sparse">
+      <div class="autocut-opt-text">
+        <div class="autocut-opt-name">Sparse</div>
+        <div class="autocut-opt-desc">~3 graphics per minute. Lets the clip breathe.</div>
+      </div>
+    </label>
+
+    <label class="autocut-opt" data-opt="density-moderate">
+      <input type="radio" name="aeDensity" id="aeDensityModerate" value="moderate" checked>
+      <div class="autocut-opt-text">
+        <div class="autocut-opt-name">Moderate</div>
+        <div class="autocut-opt-desc">~6 per minute. Default. Tasteful coverage.</div>
+      </div>
+    </label>
+
+    <label class="autocut-opt" data-opt="density-dense">
+      <input type="radio" name="aeDensity" id="aeDensityDense" value="dense">
+      <div class="autocut-opt-text">
+        <div class="autocut-opt-name">Dense</div>
+        <div class="autocut-opt-desc">~10 per minute. For high-energy social cuts.</div>
+      </div>
+    </label>
+
+    <div class="autocut-modal-actions">
+      <button id="autoeditModalCancel" type="button" class="autocut-modal-cancel">Cancel</button>
+      <button id="autoeditModalGo" type="button" class="autocut-modal-go">Auto-Edit</button>
     </div>
   </div>
 </div>
@@ -2259,6 +2334,10 @@
       <button class="autocut-btn" id="autocutBtn" type="button" title="Auto-cut: detect pauses and false starts on the selected clip">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
         Auto-Cut
+      </button>
+      <button class="autocut-btn" id="autoeditBtn" type="button" title="Auto-Edit: read the speech of the selected clip and drop motion graphics on V2/V3 at the right beats">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h16"/><circle cx="19" cy="12" r="2.5" fill="currentColor"/></svg>
+        Auto-Edit
       </button>
     </div>
     <div class="ref-bar" id="refBar"></div>
@@ -2799,6 +2878,19 @@ async function runAutoCut(opts) {
     });
   } catch {}
 
+  // Register for global ESC cancel (mirrors chat/autoedit pattern).
+  const acAbort = new AbortController();
+  const acProgressUI = {
+    fail(msg) {
+      if (labelEl) labelEl.textContent = '✗ ' + msg;
+      try { progressUI && progressUI.complete && progressUI.complete(); } catch {}
+      try { progressES && progressES.close && progressES.close(); } catch {}
+      cancelBtn.style.display = 'none';
+    },
+  };
+  activeAutocut = { abort: acAbort, reqId, progressUI: acProgressUI };
+  updateEscHint();
+
   try {
     const r = await fetch(BRIDGE + '/autocut', {
       method: 'POST',
@@ -2813,8 +2905,12 @@ async function runAutoCut(opts) {
         clipOut: (typeof sel.outPoint === 'number') ? sel.outPoint : (sel.duration || 1e9),
         // What kinds of cuts to perform
         includeSilence: !!opts.silence,
-        useTranscript:  !!opts.repeats,
+        findFillers:    !!opts.fillers,
+        findRepeats:    !!opts.repeats,
+        // Legacy compat — older bridge versions only knew `useTranscript`.
+        useTranscript:  !!(opts.fillers || opts.repeats),
       }),
+      signal: acAbort.signal,
     });
     const data = await r.json();
     progressUI.complete();
@@ -2839,7 +2935,8 @@ async function runAutoCut(opts) {
   } catch (err) {
     progressUI.cleanup();
     placeholder.wrap.remove();
-    if (cancelled) {
+    // AbortError fires when the user hits ESC. Treat it like an explicit cancel.
+    if (cancelled || (err && err.name === 'AbortError')) {
       makeMsg('claude', '<p style="color:var(--text-dim);font-style:italic">Auto-cut cancelled.</p>');
     } else {
       makeMsg('claude', '<p>Auto-cut error: ' + escapeHTML(err.message) + '</p>');
@@ -2847,6 +2944,8 @@ async function runAutoCut(opts) {
   } finally {
     if (progressES) { try { progressES.close(); } catch {} }
     btn.classList.remove('busy'); btn.disabled = false;
+    if (activeAutocut && activeAutocut.reqId === reqId) activeAutocut = null;
+    updateEscHint();
   }
 }
 
@@ -3044,11 +3143,67 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '4.0';
+  const PANEL_VERSION = '4.8';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
   if (sv) sv.textContent = PANEL_VERSION;
+})();
+
+/* Restore an input draft that was saved just before an auto-reload. */
+(function restoreDraftAfterReload() {
+  try {
+    const draft = sessionStorage.getItem('claudeBridge.draft');
+    if (draft && input) {
+      input.value = draft;
+      autosize();
+      sessionStorage.removeItem('claudeBridge.draft');
+    }
+  } catch {}
+})();
+
+/* ───── Auto-reload — polls /version every 5s, reloads on mtime change.
+   Replaces the dev SSE that was causing handle accumulation. Single-shot
+   fetches with a 1.5s timeout, exponential backoff on bridge-down. ───── */
+(function setupAutoReload() {
+  let baseline = null;
+  let fails = 0;
+  const POLL_OK_MS = 5000;
+  const POLL_FAIL_BASE = 8000;
+
+  async function poll() {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 1500);
+    try {
+      const r = await fetch(BRIDGE + '/version', { signal: ctrl.signal, cache: 'no-store' });
+      clearTimeout(t);
+      if (!r.ok) throw new Error(r.status);
+      const { mtime } = await r.json();
+      fails = 0;
+      if (baseline === null) {
+        baseline = mtime;
+      } else if (mtime !== baseline) {
+        // Panel file on disk changed — refresh. Save the input draft so
+        // the user doesn't lose what they were typing.
+        try {
+          sessionStorage.setItem('claudeBridge.lastReload', String(Date.now()));
+          const draft = (input && input.value) || '';
+          if (draft) sessionStorage.setItem('claudeBridge.draft', draft);
+        } catch {}
+        location.reload();
+        return; // don't reschedule
+      }
+      setTimeout(poll, POLL_OK_MS);
+    } catch {
+      clearTimeout(t);
+      fails++;
+      // 8s, 16s, 32s, then cap at 60s
+      const delay = Math.min(60000, POLL_FAIL_BASE * Math.pow(2, Math.min(fails - 1, 3)));
+      setTimeout(poll, delay);
+    }
+  }
+  // Wait 3s after page load so the bridge has time to come up
+  setTimeout(poll, 3000);
 })();
 
 /* ───── Settings — persistent prefs in localStorage ───── */
@@ -3619,6 +3774,7 @@ if (_autocutBtn) _autocutBtn.addEventListener('click', openAutocutModal);
 // Modal — gathers which kinds of cuts the user wants, then calls runAutoCut(opts).
 const autocutModal = document.getElementById('autocutModal');
 const optSilence   = document.getElementById('optSilence');
+const optFillers   = document.getElementById('optFillers');
 const optRepeats   = document.getElementById('optRepeats');
 const goBtn        = document.getElementById('autocutModalGo');
 const cancelBtn    = document.getElementById('autocutModalCancel');
@@ -3629,6 +3785,7 @@ function openAutocutModal() {
     const saved = JSON.parse(localStorage.getItem('claudeBridge.autocut.opts') || 'null');
     if (saved) {
       optSilence.checked = !!saved.silence;
+      optFillers.checked = !!saved.fillers;
       optRepeats.checked = !!saved.repeats;
     }
   } catch {}
@@ -3637,18 +3794,287 @@ function openAutocutModal() {
 }
 function closeAutocutModal() { autocutModal.classList.remove('show'); }
 function updateGoBtnState() {
-  goBtn.disabled = !optSilence.checked && !optRepeats.checked;
+  goBtn.disabled = !optSilence.checked && !optFillers.checked && !optRepeats.checked;
 }
 optSilence.addEventListener('change', updateGoBtnState);
+optFillers.addEventListener('change', updateGoBtnState);
 optRepeats.addEventListener('change', updateGoBtnState);
 cancelBtn.addEventListener('click', closeAutocutModal);
 autocutModal.addEventListener('click', (e) => { if (e.target === autocutModal) closeAutocutModal(); });
 goBtn.addEventListener('click', () => {
-  const opts = { silence: !!optSilence.checked, repeats: !!optRepeats.checked };
+  const opts = {
+    silence: !!optSilence.checked,
+    fillers: !!optFillers.checked,
+    repeats: !!optRepeats.checked,
+  };
   try { localStorage.setItem('claudeBridge.autocut.opts', JSON.stringify(opts)); } catch {}
   closeAutocutModal();
   runAutoCut(opts);
 });
+
+/* ═════════════════════════════════════════════════════════════════════
+   AUTO EDIT — modal, run pipeline, apply to timeline
+   ═════════════════════════════════════════════════════════════════════ */
+const _autoeditBtn = document.getElementById('autoeditBtn');
+const autoeditModal = document.getElementById('autoeditModal');
+const autoeditGoBtn = document.getElementById('autoeditModalGo');
+const autoeditCancelBtn = document.getElementById('autoeditModalCancel');
+
+function openAutoeditModal() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('claudeBridge.autoedit.opts') || 'null');
+    if (saved && saved.density) {
+      const r = document.querySelector(`input[name="aeDensity"][value="${saved.density}"]`);
+      if (r) r.checked = true;
+    }
+  } catch {}
+  autoeditModal.classList.add('show');
+}
+function closeAutoeditModal() { autoeditModal.classList.remove('show'); }
+if (_autoeditBtn) _autoeditBtn.addEventListener('click', openAutoeditModal);
+autoeditCancelBtn.addEventListener('click', closeAutoeditModal);
+autoeditModal.addEventListener('click', (e) => { if (e.target === autoeditModal) closeAutoeditModal(); });
+autoeditGoBtn.addEventListener('click', () => {
+  const density = (document.querySelector('input[name="aeDensity"]:checked') || {}).value || 'moderate';
+  try { localStorage.setItem('claudeBridge.autoedit.opts', JSON.stringify({ density })); } catch {}
+  closeAutoeditModal();
+  runAutoEdit({ density });
+});
+
+async function runAutoEdit(opts) {
+  const btn = document.getElementById('autoeditBtn');
+  if (btn) { btn.disabled = true; btn.classList.add('busy'); }
+  const reqId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
+  // Per-request progress filter (mirrors the autocut pattern)
+  const progressUI = startInlineProgress(reqId);
+  const abort = new AbortController();
+  activeAutoedit = { abort, reqId, progressUI };
+  updateEscHint();
+
+  try {
+    // 1. Find the selected clip
+    const selRaw = await evalES('ccGetSelectedClip()');
+    const sel = JSON.parse(selRaw);
+    if (!sel.ok) {
+      progressUI.fail('Select a clip on the timeline first.');
+      return;
+    }
+    progressUI.text('Reading clip…');
+
+    // 1b. Try Premiere's own caption track first — if there are captions on
+    // the sequence covering this clip's window, we can skip whisper. Falls
+    // back to whisper if no captions or the call fails.
+    let premiereCaptions = null;
+    let probeDump = null;
+    try {
+      const capsRaw = await evalES('ccGetSequenceCaptions()');
+      const caps = JSON.parse(capsRaw);
+      if (caps && caps.ok && caps.sentences && caps.sentences.length) {
+        premiereCaptions = caps.sentences;
+        progressUI.text(`Using Premiere captions (${caps.sentences.length} lines)…`);
+      } else {
+        // No captions found at the path I know. Run the diagnostic probe so
+        // we can see what subtitle/caption shape your Premiere actually uses.
+        try {
+          const probeRaw = await evalES('ccProbeTranscript()');
+          probeDump = probeRaw;
+          console.log('[autoedit] caption probe:', probeRaw);
+        } catch (pe) { console.log('[autoedit] probe failed:', pe); }
+      }
+    } catch (ce) { console.log('[autoedit] captions failed:', ce); }
+
+    // If captions returned empty AND we have probe output, show it in the
+    // progress card so the user can share it with me.
+    if (!premiereCaptions && probeDump) {
+      const note = document.createElement('div');
+      note.style.cssText = 'margin-top:10px;padding:8px 10px;background:rgba(217,119,87,0.08);border-left:3px solid var(--accent);border-radius:4px;font-size:11px;color:var(--muted);font-family:"SF Mono",monospace;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto;';
+      note.textContent = 'No Premiere captions found at the legacy API path. Falling back to whisper.\n\nProbe output (share with Claude to fix the reader):\n' + probeDump;
+      try {
+        const card = progressUI.text && progressUI.text._card;
+        const body = document.querySelector('.autoedit-progress')?.parentElement;
+        if (body) body.appendChild(note);
+      } catch {}
+    }
+
+    // 2. Hit the bridge
+    const resp = await fetch(BRIDGE + '/autoedit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clipPath: sel.path,
+        clipDuration: sel.duration,
+        clipIn: sel.inPoint,
+        clipOut: sel.outPoint,
+        density: opts.density || 'moderate',
+        premiereCaptions,
+        reqId,
+      }),
+      signal: abort.signal,
+    });
+    if (!resp.ok) {
+      let errMsg = 'Bridge returned ' + resp.status;
+      try { const e = await resp.json(); if (e.error) errMsg = e.error; } catch {}
+      progressUI.fail(errMsg);
+      return;
+    }
+    const data = await resp.json();
+    const applied = (data.applied || []).filter(a => a.ok);
+    if (!applied.length) {
+      progressUI.fail(data.summary || 'No motion graphics produced.');
+      return;
+    }
+
+    // 3. Apply to timeline
+    progressUI.text(`Inserting ${applied.length} graphics…`);
+    const items = applied.map(a => ({
+      file: a.file, atSec: a.atSec, type: a.type, label: a.label,
+      durationSec: a.durationSec,
+    }));
+    const escaped = JSON.stringify({ items }).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const applyRaw = await evalES('ccAutoEditApply("' + escaped + '")');
+    const applyRes = JSON.parse(applyRaw || '{}');
+
+    if (!applyRes.ok) {
+      progressUI.fail('Insert failed: ' + (applyRes.error || 'unknown'));
+      return;
+    }
+
+    progressUI.done(
+      `Applied ${(applyRes.applied || []).length}/${items.length} graphics`
+      + ((applyRes.skipped || []).length ? ` (${applyRes.skipped.length} skipped)` : '')
+    );
+  } catch (e) {
+    // AbortError = ESC cancel; cancelActive() already wrote the "Cancelled"
+    // text into the progress card so we don't overwrite it here.
+    if (e && e.name !== 'AbortError') {
+      progressUI.fail('Auto-Edit failed: ' + (e.message || e));
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.classList.remove('busy'); }
+    if (activeAutoedit && activeAutoedit.reqId === reqId) activeAutoedit = null;
+    updateEscHint();
+  }
+}
+
+// Minimal in-log progress card for AUTO EDIT. Reuses the per-request SSE
+// channel so concurrent /chat + /autoedit don't bleed status.
+//
+// Plus: live elapsed-time ticker so you can SEE the seconds passing (if they
+// stop = bridge died). Plus a "Show log" disclosure that tails the autoedit
+// log file from disk every 1s — you can watch every step in real time.
+function startInlineProgress(reqId) {
+  const card = document.createElement('div');
+  card.className = 'msg ai';
+  card.innerHTML = `
+    <div class="msg-row">
+      <div class="msg-body">
+        <div class="autoedit-progress">
+          <div class="ae-spinner"></div>
+          <div class="ae-text">Starting…</div>
+          <div class="ae-elapsed" style="margin-left:8px;color:var(--muted);font-size:12px;font-family:'SF Mono',monospace;">0s</div>
+          <button class="ae-loglink" style="margin-left:auto;background:none;border:1px solid rgba(217,119,87,0.35);color:var(--accent);padding:2px 10px;border-radius:10px;font-size:11px;cursor:pointer;font-family:inherit;">Show log</button>
+        </div>
+        <pre class="ae-logpane" style="display:none;margin-top:10px;background:rgba(0,0,0,0.25);color:#d8d4c8;font-family:'SF Mono','JetBrains Mono',monospace;font-size:11px;line-height:1.4;padding:10px 12px;border-radius:6px;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-word;border:1px solid rgba(217,119,87,0.2);"></pre>
+      </div>
+    </div>`;
+  log.appendChild(card);
+  log.scrollTop = log.scrollHeight;
+  const textEl    = card.querySelector('.ae-text');
+  const elapsedEl = card.querySelector('.ae-elapsed');
+  const logLink   = card.querySelector('.ae-loglink');
+  const logPane   = card.querySelector('.ae-logpane');
+
+  const startedAt = Date.now();
+  let finished = false;
+
+  // Elapsed-time ticker — keeps updating even when no SSE events arrive.
+  // If this stops, you know the panel itself crashed.
+  const ticker = setInterval(() => {
+    if (finished) return;
+    const sec = Math.floor((Date.now() - startedAt) / 1000);
+    elapsedEl.textContent = sec + 's';
+  }, 500);
+
+  // Live log tail — reads ~/PremiereClaude/output/autoedit-<reqId>.log
+  // every second when the user clicks "Show log". Uses CEP's native fs.
+  let tailTimer = null;
+  let logOpen = false;
+  function tailLog() {
+    try {
+      const fs = nodeRequire('fs');
+      const path = nodeRequire('path');
+      const os = nodeRequire('os');
+      if (!fs || !path || !os) return;
+      const filePath = path.join(os.homedir(), 'PremiereClaude', 'output', 'autoedit-' + reqId + '.log');
+      if (!fs.existsSync(filePath)) {
+        logPane.textContent = '(no log yet — bridge hasn\'t written anything)';
+        return;
+      }
+      const raw = fs.readFileSync(filePath, 'utf8');
+      // Keep only the last 80 lines so it stays readable
+      const lines = raw.split('\n').filter(Boolean);
+      const tail = lines.slice(-80).join('\n');
+      const wasAtBottom = logPane.scrollTop + logPane.clientHeight >= logPane.scrollHeight - 20;
+      logPane.textContent = tail;
+      if (wasAtBottom) logPane.scrollTop = logPane.scrollHeight;
+    } catch (e) {
+      logPane.textContent = '(log read error: ' + e.message + ')';
+    }
+  }
+  logLink.addEventListener('click', () => {
+    logOpen = !logOpen;
+    logPane.style.display = logOpen ? 'block' : 'none';
+    logLink.textContent   = logOpen ? 'Hide log' : 'Show log';
+    if (logOpen) {
+      tailLog();
+      tailTimer = setInterval(tailLog, 1000);
+    } else {
+      clearInterval(tailTimer); tailTimer = null;
+    }
+  });
+
+  // Subscribe to SSE — filter by reqId, surface only matching events
+  let es = null;
+  try {
+    es = new EventSource(BRIDGE + '/progress-stream');
+    es.addEventListener('progress', (ev) => {
+      try {
+        const data = JSON.parse(ev.data || '{}');
+        if (data.reqId && data.reqId !== reqId) return;
+        if (data.text) textEl.textContent = data.text;
+      } catch {}
+    });
+    es.addEventListener('done', (ev) => {
+      try {
+        const data = JSON.parse(ev.data || '{}');
+        if (data.reqId && data.reqId !== reqId) return;
+      } catch {}
+      try { es && es.close(); } catch {}
+    });
+  } catch {}
+
+  function cleanup() {
+    finished = true;
+    clearInterval(ticker);
+    clearInterval(tailTimer);
+    try { es && es.close(); } catch {}
+  }
+
+  return {
+    text(s) { textEl.textContent = s; },
+    done(s) {
+      textEl.textContent = s;
+      card.querySelector('.ae-spinner').style.display = 'none';
+      cleanup();
+    },
+    fail(s) {
+      textEl.textContent = '✗ ' + s;
+      card.querySelector('.ae-spinner').style.display = 'none';
+      card.querySelector('.ae-text').style.color = 'var(--err)';
+      cleanup();
+    },
+  };
+}
 
 // Update button — asks the bridge to pull the latest panel + bridge from GitHub
 const _updateBtn = document.getElementById('updateBtn');
@@ -4151,7 +4577,10 @@ async function tryAutoStartBridge(force) {
     // hands it a minimal PATH. GUI-launched Mac apps usually only have
     // /usr/bin:/bin:/usr/sbin:/sbin; brew lives in /opt/homebrew/bin and
     // /usr/local/bin.
-    const extraPaths = ['/opt/homebrew/bin', '/usr/local/bin', '/opt/local/bin'];
+    const extraPaths = [
+      _path.join(home, '.local', 'bin'),       // common location for user-installed claude
+      '/opt/homebrew/bin', '/usr/local/bin', '/opt/local/bin',
+    ];
     const envCopy = Object.assign({}, process.env || {});
     const existingPath = envCopy.PATH || envCopy.Path || '';
     envCopy.PATH = extraPaths.concat(existingPath ? [existingPath] : []).join(':');
@@ -4251,10 +4680,15 @@ setInterval(refreshStatus, 15000);
 
 /* ───── Send flow ───── */
 let activeChatAbort = null;
+// AUTO CUT / AUTO EDIT — also cancellable via ESC. Hold the abort controller
+// AND the reqId so we can both abort the panel-side fetch and tell the bridge
+// to kill its in-flight subprocesses (ffmpeg / whisper / claude / remotion).
+let activeAutocut = null;   // { abort: AbortController, reqId: string, progressUI }
+let activeAutoedit = null;  // { abort: AbortController, reqId: string, progressUI }
 const escHint = document.getElementById('escHint');
 
 function updateEscHint() {
-  const anyBusy = !!activeChatAbort || expanding;
+  const anyBusy = !!activeChatAbort || expanding || !!activeAutocut || !!activeAutoedit;
   escHint.classList.toggle('show', anyBusy);
 }
 
@@ -4281,6 +4715,23 @@ function cancelActive() {
     try { expandAbort.abort(); } catch {}
     cancelled = true;
   }
+  if (activeAutocut) {
+    const a = activeAutocut;
+    try { a.abort.abort(); } catch {}
+    try { fetch(BRIDGE + '/autocut-cancel', { method: 'POST' }).catch(() => {}); } catch {}
+    if (a.progressUI) try { a.progressUI.fail('Cancelled'); } catch {}
+    activeAutocut = null;
+    cancelled = true;
+  }
+  if (activeAutoedit) {
+    const a = activeAutoedit;
+    try { a.abort.abort(); } catch {}
+    try { fetch(BRIDGE + '/autoedit-cancel', { method: 'POST' }).catch(() => {}); } catch {}
+    if (a.progressUI) try { a.progressUI.fail('Cancelled'); } catch {}
+    activeAutoedit = null;
+    cancelled = true;
+  }
+  updateEscHint();
   return cancelled;
 }
 
@@ -4434,6 +4885,9 @@ async function sendMessage() {
 function autosize() {
   input.style.height = 'auto';
   input.style.height = Math.min(input.scrollHeight, 180) + 'px';
+  // Programmatic input.value changes (send-clear, chip-click, expand-result)
+  // don't fire 'input', so refresh the suggested EXTEND level here too.
+  try { syncExpandEnabled && syncExpandEnabled(); updateExpandRecommendation && updateExpandRecommendation(); } catch {}
 }
 
 /* ───── Live AI ghost-text autocomplete ───── */
@@ -4551,7 +5005,7 @@ document.addEventListener('keydown', (e) => {
     closeHistory();
     return;
   }
-  if (activeChatAbort || expanding) {
+  if (activeChatAbort || expanding || activeAutocut || activeAutoedit) {
     e.preventDefault();
     cancelActive();
   }
@@ -4567,8 +5021,71 @@ function syncExpandEnabled() {
   const hasText = !!input.value.trim();
   expandBtns.forEach(b => { b.disabled = !hasText || expanding; });
 }
-input.addEventListener('input', syncExpandEnabled);
+
+/* Pick the level the prompt actually NEEDS, based on length + how many
+   creative specifics it already contains. Bare/vague prompts → heavy
+   (fill in the most blanks). Detailed prompts → light (just polish).
+   Returns 'light' | 'medium' | 'heavy' | null. */
+function recommendExpandLevel(text) {
+  const t = (text || '').trim();
+  if (!t) return null;
+  const tl = t.toLowerCase();
+  const wordCount = tl.split(/\s+/).filter(Boolean).length;
+  const charCount = t.length;
+
+  // Detail score — how much creative info the user already supplied.
+  let detail = 0;
+  // Concrete numbers (durations, fps, dimensions, percentages, ms)
+  if (/\b\d+\s*(s|sec|second|seconds|fps|px|%|ms|frame|frames|min)\b/i.test(t)) detail += 2;
+  // Hex colors
+  if (/#[0-9a-f]{3,6}\b/i.test(t)) detail += 2;
+  // Resolution / aspect / orientation
+  if (/\b(1080|1920|4k|2k|9:16|16:9|portrait|landscape|vertical|horizontal|square)\b/i.test(tl)) detail += 1;
+  // Style / mood / trend keywords
+  const styleWords = ['cinematic','minimal','brutalist','moody','playful','y2k','brat','coquette',
+    'vintage','cyber','glitch','tiktok','warm','tech','editorial','vaporwave','synthwave',
+    'noir','luxury','wellness','sage','chrome','retro','academia','elegant','bold','clean'];
+  detail += Math.min(3, styleWords.filter(w => tl.includes(w)).length);
+  // Color cues
+  const colorWords = ['red','blue','green','yellow','orange','purple','pink','black','white',
+    'cream','gold','silver','lime','sage','mocha','beige','navy','teal','magenta'];
+  detail += Math.min(2, colorWords.filter(w => tl.includes(w)).length);
+  // Compositional connectors imply structure
+  if (/\b(with|then|showing|background|behind|over|under|on top|beside|next to|fades?|transitions?|zooms?)\b/.test(tl)) detail += 1;
+  // Explicit motion / animation verbs
+  if (/\b(animate|reveal|slide|pop|fade|drop|spin|whip|cut|transition|bounce|shake)\b/.test(tl)) detail += 1;
+
+  // Decide.
+  // Detailed prompt — already has direction, just polish.
+  if (charCount >= 110 || detail >= 5) return 'light';
+  // Medium prompt — has some direction.
+  if (charCount >= 35 || detail >= 2 || wordCount >= 6) return 'medium';
+  // Bare prompt — fill in the most blanks.
+  return 'heavy';
+}
+
+let lastRecommended = null;
+function updateExpandRecommendation() {
+  if (expanding) return;
+  const rec = recommendExpandLevel(input.value);
+  expandBtns.forEach(b => {
+    const isRec = rec && b.dataset.level === rec;
+    b.classList.toggle('recommended', !!isRec);
+  });
+  if (rec && rec !== lastRecommended) {
+    const recBtn = expandGroup.querySelector('.expand-btn.recommended');
+    if (recBtn) {
+      recBtn.classList.remove('flash');
+      void recBtn.offsetWidth;
+      recBtn.classList.add('flash');
+    }
+  }
+  lastRecommended = rec;
+}
+
+input.addEventListener('input', () => { syncExpandEnabled(); updateExpandRecommendation(); });
 syncExpandEnabled();
+updateExpandRecommendation();
 
 async function expandPrompt(level, clickedBtn) {
   const text = input.value.trim();

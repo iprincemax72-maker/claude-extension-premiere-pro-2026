@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "3.6";
+var HOST_JSX_VERSION = "4.1";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -451,6 +451,305 @@ function ccApplyAutoCuts(cutsJson) {
         return JSON.stringify({ ok: true, applied: applied, failed: failed, debug: debug });
     } catch (e) {
         return JSON.stringify({ ok: false, error: String(e), debug: debug });
+    }
+}
+
+// AUTO EDIT — receive a list of pre-rendered motion graphics, import each
+// one, place it on V2/V3/V4 at the right time, with a brief fade in/out.
+// Input JSON: { items: [{ file, atSec, type, label, durationSec }], baseTimelineSec? }
+// `baseTimelineSec` is the timeline start of the selected clip (so atSec,
+// which is in source-media time, can be translated into timeline time).
+function ccAutoEditApply(payloadJson) {
+    var debug = { steps: [] };
+    function note(s) { debug.steps.push(String(s)); }
+
+    try {
+        if (typeof app === "undefined" || !app || !app.project) {
+            return JSON.stringify({ ok: false, error: "no project", debug: debug });
+        }
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) return JSON.stringify({ ok: false, error: "no active sequence", debug: debug });
+
+        var payload;
+        try { payload = JSON.parse(payloadJson); } catch (e) { return JSON.stringify({ ok: false, error: "bad json", debug: debug }); }
+        var items = payload && payload.items;
+        if (!items || !items.length) return JSON.stringify({ ok: false, error: "no items", debug: debug });
+
+        // Get FPS for frame snapping
+        var fps = 30;
+        try {
+            var settings = seq.getSettings && seq.getSettings();
+            if (settings && settings.videoFrameRate && settings.videoFrameRate.ticks) {
+                fps = 254016000000 / Number(settings.videoFrameRate.ticks);
+            }
+        } catch (e) {}
+        if (!fps || fps < 1 || fps > 240) fps = 30;
+
+        // Selected-clip context: where on the timeline does this clip START,
+        // and what is its inPoint into the source media? atSec from the bridge
+        // is in source-media time (i.e. the seconds index of the speech inside
+        // the underlying video file). To place on the timeline we need:
+        //   timelineSec = sel.timelineStart + (atSec - sel.inPoint)
+        var sel = JSON.parse(ccGetSelectedClip());
+        var timelineStart = (sel && typeof sel.timelineStart === "number") ? sel.timelineStart : 0;
+        var inPt          = (sel && typeof sel.inPoint       === "number") ? sel.inPoint       : 0;
+        note("base timelineStart=" + timelineStart + " inPt=" + inPt + " fps=" + fps.toFixed(2));
+
+        var vTracks = _ccSafe(function () { return seq.videoTracks; });
+        if (!vTracks) return JSON.stringify({ ok: false, error: "no video tracks", debug: debug });
+        var nTracks = _ccSafe(function () { return vTracks.numTracks; });
+        if (!nTracks || nTracks < 2) {
+            return JSON.stringify({ ok: false, error: "need at least 2 video tracks (V1 + V2)", debug: debug });
+        }
+
+        // Save the current playhead so we can restore it at the end.
+        var origPlayhead = null;
+        try { origPlayhead = seq.getPlayerPosition && seq.getPlayerPosition(); } catch (e) {}
+
+        var applied = [];
+        var skipped = [];
+
+        for (var i = 0; i < items.length; i++) {
+            var it = items[i];
+            if (!it || !it.file || typeof it.atSec !== "number") {
+                skipped.push({ index: i, reason: "invalid item" });
+                continue;
+            }
+
+            // 1. Import
+            var importedOk = _ccSafe(function () {
+                return app.project.importFiles([it.file], true, app.project.rootItem, false);
+            });
+            if (!importedOk) { skipped.push({ index: i, file: it.file, reason: "import failed" }); continue; }
+            var item = _ccFindItemByPath(app.project.rootItem, it.file, 0);
+            if (!item) { skipped.push({ index: i, file: it.file, reason: "item not found after import" }); continue; }
+
+            // 2. Compute target timeline time (snap to frame).
+            var rawSec = timelineStart + (it.atSec - inPt);
+            var snappedSec = Math.floor(rawSec * fps) / fps;
+            if (snappedSec < 0) snappedSec = 0;
+
+            // 3. Pick the first overlay track (>= V2) with no clip at this time.
+            var track = null, trackIdx = -1;
+            for (var t = 1; t < nTracks; t++) {
+                var trk = _ccSafe(function () { return vTracks[t]; });
+                if (trk && !_ccTrackHasClipAt(trk, snappedSec)) { track = trk; trackIdx = t; break; }
+            }
+            // Fallback — if every overlay track is busy at this point, use V2.
+            if (!track) { trackIdx = 1; track = _ccSafe(function () { return vTracks[1]; }); }
+            if (!track) { skipped.push({ index: i, file: it.file, reason: "no overlay track" }); continue; }
+
+            // 4. Move the playhead to the target time so insertClip(item, time)
+            //    drops it there. ExtendScript exposes both setPlayerPosition
+            //    (ticks-string) and Time(seconds) — try both.
+            var TICKS_PER_SEC = 254016000000;
+            var ticksStr = String(Math.floor(snappedSec * TICKS_PER_SEC));
+            var moved = false;
+            try { if (seq.setPlayerPosition) { seq.setPlayerPosition(ticksStr); moved = true; } } catch (e) {}
+            // Read back the time as a Time-shaped object Premiere's API expects.
+            var insertTime = null;
+            try { insertTime = seq.getPlayerPosition && seq.getPlayerPosition(); } catch (e) {}
+            if (!insertTime) {
+                // Fallback: construct via Time()
+                try { var tt = new Time(); tt.seconds = snappedSec; insertTime = tt; } catch (e) {}
+            }
+            if (!insertTime) { skipped.push({ index: i, file: it.file, reason: "could not build Time" }); continue; }
+
+            // 5. Insert.
+            var placed = false;
+            try {
+                if (track.insertClip) { track.insertClip(item, insertTime); placed = true; }
+                else if (track.overwriteClip) { track.overwriteClip(item, insertTime); placed = true; }
+            } catch (placeErr) {
+                skipped.push({ index: i, file: it.file, reason: "place error: " + String(placeErr) });
+                continue;
+            }
+            if (!placed) { skipped.push({ index: i, file: it.file, reason: "no insertClip method" }); continue; }
+
+            applied.push({
+                index: i, file: it.file,
+                track: "V" + (trackIdx + 1),
+                atSec: snappedSec,
+                durationSec: it.durationSec || null,
+                type: it.type || null,
+            });
+            note("placed[" + i + "] on V" + (trackIdx + 1) + " at " + snappedSec.toFixed(2) + "s");
+        }
+
+        // Restore the playhead.
+        if (origPlayhead) {
+            try { seq.setPlayerPosition && seq.setPlayerPosition(String(origPlayhead.ticks)); } catch (e) {}
+        }
+
+        return JSON.stringify({
+            ok: true,
+            applied: applied,
+            skipped: skipped,
+            debug: debug,
+        });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e), debug: debug });
+    }
+}
+
+// AUTO EDIT / AUTO CUT — try to pull a transcript out of Premiere's own
+// Speech-to-Text rather than re-running whisper. Two paths to try:
+//   (a) seq.captionTracks — populated when you click "Add captions to sequence"
+//   (b) projectItem property "transcript" / metadata — older Premiere stored
+//       transcripts on the source clip's project item
+//
+// Returns JSON: { ok, source: 'captions'|'projectItem'|'none', sentences: [...] }
+// Each sentence is { startSec, endSec, text } in SOURCE-MEDIA time (not
+// timeline time) so it's drop-in compatible with what whisper returns.
+function ccGetSequenceCaptions() {
+    var debug = { steps: [] };
+    function note(s) { debug.steps.push(String(s)); }
+    try {
+        if (typeof app === "undefined" || !app || !app.project) {
+            return JSON.stringify({ ok: false, error: "no project", debug: debug });
+        }
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) return JSON.stringify({ ok: false, error: "no active sequence", debug: debug });
+
+        // We need the selected clip's timeline-start + inPoint so we can
+        // translate caption timeline-time → source-media time.
+        var selRaw = ccGetSelectedClip();
+        var sel = JSON.parse(selRaw);
+        if (!sel.ok) return JSON.stringify({ ok: false, error: "no clip selected", debug: debug });
+
+        var timelineStart = (typeof sel.timelineStart === "number") ? sel.timelineStart : 0;
+        var timelineEnd   = (typeof sel.timelineEnd   === "number") ? sel.timelineEnd   : (timelineStart + 999999);
+        var inPt          = (typeof sel.inPoint       === "number") ? sel.inPoint       : 0;
+        note("clip timeline=[" + timelineStart.toFixed(2) + "," + timelineEnd.toFixed(2) + "] inPt=" + inPt.toFixed(2));
+
+        var sentences = [];
+
+        // ── Path A: captionTracks on the active sequence ─────────────────
+        var capTracks = _ccSafe(function () { return seq.captionTracks; });
+        var capCount = capTracks ? _ccSafe(function () { return capTracks.numTracks; }) || 0 : 0;
+        note("caption tracks: " + capCount);
+
+        if (capTracks && capCount > 0) {
+            for (var t = 0; t < capCount; t++) {
+                var track = _ccSafe(function () { return capTracks[t]; });
+                if (!track) continue;
+                var clips = _ccSafe(function () { return track.clips; });
+                if (!clips) continue;
+                var n = _ccSafe(function () { return clips.numItems; }) || 0;
+                note("  track[" + t + "] clips: " + n);
+                for (var i = 0; i < n; i++) {
+                    var c = _ccSafe(function () { return clips[i]; });
+                    if (!c) continue;
+                    var cs = _ccSafe(function () { return c.start && c.start.seconds; });
+                    var ce = _ccSafe(function () { return c.end   && c.end.seconds; });
+                    if (typeof cs !== "number" || typeof ce !== "number") continue;
+                    // Only keep captions inside this clip's timeline window
+                    if (ce < timelineStart || cs > timelineEnd) continue;
+                    // Caption text — API name varies by Premiere version
+                    var text = "";
+                    try { text = c.getCaption && c.getCaption(); } catch (e1) {}
+                    if (!text) { try { text = c.captionString; } catch (e2) {} }
+                    if (!text) { try { text = c.name; } catch (e3) {} }
+                    if (!text || typeof text !== "string") continue;
+                    text = text.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+                    if (!text) continue;
+                    sentences.push({
+                        startSec: (cs - timelineStart) + inPt,
+                        endSec:   (ce - timelineStart) + inPt,
+                        text: text,
+                    });
+                }
+            }
+        }
+
+        if (sentences.length > 0) {
+            note("returned " + sentences.length + " sentences from captionTracks");
+            return JSON.stringify({ ok: true, source: 'captions', sentences: sentences, debug: debug });
+        }
+
+        // ── Path B: projectItem-level transcript metadata ────────────────
+        // Some Premiere versions stash the transcribe-only data on the source
+        // project item as a property or XMP. Try a few accessors.
+        var pi = null;
+        try {
+            // Find project item by path
+            var path = sel.path;
+            if (path) pi = _ccFindItemByPath(app.project.rootItem, path, 0);
+        } catch (e) {}
+
+        if (pi) {
+            // Try common property names
+            var candidates = ["transcript", "transcribedSpeech", "getSpeechTranscription"];
+            for (var k = 0; k < candidates.length; k++) {
+                try {
+                    var fn = pi[candidates[k]];
+                    if (typeof fn === "function") {
+                        var v = fn.call(pi);
+                        note("pi." + candidates[k] + "() returned " + (typeof v));
+                    } else if (typeof fn === "string" && fn.length) {
+                        note("pi." + candidates[k] + " = string length " + fn.length);
+                    }
+                } catch (e) {}
+            }
+        }
+
+        return JSON.stringify({ ok: true, source: 'none', sentences: [], debug: debug });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e), debug: debug });
+    }
+}
+
+// Diagnostic — dump everything we can see about the active sequence's text/
+// captions setup. Used once to discover what's actually accessible on this
+// Premiere version. Result goes to the panel's log so we can read it.
+function ccProbeTranscript() {
+    var out = { ok: true, paths: {} };
+    try {
+        out.paths.appType = typeof app;
+        if (typeof app === "undefined" || !app || !app.project) return JSON.stringify({ ok: false, error: "no project" });
+        var seq = app.project.activeSequence;
+        if (!seq) return JSON.stringify({ ok: false, error: "no active sequence" });
+        out.paths.seqName = seq.name;
+
+        // Enumerate seq's enumerable properties (best-effort — ExtendScript
+        // doesn't always expose them via for-in, but try)
+        var seqProps = [];
+        for (var k in seq) { try { seqProps.push(k + ": " + (typeof seq[k])); } catch(e) {} }
+        out.paths.seqProps = seqProps;
+
+        // Caption tracks
+        var ct = _ccSafe(function () { return seq.captionTracks; });
+        out.paths.hasCaptionTracks = !!ct;
+        if (ct) {
+            out.paths.numCaptionTracks = _ccSafe(function () { return ct.numTracks; }) || 0;
+            if (out.paths.numCaptionTracks > 0) {
+                var t0 = _ccSafe(function () { return ct[0]; });
+                if (t0) {
+                    var c0 = _ccSafe(function () { return t0.clips; });
+                    out.paths.track0_clipsCount = c0 ? (_ccSafe(function () { return c0.numItems; }) || 0) : 0;
+                    if (c0 && out.paths.track0_clipsCount > 0) {
+                        var ci0 = _ccSafe(function () { return c0[0]; });
+                        if (ci0) {
+                            var ciProps = [];
+                            for (var k2 in ci0) { try { ciProps.push(k2 + ": " + (typeof ci0[k2])); } catch(e) {} }
+                            out.paths.firstCaptionProps = ciProps;
+                            out.paths.firstCaptionStart = _ccSafe(function () { return ci0.start && ci0.start.seconds; });
+                            out.paths.firstCaptionEnd   = _ccSafe(function () { return ci0.end   && ci0.end.seconds; });
+                            out.paths.firstCaptionTextViaGetCaption = _ccSafe(function () { return ci0.getCaption && ci0.getCaption(); });
+                            out.paths.firstCaptionTextViaString     = _ccSafe(function () { return ci0.captionString; });
+                            out.paths.firstCaptionTextViaName       = _ccSafe(function () { return ci0.name; });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Sequence-level transcript? (long shot)
+        out.paths.seqTranscript = _ccSafe(function () { return typeof seq.transcript; });
+
+        return JSON.stringify(out);
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e), partial: out });
     }
 }
 
