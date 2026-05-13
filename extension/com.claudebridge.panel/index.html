@@ -238,6 +238,33 @@
   .settings-foot { margin-top: 16px; font-size: 10.5px; color: var(--text-faint); text-align: center; }
   .settings-foot a { color: var(--text-dim); text-decoration: none; }
   .settings-foot a:hover { color: var(--accent); }
+  .settings-credit {
+    margin-top: 8px;
+    font-size: 10.5px;
+    color: var(--text-faint);
+    text-align: center;
+    letter-spacing: 0.2px;
+  }
+  .credit-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.18s var(--ease), text-shadow 0.18s var(--ease);
+  }
+  .credit-link:hover {
+    color: var(--accent-2);
+    text-shadow: 0 0 8px rgba(217, 119, 87, 0.5);
+  }
+  .credit-heart {
+    color: #ff5e5b;
+    display: inline-block;
+    margin: 0 2px;
+    animation: creditBeat 1.4s ease-in-out infinite;
+  }
+  @keyframes creditBeat {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.18); }
+  }
 
   /* ───── BOOT INTRO ───── */
   .boot-intro {
@@ -481,8 +508,11 @@
     overflow-y: hidden;
     flex-shrink: 0;
     scrollbar-width: thin;
+    /* The + button sits in a wrapper that's sticky to the right so it never
+       scrolls out of reach even with 10+ tabs. */
   }
   #tabStrip::-webkit-scrollbar { height: 4px; }
+  #tabStrip::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
   .tab-pill {
     display: flex;
     align-items: center;
@@ -496,8 +526,8 @@
     font-size: 12px;
     color: var(--text-dim);
     max-width: 180px;
-    min-width: 80px;
-    flex-shrink: 0;
+    min-width: 50px;       /* shrink down to 50px when many tabs */
+    flex: 1 1 auto;        /* shrink/grow proportionally (Chrome-style) */
     transition: background 0.15s, color 0.15s;
     position: relative;
   }
@@ -547,13 +577,19 @@
   .new-tab-btn {
     width: 26px; height: 26px;
     border: none;
-    background: transparent;
+    background: var(--bg);
     color: var(--text-dim);
     border-radius: 6px;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
-    margin-left: 2px;
+    margin-left: 4px;
+    /* Sticky to the right edge of the scroll viewport so even with 20 tabs
+       and the strip scrolled to the left, + stays visible. */
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    box-shadow: -8px 0 8px -4px var(--bg);
   }
   .new-tab-btn:hover { background: rgba(255,255,255,0.08); color: var(--fg); }
   .new-tab-btn svg { width: 14px; height: 14px; }
@@ -566,16 +602,16 @@
     justify-content: flex-start;
     min-height: 100%;
     text-align: center;
-    padding: 28px 10px 40px;
-    gap: 14px;
+    padding: 18px 10px 28px;
+    gap: 10px;
   }
   .empty-logo {
     position: relative;
-    width: 52px; height: 52px;
-    border-radius: 14px;
+    width: 44px; height: 44px;
+    border-radius: 12px;
     background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent) 55%, #b04d2f 100%);
     display: flex; align-items: center; justify-content: center;
-    color: #fff; font-weight: 700; font-size: 24px;
+    color: #fff; font-weight: 700; font-size: 20px;
     box-shadow:
       0 12px 30px rgba(217, 119, 87, 0.3),
       0 0 0 1px rgba(255,255,255,0.08) inset,
@@ -609,8 +645,8 @@
     50%      { opacity: 0.75; transform: scale(1.15); }
   }
   .empty h1 {
-    margin: 6px 0 0;
-    font-size: 19px;
+    margin: 4px 0 0;
+    font-size: 17px;
     font-weight: 600;
     letter-spacing: -0.4px;
     background: linear-gradient(180deg, #fff 0%, #d8d2c5 100%);
@@ -621,10 +657,10 @@
   }
   .empty p {
     margin: 0;
-    font-size: 12.5px;
+    font-size: 11.5px;
     color: var(--text-dim);
-    max-width: 250px;
-    line-height: 1.55;
+    max-width: 380px;
+    line-height: 1.5;
     animation: fadeUp 0.7s var(--ease-out) 0.18s backwards;
   }
   .empty-search-wrap {
@@ -646,7 +682,7 @@
   .empty-search {
     width: 100%;
     box-sizing: border-box;
-    padding: 9px 12px 9px 32px;
+    padding: 7px 12px 7px 32px;
     background: rgba(20, 20, 24, 0.6);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
@@ -671,22 +707,38 @@
   .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 5px;
     justify-content: center;
-    margin-top: 8px;
+    margin-top: 4px;
     width: 100%;
     max-width: 100%;
     padding: 0 6px;
     box-sizing: border-box;
   }
   .chip.hidden { display: none; }
+  /* .chip.extra is just a marker — visibility is governed by .hidden in JS so
+     searches can override collapse and reveal matching extras. */
+  .chip-more {
+    background: transparent !important;
+    border: 1px dashed var(--border-strong) !important;
+    color: var(--accent) !important;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500 !important;
+    opacity: 1 !important;
+    animation: none !important;
+  }
+  .chip-more:hover {
+    border-color: var(--accent-line) !important;
+    background: rgba(217, 119, 87, 0.08) !important;
+  }
   .chip {
     background: var(--surface);
     border: 1px solid var(--border);
     color: var(--text-dim);
-    padding: 4px 9px;
+    padding: 3px 8px;
     border-radius: 100px;
-    font-size: 10.5px;
+    font-size: 10px;
     line-height: 1.3;
     cursor: pointer;
     transition: transform 0.12s var(--ease-out), background 0.12s var(--ease-out), border-color 0.12s var(--ease-out), color 0.12s var(--ease-out);
@@ -758,6 +810,7 @@
     flex: 1;
     min-width: 0;
     padding-top: 3px;
+    position: relative;
   }
   .msg-author {
     font-size: 10.5px;
@@ -766,6 +819,26 @@
     margin-bottom: 4px;
     letter-spacing: 0.1px;
   }
+  /* Low-opacity copy button on every message bubble */
+  .msg-copy {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 22px; height: 22px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    opacity: 0.25;
+    cursor: pointer;
+    border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.15s var(--ease), background 0.15s var(--ease), color 0.15s var(--ease);
+  }
+  .msg-copy svg { width: 13px; height: 13px; }
+  .msg:hover .msg-copy { opacity: 0.55; }
+  .msg-copy:hover { opacity: 1 !important; background: rgba(255,255,255,0.06); color: var(--accent); }
+  .msg-copy.copied { opacity: 1 !important; color: var(--accent); }
   .you .msg-author    { color: #b6b0a2; }
   .claude .msg-author { color: var(--accent); }
 
@@ -1050,7 +1123,7 @@
   /* ───── COMPOSER ───── */
   .composer {
     flex-shrink: 0;
-    padding: 10px 12px 12px;
+    padding: 7px 12px 9px;
     background: var(--bg-elevated);
     border-top: 1px solid var(--border);
     position: relative;
@@ -1083,7 +1156,7 @@
     color: var(--text);
     border: none;
     outline: none;
-    padding: 11px 12px 6px;
+    padding: 8px 12px 5px;
     font-family: var(--font-ui);
     font-size: 13px;
     line-height: 1.55;
@@ -1101,7 +1174,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 4px 8px 7px;
+    padding: 3px 8px 5px;
   }
   .hint-text {
     font-size: 10.5px;
@@ -1127,8 +1200,8 @@
     background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent) 55%, #b04d2f 100%);
     color: #fff;
     border: none;
-    width: 30px; height: 30px;
-    border-radius: 8px;
+    width: 28px; height: 28px;
+    border-radius: 7px;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: transform 0.35s var(--spring), box-shadow 0.35s var(--ease), filter 0.3s var(--ease);
@@ -1369,7 +1442,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 8px 9px 4px;
+    padding: 6px 9px 3px;
     border-bottom: 1px solid var(--border-soft);
   }
   .mode-bar-label {
@@ -1387,7 +1460,7 @@
     align-items: center;
     justify-content: center;
     gap: 5px;
-    padding: 4px 9px;
+    padding: 3px 9px;
     border-radius: 100px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--border);
@@ -1422,7 +1495,7 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 5px 10px;
+    padding: 4px 10px;
     background: transparent;
     border: 1px solid var(--border);
     border-radius: 100px;
@@ -1543,6 +1616,26 @@
     transition: color 0.12s var(--ease-out), border-color 0.12s var(--ease-out);
   }
   .autocut-modal-cancel:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+  /* Shared "ESC to interrupt" hint — sits inside any progress row at 50% */
+  .interrupt-hint {
+    margin-left: 8px;
+    font-size: 10.5px;
+    font-family: var(--font-ui);
+    color: var(--text);
+    opacity: 0.5;
+    user-select: none;
+    letter-spacing: 0.3px;
+  }
+  .interrupt-hint::before {
+    content: '';
+    display: inline-block;
+    width: 1px; height: 10px;
+    background: currentColor;
+    opacity: 0.4;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
   /* AUTO EDIT progress card */
   .autoedit-progress {
     display: flex; align-items: center; gap: 10px;
@@ -1940,7 +2033,7 @@
   }
 
   /* ───── HISTORY PANEL ───── */
-  .history-panel {
+  .history-panel, .logs-panel {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
     background: var(--bg-base);
@@ -1955,11 +2048,64 @@
       transform 0.32s cubic-bezier(0.16, 1, 0.3, 1),
       opacity   0.22s linear;
   }
-  .history-panel.show {
+  .history-panel.show, .logs-panel.show {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
     pointer-events: auto;
   }
+
+  /* Logs panel — live tail of bridge.log + active autoedit/autocut logs */
+  .logs-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    letter-spacing: 0.2px;
+  }
+  .logs-header-actions { display: flex; align-items: center; gap: 4px; }
+  .logs-source {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-size: 11px;
+    padding: 3px 6px;
+    margin-right: 4px;
+    font-family: inherit;
+  }
+  .logs-source:focus { outline: none; border-color: var(--accent-line); }
+  .logs-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: auto;
+    margin: 0;
+    padding: 10px 12px 12px;
+    background: #0a0a0c;
+    color: #cfcabe;
+    font-family: "SF Mono", "JetBrains Mono", Menlo, monospace;
+    font-size: 10.5px;
+    line-height: 1.45;
+    white-space: pre;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  .logs-body .log-err { color: #e07474; }
+  .logs-body .log-ok  { color: #6fbf8a; }
+  .logs-body .log-dim { color: #6e6a5e; }
+  .logs-foot {
+    padding: 6px 12px;
+    background: var(--bg-elevated);
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--text-faint);
+    flex-shrink: 0;
+    font-family: "SF Mono", monospace;
+  }
+  .logs-foot.paused { color: var(--accent); }
   /* Header eases in slightly after the panel so the slide feels layered */
   .history-panel .history-header {
     opacity: 0;
@@ -2013,6 +2159,11 @@
     opacity: 0;
     transform: translate3d(0, 8px, 0);
     animation: histItemIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  .history-item button, .history-item .history-actions {
+    user-select: none;  /* buttons shouldn't catch selection */
   }
   /* Stagger the first ~12 items; later items just fade in immediately */
   .history-item:nth-child(1)  { animation-delay: 0.09s; }
@@ -2065,6 +2216,29 @@
     color: var(--text-faint);
     display: flex; gap: 6px; align-items: center;
   }
+  .history-prompt-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .history-prompt-row .history-prompt { flex: 1; min-width: 0; }
+  .history-copy {
+    flex-shrink: 0;
+    width: 22px; height: 22px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    opacity: 0.35;
+    cursor: pointer;
+    border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.15s var(--ease), background 0.15s var(--ease), color 0.15s var(--ease);
+  }
+  .history-copy svg { width: 13px; height: 13px; }
+  .history-copy:hover { opacity: 1; background: rgba(255,255,255,0.06); color: var(--accent); }
+  .history-copy.copied { opacity: 1 !important; color: var(--accent); }
+
   .history-actions {
     display: flex; gap: 4px;
     margin-top: 2px;
@@ -2125,13 +2299,19 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">4.9</span>
+    <span class="version-tag" id="versionTag">5.0</span>
   </div>
   <div style="display:flex;align-items:center">
     <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+    <button class="icon-btn" id="logsBtn" type="button" title="Live logs — bridge stdout + active render" aria-label="Logs" style="margin-right:4px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="4 17 10 11 4 5"/>
+        <line x1="12" y1="19" x2="20" y2="19"/>
       </svg>
     </button>
     <button class="icon-btn" id="updateBtn" type="button" title="Check for updates from GitHub" aria-label="Update" style="margin-right:4px">
@@ -2238,6 +2418,31 @@
     </button>
   </div>
   <div class="history-list" id="historyList"></div>
+</div>
+
+<!-- Logs Panel (overlay) — live tail of bridge + autoedit/autocut logs -->
+<div class="logs-panel" id="logsPanel">
+  <div class="logs-header">
+    <span>Live logs</span>
+    <div class="logs-header-actions">
+      <select id="logsSource" class="logs-source" title="Log to tail">
+        <option value="bridge">Bridge stdout</option>
+      </select>
+      <button class="icon-btn" id="logsPauseBtn" type="button" title="Pause / resume tail" style="margin:0 2px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" id="logsPauseIcon">
+          <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="logsClearBtn" type="button" title="Clear view (doesn't delete the file)" style="margin:0 2px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      </button>
+      <button class="icon-btn" id="logsClose" type="button" aria-label="Close" style="margin:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+  <pre class="logs-body" id="logsBody"></pre>
+  <div class="logs-foot" id="logsFoot">Watching <span id="logsPath">bridge.log</span></div>
 </div>
 
 <!-- Settings Panel (overlay) -->
@@ -2378,6 +2583,9 @@
         <button class="settings-btn danger" id="settingFactoryReset">Reset all settings</button>
       </div>
       <div class="settings-foot">v<span id="settingsVersion">2.1</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
+      <div class="settings-credit">
+        Made by <a href="https://github.com/iprincemax72-maker" target="_blank" class="credit-link">iprincemax72-maker</a> <span class="credit-heart">&#10084;</span> Claude
+      </div>
     </div>
 
   </div>
@@ -2398,7 +2606,7 @@
 
 <div id="tabStrip">
   <!-- Tab pills rendered dynamically by renderTabStrip() -->
-  <button class="new-tab-btn" id="newTabBtn" title="New animation tab — ⌘T" type="button">
+  <button class="new-tab-btn" id="newTabBtn" title="New animation tab — ⌘⇧T (Ctrl+Tab cycles)" type="button">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
   </button>
 </div>
@@ -2447,7 +2655,7 @@
       <textarea id="input" placeholder="Ask Claude…" rows="1" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
     </div>
     <div class="input-toolbar">
-      <span class="hint-text" id="hint"><kbd class="k-tab">⇥</kbd> accept · <kbd>↵</kbd> send · <kbd>⇧V</kbd> paste · <kbd>⇧B</kbd> image · <kbd>⇧C</kbd> copy</span>
+      <span class="hint-text" id="hint"><kbd class="k-tab">⇥</kbd> accept · <kbd>↵</kbd> send · <kbd>⌘V</kbd> paste text/image · <kbd>⌘C</kbd> copy</span>
       <span class="esc-hint" id="escHint" title="Cancel the current request"><kbd>esc</kbd> cancel</span>
       <div class="expand-group" id="expandGroup">
         <button class="expand-btn" data-level="light" type="button" aria-label="Light expand" title="Light — adds a couple missing specifics (duration, primary color)" disabled>
@@ -2587,6 +2795,7 @@ function stashActiveTabState() {
   const t = tabs[activeTabIdx];
   if (!t) return;
   t.inputDraft = input.value;
+  t.scrollTop  = log.scrollTop;   // remember where each tab was scrolled
   t.activeChatAbort = activeChatAbort;
   t.activeAutocut   = activeAutocut;
   t.activeAutoedit  = activeAutoedit;
@@ -2598,6 +2807,10 @@ function applyActiveTabState() {
   if (!t) return;
   // Toggle visibility of tab contents
   for (const tab of tabs) tab.contentEl.classList.toggle('active', tab === t);
+  // Restore this tab's scroll position. Defer one tick so the layout from
+  // display:none → block actually happens before we set scrollTop.
+  const targetScroll = (typeof t.scrollTop === 'number') ? t.scrollTop : 0;
+  requestAnimationFrame(() => { log.scrollTop = targetScroll; });
   // Restore input draft
   input.value = t.inputDraft || '';
   autosize && autosize();
@@ -2632,16 +2845,27 @@ function renderTabStrip() {
   tabs.forEach((t, idx) => {
     const pill = document.createElement('div');
     pill.className = 'tab-pill' + (idx === activeTabIdx ? ' active' : '');
-    pill.title = t.label;
+    // Tooltip teaches the keyboard shortcut for switching to this tab + close.
+    const switchShort = idx < 9 ? `  (⌘${idx + 1})` : '';
+    pill.title = `${t.label}${switchShort}\n⌘⇧W close · ⌘⇧T new · Ctrl+Tab cycle`;
     pill.innerHTML =
       (tabHasActivity(t) ? '<span class="tab-dot"></span>' : '')
       + '<span class="tab-label">' + escapeHTML(t.label) + '</span>'
-      + '<button class="tab-close" type="button" aria-label="Close tab" title="Close · ⌘W">'
+      + '<button class="tab-close" type="button" aria-label="Close tab" title="Close · ⌘⇧W">'
       + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
       + '</button>';
     pill.addEventListener('click', (e) => {
       if (e.target.closest('.tab-close')) return;
       switchTab(idx);
+    });
+    // Middle-click closes the tab (Chrome convention)
+    pill.addEventListener('mousedown', (e) => {
+      if (e.button === 1) { e.preventDefault(); closeTab(idx); }
+    });
+    // Some platforms / CEF builds fire `auxclick` instead of mousedown for
+    // middle button — handle both.
+    pill.addEventListener('auxclick', (e) => {
+      if (e.button === 1) { e.preventDefault(); closeTab(idx); }
     });
     pill.querySelector('.tab-close').addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2651,13 +2875,33 @@ function renderTabStrip() {
   });
 }
 
-// Wire the + button + keyboard shortcuts (⌘T new, ⌘W close, ⌘1..9 switch)
+// Wire the + button + keyboard shortcuts. Mac's Cmd+T is reserved by Premiere
+// for "Add Default Transition" so we use Cmd+Shift+T / Cmd+Shift+W instead.
+// Ctrl+Tab cycles tabs (Chrome's secondary shortcut, no Premiere conflict).
 document.getElementById('newTabBtn').addEventListener('click', () => newTab());
 document.addEventListener('keydown', (e) => {
-  if (!(e.metaKey || e.ctrlKey)) return;
-  if (e.key === 't' || e.key === 'T') { e.preventDefault(); newTab(); return; }
-  if (e.key === 'w' || e.key === 'W') { e.preventDefault(); closeTab(activeTabIdx); return; }
-  if (/^[1-9]$/.test(e.key)) {
+  // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs (works in CEP, no Premiere clash)
+  if (e.ctrlKey && e.key === 'Tab') {
+    e.preventDefault();
+    const dir = e.shiftKey ? -1 : 1;
+    const next = (activeTabIdx + dir + tabs.length) % tabs.length;
+    switchTab(next);
+    return;
+  }
+  // Cmd/Ctrl + Shift + T = new tab. Avoids Cmd+T (Premiere transition).
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+    e.preventDefault(); newTab(); return;
+  }
+  // Cmd/Ctrl + Shift + W = close tab. Avoids Cmd+W (Premiere close).
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'w' || e.key === 'W')) {
+    e.preventDefault(); closeTab(activeTabIdx); return;
+  }
+  // Cmd/Ctrl + 1..9 = switch (Premiere also uses some of these for panels —
+  // try them; if Premiere wins for one, the others might still work).
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && /^[1-9]$/.test(e.key)) {
+    // Only fire when NOT typing in an input — so ⌘1 to type "1" still works
+    const t = e.target;
+    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || t.isContentEditable)) return;
     const idx = parseInt(e.key, 10) - 1;
     if (idx < tabs.length) { e.preventDefault(); switchTab(idx); }
   }
@@ -2778,21 +3022,204 @@ const SUGGESTIONS = [
   ['Polaroid frame',    'Make a polaroid photo frame falling into view with a slight rotation and shadow'],
   ['Price reveal',      'Generate a price tag reveal animation where the price flips into view with depth'],
   ['Bookmark fold',     'Create an animated corner bookmark fold revealing with a soft shadow'],
+
+  // ─── Trend-pack hooks (use the named style library packs) ───
+  ['Brat title',        'Make a Charli XCX brat-style title — a single lowercase word in heavy black Arial on lime green, kerning closes in tight, holds for 30 frames'],
+  ['Coquette intro',    'Create a coquette pink intro — italic serif title with a few sparkles and a soft pink glow, slow blur-in'],
+  ['Y2K chrome title',  'Generate a Y2K chrome metallic gradient title for one word with a perspective grid floor and magenta glow'],
+  ['Mocha podcast intro','Make a Pantone-2025 mocha podcast intro with italic serif episode title and a soft warm light leak'],
+  ['Vaporwave sunset',  'Create a vaporwave sunset card with magenta-purple-teal gradient mesh and a synthwave grid floor'],
+  ['Dark academia card','Generate a dark academia title card with oxblood and cream, italic serif, candle-warm vignette'],
+  ['Sage wellness intro','Make a sage matcha wellness intro — slow fade, sage green palette, italic title, no effects'],
+  ['Editorial brutalist','Create an editorial brutalist title — massive uppercase headline in pure black-and-white with one red accent stripe'],
+  ['Glitch hype',       'Make a one-burst RGB-split glitch reveal on a hero word — 8 frames of chaos then hold clean'],
+  ['Reels gradient',    'Create an Instagram-style gradient mesh intro card with soft pastels and a blurred title fade-in'],
+
+  // ─── Hooks / openers (short-form opening lines) ───
+  ['Hook: wait...',     'Make a 3-second hook intro that says "Wait — you have to see this" with a quick zoom-punch on the word "this"'],
+  ['POV caption',       'Make a TikTok "POV: you just discovered..." caption with word-by-word pop and a slight stroke shake'],
+  ['When you...',       'Generate a "When you finally finish editing" relatable caption in white-on-dark TikTok kinetic style'],
+  ['Me trying to...',   'Create a "Me trying to be productive at 3am" caption with word-pop and a slight rotation per word'],
+  ['Nobody talks about','Generate a "Nobody talks about this" hook line in heavy white-on-dark with kerning-in entrance'],
+  ['Story time',        'Make a "Story time" title card with a vintage-page texture and italic serif "story time" lowercase'],
+  ['Plot twist',        'Create a "PLOT TWIST" reveal — kerning-in entrance, hold, then a quick zoom-punch'],
+  ['Real talk',         'Generate a "Real talk." caption in clean editorial serif with a thick accent bar to the left'],
+  ['Watch this →',      'Make a "WATCH THIS" sticker callout with an arrow pointing right, slight rotation, stamp-slam landing'],
+  ['Hook: I bet you',   'Create an "I bet you didn\'t know..." hook caption with word-pop reveal'],
+
+  // ─── Quote / pull-quote variants ───
+  ['Quote pull',        'Make a pulled-quote card with a thick orange accent bar and italic serif quote text, slow blur-in, hold'],
+  ['Quote + name',      'Generate a quote card with the quoted text and the speaker name beneath in muted caption case'],
+  ['Big quote',         'Create a full-frame editorial quote in serif italic with a small attribution line beneath, mocha palette'],
+  ['Author tagline',    'Make an author tagline card — italic editorial pull-quote sitting bottom-left over a dark vignette'],
+
+  // ─── Stat-slam variants ───
+  ['Big stat slam',     'Create a stat slam — tiny kicker label above, then a big number counter from 0 ticking up, hold for 30 frames'],
+  ['% growth',          'Make a percentage growth callout with a green up-arrow and the number animating from 0 to 43 percent'],
+  ['Million reveal',    'Generate a "1,000,000+" subscribers reveal with the counter ticking up to 1 million and a tiny crown above'],
+  ['Revenue tick',      'Create a revenue counter ticking from $0 to $124,500 with a tiny "this month" caption beneath'],
+  ['Time saved',        'Make a "saved 14 hours" stat card with hour-glass icon and a count-up of hours'],
+  ['Sales today',       'Generate a "Sales today" stat tile with a number counting up and a soft green up-trend line'],
+
+  // ─── Before / after / comparison ───
+  ['Before / After',    'Generate a clean horizontal split-screen "Before" vs "After" card with labels in safe zones'],
+  ['Day 1 vs Day 30',   'Make a Day 1 vs Day 30 transformation card — faded left, punchy right, accent line down the middle'],
+  ['Then vs now',       'Create a "Then vs Now" two-panel card with vintage filter left and clean right'],
+  ['What I expected',   'Generate a "What I expected vs what happened" two-panel card with playful pop labels'],
+  ['Cheap vs premium',  'Make a "Cheap vs Premium" comparison card with the premium side glowing warmer'],
+
+  // ─── Lists / step-by-step ───
+  ['3 reasons why',     'Generate a numbered "3 reasons why" list reveal — items stagger in with thin numeric prefixes 01 02 03'],
+  ['5 tips list',       'Make a "5 quick tips" list card — five items pop in one by one with check marks'],
+  ['Steps 1 to 3',      'Create a "Step 1 of 3" → "Step 2 of 3" → "Step 3 of 3" chapter sequence with a thin progress bar at top'],
+  ['How it works',      'Generate a "How it works" 3-step numbered explainer — each step has a tiny icon and a one-line caption'],
+  ['Recipe steps',      'Make a recipe step card "Step 2: whisk eggs" with step number, instruction, and a small kitchen-warm palette'],
+  ['Checklist done',    'Create a 4-item checklist where each item animates from unchecked to checked with a green tick'],
+  ['Section break',     'Generate a brief full-frame section break card with a single word title in massive caps, hard cut entry'],
+  ['Chapter divider',   'Make a chapter divider card with a Roman numeral and a chapter name, full-frame, crossfades'],
+
+  // ─── Lower thirds / name introductions ───
+  ['Bottom-left LT',    'Generate a sleek bottom-left lower third with name, role, and a thin accent stripe on the left'],
+  ['Centered intro',    'Make a centered name introduction card — big name, smaller role beneath, slide-up entrance'],
+  ['News anchor LT',    'Create a broadcast-news style lower third with name in white on a colored bar across the bottom'],
+  ['Podcast guest',     'Generate a podcast guest intro card with name, role, and company in editorial serif, fades in'],
+  ['Sponsored by',      'Make a "Sponsored by" reveal with logo placeholder, subtle accent line, top-right corner'],
+
+  // ─── Tutorial / tech / dev ───
+  ['Keyboard shortcut', 'Generate a keyboard shortcut overlay showing Cmd+Shift+T in nice rounded keycaps, popping in'],
+  ['Terminal command',  'Make a terminal command card with the command in monospace on a dark window-chrome panel'],
+  ['Code snippet',      'Create a syntax-highlighted code snippet card popping in with a soft glow underneath'],
+  ['File tree',         'Generate an animated file-tree reveal — folders open in sequence, monospace, indented hierarchy'],
+  ['Pull request',      'Make a GitHub-style pull request card with title, +200 -45, and a green merged badge'],
+  ['Error message',     'Create a red error toast popup that slides in from the top with a brief stack-trace style line'],
+  ['Loading dots',      'Generate a three-dot loading typing-indicator — pulses in sequence, bottom-left bubble'],
+
+  // ─── Music / lyric / beat ───
+  ['Karaoke line',      'Create a karaoke caption with each word highlighted yellow as it should be sung, white text on black'],
+  ['Lyric drop',        'Make a single lyric line dropping into the frame center, bold sans, with a subtle bass-thump scale'],
+  ['Beat hit pop',      'Generate a single word that pops on each beat hit — 4 quick pulses synced to a 120 BPM pulse'],
+  ['Drop incoming',     'Create a "DROP INCOMING" countdown — 3 2 1 then a flash and a single word reveal'],
+  ['Now playing',       'Generate a "Now Playing" music card with track title, artist, and a thin progress bar at the bottom'],
+  ['Sound wave bars',   'Make animated sound-wave bars equalizing in the bottom corner — 5 bars bouncing'],
+
+  // ─── Reaction / meme overlays ───
+  ['Mind blown',        'Generate a mind-blown reaction overlay with explosion lines radiating from screen center'],
+  ['Fire emoji burst',  'Make a fire-emoji particle burst from the bottom — 6-8 emoji rising and fading'],
+  ['100 emoji slam',    'Create the 100 emoji slamming into the frame center with a quick shake'],
+  ['Heart eyes',        'Generate a heart-eyes emoji popping in with little heart particles rising around it'],
+  ['Skull emoji',       'Make a skull emoji wobbling in a corner — "this is so bad" reaction loop'],
+  ['Side eye',          'Create a side-eye emoji peeking in with shifty motion, hold, then pop out'],
+  ['Crying laugh loop', 'Generate a looping crying-laughing emoji bouncing in the bottom-right corner'],
+  ['Eyes peek',         'Make the eyes emoji peeking in from the bottom edge of the frame, then retreating'],
+  ['Sparkles around',   'Create sparkles popping around a single word — magical emphasis, soft glow'],
+
+  // ─── Data / charts ───
+  ['Bar chart',         'Make a 4-bar bar chart filling up one bar at a time with values labeled above each bar'],
+  ['Pie chart',         'Generate a pie chart filling in from 0 to 100 percent in segments, each segment labeled'],
+  ['Line graph',        'Create a line graph drawing in from left to right with a single trend line and axis labels'],
+  ['Donut metric',      'Make a donut chart with the central percentage counting up to 78% and a small label below'],
+  ['Trend up arrow',    'Generate an up-trend arrow rising with the percentage label tracking alongside it'],
+  ['Bar race tiny',     'Create a tiny 3-bar bar-race animation where bars reorder as values change'],
+
+  // ─── Sports / scoreline ───
+  ['Scoreline card',    'Make an ESPN-style scoreline card with two team names and a colon score, top-of-screen badge'],
+  ['Player stat card',  'Generate a sports player card with avatar circle, name, and 3 stat lines in a dark-blue panel'],
+  ['Match progress',    'Create a match progress bar showing 45:00 of a 90-min game with a halftime marker'],
+  ['Goal flash',        'Make a "GOAL!" full-frame flash with the word slamming in shaking, on a team-color background'],
+
+  // ─── Food / recipe / lifestyle ───
+  ['Ingredient list',   'Make a recipe ingredient list — items stagger in with quantities, kitchen-warm palette'],
+  ['Recipe timer',      'Generate a recipe timer counting down from 10:00 with a thin ring filling around it'],
+  ['Calorie count',     'Create a calorie count chip in the corner — "320 kcal" with a tiny flame icon'],
+
+  // ─── Travel / location ───
+  ['Map pin drop',      'Make a map pin drop animation — pin falls into place with a small ripple under it'],
+  ['Location title',    'Generate a location title card "Tokyo, Japan" in editorial serif with a thin accent line'],
+  ['GPS trail',         'Create a GPS path drawing across a stylized map, dotted line from start to end pin'],
+  ['Sunset overlay',    'Make a warm sunset color gradient sweeping across the frame from top to bottom'],
+  ['Date stamp',        'Generate a film-stamp date card in the corner — "MAY 13, 2026" in mono, slight grain'],
+
+  // ─── Word emphasis / text effects ───
+  ['Word swap',         'Create a word-swap animation where the same position cycles through 3 words — fast pop swap'],
+  ['Strikethrough word','Generate a word getting struck through with a line, then a replacement word fading in'],
+  ['Highlighted word',  'Make a sentence where one key word gets a yellow highlight bar sliding in behind it'],
+  ['Censor bar',        'Create an animated black censor bar sliding across a word with a tiny "BLEEP" caption above'],
+  ['Spinning word',     'Generate a single word with each letter spinning into place one by one'],
+  ['Falling letters',   'Make letters of a word falling down into place one at a time with a settle bounce'],
+  ['Typewriter card',   'Create a typewriter typing-in card with a blinking caret and soft mono font'],
+  ['Sparkle title',     'Generate a title with sparkles pinging around each letter for half a second'],
+  ['Glitch word',       'Make a brief RGB-glitch on a single word — 6 frames of chaos, then hold clean'],
+
+  // ─── CTAs / engagement asks ───
+  ['Subscribe arrow',   'Create a subscribe arrow pointing to the subscribe button with a slight bounce loop'],
+  ['Tap to follow',     'Generate a "Tap to follow" overlay with a tapping finger animation in the corner'],
+  ['Share callout',     'Make a "Share this" callout with a paper-plane icon and arrow pointing to the share button'],
+  ['Save for later',    'Create a "Save this for later" bookmark icon with a subtle pulse in the corner'],
+  ['Drop a comment',    'Generate a "Drop a comment 👇" prompt with a small arrow pointing down'],
+  ['Smash that like',   'Make a "Smash that like" reminder with the like icon filling red as it animates'],
+  ['Notification bell', 'Create a bell icon ringing animation — slight rotation each side then settle'],
+  ['Coming up next',    'Generate a "Coming up next" preview strip in the bottom corner with a thumbnail placeholder'],
+  ['Up next tile',      'Make an end-screen "Up Next" tile with thumbnail + title that pops in and holds'],
+
+  // ─── Notifications / device chrome ───
+  ['Sticky note',       'Generate a yellow sticky note slamming down with a slight wobble, handwritten-style text inside'],
+  ['Speech bubble',     'Create a comic-style speech bubble popping in with a tail pointing left, text fades in'],
+  ['Thought bubble',    'Make a thought bubble rising up — cloud shape with three trailing dots, text inside'],
+  ['Tape sticker',      'Generate a piece-of-tape sticker landing on the frame at an angle, slight wobble'],
+  ['Camera flash',      'Create a quick camera-flash effect — full-frame white flash, 4 frames, then snap back'],
+  ['Recording dot',     'Make a red recording dot pulsing with "REC" label in the top corner'],
+  ['Battery low',       'Generate a battery-low warning chip with the battery icon ticking down red'],
+  ['Wifi off',          'Create a wifi-disconnected popup with the icon X-ed out and "No connection" caption'],
 ];
 
 /* Render chips on the empty state */
+/* Chips render: only the first INITIAL_CHIP_COUNT load at start so we don't
+   pay for 178 fade-up animations + 178 DOM nodes on first paint. The rest
+   come in when the user clicks "Show more" or types in the search box (any
+   query unfolds everything to allow full-text matching). */
+const INITIAL_CHIP_COUNT = 36;
+let chipsExpanded = false;
+
 function renderChips(container) {
   if (!container) return;
   container.innerHTML = '';
   SUGGESTIONS.forEach(([label, prompt], i) => {
     const c = document.createElement('div');
     c.className = 'chip';
+    const isExtra = i >= INITIAL_CHIP_COUNT;
+    if (isExtra) c.classList.add('extra');
+    // Hide collapsed extras via .hidden — the search will toggle this off
+    // for any matching chip so search works across ALL 178 suggestions.
+    if (isExtra && !chipsExpanded) c.classList.add('hidden');
     c.dataset.prompt = prompt;
     c.dataset.haystack = (label + ' ' + prompt).toLowerCase();
     c.textContent = label;
-    c.style.animationDelay = (0.28 + (i % 12) * 0.04) + 's';
+    if (!isExtra) {
+      // First batch: staggered fade-up like before
+      c.style.animationDelay = (0.28 + (i % 12) * 0.04) + 's';
+    } else {
+      // Extras: skip the fade-up animation (saves boot cost) but force them
+      // visible so they appear instantly when "Show more" or a search match
+      // removes the .hidden class.
+      c.style.animation = 'none';
+      c.style.opacity = '1';
+    }
     container.appendChild(c);
   });
+  // "Show more" button at the end
+  if (SUGGESTIONS.length > INITIAL_CHIP_COUNT) {
+    const moreBtn = document.createElement('button');
+    moreBtn.type = 'button';
+    moreBtn.className = 'chip chip-more';
+    moreBtn.textContent = chipsExpanded
+      ? `Show fewer ▴`
+      : `Show ${SUGGESTIONS.length - INITIAL_CHIP_COUNT} more ▾`;
+    moreBtn.addEventListener('click', () => {
+      chipsExpanded = !chipsExpanded;
+      renderChips(container);
+    });
+    container.appendChild(moreBtn);
+  }
 }
 renderChips(chipsContainer);
 
@@ -2804,11 +3231,19 @@ function filterChips(query) {
   const chipsEl = document.getElementById('chips');
   const noMatch = document.getElementById('emptyNoMatch');
   if (!chipsEl) return;
+  // Searching always considers ALL chips, even collapsed ones. We force the
+  // extras visible while filtering.
+  const searching = q.length > 0;
   let shown = 0;
   chipsEl.querySelectorAll('.chip').forEach(c => {
+    if (c.classList.contains('chip-more')) {
+      c.style.display = searching ? 'none' : '';
+      return;
+    }
     const hit = !q || (c.dataset.haystack || '').indexOf(q) >= 0;
-    c.classList.toggle('hidden', !hit);
-    if (hit) shown++;
+    const collapsed = c.classList.contains('extra') && !searching;
+    c.classList.toggle('hidden', !hit || collapsed);
+    if (hit && !collapsed) shown++;
   });
   if (noMatch) noMatch.style.display = shown === 0 ? '' : 'none';
 }
@@ -3335,10 +3770,18 @@ function renderHistory() {
     const promptText = e.prompt ? escapeHTML(e.prompt) : '<span style="opacity:0.5">(no prompt saved)</span>';
     const fname = e.path.split('/').pop();
     const meta = relTime(e.t) + ' · ' + escapeHTML(fname) + (fileExists ? '' : ' · <span style="color:var(--err)">missing</span>');
+    const copyBtn = e.prompt
+      ? '<button class="history-copy" data-act="copy" data-id="' + e.id + '" title="Copy prompt">'
+        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'
+        + '</button>'
+      : '';
     html += '<div class="history-item">'
       + thumbHTML
       + '<div class="history-body">'
-      +   '<div class="history-prompt">' + promptText + '</div>'
+      +   '<div class="history-prompt-row">'
+      +     '<div class="history-prompt">' + promptText + '</div>'
+      +     copyBtn
+      +   '</div>'
       +   '<div class="history-meta">' + meta + '</div>'
       +   '<div class="history-actions">'
       +     (fileExists ? '<button data-act="preview" data-id="' + e.id + '">Preview</button>' : '')
@@ -3375,6 +3818,17 @@ function renderHistory() {
           btn.style.color = 'var(--err)';
           setTimeout(() => { btn.textContent = 'Preview'; btn.style.color = ''; }, 2500);
         }
+      } else if (btn.dataset.act === 'copy') {
+        const text = (e.prompt || '').trim();
+        if (!text) return;
+        let ok = false;
+        try { ok = writeClipboardTextSync(text); } catch {}
+        if (!ok) { try { await writeClipboardText(text); ok = true; } catch {} }
+        // Brief "Copied" feedback on the button
+        const old = btn.innerHTML;
+        btn.classList.add('copied');
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        setTimeout(() => { btn.innerHTML = old; btn.classList.remove('copied'); }, 1100);
       } else if (btn.dataset.act === 'reuse') {
         input.value = e.prompt || '';
         autosize();
@@ -3418,15 +3872,217 @@ historyBtn.addEventListener('click', () => {
 document.getElementById('historyClose').addEventListener('click', closeHistory);
 renderHistoryBadge();
 
+/* ═══════════════════════════════════════════════════════════════════════
+   LOGS PANEL — live tail of bridge stdout + active autoedit/autocut logs
+   ═══════════════════════════════════════════════════════════════════════ */
+(function setupLogsPanel() {
+  const panel  = document.getElementById('logsPanel');
+  const btn    = document.getElementById('logsBtn');
+  const close  = document.getElementById('logsClose');
+  const body   = document.getElementById('logsBody');
+  const foot   = document.getElementById('logsFoot');
+  const pathEl = document.getElementById('logsPath');
+  const source = document.getElementById('logsSource');
+  const pauseBtn = document.getElementById('logsPauseBtn');
+  const clearBtn = document.getElementById('logsClearBtn');
+  const pauseIcon = document.getElementById('logsPauseIcon');
+
+  if (!panel || !btn) return;
+
+  let timer = null;
+  let paused = false;
+  let lastBytes = 0;  // last file size — only re-render when it grows
+
+  function pickActiveLogFile() {
+    // Returns the absolute path of the chosen log source, or null if missing.
+    try {
+      const home = (nodeRequire('os') || {}).homedir && nodeRequire('os').homedir();
+      if (!home || !_fs || !_path) return null;
+      const outDir = _path.join(home, 'PremiereClaude', 'output');
+      const sel = source.value;
+      if (sel === 'bridge') {
+        return _path.join(home, 'PremiereClaude', 'bridge.log');
+      }
+      // Newest autoedit or autocut log
+      if (sel === 'autoedit' || sel === 'autocut') {
+        if (!_fs.existsSync(outDir)) return null;
+        const files = _fs.readdirSync(outDir)
+          .filter(n => n.startsWith(sel + '-') && n.endsWith('.log'))
+          .map(n => ({ n, t: _fs.statSync(_path.join(outDir, n)).mtimeMs }))
+          .sort((a, b) => b.t - a.t);
+        return files.length ? _path.join(outDir, files[0].n) : null;
+      }
+    } catch {}
+    return null;
+  }
+
+  function refreshSourceOptions() {
+    try {
+      const home = (nodeRequire('os') || {}).homedir && nodeRequire('os').homedir();
+      if (!home || !_fs || !_path) return;
+      const outDir = _path.join(home, 'PremiereClaude', 'output');
+      let hasAutoedit = false, hasAutocut = false;
+      if (_fs.existsSync(outDir)) {
+        const files = _fs.readdirSync(outDir);
+        hasAutoedit = files.some(n => n.startsWith('autoedit-') && n.endsWith('.log'));
+        hasAutocut  = files.some(n => n.startsWith('autocut-')  && n.endsWith('.log'));
+      }
+      const want = ['bridge'];
+      if (hasAutoedit) want.push('autoedit');
+      if (hasAutocut) want.push('autocut');
+      const current = source.value;
+      const existing = Array.from(source.options).map(o => o.value);
+      if (JSON.stringify(want) === JSON.stringify(existing)) return;
+      const labels = { bridge: 'Bridge stdout', autoedit: 'Auto-Edit (latest)', autocut: 'Auto-Cut (latest)' };
+      source.innerHTML = want.map(v => `<option value="${v}">${labels[v]}</option>`).join('');
+      if (want.indexOf(current) >= 0) source.value = current;
+    } catch {}
+  }
+
+  function colorise(line) {
+    const l = line.toLowerCase();
+    if (l.indexOf('error') >= 0 || l.indexOf(' xx ') >= 0 || l.indexOf('failed') >= 0) return 'log-err';
+    if (l.indexOf(' ok ') >= 0 || l.indexOf('done') >= 0) return 'log-ok';
+    if (line.startsWith('[20') || line.startsWith('  ')) return 'log-dim';
+    return '';
+  }
+
+  function tail() {
+    if (paused) return;
+    try {
+      refreshSourceOptions();
+      const file = pickActiveLogFile();
+      if (!file || !_fs.existsSync(file)) {
+        body.textContent = '(no log file yet at ' + (file || 'unknown') + ')';
+        pathEl.textContent = file || '(none)';
+        lastBytes = 0;
+        return;
+      }
+      const st = _fs.statSync(file);
+      pathEl.textContent = file;
+      if (st.size === lastBytes) return; // no change
+      lastBytes = st.size;
+      // Read last 64KB only — enough for ~600 lines without bogging the panel
+      const startByte = Math.max(0, st.size - 64 * 1024);
+      const fd = _fs.openSync(file, 'r');
+      const len = st.size - startByte;
+      const buf = Buffer.alloc(len);
+      _fs.readSync(fd, buf, 0, len, startByte);
+      _fs.closeSync(fd);
+      let text = buf.toString('utf8');
+      if (startByte > 0) {
+        const nl = text.indexOf('\n');
+        if (nl >= 0) text = text.slice(nl + 1);  // drop partial first line
+      }
+      const lines = text.split('\n').slice(-400);
+      // Render with simple per-line class for colour. Use a DocumentFragment.
+      const frag = document.createDocumentFragment();
+      lines.forEach(l => {
+        const span = document.createElement('span');
+        const cls = colorise(l);
+        if (cls) span.className = cls;
+        span.textContent = l + '\n';
+        frag.appendChild(span);
+      });
+      const wasAtBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 20;
+      body.innerHTML = '';
+      body.appendChild(frag);
+      if (wasAtBottom) body.scrollTop = body.scrollHeight;
+    } catch (e) {
+      body.textContent = '(log read error: ' + e.message + ')';
+    }
+  }
+
+  function start() {
+    if (timer) return;
+    tail();
+    timer = setInterval(tail, 1000);
+  }
+  function stop() {
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+
+  btn.addEventListener('click', () => {
+    if (panel.classList.contains('show')) { panel.classList.remove('show'); stop(); }
+    else { panel.classList.add('show'); start(); }
+  });
+  close.addEventListener('click', () => { panel.classList.remove('show'); stop(); });
+  source.addEventListener('change', () => { lastBytes = 0; tail(); });
+  clearBtn.addEventListener('click', () => { body.innerHTML = ''; lastBytes = 0; });
+  pauseBtn.addEventListener('click', () => {
+    paused = !paused;
+    foot.classList.toggle('paused', paused);
+    foot.textContent = paused ? 'Paused — click play to resume' : 'Watching ';
+    if (paused) {
+      pauseIcon.innerHTML = '<polygon points="6 4 20 12 6 20 6 4"/>';
+    } else {
+      pauseIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+      if (!paused) {
+        const span = document.createElement('span');
+        span.id = 'logsPath';
+        span.textContent = pathEl ? pathEl.textContent : '';
+        foot.appendChild(span);
+      }
+    }
+  });
+})();
+
 // Verify host.jsx version matches panel version; show a mismatch warning.
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '4.9';
+  const PANEL_VERSION = '5.0';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
   if (sv) sv.textContent = PANEL_VERSION;
+})();
+
+/* Open a URL in the system's default browser. CEP webviews can't follow
+   <a target="_blank">; we need to bridge to the OS. Try in order:
+   1. CSInterface.openURLInDefaultBrowser (the official path)
+   2. window.cep.util.openURLInDefaultBrowser
+   3. node child_process spawning `open` (macOS) / `start` (Windows) */
+function openExternalURL(url) {
+  if (!url) return;
+  // 1. CSInterface
+  try {
+    if (typeof CSInterface !== 'undefined') {
+      const csi = new CSInterface();
+      if (csi.openURLInDefaultBrowser) { csi.openURLInDefaultBrowser(url); return; }
+    }
+  } catch {}
+  // 2. window.cep.util
+  try {
+    if (window.cep && window.cep.util && window.cep.util.openURLInDefaultBrowser) {
+      window.cep.util.openURLInDefaultBrowser(url);
+      return;
+    }
+  } catch {}
+  // 3. Node child_process fallback
+  try {
+    const cp = nodeRequire('child_process');
+    if (cp) {
+      const isWin = /^win/i.test((nodeRequire('os') || {}).platform && nodeRequire('os').platform() || '');
+      const cmd = isWin ? 'cmd' : 'open';
+      const args = isWin ? ['/c', 'start', '', url] : [url];
+      const child = cp.spawn(cmd, args, { detached: true, stdio: 'ignore' });
+      child.unref && child.unref();
+    }
+  } catch {}
+}
+
+/* Wire <a> elements with data-external (or href starting with http) to open
+   in the system browser instead of doing nothing inside CEP. */
+(function wireExternalLinks() {
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest && e.target.closest('a[href]');
+    if (!a) return;
+    const href = a.getAttribute('href');
+    if (!href || !/^https?:\/\//i.test(href)) return;
+    e.preventDefault();
+    openExternalURL(href);
+  });
 })();
 
 /* Restore an input draft that was saved just before an auto-reload. */
@@ -3447,41 +4103,59 @@ renderHistoryBadge();
 (function setupAutoReload() {
   let baseline = null;
   let fails = 0;
+  let lastUserActivityAt = Date.now();
   const POLL_OK_MS = 5000;
   const POLL_FAIL_BASE = 8000;
+  const QUIET_BEFORE_RELOAD_MS = 4000; // wait 4s of typing-silence before reload
+
+  // Track typing activity so we don't yank the rug while the user is editing.
+  // Cmd+A then Backspace was failing because a reload kept slipping in between
+  // selection and delete. Now any keystroke / mousedown defers reload by 4s.
+  ['keydown', 'input', 'mousedown', 'paste'].forEach(ev => {
+    document.addEventListener(ev, () => { lastUserActivityAt = Date.now(); }, true);
+  });
+
+  function userIsActive() {
+    if (Date.now() - lastUserActivityAt < QUIET_BEFORE_RELOAD_MS) return true;
+    // Also defer if the textarea is focused and has unsent content
+    if (document.activeElement === input && (input.value || '').trim().length > 0) return true;
+    return false;
+  }
 
   async function poll() {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 1500);
+    const tt = setTimeout(() => ctrl.abort(), 1500);
     try {
       const r = await fetch(BRIDGE + '/version', { signal: ctrl.signal, cache: 'no-store' });
-      clearTimeout(t);
+      clearTimeout(tt);
       if (!r.ok) throw new Error(r.status);
       const { mtime } = await r.json();
       fails = 0;
       if (baseline === null) {
         baseline = mtime;
       } else if (mtime !== baseline) {
-        // Panel file on disk changed — refresh. Save the input draft so
-        // the user doesn't lose what they were typing.
+        if (userIsActive()) {
+          // Don't reload now — try again in a second. Keep `baseline` at the
+          // OLD value so we still detect the change once the user is idle.
+          setTimeout(poll, 1500);
+          return;
+        }
         try {
           sessionStorage.setItem('claudeBridge.lastReload', String(Date.now()));
           const draft = (input && input.value) || '';
           if (draft) sessionStorage.setItem('claudeBridge.draft', draft);
         } catch {}
         location.reload();
-        return; // don't reschedule
+        return;
       }
       setTimeout(poll, POLL_OK_MS);
     } catch {
-      clearTimeout(t);
+      clearTimeout(tt);
       fails++;
-      // 8s, 16s, 32s, then cap at 60s
       const delay = Math.min(60000, POLL_FAIL_BASE * Math.pow(2, Math.min(fails - 1, 3)));
       setTimeout(poll, delay);
     }
   }
-  // Wait 3s after page load so the bridge has time to come up
   setTimeout(poll, 3000);
 })();
 
@@ -3796,20 +4470,21 @@ renderRefBar();
 // first, then falls back to a platform-specific shell command:
 //   macOS   → osascript reads PNG data
 //   Windows → PowerShell pulls Clipboard.GetImage() and saves PNG
-async function readClipboardImage() {
-  if (navigator.clipboard && navigator.clipboard.read) {
+// Promise wrapper for execFile so we don't block the event loop on subprocess
+// reads. execFileSync was making Cmd+V feel laggy because it stalled the UI.
+function _execFile(cmd, args, opts) {
+  return new Promise((resolve, reject) => {
     try {
-      const items = await navigator.clipboard.read();
-      for (const item of items) {
-        for (const type of item.types) {
-          if (type.startsWith('image/')) {
-            const blob = await item.getType(type);
-            return { blob, ext: (type.split('/')[1] || 'png') };
-          }
-        }
-      }
-    } catch {}
-  }
+      const cp = nodeRequire('child_process');
+      if (!cp) return reject(new Error('no child_process'));
+      cp.execFile(cmd, args, opts || { encoding: 'utf8' }, (err, stdout, stderr) => {
+        if (err) reject(err); else resolve(stdout);
+      });
+    } catch (e) { reject(e); }
+  });
+}
+
+async function readClipboardImage() {
   if (!_fs || !OUTPUT_DIR_JS) return null;
   const cp = nodeRequire('child_process');
   if (!cp) return null;
@@ -3824,7 +4499,7 @@ async function readClipboardImage() {
         + '  close access theFile\n'
         + '  return "ok"\n'
         + 'on error\n  return "no"\nend try';
-      const out = cp.execFileSync('osascript', ['-e', script], { encoding: 'utf8' });
+      const out = await _execFile('osascript', ['-e', script], { encoding: 'utf8' });
       if (out && out.trim() === 'ok' && _fs.existsSync(tmpPath)) {
         const buf = _fs.readFileSync(tmpPath);
         try { _fs.unlinkSync(tmpPath); } catch {}
@@ -3837,7 +4512,7 @@ async function readClipboardImage() {
       const ps = "Add-Type -AssemblyName System.Windows.Forms,System.Drawing;"
         + "$img = [System.Windows.Forms.Clipboard]::GetImage();"
         + "if ($img) { $img.Save('" + psPath + "', [System.Drawing.Imaging.ImageFormat]::Png); $img.Dispose(); 'ok' } else { 'no' }";
-      const out = cp.execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], { encoding: 'utf8', timeout: 8000 });
+      const out = await _execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], { encoding: 'utf8', timeout: 8000 });
       if (out && out.trim() === 'ok' && _fs.existsSync(tmpPath)) {
         const buf = _fs.readFileSync(tmpPath);
         try { _fs.unlinkSync(tmpPath); } catch {}
@@ -3855,19 +4530,20 @@ async function readClipboardImage() {
 // Lock for capital V/B/C, or paste them in via Shift+V.
 
 async function readClipboardText() {
+  // Prefer the fast Node path on Mac (pbpaste is ~20-50ms) so we don't wait
+  // on the navigator.clipboard.readText() call which can hang in CEP.
+  if (isMac) {
+    try { return (await _execFile('pbpaste', [], { encoding: 'utf8' })) || ''; } catch {}
+  }
   if (navigator.clipboard && navigator.clipboard.readText) {
     try {
       const t = await navigator.clipboard.readText();
       if (typeof t === 'string') return t;
     } catch {}
   }
-  const cp = nodeRequire('child_process');
-  if (!cp) return null;
-  if (isMac) {
-    try { return cp.execFileSync('pbpaste', [], { encoding: 'utf8' }); } catch {}
-  } else if (isWindows) {
+  if (isWindows) {
     try {
-      const out = cp.execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', 'Get-Clipboard -Raw'], { encoding: 'utf8', timeout: 4000 });
+      const out = await _execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', 'Get-Clipboard -Raw'], { encoding: 'utf8', timeout: 4000 });
       return out.replace(/\r\n$/, '');
     } catch {}
   }
@@ -3953,9 +4629,113 @@ document.addEventListener('keydown', (e) => {
   maximizeFrame();
 }, true);
 
+// Native paste handler — fires synchronously when the browser's own Cmd+V
+// path runs (instant, clipboardData is already populated). Text falls
+// through to default behaviour, images are intercepted and attached.
+// Setting `_nativePasteFiredAt` lets the keydown subprocess fallback know
+// the native path already handled this paste so it doesn't double-fire.
+let _nativePasteFiredAt = 0;
+input.addEventListener('paste', async (e) => {
+  _nativePasteFiredAt = Date.now();
+  try {
+    const items = (e.clipboardData && e.clipboardData.items) || [];
+    for (const it of items) {
+      if (it.kind === 'file' && /^image\//i.test(it.type)) {
+        e.preventDefault();
+        const blob = it.getAsFile();
+        if (blob) {
+          const ext = (it.type.split('/')[1] || 'png').toLowerCase();
+          await attachBlobAsReference(blob, ext);
+          input.focus();
+        }
+        return;
+      }
+    }
+    // No image → let the browser do default text paste (instant).
+  } catch {}
+});
+
+// Cmd+V interception at capture phase — Premiere intercepts Cmd+V for
+// timeline paste before the webview sees it. We grab the keydown FIRST and
+// manually run the clipboard read. This makes Cmd+V work reliably inside the
+// panel for both text and images, even when Premiere is fighting us for it.
+document.addEventListener('keydown', async (e) => {
+  if (!(e.metaKey || e.ctrlKey)) return;
+  if (e.shiftKey || e.altKey) return;
+  const k = (e.key || '').toLowerCase();
+
+  if (k === 'v') {
+    // Only when the textarea is focused.
+    if (document.activeElement !== input) return;
+
+    // PRIMARY PATH: let the browser's native paste fire — it's instant
+    // because clipboardData is synchronous, no subprocess needed. Wait ~70ms
+    // to see if the paste event ran; if it didn't (Premiere intercepted),
+    // fall back to subprocess. This gives us native speed when possible.
+    const pre = _nativePasteFiredAt;
+    setTimeout(async () => {
+      if (_nativePasteFiredAt !== pre) return; // native paste fired — done
+      // Native paste was blocked by Premiere → subprocess fallback. Race
+      // text and image readers and keep the first one that has content.
+      let resolved = false;
+      const textP = readClipboardText().then(t => {
+        if (resolved) return;
+        if (t && typeof t === 'string' && t.length) {
+          resolved = true;
+          insertTextAtCursor(t);
+        }
+      }).catch(() => {});
+      const imgP = readClipboardImage().then(img => {
+        if (resolved) return;
+        if (img && img.blob) {
+          resolved = true;
+          return attachBlobAsReference(img.blob, img.ext).then(() => input.focus());
+        }
+      }).catch(() => {});
+      Promise.race([textP, imgP]);
+    }, 70);
+    return; // do NOT preventDefault — let native paste run
+  }
+
+  if (k === 'c') {
+    // Premiere claims Cmd+C for "Copy" on the timeline before the panel sees
+    // it. We catch at capture phase, grab the current selection, and write
+    // it to clipboard manually. Works in chat log, history panel, anywhere.
+    const sel = window.getSelection && window.getSelection();
+    const selText = sel && sel.toString && sel.toString();
+    let toCopy = '';
+    if (selText && selText.length > 0) {
+      toCopy = selText;
+    } else if (document.activeElement === input
+               && typeof input.selectionStart === 'number'
+               && input.selectionStart !== input.selectionEnd) {
+      toCopy = input.value.substring(input.selectionStart, input.selectionEnd);
+    } else {
+      // No selection — let native Cmd+C try (and let Premiere see it if needed)
+      return;
+    }
+    // We've got text to copy. Stop Premiere from also catching this.
+    e.preventDefault();
+    e.stopPropagation();
+    // Try sync execCommand path first (instant, no subprocess). If that
+    // fails we fall back to async pbcopy/powershell paths.
+    try {
+      if (!writeClipboardTextSync(toCopy)) {
+        writeClipboardText(toCopy).catch(() => {});
+      }
+    } catch {}
+    return;
+  }
+}, true); // CAPTURE phase — fires before Premiere intercepts
+
+// Legacy Shift+V/B/C — kept ONLY when input is NOT focused (so they don't
+// hijack normal typing). When focused, use native Cmd+V (text or image) and
+// Cmd+C as usual.
 document.addEventListener('keydown', async (e) => {
   if (!e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
   if (lightbox.classList.contains('show')) return;
+  const t = e.target;
+  if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || t.isContentEditable)) return;
   const k = e.key;
 
   if (k === 'V' || k === 'v') {
@@ -4251,6 +5031,7 @@ function startInlineProgress(reqId) {
           <div class="ae-spinner"></div>
           <div class="ae-text">Starting…</div>
           <div class="ae-elapsed" style="margin-left:8px;color:var(--muted);font-size:12px;font-family:'SF Mono',monospace;">0s</div>
+          <span class="interrupt-hint">ESC to interrupt</span>
           <button class="ae-loglink" style="margin-left:auto;background:none;border:1px solid rgba(217,119,87,0.35);color:var(--accent);padding:2px 10px;border-radius:10px;font-size:11px;cursor:pointer;font-family:inherit;">Show log</button>
         </div>
         <pre class="ae-logpane" style="display:none;margin-top:10px;background:rgba(0,0,0,0.25);color:#d8d4c8;font-family:'SF Mono','JetBrains Mono',monospace;font-size:11px;line-height:1.4;padding:10px 12px;border-radius:6px;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-word;border:1px solid rgba(217,119,87,0.2);"></pre>
@@ -4485,7 +5266,25 @@ function makeMsg(role, html) {
   const body = document.createElement('div');
   body.className = 'msg-body';
   body.innerHTML = html;
+  // Low-opacity copy button at the top-right of every message bubble
+  const copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = 'msg-copy';
+  copyBtn.title = 'Copy message';
+  copyBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+  copyBtn.addEventListener('click', async () => {
+    const text = (body.innerText || body.textContent || '').trim();
+    if (!text) return;
+    let ok = false;
+    try { ok = writeClipboardTextSync(text); } catch {}
+    if (!ok) { try { await writeClipboardText(text); ok = true; } catch {} }
+    const old = copyBtn.innerHTML;
+    copyBtn.classList.add('copied');
+    copyBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    setTimeout(() => { copyBtn.innerHTML = old; copyBtn.classList.remove('copied'); }, 1100);
+  });
   content.appendChild(author);
+  content.appendChild(copyBtn);
   content.appendChild(body);
   wrap.appendChild(av);
   wrap.appendChild(content);
@@ -4499,6 +5298,7 @@ function thinkingHTML() {
     +   '<span class="orbit"><span class="orbit-dot"></span><span class="orbit-dot"></span><span class="orbit-dot"></span></span>'
     +   '<span class="orbit-label">Working</span>'
     +   '<span class="thinking-elapsed"></span>'
+    +   '<span class="interrupt-hint">ESC to interrupt</span>'
     + '</div>'
     + '<div class="progress-bar"><div class="progress-bar-fill"></div></div>'
     + '</div>';
@@ -5256,6 +6056,89 @@ input.addEventListener('input', () => {
 });
 input.addEventListener('scroll', () => { ghost.scrollTop = input.scrollTop; });
 input.addEventListener('blur', clearGhost);
+
+/* Word-by-word and line-start cursor navigation. Premiere intercepts
+   Alt+Left/Right ("step one frame") and Cmd+Left/Right (some shortcut)
+   before the panel sees them, so we capture and run the cursor moves
+   manually. Supports Shift for selection, Alt+Backspace for delete word. */
+function _wordBoundary(text, pos, direction) {
+  const isWord = (c) => /[\w'’-]/.test(c);
+  if (direction < 0) {
+    while (pos > 0 && !isWord(text[pos - 1])) pos--;
+    while (pos > 0 && isWord(text[pos - 1])) pos--;
+  } else {
+    while (pos < text.length && !isWord(text[pos])) pos++;
+    while (pos < text.length && isWord(text[pos])) pos++;
+  }
+  return pos;
+}
+function _lineBoundary(text, pos, direction) {
+  if (direction < 0) {
+    const nl = text.lastIndexOf('\n', pos - 1);
+    return nl < 0 ? 0 : nl + 1;
+  } else {
+    const nl = text.indexOf('\n', pos);
+    return nl < 0 ? text.length : nl;
+  }
+}
+function _moveCursor(newPos, extend, anchorEnd) {
+  if (extend) {
+    if (anchorEnd) input.setSelectionRange(newPos, input.selectionEnd);
+    else           input.setSelectionRange(input.selectionStart, newPos);
+  } else {
+    input.setSelectionRange(newPos, newPos);
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (document.activeElement !== input) return;
+  const k = e.key;
+  const isArrow = (k === 'ArrowLeft' || k === 'ArrowRight');
+
+  // Alt+Left/Right — word-by-word navigation
+  if (e.altKey && !e.metaKey && !e.ctrlKey && isArrow) {
+    e.preventDefault();
+    e.stopPropagation();
+    const dir = (k === 'ArrowLeft') ? -1 : 1;
+    const cursor = dir < 0 ? input.selectionStart : input.selectionEnd;
+    const newPos = _wordBoundary(input.value, cursor, dir);
+    _moveCursor(newPos, e.shiftKey, dir < 0);
+    return;
+  }
+  // Cmd+Left/Right — jump to line start / end (Mac convention)
+  if (e.metaKey && !e.altKey && !e.ctrlKey && isArrow) {
+    e.preventDefault();
+    e.stopPropagation();
+    const dir = (k === 'ArrowLeft') ? -1 : 1;
+    const cursor = dir < 0 ? input.selectionStart : input.selectionEnd;
+    const newPos = _lineBoundary(input.value, cursor, dir);
+    _moveCursor(newPos, e.shiftKey, dir < 0);
+    return;
+  }
+  // Alt+Backspace — delete previous word
+  if (e.altKey && !e.metaKey && !e.ctrlKey && k === 'Backspace') {
+    e.preventDefault();
+    e.stopPropagation();
+    const end = input.selectionEnd;
+    const start = _wordBoundary(input.value, input.selectionStart, -1);
+    input.value = input.value.slice(0, start) + input.value.slice(end);
+    input.setSelectionRange(start, start);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
+  // Cmd+Backspace — delete to line start
+  if (e.metaKey && !e.altKey && !e.ctrlKey && k === 'Backspace') {
+    e.preventDefault();
+    e.stopPropagation();
+    const end = input.selectionEnd;
+    const start = _lineBoundary(input.value, input.selectionStart, -1);
+    input.value = input.value.slice(0, start) + input.value.slice(end);
+    input.setSelectionRange(start, start);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
+}, true);  // CAPTURE phase — beats Premiere's interception
+
 input.addEventListener('keydown', (e) => {
   if (e.key === 'Tab' && activeSuggestion) {
     e.preventDefault();
