@@ -753,6 +753,36 @@ PROJECT REUSE POLICY:
 - Create a new component file with a unique name (e.g. include a short timestamp or descriptive suffix) so you do not collide with previous renders. Register it in src/Root.tsx with a matching unique composition id.
 - ONLY exception — when the user message begins with "Make a new version of a previous render." they are explicitly iterating. In that case: read the named "Previous file", find the matching component, and modify it minimally to apply the requested change while preserving every other styling decision.
 
+STYLE LIBRARY — IMPORT FROM THIS, DO NOT REINVENT:
+The project has a curated style library at ${WORK_DIR}/remotion-intro/src/lib/ — use it for every render:
+
+  // src/lib/palettes.ts — named color palettes
+  import { palettes, type PaletteName } from '../lib/palettes';
+  // Available: modernDark, warmCinema, playfulPunch, techBlue, editorialLight, vibrantNight
+  // Pick based on prompt vibe; default modernDark.
+  const p = palettes.modernDark;
+  // Then use p.bg, p.fg, p.accent, p.accent2, p.muted, p.shadow
+
+  // src/lib/easings.ts — named bezier curves (use INSTEAD of raw cubic-bezier())
+  import { EASE, FRAMES } from '../lib/easings';
+  // EASE.standard | hero | snap | spring | bouncy | whip | linear | anticipate | cinematic
+  // FRAMES.micro (6) | short (9) | base (15) | medium (24) | long (36) | hold (45)
+
+  // src/lib/typography.ts — typographic recipes + TikTok-caption preset
+  import { TYPE, TIKTOK_CAPTION } from '../lib/typography';
+  // TYPE.titleHero | titleMd | body | caption | mono | editorial
+
+  // src/lib/motion.ts — reusable motion helpers
+  import { popIn, fadeIn, slideUp, slideIn, staggered, fadeOut, shake, pulse, useSpring } from '../lib/motion';
+  // Use these instead of writing interpolate() from scratch.
+
+Rules for using the library:
+- ALWAYS import palette + easings + at least one helper. Don't hard-code colors or write your own cubic-bezier.
+- If the user asks for "warm" / "cinematic" → warmCinema palette. "Tech" / "SaaS" → techBlue. "Fun" / "punchy" / "TikTok" → playfulPunch. "Editorial" / "minimal" → editorialLight. "Music" / "party" → vibrantNight. Otherwise modernDark.
+- For text: pick a TYPE recipe close to your need, override fontSize if needed. For TikTok-style captions use TIKTOK_CAPTION as the base.
+- For motion: prefer popIn / slideUp / staggered over raw interpolate. Use FRAMES constants for durations.
+- The library is intentionally small. If you need a primitive that's not there, write it inline in the component — don't add to the library.
+
 Style: terse. The user is editing in Premiere, not reading docs. One or two sentences plus the import marker is the goal. Skip preamble like "Sure, I'll help…".`;
 
 const server = http.createServer((req, res) => {
