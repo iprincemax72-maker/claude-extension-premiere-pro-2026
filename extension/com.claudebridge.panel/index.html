@@ -466,6 +466,97 @@
     position: relative;
     -webkit-overflow-scrolling: touch;
   }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ───── TAB STRIP (Chrome-style) ───── */
+  #tabStrip {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 10px 0;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-shrink: 0;
+    scrollbar-width: thin;
+  }
+  #tabStrip::-webkit-scrollbar { height: 4px; }
+  .tab-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px 7px 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-dim);
+    max-width: 180px;
+    min-width: 80px;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+    position: relative;
+  }
+  .tab-pill:hover { background: rgba(255,255,255,0.06); color: var(--fg); }
+  .tab-pill.active {
+    background: var(--bg-elev, rgba(255,255,255,0.08));
+    color: var(--fg);
+    border-color: var(--border);
+  }
+  .tab-pill.active::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: -1px;
+    height: 1px;
+    background: var(--bg-elev, rgba(255,255,255,0.08));
+  }
+  .tab-pill .tab-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .tab-pill .tab-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+    box-shadow: 0 0 6px var(--accent);
+    animation: tabDotPulse 1.4s ease-in-out infinite;
+  }
+  @keyframes tabDotPulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .tab-pill .tab-close {
+    width: 16px; height: 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+  .tab-pill .tab-close:hover { background: rgba(255,255,255,0.12); color: var(--fg); opacity: 1; }
+  .tab-pill .tab-close svg { width: 10px; height: 10px; }
+  .new-tab-btn {
+    width: 26px; height: 26px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-left: 2px;
+  }
+  .new-tab-btn:hover { background: rgba(255,255,255,0.08); color: var(--fg); }
+  .new-tab-btn svg { width: 14px; height: 14px; }
 
   /* ───── EMPTY STATE ───── */
   .empty {
@@ -2034,7 +2125,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">4.8</span>
+    <span class="version-tag" id="versionTag">4.9</span>
   </div>
   <div style="display:flex;align-items:center">
     <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
@@ -2305,7 +2396,15 @@
   </div>
 </div>
 
+<div id="tabStrip">
+  <!-- Tab pills rendered dynamically by renderTabStrip() -->
+  <button class="new-tab-btn" id="newTabBtn" title="New animation tab — ⌘T" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+</div>
+
 <div id="log">
+  <div class="tab-content active" data-tab-id="t1">
   <div class="empty" id="empty">
     <div class="empty-logo">C</div>
     <h1>Your editing copilot</h1>
@@ -2317,6 +2416,7 @@
     <div class="chips" id="chips"></div>
     <div class="empty-no-match" id="emptyNoMatch" style="display:none">No matches</div>
   </div>
+  </div><!-- /tab-content t1 -->
 </div>
 
 <div class="composer">
@@ -2385,8 +2485,185 @@
 <script>
 const BRIDGE = 'http://127.0.0.1:3737';
 const log = document.getElementById('log');
-const empty = document.getElementById('empty');
+let empty = document.getElementById('empty');
 const _emptyHTML = empty ? empty.outerHTML : ''; // snapshot for "new chat" restore
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TABS — Chrome-style. Each tab has its own log content + input draft +
+   in-flight state. SSE progress events scope by reqId so progress keeps
+   updating in inactive tabs too.
+
+   Architecture:
+   - One log viewport (#log) containing multiple .tab-content divs (one per
+     tab). Only the active one has class .active (CSS shows only it).
+   - Per-tab state in `tabs[]`: { id, label, contentEl, inputDraft,
+     activeChatAbort, activeAutocut, activeAutoedit, expanding }.
+   - On tab switch: stash live globals into leaving tab, restore from
+     entering tab. Globals are always the active tab's state.
+   ═══════════════════════════════════════════════════════════════════════ */
+const tabs = [];   // [{ id, label, contentEl, inputDraft, activeChatAbort, activeAutocut, activeAutoedit, expanding }]
+let activeTabIdx = 0;
+let _tabCounter = 1;
+
+function getActiveLogContent() {
+  return tabs[activeTabIdx] && tabs[activeTabIdx].contentEl;
+}
+
+// Mount the first tab around the existing log content
+(function initTabs() {
+  const firstContent = log.querySelector('.tab-content');
+  tabs.push({
+    id: 't1',
+    label: 'New animation',
+    contentEl: firstContent,
+    inputDraft: '',
+    activeChatAbort: null,
+    activeAutocut: null,
+    activeAutoedit: null,
+    expanding: false,
+  });
+})();
+
+function makeTabId() { _tabCounter++; return 't' + _tabCounter; }
+
+function newTab(opts) {
+  // Stash current globals into the leaving tab
+  stashActiveTabState();
+
+  const id = makeTabId();
+  const contentEl = document.createElement('div');
+  contentEl.className = 'tab-content';
+  contentEl.dataset.tabId = id;
+  // Each new tab starts with the empty-state UI so the user sees the chips.
+  contentEl.innerHTML = _emptyHTML;
+  log.appendChild(contentEl);
+
+  tabs.push({
+    id, label: 'New animation',
+    contentEl,
+    inputDraft: '',
+    activeChatAbort: null,
+    activeAutocut: null,
+    activeAutoedit: null,
+    expanding: false,
+  });
+  activeTabIdx = tabs.length - 1;
+  applyActiveTabState();
+  renderTabStrip();
+  setTimeout(() => { try { input.focus(); } catch {} }, 50);
+}
+
+function switchTab(idx) {
+  if (idx < 0 || idx >= tabs.length || idx === activeTabIdx) return;
+  stashActiveTabState();
+  activeTabIdx = idx;
+  applyActiveTabState();
+  renderTabStrip();
+  try { input.focus(); } catch {}
+}
+
+function closeTab(idx) {
+  if (idx < 0 || idx >= tabs.length) return;
+  const t = tabs[idx];
+  // Cancel in-flight work on this tab before closing
+  if (t.activeChatAbort) { try { t.activeChatAbort.abort(); } catch {} }
+  if (t.activeAutocut)   { try { t.activeAutocut.abort.abort(); fetch(BRIDGE + '/autocut-cancel',  { method:'POST' }).catch(()=>{}); } catch {} }
+  if (t.activeAutoedit)  { try { t.activeAutoedit.abort.abort(); fetch(BRIDGE + '/autoedit-cancel', { method:'POST' }).catch(()=>{}); } catch {} }
+  try { t.contentEl.remove(); } catch {}
+  tabs.splice(idx, 1);
+  if (tabs.length === 0) {
+    // Always have at least one tab open.
+    activeTabIdx = 0;
+    newTab();
+    return;
+  }
+  if (activeTabIdx >= tabs.length) activeTabIdx = tabs.length - 1;
+  else if (idx < activeTabIdx) activeTabIdx--;
+  applyActiveTabState();
+  renderTabStrip();
+}
+
+function stashActiveTabState() {
+  const t = tabs[activeTabIdx];
+  if (!t) return;
+  t.inputDraft = input.value;
+  t.activeChatAbort = activeChatAbort;
+  t.activeAutocut   = activeAutocut;
+  t.activeAutoedit  = activeAutoedit;
+  t.expanding       = expanding;
+}
+
+function applyActiveTabState() {
+  const t = tabs[activeTabIdx];
+  if (!t) return;
+  // Toggle visibility of tab contents
+  for (const tab of tabs) tab.contentEl.classList.toggle('active', tab === t);
+  // Restore input draft
+  input.value = t.inputDraft || '';
+  autosize && autosize();
+  // Restore in-flight state globals
+  activeChatAbort = t.activeChatAbort;
+  activeAutocut   = t.activeAutocut;
+  activeAutoedit  = t.activeAutoedit;
+  expanding       = t.expanding || false;
+  // Re-bind `empty` to the new tab's empty element (chips/search look at it)
+  empty = t.contentEl.querySelector('.empty');
+  try { setBusy && setBusy(!!activeChatAbort); } catch {}
+  try { updateEscHint && updateEscHint(); } catch {}
+  try { syncExpandEnabled && syncExpandEnabled(); updateExpandRecommendation && updateExpandRecommendation(); } catch {}
+}
+
+function setTabLabel(idx, label) {
+  if (!tabs[idx]) return;
+  tabs[idx].label = (label || 'New animation').slice(0, 28);
+  renderTabStrip();
+}
+
+function tabHasActivity(t) {
+  return !!(t.activeChatAbort || t.activeAutocut || t.activeAutoedit || t.expanding);
+}
+
+function renderTabStrip() {
+  const strip = document.getElementById('tabStrip');
+  if (!strip) return;
+  const newBtn = strip.querySelector('#newTabBtn');
+  // Clear existing pills (preserve the + button)
+  Array.from(strip.querySelectorAll('.tab-pill')).forEach(el => el.remove());
+  tabs.forEach((t, idx) => {
+    const pill = document.createElement('div');
+    pill.className = 'tab-pill' + (idx === activeTabIdx ? ' active' : '');
+    pill.title = t.label;
+    pill.innerHTML =
+      (tabHasActivity(t) ? '<span class="tab-dot"></span>' : '')
+      + '<span class="tab-label">' + escapeHTML(t.label) + '</span>'
+      + '<button class="tab-close" type="button" aria-label="Close tab" title="Close · ⌘W">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
+      + '</button>';
+    pill.addEventListener('click', (e) => {
+      if (e.target.closest('.tab-close')) return;
+      switchTab(idx);
+    });
+    pill.querySelector('.tab-close').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeTab(idx);
+    });
+    strip.insertBefore(pill, newBtn);
+  });
+}
+
+// Wire the + button + keyboard shortcuts (⌘T new, ⌘W close, ⌘1..9 switch)
+document.getElementById('newTabBtn').addEventListener('click', () => newTab());
+document.addEventListener('keydown', (e) => {
+  if (!(e.metaKey || e.ctrlKey)) return;
+  if (e.key === 't' || e.key === 'T') { e.preventDefault(); newTab(); return; }
+  if (e.key === 'w' || e.key === 'W') { e.preventDefault(); closeTab(activeTabIdx); return; }
+  if (/^[1-9]$/.test(e.key)) {
+    const idx = parseInt(e.key, 10) - 1;
+    if (idx < tabs.length) { e.preventDefault(); switchTab(idx); }
+  }
+});
+
+renderTabStrip();
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send');
 const statusEl = document.getElementById('status');
@@ -2553,10 +2830,12 @@ log.addEventListener('keydown', (e) => {
 function resetToHome() {
   // Cancel any in-flight chat
   try { if (activeChatAbort) activeChatAbort.abort(); } catch {}
-  // Clear chat log entirely; restore the empty state
-  log.innerHTML = _emptyHTML;
+  // Clear ONLY the active tab's content (not the whole log container,
+  // which would nuke other tabs).
+  const active = getActiveLogContent();
+  if (active) active.innerHTML = _emptyHTML;
   // Re-render chips in the freshly inserted empty container
-  const freshChips = document.getElementById('chips');
+  const freshChips = (active || document).querySelector('#chips');
   if (freshChips) renderChips(freshChips);
   // Drop composer state
   input.value = '';
@@ -3143,7 +3422,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '4.8';
+  const PANEL_VERSION = '4.9';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -3977,7 +4256,7 @@ function startInlineProgress(reqId) {
         <pre class="ae-logpane" style="display:none;margin-top:10px;background:rgba(0,0,0,0.25);color:#d8d4c8;font-family:'SF Mono','JetBrains Mono',monospace;font-size:11px;line-height:1.4;padding:10px 12px;border-radius:6px;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-word;border:1px solid rgba(217,119,87,0.2);"></pre>
       </div>
     </div>`;
-  log.appendChild(card);
+  (getActiveLogContent() || log).appendChild(card);
   log.scrollTop = log.scrollHeight;
   const textEl    = card.querySelector('.ae-text');
   const elapsedEl = card.querySelector('.ae-elapsed');
@@ -4210,7 +4489,7 @@ function makeMsg(role, html) {
   content.appendChild(body);
   wrap.appendChild(av);
   wrap.appendChild(content);
-  log.appendChild(wrap);
+  (getActiveLogContent() || log).appendChild(wrap);
   log.scrollTop = log.scrollHeight;
   return { wrap, body };
 }
@@ -4690,6 +4969,16 @@ const escHint = document.getElementById('escHint');
 function updateEscHint() {
   const anyBusy = !!activeChatAbort || expanding || !!activeAutocut || !!activeAutoedit;
   escHint.classList.toggle('show', anyBusy);
+  // Refresh the tab strip so the pulsing dot tracks in-flight work
+  try {
+    if (tabs[activeTabIdx]) {
+      tabs[activeTabIdx].activeChatAbort = activeChatAbort;
+      tabs[activeTabIdx].activeAutocut   = activeAutocut;
+      tabs[activeTabIdx].activeAutoedit  = activeAutoedit;
+      tabs[activeTabIdx].expanding       = expanding;
+    }
+    renderTabStrip && renderTabStrip();
+  } catch {}
 }
 
 function setBusy(busy) {
@@ -4801,6 +5090,10 @@ async function sendMessage() {
     youHTML += thumbsHTML;
   }
   makeMsg('you', youHTML);
+  // Auto-label the current tab from the first prompt (only if still default)
+  if (tabs[activeTabIdx] && tabs[activeTabIdx].label === 'New animation') {
+    setTabLabel(activeTabIdx, msg);
+  }
   setBusy(true);
   // The iteration context was already baked into outboundMsg; clear it so the
   // next prompt is fresh unless the user explicitly hits Changes again.
