@@ -965,7 +965,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/chat') {
     let body = '';
     req.on('data', c => body += c);
-    req.on('end', () => {
+    req.on('end', async () => {
       let payload;
       try { payload = JSON.parse(body); }
       catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
@@ -1006,116 +1006,133 @@ const server = http.createServer((req, res) => {
 
       console.log('\n> ' + message.slice(0, 80));
       broadcastProgress('Thinking');
-      const proc = spawn('claude', args, { cwd: WORK_DIR, env: process.env });
-      let stderr = '';
-      let lineBuf = '';
-      let finalReply = '';
-      let lastActivity = Date.now();
 
-      proc.stderr.on('data', d => stderr += d);
+      // Run claude once. Returns { ok, reply, error, idleKilled }. The caller
+      // can retry if idleKilled=true and reply is empty.
+      function runClaudeOnce(retry) {
+        return new Promise(resolve => {
+          const proc = spawn('claude', args, { cwd: WORK_DIR, env: process.env });
+          let stderr = '';
+          let lineBuf = '';
+          let finalReply = '';
+          let lastActivity = Date.now();
+          let idleKilled = false;
+          let resolved = false;
+          let aborted = false;
 
-      proc.stdout.on('data', chunk => {
-        lastActivity = Date.now();
-        lineBuf += chunk.toString();
-        let nl;
-        while ((nl = lineBuf.indexOf('\n')) >= 0) {
-          const line = lineBuf.slice(0, nl).trim();
-          lineBuf = lineBuf.slice(nl + 1);
-          if (!line) continue;
-          let evt;
-          try { evt = JSON.parse(line); } catch { continue; }
+          const onAbort = () => {
+            aborted = true;
+            try { proc.kill('SIGKILL'); } catch {}
+          };
+          req.once('aborted', onAbort);
 
-          // Push human-readable status when we see a tool call
-          const status = streamEventToStatus(evt);
-          if (status) broadcastProgress(status);
-
-          // Capture the final assistant text
-          if (evt.type === 'result' && typeof evt.result === 'string') {
-            finalReply = evt.result;
-          }
-          if (evt.type === 'assistant' && evt.message && Array.isArray(evt.message.content)) {
-            for (const blk of evt.message.content) {
-              if (blk.type === 'text' && typeof blk.text === 'string') {
-                finalReply = blk.text;
+          proc.stderr.on('data', d => stderr += d);
+          proc.stdout.on('data', chunk => {
+            lastActivity = Date.now();
+            lineBuf += chunk.toString();
+            let nl;
+            while ((nl = lineBuf.indexOf('\n')) >= 0) {
+              const line = lineBuf.slice(0, nl).trim();
+              lineBuf = lineBuf.slice(nl + 1);
+              if (!line) continue;
+              let evt;
+              try { evt = JSON.parse(line); } catch { continue; }
+              const status = streamEventToStatus(evt);
+              if (status) broadcastProgress(status);
+              if (evt.type === 'result' && typeof evt.result === 'string') finalReply = evt.result;
+              if (evt.type === 'assistant' && evt.message && Array.isArray(evt.message.content)) {
+                for (const blk of evt.message.content) {
+                  if (blk.type === 'text' && typeof blk.text === 'string') finalReply = blk.text;
+                }
               }
             }
-          }
-        }
-      });
+          });
+
+          // Idle watchdog
+          const IDLE_TIMEOUT_MS = 3 * 60 * 1000;
+          const idleCheck = setInterval(() => {
+            if (resolved) { clearInterval(idleCheck); return; }
+            const idle = Date.now() - lastActivity;
+            if (idle > IDLE_TIMEOUT_MS) {
+              console.log('  [chat] idle ' + Math.round(idle/1000) + 's' + (retry ? ' (retry)' : '') + ' — killing claude');
+              idleKilled = true;
+              try { proc.kill('SIGKILL'); } catch {}
+            }
+          }, 30000);
+
+          // Hard timeout
+          const HARD_TIMEOUT_MS = 10 * 60 * 1000;
+          const hardKiller = setTimeout(() => {
+            if (resolved) return;
+            console.log('  [chat] hard timeout — killing claude');
+            try { proc.kill('SIGKILL'); } catch {}
+          }, HARD_TIMEOUT_MS);
+
+          const done = (obj) => {
+            if (resolved) return;
+            resolved = true;
+            clearInterval(idleCheck);
+            clearTimeout(hardKiller);
+            try { req.off('aborted', onAbort); } catch {}
+            resolve(obj);
+          };
+
+          proc.on('error', err => done({ ok:false, error:'claude CLI not found: ' + err.message }));
+          proc.on('close', code => {
+            if (aborted) return done({ ok:false, aborted:true });
+            if (code !== 0) {
+              return done({
+                ok: false,
+                reply: finalReply,
+                idleKilled,
+                error: stderr.trim() || ('claude exited with code ' + code),
+              });
+            }
+            done({ ok:true, reply: finalReply });
+          });
+        });
+      }
 
       let chatDone = false;
-
-      // Idle watchdog — if Claude emits no stream-json events for 3 minutes,
-      // kill it. Catches the "0% CPU forever" hang. 3 min is generous so a
-      // legitimate long render isn't interrupted while the actual ffmpeg /
-      // remotion subprocess is running (those emit no claude events).
-      const IDLE_TIMEOUT_MS = 3 * 60 * 1000;
-      const idleCheck = setInterval(() => {
-        if (chatDone) { clearInterval(idleCheck); return; }
-        const idle = Date.now() - lastActivity;
-        if (idle > IDLE_TIMEOUT_MS) {
-          console.log('  [chat] idle ' + Math.round(idle/1000) + 's — killing claude');
-          try { proc.kill('SIGKILL'); } catch {}
-        }
-      }, 30000);
-
-      // Hard timeout — chat can't ever take more than 10 minutes
-      const HARD_TIMEOUT_MS = 10 * 60 * 1000;
-      const hardKiller = setTimeout(() => {
-        if (chatDone) return;
-        console.log('  [chat] hard timeout — killing claude');
-        try { proc.kill('SIGKILL'); } catch {}
-      }, HARD_TIMEOUT_MS);
-
       const sendErr = (m) => {
         if (chatDone) return; chatDone = true;
-        clearInterval(idleCheck); clearTimeout(hardKiller);
         broadcastProgressDone();
         try { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: m })); } catch {}
       };
       const sendOk = (obj) => {
         if (chatDone) return; chatDone = true;
-        clearInterval(idleCheck); clearTimeout(hardKiller);
         broadcastProgressDone();
         try { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); } catch {}
       };
 
-      req.on('aborted', () => {
-        if (!chatDone) { try { proc.kill('SIGKILL'); } catch {} chatDone = true; clearInterval(idleCheck); clearTimeout(hardKiller); broadcastProgressDone(); }
-      });
+      let r = await runClaudeOnce(false);
+      // If claude was idle-killed and produced no output, the bridge process is
+      // probably degraded. Auto-retry ONCE — the second attempt almost always
+      // works because claude takes a fresh internal path.
+      if (!r.ok && r.idleKilled && !(r.reply || '').trim()) {
+        console.log('  [chat] auto-retrying after idle kill');
+        broadcastProgress('Retrying');
+        r = await runClaudeOnce(true);
+      }
 
-      proc.on('error', err => {
-        console.error('spawn error:', err.message);
-        sendErr('claude CLI not found: ' + err.message);
-      });
-      proc.on('close', code => {
-        if (chatDone) return;
-        if (code !== 0) {
-          console.error('claude exit', code, stderr);
-          sendErr(stderr.trim() || `claude exited with code ${code}`);
-          return;
-        }
-        const reply = (finalReply || '').trim() || '(no response)';
-        const rawImports = [];
-        const re = /\[\[IMPORT:([^\]]+)\]\]/g;
-        let m;
-        while ((m = re.exec(reply)) !== null) rawImports.push(m[1].trim());
-        console.log('< ' + String(reply).slice(0, 80));
-        if (rawImports.length) console.log('  imports: ' + rawImports.join(', '));
+      if (r.aborted) { chatDone = true; broadcastProgressDone(); return; }
+      if (!r.ok) return sendErr(r.error || 'claude failed');
 
-        // Safety net — Premiere can't import .webm. Auto-transcode to .mp4
-        // (H.264 + AAC) before handing the path to the panel. Same for any
-        // other format Premiere refuses; we transcode all of them through here.
-        Promise.all(rawImports.map(p => ensurePremiereImportable(p)))
-          .then(safePaths => {
-            const imports = safePaths.filter(Boolean);
-            sendOk({ reply, imports });
-          })
-          .catch(err => {
-            console.error('transcode error:', err.message);
-            sendOk({ reply, imports: rawImports });
-          });
-      });
+      const reply = (r.reply || '').trim() || '(no response)';
+      const rawImports = [];
+      const re = /\[\[IMPORT:([^\]]+)\]\]/g;
+      let m;
+      while ((m = re.exec(reply)) !== null) rawImports.push(m[1].trim());
+      console.log('< ' + String(reply).slice(0, 80));
+      if (rawImports.length) console.log('  imports: ' + rawImports.join(', '));
+
+      try {
+        const safePaths = await Promise.all(rawImports.map(p => ensurePremiereImportable(p)));
+        sendOk({ reply, imports: safePaths.filter(Boolean) });
+      } catch (err) {
+        console.error('transcode error:', err.message);
+        sendOk({ reply, imports: rawImports });
+      }
     });
     return;
   }

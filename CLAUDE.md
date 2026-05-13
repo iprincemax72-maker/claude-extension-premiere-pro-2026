@@ -397,7 +397,7 @@ The relevant bits Claude is told:
 
 ## USER COLLABORATION STYLE
 
-- **Freelance video editor doing short-form social content.** Casual, direct, swears occasionally. Imperfect English — translate intent generously; don't ask for clarification when you can guess.
+- Casual, direct. Imperfect English at times — translate intent generously; don't ask for clarification when you can guess.
 - **Action over analysis.** Build, don't deliberate.
 - **No filler.** "Sure, I'll help…" is forbidden. State what you're doing in one line, then do it.
 - **Hates broken features.** If something can't work robustly, say so up front and offer a workaround.
