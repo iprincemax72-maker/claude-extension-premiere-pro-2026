@@ -255,16 +255,16 @@ function analyseTranscriptWithClaude(transcript) {
 
 // Master transcript path — local whisper + claude analyze. Replaces the old
 // "Claude does everything" implementation that hung forever.
-async function transcriptCutsLocal(clipPath, clipDuration, clipIn, clipOut, silenceCuts) {
+async function transcriptCutsLocal(clipPath, clipDuration, clipIn, clipOut, silenceCuts, reqId) {
   const audioDur = (clipOut - clipIn) || clipDuration || 60;
   // 1. Extract audio chunk
-  broadcastProgress('Extracting audio', 20);
+  broadcastProgress('Extracting audio', 20, reqId);
   let wavPath;
   try { wavPath = await extractAudioForWhisper(clipPath, clipIn, clipOut); }
   catch (e) { console.log('  [autocut] audio extract failed: ' + e.message); return { cuts: silenceCuts, transcribed: false, summary: null }; }
 
   // 2. Whisper transcribe
-  broadcastProgress('Transcribing (whisper)', 35);
+  broadcastProgress('Transcribing (whisper)', 35, reqId);
   let transcript;
   try { transcript = await runWhisper(wavPath, audioDur); }
   catch (e) {
@@ -275,7 +275,7 @@ async function transcriptCutsLocal(clipPath, clipDuration, clipIn, clipOut, sile
   console.log('  [autocut] whisper transcribed ' + transcript.length + ' segments');
 
   // 3. Claude analyses the transcript (no tool use — just text in, JSON out)
-  broadcastProgress('Finding fillers', 70);
+  broadcastProgress('Finding fillers', 70, reqId);
   const analysis = await analyseTranscriptWithClaude(transcript);
   console.log('  [autocut] claude found ' + analysis.cuts.length + ' filler/false-start cuts');
 
@@ -563,18 +563,20 @@ function ensurePremiereImportable(absPath) {
 // human-readable status lines ("Writing component", "Rendering frames", etc.)
 // over SSE so the panel can display what's actually happening.
 const progressClients = new Set();
-function broadcastProgress(text, pct) {
+function broadcastProgress(text, pct, reqId) {
   if (!text && pct == null) return;
   const payload = { text: text || '' };
   if (typeof pct === 'number') payload.pct = Math.max(0, Math.min(100, pct));
+  if (reqId) payload.reqId = reqId;
   const data = JSON.stringify(payload);
   for (const c of progressClients) {
     try { c.write('event: progress\ndata: ' + data + '\n\n'); } catch {}
   }
 }
-function broadcastProgressDone() {
+function broadcastProgressDone(reqId) {
+  const data = JSON.stringify(reqId ? { reqId } : {});
   for (const c of progressClients) {
-    try { c.write('event: done\ndata: 1\n\n'); } catch {}
+    try { c.write('event: done\ndata: ' + data + '\n\n'); } catch {}
   }
 }
 
@@ -972,6 +974,7 @@ const server = http.createServer((req, res) => {
 
       const message = payload.message;
       const context = payload.context || null;
+      const reqId   = payload.reqId || crypto.randomUUID();
       if (!message) { res.writeHead(400); res.end('{"error":"empty message"}'); return; }
 
       let fullMessage = message;
@@ -1005,7 +1008,7 @@ const server = http.createServer((req, res) => {
       args.push(fullMessage);
 
       console.log('\n> ' + message.slice(0, 80));
-      broadcastProgress('Thinking');
+      broadcastProgress('Thinking', null, reqId);
 
       // Run claude once. Returns { ok, reply, error, idleKilled }. The caller
       // can retry if idleKilled=true and reply is empty.
@@ -1038,7 +1041,7 @@ const server = http.createServer((req, res) => {
               let evt;
               try { evt = JSON.parse(line); } catch { continue; }
               const status = streamEventToStatus(evt);
-              if (status) broadcastProgress(status);
+              if (status) broadcastProgress(status, null, reqId);
               if (evt.type === 'result' && typeof evt.result === 'string') finalReply = evt.result;
               if (evt.type === 'assistant' && evt.message && Array.isArray(evt.message.content)) {
                 for (const blk of evt.message.content) {
@@ -1096,13 +1099,13 @@ const server = http.createServer((req, res) => {
       let chatDone = false;
       const sendErr = (m) => {
         if (chatDone) return; chatDone = true;
-        broadcastProgressDone();
-        try { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: m })); } catch {}
+        broadcastProgressDone(reqId);
+        try { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: m, reqId })); } catch {}
       };
       const sendOk = (obj) => {
         if (chatDone) return; chatDone = true;
-        broadcastProgressDone();
-        try { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); } catch {}
+        broadcastProgressDone(reqId);
+        try { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(Object.assign({ reqId }, obj))); } catch {}
       };
 
       let r = await runClaudeOnce(false);
@@ -1111,11 +1114,11 @@ const server = http.createServer((req, res) => {
       // works because claude takes a fresh internal path.
       if (!r.ok && r.idleKilled && !(r.reply || '').trim()) {
         console.log('  [chat] auto-retrying after idle kill');
-        broadcastProgress('Retrying');
+        broadcastProgress('Retrying', null, reqId);
         r = await runClaudeOnce(true);
       }
 
-      if (r.aborted) { chatDone = true; broadcastProgressDone(); return; }
+      if (r.aborted) { chatDone = true; broadcastProgressDone(reqId); return; }
       if (!r.ok) return sendErr(r.error || 'claude failed');
 
       const reply = (r.reply || '').trim() || '(no response)';
@@ -1171,6 +1174,7 @@ const server = http.createServer((req, res) => {
       try { payload = JSON.parse(body); }
       catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
       const { clipPath, clipDuration, clipIn, clipOut, useTranscript, includeSilence } = payload;
+      const reqId = payload.reqId || crypto.randomUUID();
       // includeSilence defaults to true for backwards compat with older panels
       const wantSilence = (includeSilence === undefined) ? true : !!includeSilence;
       if (!clipPath) { res.writeHead(400); res.end('{"error":"missing clipPath"}'); return; }
@@ -1179,9 +1183,9 @@ const server = http.createServer((req, res) => {
       try {
         // Silence-only by default. Fast, reliable, doesn't involve Claude.
         // useTranscript is opt-in from Settings (false until user enables it).
-        broadcastProgress('Detecting silences', 5);
+        broadcastProgress('Detecting silences', 5, reqId);
         const allSilences = await detectSilences(clipPath, clipDuration, (p) => {
-          broadcastProgress('Detecting silences', 5 + p * 90);
+          broadcastProgress('Detecting silences', 5 + p * 90, reqId);
         });
 
         // CRITICAL — ffmpeg scans the whole source media, but the clip on the
@@ -1218,7 +1222,7 @@ const server = http.createServer((req, res) => {
           // claude (analysis only). Pass the silence set we want included so
           // they're merged into the final cut list.
           const baseSilences = wantSilence ? silenceCuts : [];
-          const analysisResult = await transcriptCutsLocal(clipPath, clipDuration, inP, outP, baseSilences);
+          const analysisResult = await transcriptCutsLocal(clipPath, clipDuration, inP, outP, baseSilences, reqId);
           if (analysisResult.cuts && analysisResult.cuts.length) {
             finalCuts = analysisResult.cuts;
             transcribed = !!analysisResult.transcribed;
@@ -1229,18 +1233,15 @@ const server = http.createServer((req, res) => {
         let totalCut = 0;
         for (const c of finalCuts) totalCut += (c.end - c.start);
 
-        broadcastProgressDone();
+        broadcastProgressDone(reqId);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-          cuts: finalCuts,
-          totalCut,
-          transcribed,
-          summary,
+          reqId, cuts: finalCuts, totalCut, transcribed, summary,
           method: transcribed ? 'silence+transcript' : 'silence-only',
         }));
       } catch (e) {
-        broadcastProgressDone();
-        try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e) })); } catch {}
+        broadcastProgressDone(reqId);
+        try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e), reqId })); } catch {}
       }
     });
     return;
