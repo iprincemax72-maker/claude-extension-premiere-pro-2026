@@ -2299,7 +2299,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">5.0</span>
+    <span class="version-tag" id="versionTag">5.7</span>
   </div>
   <div style="display:flex;align-items:center">
     <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
@@ -4031,7 +4031,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '5.0';
+  const PANEL_VERSION = '5.7';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -4085,40 +4085,74 @@ function openExternalURL(url) {
   });
 })();
 
-/* Restore an input draft that was saved just before an auto-reload. */
-(function restoreDraftAfterReload() {
+/* DRAFT AUTOSAVE — every keystroke, save input.value to localStorage so the
+   draft survives ANY reload / crash / close. localStorage (not session)
+   means it persists across panel close + reopen too. Restored on load. */
+const DRAFT_KEY = 'claudeBridge.activeDraft';
+let _draftSaveTimer = null;
+function _scheduleDraftSave() {
+  clearTimeout(_draftSaveTimer);
+  _draftSaveTimer = setTimeout(() => {
+    try {
+      const v = input.value || '';
+      if (v) localStorage.setItem(DRAFT_KEY, v);
+      else   localStorage.removeItem(DRAFT_KEY);
+    } catch {}
+  }, 300);
+}
+input.addEventListener('input', _scheduleDraftSave);
+input.addEventListener('paste', () => setTimeout(_scheduleDraftSave, 50));
+
+/* Restore draft on panel load. Tries localStorage (new strict path) first,
+   falls back to the old sessionStorage location so drafts written by older
+   versions still recover. */
+(function restoreDraftOnLoad() {
   try {
-    const draft = sessionStorage.getItem('claudeBridge.draft');
-    if (draft && input) {
+    let draft = localStorage.getItem(DRAFT_KEY);
+    if (!draft) {
+      // Legacy fallback — older versions used sessionStorage
+      draft = sessionStorage.getItem('claudeBridge.draft');
+      if (draft) sessionStorage.removeItem('claudeBridge.draft');
+    }
+    if (draft && input && !input.value) {
       input.value = draft;
       autosize();
-      sessionStorage.removeItem('claudeBridge.draft');
+      // Mirror into active tab's draft so tab-switch doesn't wipe it
+      if (typeof tabs !== 'undefined' && tabs[activeTabIdx]) tabs[activeTabIdx].inputDraft = draft;
     }
   } catch {}
 })();
 
 /* ───── Auto-reload — polls /version every 5s, reloads on mtime change.
-   Replaces the dev SSE that was causing handle accumulation. Single-shot
-   fetches with a 1.5s timeout, exponential backoff on bridge-down. ───── */
+   STRICT: refuses to reload if the textarea has ANY content, OR if any
+   chat/autocut/autoedit is in flight, OR if any modal is open. Better to
+   skip a reload than to nuke someone's prompt mid-typing. ───── */
 (function setupAutoReload() {
   let baseline = null;
   let fails = 0;
-  let lastUserActivityAt = Date.now();
   const POLL_OK_MS = 5000;
   const POLL_FAIL_BASE = 8000;
-  const QUIET_BEFORE_RELOAD_MS = 4000; // wait 4s of typing-silence before reload
 
-  // Track typing activity so we don't yank the rug while the user is editing.
-  // Cmd+A then Backspace was failing because a reload kept slipping in between
-  // selection and delete. Now any keystroke / mousedown defers reload by 4s.
-  ['keydown', 'input', 'mousedown', 'paste'].forEach(ev => {
-    document.addEventListener(ev, () => { lastUserActivityAt = Date.now(); }, true);
-  });
-
-  function userIsActive() {
-    if (Date.now() - lastUserActivityAt < QUIET_BEFORE_RELOAD_MS) return true;
-    // Also defer if the textarea is focused and has unsent content
-    if (document.activeElement === input && (input.value || '').trim().length > 0) return true;
+  function isUnsafeToReload() {
+    // Any text in the textarea — even if not focused
+    if ((input.value || '').length > 0) return true;
+    // Any tab's input draft (multi-tab safety)
+    try {
+      if (typeof tabs !== 'undefined') {
+        for (const t of tabs) if ((t.inputDraft || '').length > 0) return true;
+      }
+    } catch {}
+    // Any work in flight
+    if (typeof activeChatAbort !== 'undefined' && activeChatAbort) return true;
+    if (typeof activeAutocut   !== 'undefined' && activeAutocut)   return true;
+    if (typeof activeAutoedit  !== 'undefined' && activeAutoedit)  return true;
+    if (typeof expanding       !== 'undefined' && expanding)       return true;
+    // Modals open
+    if (document.querySelector('.autocut-modal.show')) return true;
+    if (document.querySelector('.history-panel.show')) return true;
+    if (document.querySelector('.settings-panel.show')) return true;
+    if (document.querySelector('.logs-panel.show')) return true;
+    if (document.querySelector('.lightbox.show'))   return true;
     return false;
   }
 
@@ -4134,17 +4168,12 @@ function openExternalURL(url) {
       if (baseline === null) {
         baseline = mtime;
       } else if (mtime !== baseline) {
-        if (userIsActive()) {
-          // Don't reload now — try again in a second. Keep `baseline` at the
-          // OLD value so we still detect the change once the user is idle.
-          setTimeout(poll, 1500);
+        if (isUnsafeToReload()) {
+          // Keep baseline at the OLD mtime — we still know there's a pending
+          // change, we just won't reload yet. Retry every 2s.
+          setTimeout(poll, 2000);
           return;
         }
-        try {
-          sessionStorage.setItem('claudeBridge.lastReload', String(Date.now()));
-          const draft = (input && input.value) || '';
-          if (draft) sessionStorage.setItem('claudeBridge.draft', draft);
-        } catch {}
         location.reload();
         return;
       }
@@ -5844,6 +5873,7 @@ async function sendMessage() {
   if (!msg) return;
   clearEmpty();
   input.value = '';
+  try { localStorage.removeItem(DRAFT_KEY); } catch {}
   autosize();
   clearGhost();
 
@@ -6056,6 +6086,88 @@ input.addEventListener('input', () => {
 });
 input.addEventListener('scroll', () => { ghost.scrollTop = input.scrollTop; });
 input.addEventListener('blur', clearGhost);
+
+/* TELL PREMIERE TO STOP EATING KEYSTROKES.
+   Premiere claims Alt+Arrow ("step one frame"), Cmd+Arrow, Cmd+V/C, Cmd+A,
+   etc. at the menu/accelerator level — they never even reach the webview
+   for our keydown listeners to catch. CEP provides registerKeyEventsInterest
+   to opt back in: we hand Premiere a list of (keyCode + modifiers) combos
+   we want passed through to the panel instead of swallowed.
+
+   Once registered, Alt+Left/Right etc. fire normally in the textarea (which
+   is what we want — native cursor word-nav just works), and our custom
+   keydown handlers below also see them.
+
+   See: https://github.com/Adobe-CEP/CEP-Resources for the API spec. */
+function _registerKeyboardInterest() {
+  if (!window.__adobe_cep__ || !window.__adobe_cep__.registerKeyEventsInterest) {
+    console.log('[keys] registerKeyEventsInterest API not available');
+    return false;
+  }
+  // Adobe's API matches keystrokes against EXACT modifier values, so every
+  // entry needs all 4 modifier fields explicitly set to true OR false. If
+  // you leave one out, Premiere matches "false" — meaning it won't match
+  // your Alt+Left when the registration said only "altKey: true" without
+  // also "metaKey: false, ctrlKey: false, shiftKey: false".
+  const mk = (keyCode, opts) => ({
+    keyCode: keyCode,
+    ctrlKey:  !!(opts && opts.ctrlKey),
+    altKey:   !!(opts && opts.altKey),
+    shiftKey: !!(opts && opts.shiftKey),
+    metaKey:  !!(opts && opts.metaKey),
+  });
+
+  const keys = [];
+  const arrows = [37, 38, 39, 40];   // Left, Up, Right, Down
+  const arrowMods = [
+    {},                                // plain
+    { shiftKey: true },                // shift
+    { altKey: true },                  // alt
+    { metaKey: true },                 // cmd
+    { altKey: true, shiftKey: true },  // alt+shift
+    { metaKey: true, shiftKey: true }, // cmd+shift
+    { ctrlKey: true },                 // ctrl (windows + emacs-style)
+    { ctrlKey: true, shiftKey: true },
+  ];
+  for (const code of arrows) for (const m of arrowMods) keys.push(mk(code, m));
+
+  // Backspace / Delete with all modifier variants
+  const editMods = [{}, { altKey: true }, { metaKey: true }, { ctrlKey: true }];
+  for (const m of editMods) {
+    keys.push(mk(8,  m));  // Backspace
+    keys.push(mk(46, m));  // Delete
+  }
+
+  // Standard editing shortcuts
+  for (const code of [65 /*A*/, 67 /*C*/, 86 /*V*/, 88 /*X*/, 90 /*Z*/, 89 /*Y*/]) {
+    keys.push(mk(code, { metaKey: true }));
+    keys.push(mk(code, { metaKey: true, shiftKey: true }));
+    keys.push(mk(code, { ctrlKey: true }));
+    keys.push(mk(code, { ctrlKey: true, shiftKey: true }));
+  }
+
+  // Home / End / PageUp / PageDown
+  for (const code of [33, 34, 35, 36]) {
+    keys.push(mk(code, {}));
+    keys.push(mk(code, { shiftKey: true }));
+    keys.push(mk(code, { metaKey: true }));
+  }
+
+  try {
+    window.__adobe_cep__.registerKeyEventsInterest(JSON.stringify(keys));
+    console.log('[keys] registered', keys.length, 'key combos');
+    return true;
+  } catch (e) {
+    console.log('[keys] registerKeyEventsInterest failed:', e);
+    return false;
+  }
+}
+
+// Register now, and re-register on every textarea focus (some CEP builds
+// reset the interest table on host focus changes).
+setTimeout(_registerKeyboardInterest, 50);
+setTimeout(_registerKeyboardInterest, 500);  // belt-and-suspenders after panel mounts
+input.addEventListener('focus', _registerKeyboardInterest);
 
 /* Word-by-word and line-start cursor navigation. Premiere intercepts
    Alt+Left/Right ("step one frame") and Cmd+Left/Right (some shortcut)

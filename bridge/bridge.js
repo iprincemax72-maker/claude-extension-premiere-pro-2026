@@ -1129,6 +1129,152 @@ The project has a curated style library at ${WORK_DIR}/remotion-intro/src/lib/ �
   import { BentoGrid, BentoCell, Split, LowerThird, Pip, CardStack, StickyBadge,
            ProgressBar, CaptionBox } from '../lib/layouts';
 
+  // src/lib/shapes.tsx — reusable SVG/JSX shapes — DON'T hand-roll these
+  import { Arrow, Star, Heart, Burst, SpeechBubble, ThoughtBubble, Badge,
+           Tape, StickyNote, Blob, Ring, RoundedRect, Underline, Scribble,
+           HighlightBar, PhoneFrame, MacWindow, BrowserFrame, TerminalWindow } from '../lib/shapes';
+
+  // src/lib/cards.tsx — card design styles (glass, brutalist, paper-tear, etc.)
+  import { GlassCard, NeumorphCard, BrutalistCard, PaperTear, Polaroid,
+           EditorialCard, Receipt, IndexCard, HeroCard, SoftCard } from '../lib/cards';
+
+  // src/lib/icons.tsx — common pictograms as React SVG. Don't reinvent.
+  // IconCheck, IconX, IconPlus, IconMinus, IconCircleCheck, IconCircleX,
+  // IconWarning, IconInfo, IconHeart, IconStar, IconThumbsUp, IconShare,
+  // IconBookmark, IconBell, IconChat, IconPlay, IconPause, IconSkipForward,
+  // IconVolumeOn, IconVolumeMute, IconTrendUp, IconTrendDown, IconArrowUp,
+  // IconCamera, IconVideo, IconImage, IconMic, IconClock, IconCalendar,
+  // IconUser, IconDollar, IconLightbulb, IconFire, IconSparkle, IconSearch,
+  // IconSettings, IconHome, IconLock, IconRocket, IconTrophy
+  import { IconHeart, IconStar, IconBell, IconFire, IconCheck } from '../lib/icons';
+
+  // src/lib/charts.tsx — animated data viz (frame-driven reveals).
+  // BarChart, LineChart, PieChart, DonutChart, ProgressLine, ProgressRing,
+  // Gauge, Sparkline — all take { frame, start, dur, data } props.
+  import { BarChart, DonutChart, ProgressRing } from '../lib/charts';
+
+  // src/lib/backgrounds.tsx — drop-in fullscreen backdrops.
+  // DotGrid, LineGrid (with optional perspective), Stripes, Halftone,
+  // RadialBurst, GradientMesh, Aurora, Static, Vignette, StarField,
+  // Particles, LightLeak, IsoGrid
+  import { DotGrid, GradientMesh, Aurora, StarField } from '../lib/backgrounds';
+
+  // src/lib/avatars.tsx — circle/square user pics with auto-color from name
+  // Avatar, AvatarStack, FacePlaceholder
+  import { Avatar, AvatarStack } from '../lib/avatars';
+
+  // src/lib/social.tsx — platform mock cards. TweetCard, RedditCard,
+  // LinkedInCard, iMessage, iMessageThread, SlackMessage, Notification,
+  // EmailCard, TikTokOverlay. Pass content via props — no reverse-
+  // engineering Twitter's CSS each time.
+  import { TweetCard, IMessage, IMessageThread, SlackMessage, Notification, TikTokOverlay } from '../lib/social';
+
+  // src/lib/text-paths.tsx — curved / arched / wavy / spiral text via SVG textPath.
+  // CircularText, ArchText (up/down), WaveText, SpiralText, TextOnPath (custom d),
+  // PerLetter (wrap each char in styled span), Rotate3DText (Y-axis rig).
+  import { CircularText, ArchText, WaveText, Rotate3DText } from '../lib/text-paths';
+
+  // src/lib/presets.ts — named composed animations. Spread onto style.
+  // PRESETS.heroEntrance | slam | pop | fadeUp | fadeDown | hold | exitFade |
+  // exitFlyOut | callout | enterHoldExit | reveal | iris | pulse | shake |
+  // flip | stickerSlam | kenBurns | parallax
+  //   <div style={{ ...PRESETS.heroEntrance(frame, {start:0, dur:24}) }}>
+  import { PRESETS } from '../lib/presets';
+
+  // src/lib/transitions-extra.ts — more scene transitions.
+  // cubeFlipTransition, pageCurlTransition, liquidWipeTransition,
+  // colorWashTransition, zoomBlurTransition, impactShakeTransition,
+  // slideCoverTransition, crossfadeTransition
+  import { cubeFlipTransition, pageCurlTransition, zoomBlurTransition } from '../lib/transitions-extra';
+
+  // src/lib/icons-animated.tsx — same icons but moving. Pass frame.
+  // HeartBeat, BellRing, StarTwinkle, FireFlicker, SpinIcon, BounceIcon,
+  // ShakeIcon, CheckDraw, XDraw, TrendDraw, SparkleTrail, RocketLaunch, LightbulbOn
+  import { HeartBeat, CheckDraw, SparkleTrail } from '../lib/icons-animated';
+
+  // src/lib/numbers.tsx — counters with formatting (commas, %, K/M/B, $).
+  // CountUp, CountUpFlip (odometer-style), BigStat, PriceTag, DeltaBadge.
+  // Also: formatNumber(n, format, decimals, prefix, suffix) helper.
+  import { CountUp, BigStat, PriceTag, DeltaBadge } from '../lib/numbers';
+
+  // src/lib/particles.tsx — particle effects. Confetti, Explosion, Smoke,
+  // Sparks, Snow, Balloons, generic Emitter.
+  import { Confetti, Explosion, Smoke, Sparks } from '../lib/particles';
+
+  // src/lib/loaders.tsx — Spinner, DotTyping, PulseDots, BarLoader,
+  // Skeleton, SkeletonCard, ProgressFill, IndeterminateBar.
+  import { Spinner, DotTyping, Skeleton } from '../lib/loaders';
+
+  // src/lib/code.tsx — code blocks with syntax-style coloring. CODE_THEMES
+  // (dark, light, cyber, warmCream). CodeBlock, TypingCodeBlock (typewriter
+  // reveal with caret), InlineCode chip.
+  import { CodeBlock, TypingCodeBlock, InlineCode, CODE_THEMES } from '../lib/code';
+
+  // src/lib/buttons.tsx — CTAButton (gradient pill), GhostButton, SoftButton,
+  // SubscribeButton (YouTube red), AppStoreBadge ('apple'|'google'), Toggle,
+  // Chip.
+  import { CTAButton, GhostButton, SubscribeButton, AppStoreBadge, Toggle, Chip } from '../lib/buttons';
+
+  // src/lib/audio-viz.tsx — audio-style visualizations (no real audio).
+  // WaveformBars, WaveformBarsMirrored, Waveform (sine line), VinylRecord
+  // (spinning), CassetteTape (spinning reels), NowPlaying pill.
+  import { WaveformBars, Waveform, VinylRecord, NowPlaying } from '../lib/audio-viz';
+
+  // src/lib/motion-extra.ts — physics-y, character-animation feel.
+  //   anticipate (slingshot wind-up), recoil (kick after impact),
+  //   hover (gentle infinite), pendulum (damped swing), tilt (3D mouse-ish),
+  //   pathFollow (along a bezier), springChain (staggered springs),
+  //   popcorn (random-order stagger), explodeIn / explodeOut (parts fly in/out),
+  //   meltDown (drip), foldOpen (paper unfold), riseAndShine (slow rise+glow),
+  //   dropAndCrack (fall + impact spike, exposes impactFrame for cracks),
+  //   magnetic (slide-to-target with overshoot), stretchFlick (squash+bounce),
+  //   attentionShake (look-at-me wobble), heartbeat (double-beat scale),
+  //   drift (perlin-ish random walk), gradientReveal (mask wipe),
+  //   typeOnWithCursor (typewriter + caret blink state), elastic (overshoot 0→1),
+  //   orbital (circle around a point).
+  import { anticipate, recoil, hover, squashStretch, tilt, pathFollow,
+           explodeIn, magnetic, heartbeat, drift, orbital, foldOpen } from '../lib/motion-extra';
+
+  // src/lib/code.tsx — now supports js, ts, py, sql, bash, css, go, rust.
+  // Same imports as before; just pass language="ts" / "sql" / etc.
+
+  // src/lib/sketchy.tsx — hand-drawn / wobble motion + decorations.
+  // sketchJitter (helper), ScribbleUnderline, Scribble (closed loop),
+  // Asterisk, PlusSign, SketchArrow, SketchFrame, DoodleDots,
+  // HandCircled (wraps element in wobbly circle), Sketchy (wraps in jitter),
+  // DoodleStar, TwinkleMark.
+  import { Sketchy, ScribbleUnderline, SketchArrow, SketchFrame,
+           Asterisk, DoodleStar, HandCircled } from '../lib/sketchy';
+
+  // src/lib/photo-fx.tsx — photographic effects.
+  // LensFlare, DOFBlur (wrap), TiltShift, DoubleExposure, FilmBurn,
+  // ColorGrade (presets: tealOrange, cool, warm, vintage, noir, cyber, sepia),
+  // Bloom, ChromaticAberrationAnim, VintageBorder, DustMotes, GodRays.
+  import { LensFlare, FilmBurn, ColorGrade, GodRays, DustMotes } from '../lib/photo-fx';
+
+  // src/lib/bg-procedural.tsx — generative animated backgrounds.
+  // CheckerboardAnim, Voronoi, HalftoneWave, NoiseField, StripeWave,
+  // ConcentricPulse, Topographic, Plasma.
+  import { CheckerboardAnim, Voronoi, HalftoneWave, Plasma, ConcentricPulse } from '../lib/bg-procedural';
+
+  // src/lib/flags.tsx — country flags as SVG. Top 22.
+  // FlagUS, FlagUK, FlagJP, FlagFR, FlagDE, FlagIT, FlagES, FlagCA, FlagAU,
+  // FlagBR, FlagIN, FlagCN, FlagKR, FlagMX, FlagNL, FlagSE, FlagNO, FlagRU,
+  // FlagCH, FlagPride, FlagTrans, FlagEU.
+  import { FlagUS, FlagJP, FlagUK } from '../lib/flags';
+
+  // src/lib/prims3d.tsx — mock-3D primitives via CSS/SVG.
+  // Cube3D (animated rotation), ShadedSphere, Cylinder, Pyramid,
+  // IsoCube, IsoStack, Card3D.
+  import { Cube3D, ShadedSphere, IsoCube, IsoStack } from '../lib/prims3d';
+
+  // src/lib/typography.ts — also exports TEXT_FX with text-effect recipes:
+  // TEXT_FX.outlined(stroke, w, fill) | outlineOnly | neon(color) | softGlow |
+  // hardDrop | stackDrop | gradient(top,bot) | chrome | gold | holographic |
+  // embossed | debossed | letterpress | sticker | tapeStrip | highlight |
+  // underline | strikethrough | magazineCondensed | wideTrack(px)
+  // Apply like:  <h1 style={{ ...TYPE.titleHero, ...TEXT_FX.neon('#ff3d8a') }}>
+
   // src/lib/trends.ts — NAMED STYLE PACKS — bundles of palette+type+motion+effects.
   // Read TRENDS to see all packs. Pick by keyword match to the user's prompt.
   import { TRENDS, type TrendName } from '../lib/trends';

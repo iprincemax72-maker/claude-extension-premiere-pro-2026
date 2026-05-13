@@ -203,3 +203,159 @@ export const GLITCH_LAYERS = {
   green: { color: '#fff' },
   blue:  { color: '#00ffe1', mixBlendMode: 'screen' as const },
 };
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TEXT EFFECT RECIPES — drop-in text styles for common visual effects.
+   Each is a CSSProperties object you spread onto a text element.
+
+   Examples:
+     <h1 style={{ ...TYPE.titleHero, ...TEXT_FX.outlined('#fff', 6) }}>BOLD</h1>
+     <h1 style={{ ...TYPE.titleHero, ...TEXT_FX.neon('#ff3d8a') }}>GLOW</h1>
+     <h1 style={{ ...TYPE.titleHero, ...TEXT_FX.gradient('#ff3d8a', '#6b3df5') }}>HOT</h1>
+   ═══════════════════════════════════════════════════════════════════════ */
+export const TEXT_FX = {
+  /** Outlined / stroked text — visible text fill with a contrasting border. */
+  outlined: (strokeColor: string, strokeWidth: number = 6, fillColor: string = '#fff'): CSSProperties => ({
+    color: fillColor,
+    WebkitTextStroke: `${strokeWidth}px ${strokeColor}`,
+    paintOrder: 'stroke fill',
+  }),
+
+  /** Outline-only — transparent fill, only the stroke is visible. */
+  outlineOnly: (strokeColor: string, strokeWidth: number = 4): CSSProperties => ({
+    color: 'transparent',
+    WebkitTextStroke: `${strokeWidth}px ${strokeColor}`,
+  }),
+
+  /** Neon glow — colored text with a multi-layered halo. */
+  neon: (color: string = '#ff3d8a', intensity: number = 1): CSSProperties => ({
+    color,
+    textShadow: [
+      `0 0 ${4 * intensity}px ${color}`,
+      `0 0 ${10 * intensity}px ${color}`,
+      `0 0 ${22 * intensity}px ${color}80`,
+      `0 0 ${44 * intensity}px ${color}40`,
+    ].join(', '),
+  }),
+
+  /** Soft glow — subtle halo, no oversaturation. */
+  softGlow: (color: string = '#fff', intensity: number = 1): CSSProperties => ({
+    color,
+    textShadow: `0 0 ${18 * intensity}px ${color}aa, 0 0 ${36 * intensity}px ${color}55`,
+  }),
+
+  /** Hard shadow drop — comic-book / sticker style. */
+  hardDrop: (color: string = '#000', x: number = 6, y: number = 6): CSSProperties => ({
+    textShadow: `${x}px ${y}px 0 ${color}`,
+  }),
+
+  /** Stacked hard drops — layered 3D / retro feel. */
+  stackDrop: (color: string = '#ff5e5b', steps: number = 4, step: number = 4): CSSProperties => {
+    const shadows = [];
+    for (let i = 1; i <= steps; i++) shadows.push(`${i * step}px ${i * step}px 0 ${color}`);
+    return { textShadow: shadows.join(', ') };
+  },
+
+  /** Vertical gradient fill (linear). */
+  gradient: (top: string, bottom: string, angle: number = 180): CSSProperties => ({
+    background: `linear-gradient(${angle}deg, ${top} 0%, ${bottom} 100%)`,
+    WebkitBackgroundClip: 'text',
+    backgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+  }),
+
+  /** Chrome / metallic gradient (silver). */
+  chrome: (): CSSProperties => ({
+    background: 'linear-gradient(180deg, #fafbff 0%, #c0c5d4 35%, #6e7088 50%, #c0c5d4 65%, #fafbff 100%)',
+    WebkitBackgroundClip: 'text',
+    backgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    filter: 'drop-shadow(0 4px 12px rgba(0,200,255,0.5))',
+  }),
+
+  /** Gold foil gradient. */
+  gold: (): CSSProperties => ({
+    background: 'linear-gradient(180deg, #fff4d4 0%, #f0c460 35%, #b8860b 55%, #f0c460 75%, #fff4d4 100%)',
+    WebkitBackgroundClip: 'text',
+    backgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+  }),
+
+  /** Holographic shift — multi-color iridescent gradient. */
+  holographic: (): CSSProperties => ({
+    background: 'linear-gradient(90deg, #ff3d8a 0%, #ffd43d 20%, #5eb6e8 40%, #6b3df5 60%, #ff3d8a 80%, #ffd43d 100%)',
+    backgroundSize: '200% 100%',
+    WebkitBackgroundClip: 'text',
+    backgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+  }),
+
+  /** Embossed — raised look using inset shadow trickery. */
+  embossed: (color: string = '#1a1a1c', light: string = 'rgba(255,255,255,0.4)', dark: string = 'rgba(0,0,0,0.6)'): CSSProperties => ({
+    color,
+    textShadow: `-1px -1px 0 ${light}, 2px 2px 4px ${dark}`,
+  }),
+
+  /** Debossed — pressed-in look. */
+  debossed: (color: string = '#1a1a1c'): CSSProperties => ({
+    color,
+    textShadow: '1px 1px 0 rgba(255,255,255,0.4), -1px -1px 1px rgba(0,0,0,0.5)',
+  }),
+
+  /** Letterpress — vintage paper-pressed feel. */
+  letterpress: (bg: string = '#f4ead3'): CSSProperties => ({
+    color: bg,
+    textShadow: '0 1px 0 rgba(255,255,255,0.5), 0 -1px 0 rgba(0,0,0,0.3)',
+  }),
+
+  /** Sticker style — text on solid pad with rotation hint. */
+  sticker: (bg: string = '#ff5e5b', color: string = '#fff', rotation: number = -2): CSSProperties => ({
+    display: 'inline-block',
+    background: bg,
+    color,
+    padding: '8px 18px',
+    borderRadius: 8,
+    transform: `rotate(${rotation}deg)`,
+    boxShadow: '0 10px 24px rgba(0,0,0,0.18)',
+  }),
+
+  /** Tape strip — text on a piece of washi-tape style background. */
+  tapeStrip: (bg: string = '#ffe178'): CSSProperties => ({
+    display: 'inline-block',
+    background: `linear-gradient(180deg, rgba(255,255,255,0.18) 0%, transparent 50%), ${bg}`,
+    padding: '6px 24px',
+    transform: 'rotate(-3deg)',
+    boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+  }),
+
+  /** Highlighter marker behind text. */
+  highlight: (markerColor: string = '#ffe600'): CSSProperties => ({
+    background: `linear-gradient(180deg, transparent 60%, ${markerColor} 60%, ${markerColor} 90%, transparent 90%)`,
+    display: 'inline',
+    padding: '0 4px',
+  }),
+
+  /** Underline — solid thick underline that lives in the text baseline. */
+  underline: (color: string = 'currentColor', thickness: number = 4): CSSProperties => ({
+    textDecoration: `underline ${color} ${thickness}px`,
+    textUnderlineOffset: `${thickness + 2}px`,
+  }),
+
+  /** Strikethrough. */
+  strikethrough: (color: string = 'currentColor'): CSSProperties => ({
+    textDecoration: `line-through ${color} 3px`,
+  }),
+
+  /** Magazine-style condensed mega-title (very tight + very wide). */
+  magazineCondensed: (): CSSProperties => ({
+    fontStretch: 'condensed',
+    letterSpacing: '-2px',
+    lineHeight: 0.85,
+  }),
+
+  /** Wide tracking — luxury / spaced-out caps. */
+  wideTrack: (px: number = 8): CSSProperties => ({
+    letterSpacing: px + 'px',
+    textTransform: 'uppercase',
+  }),
+};
