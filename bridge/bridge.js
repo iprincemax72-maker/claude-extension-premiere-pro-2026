@@ -1376,10 +1376,34 @@ When the user asks for motion graphics, intros, outros, lower thirds, transition
 
 OUTPUT FORMAT REQUIREMENTS (critical — Premiere can't import some formats):
 - For motion video → MP4 with H.264 codec. NEVER WebM, NEVER VP8/VP9 — Premiere Pro refuses these.
-- For looping animation with transparency → MOV with ProRes 4444 (alpha-capable) or animated PNG.
 - For still images → PNG.
-- The Remotion CLI flag is \`--codec h264\` for MP4 and \`--codec prores --prores-profile 4444\` for transparent MOV. Always pass an explicit \`--codec\` so it doesn't default to webm.
 - File extensions MUST match codec: h264 → .mp4, prores → .mov, png → .png. The panel parses the extension to decide how to import.
+- Always pass an explicit \`--codec\` so it doesn't default to webm.
+
+★★★ TRANSPARENCY — READ THIS, IT IS THE #1 THING PEOPLE GET WRONG ★★★
+If the request mentions "transparent", "no background", "remove the
+background", "alpha", "overlay", "on top of", "for V2/V3", or anything
+that implies the result sits OVER other footage — you MUST do BOTH of
+these, or the output will have a solid black background:
+
+  1. THE COMPOSITION MUST NOT PAINT A BACKGROUND. Do not put a
+     \`backgroundColor\` on the root, do not render a solid <AbsoluteFill>
+     behind the content, do not add a dark/black panel "for contrast".
+     The root element's background stays fully transparent. Only the
+     actual graphic elements are drawn.
+  2. RENDER AS PRORES 4444 — the ONLY alpha-capable format here:
+        --codec prores --prores-profile 4444   →  output file is .mov
+     H.264 / MP4 HAS NO ALPHA CHANNEL. Rendering a transparent
+     composition to .mp4 produces a BLACK background every time. There
+     is no flag that makes .mp4 transparent — you must use ProRes 4444.
+
+  After rendering, the .mov's pixel format must be \`yuva444p10le\` (the
+  \`yuva\` = alpha). If you are unsure, check with:
+     ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of csv=p=0 <file>
+  If it comes back \`yuv422...\` (no alpha), you used the wrong codec —
+  re-render with --prores-profile 4444.
+
+Only when the request does NOT involve transparency: render H.264 .mp4.
 
 3. Emit the import marker so the panel auto-imports it.
 
@@ -1987,6 +2011,19 @@ const server = http.createServer((req, res) => {
         ctxLines.push('Output dir for any rendered files: ' + OUTPUT_DIR);
         ctxLines.push('');
         fullMessage = ctxLines.join('\n') + '\n' + message;
+      }
+
+      // If the user is asking for transparency, inject a hard reminder right
+      // into the message — the system prompt covers it, but a direct note
+      // where Claude can't skim past it is what actually sticks.
+      if (/\b(transparent|transparency|no background|remove (the )?background|alpha channel|overlay|on top of|for v[2-9])\b/i.test(message)) {
+        fullMessage = '[TRANSPARENCY REQUIRED] This output must have a real transparent '
+          + 'background. (1) The Remotion composition root must NOT paint any '
+          + 'background — no backgroundColor, no solid AbsoluteFill behind the '
+          + 'content. (2) Render with --codec prores --prores-profile 4444 to a '
+          + '.mov file. H.264/.mp4 CANNOT be transparent and will come out black. '
+          + 'The final .mov pixel format must be yuva444p10le.\n\n'
+          + fullMessage;
       }
 
       // Stream-JSON output gives us a JSONL feed of system/tool/assistant
