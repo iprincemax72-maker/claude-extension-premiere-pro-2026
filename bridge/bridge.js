@@ -281,7 +281,14 @@ function analyseTranscriptWithClaude(transcript, opts) {
       userMsg,
     ];
 
-    const proc = spawn('claude', args, { cwd: WORK_DIR, env: process.env });
+    // stdin 'ignore' — without it the claude CLI blocks waiting for stdin
+    // ("no stdin data received in 3s") and times out without answering.
+    // cwd is a temp dir so claude doesn't load the project CLAUDE.md.
+    const proc = spawn('claude', args, {
+      cwd: os.tmpdir(),
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     let stdoutBuf = '';
     proc.stdout.on('data', d => stdoutBuf += d.toString());
     let stderrBuf = '';
@@ -723,9 +730,23 @@ function detectMoments(sentences, density, styleOverride, reqId, log) {
       '/opt/homebrew/bin',
       '/usr/local/bin',
     ].filter(Boolean).join(':');
-    const proc = spawn(claudePath, ['-p', fullPrompt, '--output-format', 'text'], {
+    // stdio: stdin MUST be 'ignore' — otherwise the claude CLI sits waiting
+    // for stdin ("no stdin data received in 3s") and the idle watchdog kills
+    // it before it answers. cwd is a temp dir, not WORK_DIR, so claude
+    // doesn't load the project's CLAUDE.md (which tells it to go read the
+    // Remotion skill files — irrelevant to a pure text→JSON task and a
+    // source of multi-minute stalls). Haiku + bypassPermissions keep it
+    // fast and unblocked.
+    const proc = spawn(claudePath, [
+      '-p', fullPrompt,
+      '--output-format', 'text',
+      '--model', 'claude-haiku-4-5-20251001',
+      '--permission-mode', 'bypassPermissions',
+      '--no-session-persistence',
+    ], {
       env: { ...process.env, PATH: extendedPath },
-      cwd: WORK_DIR,
+      cwd: os.tmpdir(),
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
     if (_activeAutoedit) _activeAutoedit.children.add(proc);
 
@@ -2004,6 +2025,28 @@ const server = http.createServer((req, res) => {
   // Manual update trigger from the panel — pulls latest files from GitHub raw
   if (req.method === 'POST' && req.url === '/update') {
     handleUpdateRequest(req, res);
+    return;
+  }
+
+  // Debug-log sink. ExtendScript's File.write proved unreliable (0-byte
+  // files), so host.jsx returns its debug.steps to the panel and the panel
+  // POSTs them here to be written where they can actually be read.
+  if (req.method === 'POST' && req.url === '/applylog') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const steps = Array.isArray(payload.steps) ? payload.steps : [];
+        const file = path.join(OUTPUT_DIR, 'autocut-apply-' + Date.now() + '.log');
+        fs.writeFileSync(file, steps.join('\n') + '\n');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, file }));
+      } catch (e) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: String(e) }));
+      }
+    });
     return;
   }
 
