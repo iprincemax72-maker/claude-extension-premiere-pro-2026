@@ -2331,7 +2331,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">7.0</span>
+    <span class="version-tag" id="versionTag">7.1</span>
   </div>
   <div style="display:flex;align-items:center">
     <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
@@ -2679,9 +2679,9 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="13" height="11" rx="1.5"/><rect x="7" y="4" width="13" height="11" rx="1.5"/></svg>
         Overlap
       </button>
-      <div class="rmode-group" id="renderModeGroup" title="How hard Claude works on the animation — Fast: quick + simple, ready in ~1 min. Mid: balanced, looks good (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
-        <button class="rmode-pill" data-rmode="fast" type="button" title="Fast — quick + simple animation, ~1 min">Fast</button>
-        <button class="rmode-pill active" data-rmode="mid" type="button" title="Mid — balanced quality + speed, ~2 min">Mid</button>
+      <div class="rmode-group" id="renderModeGroup" title="How hard Claude works on the animation — Fast: quick template-based, ~1 min. Default: a real custom-built animation, no templates (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
+        <button class="rmode-pill" data-rmode="fast" type="button" title="Fast — quick template-based animation, ~1 min">Fast</button>
+        <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
         <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Claude takes its time, ~3-5 min">Slow</button>
       </div>
       <button class="autocut-btn" id="autocutBtn" type="button" title="Auto-cut: detect pauses and false starts on the selected clip">
@@ -4108,7 +4108,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '7.0';
+  const PANEL_VERSION = '7.1';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -4279,7 +4279,7 @@ const SETTINGS_DEFAULTS = {
   transcript: false,  // off by default — silence-only is fast + reliable
   audio: false,
   autoOpen: false,
-  renderMode: 'mid',  // fast | mid | slow — speed/quality dial for renders
+  renderMode: 'default',  // fast | default | slow — speed/quality dial for renders
 };
 const ACCENT_PALETTES = {
   coral:   { accent:'#d97757', accent2:'#e89a6c', hover:'#e88566', soft:'rgba(217,119,87,0.14)', line:'rgba(217,119,87,0.45)', glow:'rgba(217,119,87,0.55)' },
@@ -4938,7 +4938,8 @@ document.getElementById('modeBar').addEventListener('click', (e) => {
 // Render mode (Fast / Mid / Slow) — how hard Claude works on each animation.
 // Stored in userSettings.renderMode and sent with every /chat request.
 function setRenderMode(m) {
-  if (!['fast', 'mid', 'slow'].includes(m)) m = 'mid';
+  if (m === 'mid') m = 'default';  // old name migration
+  if (!['fast', 'default', 'slow'].includes(m)) m = 'default';
   userSettings.renderMode = m;
   try { saveSettings(); } catch {}
   document.querySelectorAll('.rmode-pill').forEach(p =>
@@ -4948,7 +4949,7 @@ function setRenderMode(m) {
   const group = document.getElementById('renderModeGroup');
   if (!group) return;
   // Restore from saved settings
-  setRenderMode(userSettings.renderMode || 'mid');
+  setRenderMode(userSettings.renderMode || 'default');
   group.addEventListener('click', (e) => {
     const btn = e.target.closest('.rmode-pill');
     if (btn) setRenderMode(btn.dataset.rmode);
@@ -6070,7 +6071,7 @@ async function sendMessage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         reqId, message: outboundMsg, context,
-        renderMode: userSettings.renderMode || 'mid',
+        renderMode: userSettings.renderMode || 'default',
       }),
       signal: activeChatAbort.signal,
     });

@@ -1962,14 +1962,15 @@ const server = http.createServer((req, res) => {
       const message = payload.message;
       const context = payload.context || null;
       const reqId   = payload.reqId || crypto.randomUUID();
-      // Render mode — fast / mid / slow. Controls self-critique depth and
-      // how much exploration Claude does. Backward-compat: old panels send
-      // selfCritique:bool → map true=mid, false=fast.
+      // Render mode — fast / default / slow. Controls self-critique depth
+      // and how much exploration Claude does. Backward-compat: old panels
+      // send selfCritique:bool, and "mid" was the old name for "default".
       let renderMode = payload.renderMode;
+      if (renderMode === 'mid') renderMode = 'default';
       if (!renderMode) {
-        renderMode = (payload.selfCritique === false) ? 'fast' : 'mid';
+        renderMode = (payload.selfCritique === false) ? 'fast' : 'default';
       }
-      if (!['fast', 'mid', 'slow'].includes(renderMode)) renderMode = 'mid';
+      if (!['fast', 'default', 'slow'].includes(renderMode)) renderMode = 'default';
       if (!message) { res.writeHead(400); res.end('{"error":"empty message"}'); return; }
 
       let fullMessage = message;
@@ -1997,10 +1998,11 @@ const server = http.createServer((req, res) => {
       // instructions. Render mode decides whether to keep that block and
       // what extra mode-specific guidance to prepend.
       //
-      //   fast — strip self-critique entirely; template-only, no exploration
-      //   mid  — keep self-critique as written (1 retry); normal composition
-      //   slow — keep self-critique + ask for 2 retries, 3-frame checks,
-      //          and deliberate library exploration
+      //   fast    — strip self-critique entirely; template-only, no exploration
+      //   default — keep self-critique (1 retry); custom-built composition,
+      //             written from scratch (no templates)
+      //   slow    — keep self-critique + ask for 2 retries, 3-frame checks,
+      //             and deliberate library exploration
       let resolvedSystemPrompt;
       if (renderMode === 'fast') {
         resolvedSystemPrompt = SYSTEM_PROMPT
@@ -2032,7 +2034,20 @@ const server = http.createServer((req, res) => {
           '═══════════════════════════════════════════════════════════════════════════',
           '',
         ].join('\n'),
-        mid: '',  // mid = the prompt as-written, no extra header
+        default: [
+          '═══════════════════════════════════════════════════════════════════════════',
+          'MODE: DEFAULT — build the animation yourself, from scratch.',
+          '═══════════════════════════════════════════════════════════════════════════',
+          'Do NOT copy a template. IGNORE the TEMPLATES section below entirely —',
+          'it is only for Fast mode. Write a fresh, custom Remotion composition',
+          'using your own judgment for the design and motion. You MAY use the',
+          'style library (easings, palettes, typography, motion helpers) as',
+          'building blocks, but the composition itself is yours — a real,',
+          'purpose-built animation, not a template with the text swapped.',
+          'Keep the self-critique pass (one fix-and-re-render is fine).',
+          '═══════════════════════════════════════════════════════════════════════════',
+          '',
+        ].join('\n'),
         slow: [
           '═══════════════════════════════════════════════════════════════════════════',
           'MODE: SLOW — a layered, choreographed piece. Take 3-5 minutes.',
