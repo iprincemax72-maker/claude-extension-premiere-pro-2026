@@ -284,42 +284,67 @@ function analyseTranscriptWithClaude(transcript, opts) {
     // stdin 'ignore' — without it the claude CLI blocks waiting for stdin
     // ("no stdin data received in 3s") and times out without answering.
     // cwd is a temp dir so claude doesn't load the project CLAUDE.md.
+    const log = opts.log || (() => {});
+    const t0 = Date.now();
+    const el = () => '+' + ((Date.now() - t0) / 1000).toFixed(1) + 's';
+    log(`analyseClaude: spawning claude, msgLen=${userMsg.length}, args=${JSON.stringify(args.slice(0, -1))}`);
     const proc = spawn('claude', args, {
       cwd: os.tmpdir(),
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    log(`analyseClaude: spawned pid=${proc.pid} ${el()}`);
     let stdoutBuf = '';
-    proc.stdout.on('data', d => stdoutBuf += d.toString());
     let stderrBuf = '';
-    proc.stderr.on('data', d => stderrBuf += d.toString());
+    let firstOut = false, firstErr = false;
+    proc.stdout.on('data', d => {
+      stdoutBuf += d.toString();
+      if (!firstOut) { firstOut = true; log(`analyseClaude: first stdout byte ${el()}`); }
+    });
+    proc.stderr.on('data', d => {
+      stderrBuf += d.toString();
+      if (!firstErr) { firstErr = true; log(`analyseClaude: first stderr byte ${el()}: ${d.toString().slice(0, 200)}`); }
+    });
 
-    // Timeout scales with transcript length — a 12-minute clip's transcript
-    // needs more than the old hard 60s. 60s base + ~1s per segment, capped
-    // at 4 minutes.
-    const timeoutMs = Math.min(240000, 60000 + transcript.length * 1000);
+    // claude is NOT hung when this fires — measured: a real 127-segment
+    // transcript with the full aggressive prompt takes Haiku ~150-200s of
+    // genuine analysis before it emits anything (json output mode buffers
+    // until the end). The old 187s cap killed it ~right as it finished.
+    // Give real headroom: 2 min base + 2.5s/segment, capped at 8 min.
+    const timeoutMs = Math.min(480000, 120000 + transcript.length * 2500);
     let done = false;
     const finish = (result) => { if (done) return; done = true; clearTimeout(killer); resolve(result); };
     const killer = setTimeout(() => {
+      log(`analyseClaude: TIMEOUT at ${el()} — killing pid=${proc.pid}. stdoutSoFar=${stdoutBuf.length}B stderrSoFar=${JSON.stringify(stderrBuf.slice(-400))}`);
       try { proc.kill('SIGKILL'); } catch {}
       finish({ cuts: [], summary: 'analysis timed out (' + Math.round(timeoutMs/1000) + 's)' });
     }, timeoutMs);
 
-    proc.on('error', () => finish({ cuts: [], summary: 'claude unavailable' }));
-    proc.on('close', () => {
-      // Claude's json output mode wraps the assistant text in a top-level "result" field
+    // Parse the result. Called on whichever of exit/close fires first — if
+    // claude leaves a stdio pipe open, 'close' never fires, so 'exit' is the
+    // backstop.
+    let parsedOnce = false;
+    const handleEnd = (evt, code) => {
+      if (parsedOnce) return;
+      parsedOnce = true;
+      log(`analyseClaude: ${evt} code=${code} ${el()} stdout=${stdoutBuf.length}B stderr=${JSON.stringify(stderrBuf.slice(-400))}`);
       let result = null;
       try { const j = JSON.parse(stdoutBuf); result = j.result || j.text; } catch {}
-      if (!result) return finish({ cuts: [], summary: null });
+      if (!result) { log('analyseClaude: no parseable result field'); return finish({ cuts: [], summary: null }); }
       let parsed = null;
       try { parsed = JSON.parse(result); } catch {}
       if (!parsed) {
         const m = result.match(/\{[\s\S]*\}/);
         if (m) { try { parsed = JSON.parse(m[0]); } catch {} }
       }
-      if (!parsed || !Array.isArray(parsed.cuts)) return finish({ cuts: [], summary: null });
+      if (!parsed || !Array.isArray(parsed.cuts)) { log('analyseClaude: result had no cuts array'); return finish({ cuts: [], summary: null }); }
+      log(`analyseClaude: parsed ${parsed.cuts.length} cuts ok`);
       finish(parsed);
-    });
+    };
+
+    proc.on('error', (e) => { log(`analyseClaude: spawn ERROR ${el()}: ${e}`); finish({ cuts: [], summary: 'claude unavailable: ' + e }); });
+    proc.on('exit', (code) => handleEnd('exit', code));
+    proc.on('close', (code) => handleEnd('close', code));
   });
 }
 
@@ -365,7 +390,7 @@ async function transcriptCutsLocal(clipPath, clipDuration, clipIn, clipOut, sile
                      : findRepeats ? 'Finding repeats / false starts'
                      :               'Finding fillers';
   broadcastProgress(progressLabel, 70, reqId);
-  const analysis = await analyseTranscriptWithClaude(transcript, { findFillers, findRepeats });
+  const analysis = await analyseTranscriptWithClaude(transcript, { findFillers, findRepeats, log });
   console.log('  [autocut] claude found ' + analysis.cuts.length + ' filler/false-start cuts');
   log(`Claude returned ${analysis.cuts.length} transcript cuts. summary=${analysis.summary || '(none)'}`);
   for (let i = 0; i < analysis.cuts.length; i++) {
@@ -750,17 +775,19 @@ function detectMoments(sentences, density, styleOverride, reqId, log) {
     });
     if (_activeAutoedit) _activeAutoedit.children.add(proc);
 
-    // Hard timeout based on transcript length — 60s + 1s per 10 sentences.
-    const timeoutMs = 60000 + Math.min(120000, sentences.length * 100);
+    // Hard timeout. claude does genuine heavy analysis here — with json/text
+    // output it buffers and emits nothing until the end, which can take
+    // 150-250s on a long transcript. 2 min base + 2.5s/sentence, cap 8 min.
+    const timeoutMs = Math.min(480000, 120000 + sentences.length * 2500);
     const killer = setTimeout(() => {
       log(`moments HARD TIMEOUT (${timeoutMs}ms) — killing claude`);
       try { proc.kill('SIGKILL'); } catch {}
     }, timeoutMs);
 
-    // Idle watchdog — if claude produces no stdout/stderr for IDLE_MS, it's
-    // hung at 0% CPU (the known claude CLI bug). Kill it so the request can
-    // recover instead of dangling forever.
-    const IDLE_MS = 60000;
+    // Idle watchdog — only a TRUE hang (0% CPU, no output for minutes) should
+    // trip this. claude legitimately produces no output for 2-3 min while
+    // analysing, so this must be well above that or it kills good runs.
+    const IDLE_MS = 300000;
     let lastOutputAt = Date.now();
     const idleCheck = setInterval(() => {
       if (Date.now() - lastOutputAt > IDLE_MS) {
@@ -770,13 +797,26 @@ function detectMoments(sentences, density, styleOverride, reqId, log) {
       }
     }, 5000);
 
-    proc.stdout.on('data', d => { stdout += d; lastOutputAt = Date.now(); });
+    const _mt0 = Date.now();
+    const _mel = () => '+' + ((Date.now() - _mt0) / 1000).toFixed(1) + 's';
+    let _mFirstOut = false;
+    log(`moments: spawned pid=${proc.pid}`);
+    proc.stdout.on('data', d => {
+      stdout += d; lastOutputAt = Date.now();
+      if (!_mFirstOut) { _mFirstOut = true; log(`moments: first stdout byte ${_mel()}`); }
+    });
     proc.stderr.on('data', d => { stderr += d; lastOutputAt = Date.now(); });
-    proc.on('close', () => {
+
+    // handleEnd runs on whichever of exit/close fires first. If claude leaves
+    // a stdio pipe open, 'close' never fires — 'exit' is the backstop.
+    let _mDone = false;
+    const handleEnd = (evt, code) => {
+      if (_mDone) return;
+      _mDone = true;
       clearInterval(idleCheck);
       clearTimeout(killer);
       if (_activeAutoedit) _activeAutoedit.children.delete(proc);
-      log('moments stdout chars: ' + stdout.length);
+      log(`moments: ${evt} code=${code} ${_mel()} stdout=${stdout.length}B`);
       if (stderr) log('moments stderr: ' + stderr.slice(-500));
       // Strip any markdown fences or pre-amble Claude might have added
       const cleaned = stdout
@@ -799,9 +839,12 @@ function detectMoments(sentences, density, styleOverride, reqId, log) {
         && m.endSec - m.startSec < 30
         && (m.confidence == null || m.confidence >= 0.6)
       );
+      log(`moments: parsed ${parsed.length} moments`);
       resolve(parsed);
-    });
-    proc.on('error', (e) => { log('moments spawn err: ' + e.message); clearTimeout(killer); resolve([]); });
+    };
+    proc.on('exit', (code) => handleEnd('exit', code));
+    proc.on('close', (code) => handleEnd('close', code));
+    proc.on('error', (e) => { log('moments spawn err: ' + e.message); clearInterval(idleCheck); clearTimeout(killer); if (!_mDone) { _mDone = true; resolve([]); } });
   });
 }
 
@@ -2025,6 +2068,78 @@ const server = http.createServer((req, res) => {
   // Manual update trigger from the panel — pulls latest files from GitHub raw
   if (req.method === 'POST' && req.url === '/update') {
     handleUpdateRequest(req, res);
+    return;
+  }
+
+  // Self-test: run several claude-spawn variants from INSIDE the bridge
+  // process to find which one actually works here. Every variant works when
+  // run standalone — so the failure is specific to this process context.
+  if (req.method === 'GET' && req.url === '/testclaude') {
+    const prompt = 'Reply ONLY with the JSON {"ok":true} and nothing else.';
+    const baseArgs = ['-p', '--output-format', 'json', '--model', 'claude-haiku-4-5-20251001',
+                      '--permission-mode', 'bypassPermissions', '--no-session-persistence'];
+    const variants = [
+      { name: 'A: stdio[ignore,pipe,pipe] cwd=tmp', opts: { cwd: os.tmpdir(), env: process.env, stdio: ['ignore', 'pipe', 'pipe'] }, useFile: false },
+      { name: 'B: stdio default (all pipes) cwd=tmp', opts: { cwd: os.tmpdir(), env: process.env }, useFile: false },
+      { name: 'C: stdout/stderr to FILES cwd=tmp', opts: { cwd: os.tmpdir(), env: process.env }, useFile: true },
+      { name: 'D: detached + stdio[ignore,pipe,pipe]', opts: { cwd: os.tmpdir(), env: process.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true }, useFile: false },
+      { name: 'E: minimal env {HOME,PATH,USER}', opts: { cwd: os.tmpdir(), env: { HOME: process.env.HOME, PATH: process.env.PATH, USER: process.env.USER }, stdio: ['ignore', 'pipe', 'pipe'] }, useFile: false },
+    ];
+    const runVariant = (v) => new Promise((resolve) => {
+      const t0 = Date.now();
+      const el = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
+      let proc, outFile;
+      try {
+        if (v.useFile) {
+          outFile = path.join(os.tmpdir(), 'testclaude-' + Date.now() + '.out');
+          const fd = fs.openSync(outFile, 'w');
+          proc = spawn('claude', [...baseArgs, prompt], { ...v.opts, stdio: ['ignore', fd, fd] });
+        } else {
+          proc = spawn('claude', [...baseArgs, prompt], v.opts);
+        }
+      } catch (e) {
+        return resolve({ name: v.name, result: 'spawn threw: ' + e.message });
+      }
+      let out = '';
+      if (proc.stdout) proc.stdout.on('data', d => out += d);
+      if (proc.stderr) proc.stderr.on('data', d => out += d);
+      let done = false;
+      const finish = (r) => { if (done) return; done = true; clearTimeout(t); try { proc.kill('SIGKILL'); } catch {} resolve({ name: v.name, result: r }); };
+      const t = setTimeout(() => finish('HUNG (killed at 30s)'), 30000);
+      proc.on('exit', (code) => {
+        let captured = out;
+        if (v.useFile) { try { captured = fs.readFileSync(outFile, 'utf8'); fs.unlinkSync(outFile); } catch {} }
+        finish('exit code=' + code + ' in ' + el() + ' — ' + (captured.length ? 'GOT ' + captured.length + 'B: ' + captured.slice(0, 80) : 'NO OUTPUT'));
+      });
+      proc.on('error', (e) => finish('proc error: ' + e.message));
+    });
+    (async () => {
+      const results = [];
+      for (const v of variants) results.push(await runVariant(v));
+      // Variant F: call the REAL analyseTranscriptWithClaude with a realistic
+      // 127-segment transcript — the exact code path the autocut uses.
+      const fakeTranscript = [];
+      let tt = 0;
+      const words = 'the boxing match was really intense and he wanted to win the fight badly that day you know'.split(' ');
+      for (let i = 0; i < 127; i++) {
+        const d = 0.4 + Math.random() * 2;
+        const txt = Array.from({ length: 3 + Math.floor(Math.random() * 7) }, () => words[Math.floor(Math.random() * words.length)]).join(' ');
+        fakeTranscript.push({ start: tt, end: tt + d, text: txt });
+        tt += d;
+      }
+      const fT0 = Date.now();
+      let fLog = [];
+      try {
+        const analysis = await analyseTranscriptWithClaude(fakeTranscript, {
+          findFillers: true, findRepeats: true, log: (s) => fLog.push(s),
+        });
+        results.push({ name: 'F: REAL analyseTranscriptWithClaude (127 segs)', result: 'returned ' + (analysis.cuts ? analysis.cuts.length : '?') + ' cuts in ' + ((Date.now() - fT0) / 1000).toFixed(1) + 's, summary=' + analysis.summary, log: fLog });
+      } catch (e) {
+        results.push({ name: 'F: REAL analyseTranscriptWithClaude', result: 'THREW: ' + e.message, log: fLog });
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, bridgePid: process.pid, results }, null, 2));
+    })();
     return;
   }
 
