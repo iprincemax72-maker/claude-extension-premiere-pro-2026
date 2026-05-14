@@ -1489,6 +1489,38 @@
   .mode-pill.active:hover { transform: translateY(-1px); }
   .mode-pill:active { transform: scale(0.96); transition-duration: 0.1s; }
 
+  /* Render-mode segmented control — Fast / Mid / Slow, in the Place row */
+  .rmode-group {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    padding: 2px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    gap: 1px;
+  }
+  .rmode-pill {
+    border: none;
+    background: transparent;
+    color: var(--text-faint);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.12s var(--ease-out), color 0.12s var(--ease-out);
+    user-select: none;
+  }
+  .rmode-pill:hover { color: var(--text); }
+  .rmode-pill.active {
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(217, 119, 87, 0.25);
+  }
+  .rmode-pill:active { transform: scale(0.94); transition-duration: 0.1s; }
+
   /* Auto-Cut button — sits in the mode-bar next to placement pills */
   .autocut-btn {
     margin-left: auto;
@@ -2299,7 +2331,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">5.7</span>
+    <span class="version-tag" id="versionTag">5.9</span>
   </div>
   <div style="display:flex;align-items:center">
     <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
@@ -2397,6 +2429,14 @@
       <div class="autocut-opt-text">
         <div class="autocut-opt-name">Dense</div>
         <div class="autocut-opt-desc">~10 per minute. For high-energy social cuts.</div>
+      </div>
+    </label>
+
+    <label class="autocut-opt" data-opt="density-full">
+      <input type="radio" name="aeDensity" id="aeDensityFull" value="full">
+      <div class="autocut-opt-text">
+        <div class="autocut-opt-name">Full coverage</div>
+        <div class="autocut-opt-desc">No gaps. A motion graphic on screen the entire video — the key beats get their special cards, every gap in between gets filled.</div>
       </div>
     </label>
 
@@ -2522,13 +2562,6 @@
         </div>
         <label class="settings-toggle"><input type="checkbox" id="settingAutoUpdate" checked><span></span></label>
       </div>
-      <div class="settings-row">
-        <div class="settings-row-label">
-          <div class="settings-row-name">Self-critique render</div>
-          <div class="settings-row-hint">After render, Claude views a middle-frame still and fixes layout issues. Adds ~20–30s. Off = faster but more clipping/off-center bugs.</div>
-        </div>
-        <label class="settings-toggle"><input type="checkbox" id="settingSelfCritique" checked><span></span></label>
-      </div>
     </div>
 
     <div class="settings-section">
@@ -2646,6 +2679,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="13" height="11" rx="1.5"/><rect x="7" y="4" width="13" height="11" rx="1.5"/></svg>
         Overlap
       </button>
+      <div class="rmode-group" id="renderModeGroup" title="How hard Claude works on the animation — Fast: quick + simple, ready in ~1 min. Mid: balanced, looks good (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
+        <button class="rmode-pill" data-rmode="fast" type="button" title="Fast — quick + simple animation, ~1 min">Fast</button>
+        <button class="rmode-pill active" data-rmode="mid" type="button" title="Mid — balanced quality + speed, ~2 min">Mid</button>
+        <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Claude takes its time, ~3-5 min">Slow</button>
+      </div>
       <button class="autocut-btn" id="autocutBtn" type="button" title="Auto-cut: detect pauses and false starts on the selected clip">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
         Auto-Cut
@@ -4038,7 +4076,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '5.7';
+  const PANEL_VERSION = '5.9';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -4209,7 +4247,7 @@ const SETTINGS_DEFAULTS = {
   transcript: false,  // off by default — silence-only is fast + reliable
   audio: false,
   autoOpen: false,
-  selfCritique: true,  // visual auto-fix loop — render still + critique. Adds 20-30s per render but catches layout issues.
+  renderMode: 'mid',  // fast | mid | slow — speed/quality dial for renders
 };
 const ACCENT_PALETTES = {
   coral:   { accent:'#d97757', accent2:'#e89a6c', hover:'#e88566', soft:'rgba(217,119,87,0.14)', line:'rgba(217,119,87,0.45)', glow:'rgba(217,119,87,0.55)' },
@@ -4278,7 +4316,7 @@ function syncSettingsUI() {
   const sw = document.getElementById('settingAccent');
   if (sw) sw.querySelectorAll('.sw').forEach(b => b.classList.toggle('active', b.dataset.val === userSettings.accent));
   // Toggles
-  const toggles = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingTranscript: 'transcript', settingAudio: 'audio', settingAutoOpen: 'autoOpen', settingSelfCritique: 'selfCritique' };
+  const toggles = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingTranscript: 'transcript', settingAudio: 'audio', settingAutoOpen: 'autoOpen' };
   for (const id in toggles) {
     const el = document.getElementById(id);
     if (el) el.checked = !!userSettings[toggles[id]];
@@ -4315,7 +4353,7 @@ function bindSettingsHandlers() {
     applySettings();
   });
   // Toggles
-  const toggleMap = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingTranscript: 'transcript', settingAudio: 'audio', settingAutoOpen: 'autoOpen', settingSelfCritique: 'selfCritique' };
+  const toggleMap = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingTranscript: 'transcript', settingAudio: 'audio', settingAutoOpen: 'autoOpen' };
   for (const id in toggleMap) {
     const el = document.getElementById(id);
     if (!el) continue;
@@ -4864,6 +4902,26 @@ document.getElementById('modeBar').addEventListener('click', (e) => {
   if (!btn) return;
   setMode(btn.dataset.mode);
 });
+
+// Render mode (Fast / Mid / Slow) — how hard Claude works on each animation.
+// Stored in userSettings.renderMode and sent with every /chat request.
+function setRenderMode(m) {
+  if (!['fast', 'mid', 'slow'].includes(m)) m = 'mid';
+  userSettings.renderMode = m;
+  try { saveSettings(); } catch {}
+  document.querySelectorAll('.rmode-pill').forEach(p =>
+    p.classList.toggle('active', p.dataset.rmode === m));
+}
+(function initRenderMode() {
+  const group = document.getElementById('renderModeGroup');
+  if (!group) return;
+  // Restore from saved settings
+  setRenderMode(userSettings.renderMode || 'mid');
+  group.addEventListener('click', (e) => {
+    const btn = e.target.closest('.rmode-pill');
+    if (btn) setRenderMode(btn.dataset.rmode);
+  });
+})();
 const _autocutBtn = document.getElementById('autocutBtn');
 if (_autocutBtn) _autocutBtn.addEventListener('click', openAutocutModal);
 
@@ -5980,7 +6038,7 @@ async function sendMessage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         reqId, message: outboundMsg, context,
-        selfCritique: !!userSettings.selfCritique,
+        renderMode: userSettings.renderMode || 'mid',
       }),
       signal: activeChatAbort.signal,
     });

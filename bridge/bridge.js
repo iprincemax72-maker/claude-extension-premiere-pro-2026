@@ -632,7 +632,9 @@ function detectMoments(sentences, density, styleOverride, reqId, log) {
   return new Promise((resolve) => {
     const targetCount = density === 'sparse' ? Math.max(3, Math.floor(sentences.length / 18))
                       : density === 'dense'  ? Math.max(8, Math.floor(sentences.length / 6))
+                      : density === 'full'   ? Math.max(12, Math.floor(sentences.length / 2))
                       :                        Math.max(5, Math.floor(sentences.length / 10));
+    const isFull = density === 'full';
 
     // Cap the prompt size — Claude struggles with very long transcripts AND
     // the 0%-CPU hang risk goes up the bigger the prompt. For >600-sentence
@@ -668,9 +670,13 @@ function detectMoments(sentences, density, styleOverride, reqId, log) {
       '  - fact       : a supporting fact worth a small side card. payload: { text: "the fact" }',
       '',
       'RULES:',
-      '  1. Do NOT add motion graphics to every sentence. Most sentences should NOT become moments.',
+      (isFull
+        ? '  1. FULL-COVERAGE MODE: cover the ENTIRE timeline with NO gaps. Every span of speech gets a moment. Where something "key" happens (a stat, name, list, quote) use that special type. Where the speaker is just talking with nothing special, STILL make a moment — use type "fact", "callout", or "quote" with the best short phrase from that span. Leave NO gap longer than 2.5 seconds anywhere in the video.'
+        : '  1. Do NOT add motion graphics to every sentence. Most sentences should NOT become moments.'),
       '  2. Aim for ~' + targetCount + ' moments total across the whole transcript.',
-      '  3. confidence is 0..1. Only include moments with confidence >= 0.6.',
+      (isFull
+        ? '  3. confidence: in full-coverage mode include everything, even confidence ~0.4. The point is wall-to-wall coverage.'
+        : '  3. confidence is 0..1. Only include moments with confidence >= 0.6.'),
       '  4. startSec/endSec must come directly from the timestamps in the transcript I gave you.',
       '  5. id is a short unique string like "m1", "m2", etc.',
       '  6. label is a 2-6 word human description for logs.',
@@ -774,6 +780,59 @@ function spaceMoments(moments, minGapSec, maxPerMin, totalDurSec) {
     .slice(0, cap)
     .sort((a, b) => a.startSec - b.startSec)
     .map(({ _conf, ...rest }) => rest);
+}
+
+// FULL-COVERAGE gap filler. Given the moments Claude found + the transcript
+// + the clip's [inP, outP] window, guarantee NO gap longer than maxGapSec
+// remains. Any uncovered span gets a "fact" moment built from the transcript
+// text spoken during that span. The result: a motion graphic on screen the
+// entire video — key beats keep their special cards, gaps get filled.
+function fillGaps(moments, sentences, inP, outP, maxGapSec = 2.0) {
+  const sorted = [...moments].sort((a, b) => a.startSec - b.startSec);
+  const result = [];
+  let cursor = inP;
+  let fillIdx = 0;
+
+  // Pull the speech text spoken during [from, to] from the transcript.
+  const textForSpan = (from, to) => {
+    const hits = sentences.filter(s => s.endSec > from + 0.1 && s.startSec < to - 0.1);
+    let txt = hits.map(s => s.text).join(' ').replace(/\s+/g, ' ').trim();
+    // Keep it short — a fill card shouldn't carry a paragraph. ~14 words max.
+    const words = txt.split(' ');
+    if (words.length > 14) txt = words.slice(0, 14).join(' ') + '…';
+    return txt;
+  };
+
+  const makeFill = (from, to) => {
+    const txt = textForSpan(from, to);
+    if (!txt) return null;                       // silence — nothing to show
+    if (to - from < 0.8) return null;            // too short to be worth a graphic
+    return {
+      id: 'fill_' + (fillIdx++),
+      type: 'fact',
+      startSec: from,
+      endSec: to,
+      label: 'gap fill',
+      payload: { text: txt },
+      confidence: 0.5,
+      _isFill: true,
+    };
+  };
+
+  for (const m of sorted) {
+    if (m.startSec - cursor > maxGapSec) {
+      const f = makeFill(cursor, m.startSec);
+      if (f) result.push(f);
+    }
+    result.push(m);
+    cursor = Math.max(cursor, m.endSec);
+  }
+  // Trailing gap after the last moment to the end of the clip.
+  if (outP - cursor > maxGapSec) {
+    const f = makeFill(cursor, outP);
+    if (f) result.push(f);
+  }
+  return result.sort((a, b) => a.startSec - b.startSec);
 }
 
 // Map a moment type + index → a recommended trend pack name. Rotates across
@@ -1637,8 +1696,14 @@ const server = http.createServer((req, res) => {
       const message = payload.message;
       const context = payload.context || null;
       const reqId   = payload.reqId || crypto.randomUUID();
-      // Self-critique step is opt-out via panel setting. Default true.
-      const selfCritique = (payload.selfCritique !== undefined) ? !!payload.selfCritique : true;
+      // Render mode — fast / mid / slow. Controls self-critique depth and
+      // how much exploration Claude does. Backward-compat: old panels send
+      // selfCritique:bool → map true=mid, false=fast.
+      let renderMode = payload.renderMode;
+      if (!renderMode) {
+        renderMode = (payload.selfCritique === false) ? 'fast' : 'mid';
+      }
+      if (!['fast', 'mid', 'slow'].includes(renderMode)) renderMode = 'mid';
       if (!message) { res.writeHead(400); res.end('{"error":"empty message"}'); return; }
 
       let fullMessage = message;
@@ -1663,17 +1728,93 @@ const server = http.createServer((req, res) => {
       // returned to the panel in the original /chat response shape.
       //
       // The SELF_CRITIQUE_BEGIN/END markers wrap the visual auto-fix loop
-      // instructions. We either strip them or keep their content based on
-      // the panel setting.
+      // instructions. Render mode decides whether to keep that block and
+      // what extra mode-specific guidance to prepend.
+      //
+      //   fast — strip self-critique entirely; template-only, no exploration
+      //   mid  — keep self-critique as written (1 retry); normal composition
+      //   slow — keep self-critique + ask for 2 retries, 3-frame checks,
+      //          and deliberate library exploration
       let resolvedSystemPrompt;
-      if (selfCritique) {
+      if (renderMode === 'fast') {
+        resolvedSystemPrompt = SYSTEM_PROMPT
+          .replace(/__SELF_CRITIQUE_BEGIN__[\s\S]*?__SELF_CRITIQUE_END__\n?/g, '');
+      } else {
         resolvedSystemPrompt = SYSTEM_PROMPT
           .replace(/__SELF_CRITIQUE_BEGIN__\n?/g, '')
           .replace(/__SELF_CRITIQUE_END__\n?/g, '');
-      } else {
-        resolvedSystemPrompt = SYSTEM_PROMPT
-          .replace(/__SELF_CRITIQUE_BEGIN__[\s\S]*?__SELF_CRITIQUE_END__\n?/g, '');
       }
+
+      // The modes differ in CREATIVE AMBITION, not just QA rigor. The whole
+      // point: Fast = one simple move; Slow = a layered, choreographed piece.
+      // If Slow just critiques the same simple result harder, it's pointless.
+      const MODE_HEADERS = {
+        fast: [
+          '═══════════════════════════════════════════════════════════════════════════',
+          'MODE: FAST — quick + simple. Target ~1 minute of your time.',
+          '═══════════════════════════════════════════════════════════════════════════',
+          'AMBITION: deliberately LOW. The user wants something usable back fast,',
+          'not impressive. Keep it minimal:',
+          '- Copy the closest src/templates/ file, change ONLY the text/colors,',
+          '  register, render. Done.',
+          '- Composition duration: SHORT — 2-2.5 seconds (60-75 frames @ 30fps).',
+          '- ONE simple motion only: a fade-in or a single pop. Nothing layered.',
+          '- Do NOT read other library files. Do NOT add components. Do NOT',
+          '  choreograph multiple moments. Do NOT animate the background.',
+          '- Skip the self-critique step. Render once and ship.',
+          '- One-sentence reply + import marker.',
+          '═══════════════════════════════════════════════════════════════════════════',
+          '',
+        ].join('\n'),
+        mid: '',  // mid = the prompt as-written, no extra header
+        slow: [
+          '═══════════════════════════════════════════════════════════════════════════',
+          'MODE: SLOW — a layered, choreographed piece. Take 3-5 minutes.',
+          '═══════════════════════════════════════════════════════════════════════════',
+          'AMBITION: deliberately HIGH. This is the mode where the output should',
+          'be VISIBLY more impressive than Fast/Mid — not the same thing rendered',
+          'slower. If your Slow result looks like the Fast result, you failed.',
+          '',
+          'What "more impressive" actually means — build a CHOREOGRAPHED SEQUENCE,',
+          'not a static card with one fade. The composition must have 3-4 DISTINCT',
+          'animated moments that play out over time, each with its own timing:',
+          '',
+          '  1. The container/background arrives (scale-in, wipe, draw-on border,',
+          '     or a subtle moving backdrop — pick ONE, do it well).',
+          '  2. The text reveals as its own beat — word-by-word, line-by-line, or',
+          '     kerning-in. NOT just appearing with the container.',
+          '  3. An accent element does something — a rule draws across, an icon',
+          '     pops, a number ticks, a highlight sweeps. One small detail that',
+          '     a junior would skip and a senior would add.',
+          '  4. A HOLD (everything sits still 15-30 frames so it can be read),',
+          '     then optionally a small exit flourish.',
+          '',
+          'Concretely for THIS mode:',
+          '- Composition duration: LONGER — 4-6 seconds (120-180 frames @ 30fps).',
+          '  You need the runtime for choreography. A 2s clip cannot be layered.',
+          '- Start from a template for the BASE, but you MUST then read 2-3 lib',
+          '  files (motion-extra, presets, effects, backgrounds) and genuinely',
+          '  add layers. The restraint rules still apply — every layer must EARN',
+          '  its place and read clearly — but "restraint" here means "3-4 things',
+          '  choreographed", not "1 thing". Slow is allowed more than Mid.',
+          '- Stagger the timing. Moment 1 at frame 0-15, moment 2 at frame 12-30,',
+          '  moment 3 at frame 25-45, hold from ~50, etc. Things should NOT all',
+          '  happen on frame 0.',
+          '- Think before writing: what is the ONE idea, then how do 3-4 elements',
+          '  choreograph to deliver it over the full duration.',
+          '',
+          'Self-critique HARDER: render stills at THREE points — early (~20%),',
+          'middle (~50%), late (~85%). A choreographed piece looks DIFFERENT at',
+          'each — if all three look identical, your animation is too static, go',
+          'add motion. Check all three against the 8 rules. You get up to TWO',
+          'fix-and-re-render iterations. Use them to add craft, not just fix bugs.',
+          '═══════════════════════════════════════════════════════════════════════════',
+          '',
+        ].join('\n'),
+      };
+      resolvedSystemPrompt = (MODE_HEADERS[renderMode] || '') + resolvedSystemPrompt;
+      console.log('  [chat] render mode: ' + renderMode);
+
       const args = [
         '-p',
         '--output-format', 'stream-json',
@@ -2105,11 +2246,28 @@ const server = http.createServer((req, res) => {
         const moments = await detectMoments(sentences, density, styleOverride, reqId, log);
         log(`moments raw: ${moments.length}`);
 
-        // ── 4. Anti-collision + spacing ───────────────────────────────────
-        const minGapSec = density === 'sparse' ? 8 : density === 'dense' ? 2 : 4;
-        const maxPerMin = density === 'sparse' ? 3 : density === 'dense' ? 10 : 6;
-        const filtered  = spaceMoments(moments, minGapSec, maxPerMin, totalDur);
-        log(`moments after spacing: ${filtered.length}`);
+        // ── 4. Anti-collision + spacing (or gap-fill for full coverage) ───
+        let filtered;
+        if (density === 'full') {
+          // Full coverage: don't drop anything for spacing. Instead, GUARANTEE
+          // no gaps — fill every uncovered span with a moment built from the
+          // transcript. Light de-dup only (drop exact-overlap duplicates).
+          const sorted = [...moments].sort((a, b) => a.startSec - b.startSec);
+          const deduped = [];
+          let lastEnd = -Infinity;
+          for (const m of sorted) {
+            if (m.startSec < lastEnd - 0.3) continue;   // overlapping dupe
+            deduped.push(m);
+            lastEnd = m.endSec;
+          }
+          filtered = fillGaps(deduped, sentences, inP, outP, 2.0);
+          log(`full coverage: ${deduped.length} key moments + gap-fill → ${filtered.length} total`);
+        } else {
+          const minGapSec = density === 'sparse' ? 8 : density === 'dense' ? 2 : 4;
+          const maxPerMin = density === 'sparse' ? 3 : density === 'dense' ? 10 : 6;
+          filtered  = spaceMoments(moments, minGapSec, maxPerMin, totalDur);
+          log(`moments after spacing: ${filtered.length}`);
+        }
 
         if (!filtered.length) {
           broadcastProgressDone(reqId);
