@@ -45,12 +45,12 @@ console.log('ffmpeg bin: ' + FFMPEG_BIN);
 // `onProgress(0..1)` fires as ffmpeg's "time=" reports advance through the clip.
 function detectSilences(clipPath, clipDuration, onProgress) {
   return new Promise((resolve, reject) => {
-    // Measured on a real clip: noise=-30dB:d=0.6 flagged 55% of the whole
-    // video as "silence" — it was catching quiet speech, room tone and
-    // breaths, not just dead air. noise=-45dB:d=1.5 flags 35% of that same
-    // clip: -45dB only catches near-true-silence, and d=1.5 ignores the
-    // natural 0.5-1s gaps that are part of normal speech rhythm.
-    const args = ['-i', clipPath, '-af', 'silencedetect=noise=-45dB:d=1.5', '-f', 'null', '-'];
+    // Tuned middle ground. -30dB:0.6 was too aggressive (cut a 16-min clip to
+    // 2 min — caught quiet speech as silence). -45dB:1.5 was too soft (same
+    // clip only went to 11 min). -35dB:0.7 sits between: -35dB ignores quiet
+    // speech but still catches genuine dead air, and d=0.7 trims real pauses
+    // (0.7s+) without nuking every natural half-second breath.
+    const args = ['-i', clipPath, '-af', 'silencedetect=noise=-35dB:d=0.7', '-f', 'null', '-'];
     const ff = spawn(FFMPEG_BIN, args);
     let stderr = '';
     const timeRe = /time=([\d:.]+)/g;
@@ -228,20 +228,21 @@ function analyseTranscriptWithClaude(transcript, opts) {
     }
     if (findRepeats) {
       lookFor.push(
-        'REPEATED SENTENCES, FALSE STARTS, AND SELF-CORRECTIONS to remove:',
-        '  BE CONSERVATIVE. Only cut when you are CLEARLY sure it is a mistake.',
-        '  When in doubt, DO NOT CUT. A missed stutter is fine; cutting real',
-        '  speech is not. Most segments are NOT mistakes — expect to cut few.',
+        'REPEATED SENTENCES, FALSE STARTS, SELF-CORRECTIONS, RAMBLING to remove:',
+        '  Edit like a human editor making a tight final cut. Catch the clear',
+        '  flubs and dead weight — but never cut something a viewer would miss.',
         '  - PARTIAL-WORD false start: "maybe it was th-" then "maybe it was the fear"',
-        '    → cut ONLY "th-" and the gap before the restart. Keep it tight.',
-        '  - PHRASE REDO: the SAME phrase said twice back-to-back → cut the first.',
-        '    Only if it is genuinely the same phrase restarted, not a similar idea.',
+        '    → cut "th-" and the gap before the restart.',
+        '  - PHRASE / SENTENCE REDO: speaker says something, then says it again',
+        '    better → cut the weaker first version (use its full start/end).',
         '  - SELF-CORRECTION: "the red car, no, the blue car" → cut "the red car, no,".',
         '  - REPEATED FILLER PHRASES: "so, so the thing is" → cut the first "so,".',
-        '  Each cut must be SHORT — a false start is usually under 2 seconds. If a',
-        '  cut would be longer than ~3 seconds, you are probably cutting real',
-        '  content; do not make it. NEVER cut a complete, coherent sentence just',
-        '  because a later sentence is on a similar topic — that is not a redo.'
+        '  - RAMBLING / DEAD WEIGHT: a long meandering aside that goes nowhere and',
+        '    the speaker clearly abandons → cut it.',
+        '  - HESITATION RESTART: word said, long pause, said again → cut the first.',
+        '  Keep each cut tight to the flubbed span. DO cut redo sentences fully,',
+        '  but NEVER cut a coherent sentence just because a later one is on a',
+        '  similar topic, and NEVER cut deliberate rhetorical repetition.'
       );
     }
 
@@ -260,14 +261,12 @@ function analyseTranscriptWithClaude(transcript, opts) {
       '- Each cut\'s start/end must fall WITHIN the [start-end] range of the',
       '  segment(s) it covers. If a false start is the first half of a segment,',
       '  estimate the split point proportionally inside that segment\'s range.',
-      '- Keep cuts TIGHT — cover only the flubbed words plus the gap before the',
-      '  restart. Do not pad. Do not cut whole sentences.',
-      '- It is BETTER to leave a small stutter in than to cut real speech.',
-      '  When unsure, return NO cut. Fewer, precise cuts — not more.',
+      '- For a redo, cut the WHOLE weaker version (its full start to end). For a',
+      '  partial-word flub, keep the cut tight to the flubbed words.',
       '- NEVER cut deliberate rhetorical repetition (e.g. "when you lose,',
       '  especially when you lose" is intentional emphasis — do NOT cut).',
-      '- It is completely fine to return an empty cuts array if the speaker is',
-      '  clean. Do not invent cuts to seem useful.',
+      '- Aim for a tight final cut — be willing to cut, but every cut must be a',
+      '  genuine flub, redo, filler or abandoned ramble, not real content.',
       '',
       'Output EXACTLY this JSON, nothing else (no prose, no fences, no commentary):',
       '{"cuts":[{"start":2.30,"end":3.10,"kind":"false_start","reason":"truncated word \'th-\' before restart"}],"summary":"Found 3 fillers and 5 false starts."}',
@@ -2306,11 +2305,10 @@ const server = http.createServer((req, res) => {
         const inP  = (typeof clipIn  === 'number') ? clipIn  : 0;
         const outP = (typeof clipOut === 'number') ? clipOut : Number.MAX_SAFE_INTEGER;
         log(`clip used range in source: [${inP.toFixed(3)}, ${outP.toFixed(3)}] (${(outP - inP).toFixed(2)}s on timeline)`);
-        // Leave a natural breath at each end of a silence instead of removing
-        // the whole thing — cutting a silence down to zero makes a hard,
-        // jarring jump-cut and removes the speaker's pacing. We keep 0.3s on
-        // each side, so a 2.0s pause becomes a 1.4s cut and still feels human.
-        const SILENCE_PAD = 0.3;
+        // Leave a small breath at each end of a silence instead of removing
+        // the whole thing — cutting a pause to zero makes a hard jump-cut.
+        // 0.15s is enough to soften the cut without leaving dead air.
+        const SILENCE_PAD = 0.15;
         const silenceCuts = allSilences
           .map(c => {
             // Clip the silence to the [inP, outP] window, then pad inward.
