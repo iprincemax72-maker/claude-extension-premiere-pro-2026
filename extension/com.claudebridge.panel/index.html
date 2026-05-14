@@ -2522,6 +2522,13 @@
         </div>
         <label class="settings-toggle"><input type="checkbox" id="settingAutoUpdate" checked><span></span></label>
       </div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Self-critique render</div>
+          <div class="settings-row-hint">After render, Claude views a middle-frame still and fixes layout issues. Adds ~20–30s. Off = faster but more clipping/off-center bugs.</div>
+        </div>
+        <label class="settings-toggle"><input type="checkbox" id="settingSelfCritique" checked><span></span></label>
+      </div>
     </div>
 
     <div class="settings-section">
@@ -4202,6 +4209,7 @@ const SETTINGS_DEFAULTS = {
   transcript: false,  // off by default — silence-only is fast + reliable
   audio: false,
   autoOpen: false,
+  selfCritique: true,  // visual auto-fix loop — render still + critique. Adds 20-30s per render but catches layout issues.
 };
 const ACCENT_PALETTES = {
   coral:   { accent:'#d97757', accent2:'#e89a6c', hover:'#e88566', soft:'rgba(217,119,87,0.14)', line:'rgba(217,119,87,0.45)', glow:'rgba(217,119,87,0.55)' },
@@ -4270,7 +4278,7 @@ function syncSettingsUI() {
   const sw = document.getElementById('settingAccent');
   if (sw) sw.querySelectorAll('.sw').forEach(b => b.classList.toggle('active', b.dataset.val === userSettings.accent));
   // Toggles
-  const toggles = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingTranscript: 'transcript', settingAudio: 'audio', settingAutoOpen: 'autoOpen' };
+  const toggles = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingTranscript: 'transcript', settingAudio: 'audio', settingAutoOpen: 'autoOpen', settingSelfCritique: 'selfCritique' };
   for (const id in toggles) {
     const el = document.getElementById(id);
     if (el) el.checked = !!userSettings[toggles[id]];
@@ -4307,7 +4315,7 @@ function bindSettingsHandlers() {
     applySettings();
   });
   // Toggles
-  const toggleMap = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingTranscript: 'transcript', settingAudio: 'audio', settingAutoOpen: 'autoOpen' };
+  const toggleMap = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingTranscript: 'transcript', settingAudio: 'audio', settingAutoOpen: 'autoOpen', settingSelfCritique: 'selfCritique' };
   for (const id in toggleMap) {
     const el = document.getElementById(id);
     if (!el) continue;
@@ -5970,7 +5978,10 @@ async function sendMessage() {
     const r = await fetch(BRIDGE + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reqId, message: outboundMsg, context }),
+      body: JSON.stringify({
+        reqId, message: outboundMsg, context,
+        selfCritique: !!userSettings.selfCritique,
+      }),
       signal: activeChatAbort.signal,
     });
     const data = await r.json();

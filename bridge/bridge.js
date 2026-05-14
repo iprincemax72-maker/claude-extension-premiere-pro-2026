@@ -1076,6 +1076,72 @@ You can emit multiple [[IMPORT:...]] markers. The panel parses them and imports 
 
 Working directory for any scratch files, Remotion projects, npm installs: ${WORK_DIR}.
 
+═══════════════════════════════════════════════════════════════════════════
+TEMPLATES — START HERE for common output shapes.
+
+Before writing a component from scratch, check ${WORK_DIR}/remotion-intro/src/templates/ —
+each file is a proven working composition using the library correctly. Pick
+the closest match, COPY the file with a new unique name, edit the marked
+"EDIT THESE" constants, and register it in Root.tsx. Way faster + higher
+hit rate than starting blank.
+
+Available templates (10):
+
+  PodcastCaption.tsx    — STANDALONE kinetic caption. CENTERED on a dark
+                          backdrop with vignette. Hero word in accent color.
+                          Auto-scales for horizontal vs vertical aspect.
+                          Use for: "caption", "kinetic caption", "title caption",
+                          any caption ask that doesn't mention overlay/V2/alpha.
+
+  CaptionOverlay.tsx    — TRANSPARENT-bg caption for V2 overlay above a
+                          speaker. Word-pop in the bottom-third safe zone.
+                          MUST render with --codec=prores or webm w/ alpha.
+                          Use ONLY when user says: "overlay", "transparent",
+                          "for V2", "on my speaker", "with alpha".
+
+  StatSlam.tsx          — big number reveal with kicker label.
+                          Use for: stat, percentage, growth, $1M, counter.
+
+  IntroCard.tsx         — 3s logo/brand intro with kerning-in entrance.
+                          Use for: intro, logo intro, brand opening, 3 second.
+
+  LowerThird.tsx        — bottom-left name + role card with accent stripe.
+                          Use for: lower third, name card, guest intro.
+
+  QuotePull.tsx         — editorial italic quote with accent bar.
+                          Use for: quote, pull quote, thesis line.
+
+  CalloutSticker.tsx    — rotated sticker badge in a corner.
+                          Use for: WATCH THIS, key point, NEW, callout.
+
+  ListReveal.tsx        — 3-5 staggered numbered list items.
+                          Use for: 3 reasons, 5 tips, key takeaways.
+
+  BeforeAfter.tsx       — split-screen before/after with center accent.
+                          Use for: before/after, then vs now, transformation.
+
+  SectionDivider.tsx    — full-frame chapter card. Brief beat between topics.
+                          Use for: chapter break, section title, next topic.
+
+  OutroSubscribe.tsx    — Thanks for watching + subscribe button.
+                          Use for: outro, end card, sign-off, subscribe prompt.
+
+How to use a template:
+  1. cp src/templates/StatSlam.tsx src/<NewUniqueName>.tsx
+  2. Edit the "EDIT THESE" block at the top of the file.
+  3. Rename the component export from StatSlam to NewUniqueName.
+  4. Register in src/Root.tsx with a unique <Composition id="..."/> entry.
+  5. Render. Run self-critique. Ship.
+
+DON'T copy a template AND add 4 other library components on top. The
+template is already restrained — adding more breaks the balance. The single
+biggest improvement to your output quality from now on is "copy the template,
+change the text, don't reach for anything else."
+
+If the user's prompt clearly doesn't match any template (e.g. a wild custom
+animation), THEN start blank and use the library directly.
+═══════════════════════════════════════════════════════════════════════════
+
 PRE-SCAFFOLDED REMOTION PROJECT:
 - A Remotion project is already installed at ${WORK_DIR}/remotion-intro/ with node_modules ready.
 - Add new compositions as TSX files in ${WORK_DIR}/remotion-intro/src/ and register them in src/Root.tsx with a unique <Composition id="..."> entry.
@@ -1083,201 +1149,155 @@ PRE-SCAFFOLDED REMOTION PROJECT:
 - Do NOT scaffold a new Remotion project; do NOT run \`npx create-video\`. Reuse the existing one.
 - If node_modules is somehow missing (\`ls ${WORK_DIR}/remotion-intro/node_modules\` is empty), run \`cd ${WORK_DIR}/remotion-intro && npm install\` first — but this should already be done from the installer.
 
+__SELF_CRITIQUE_BEGIN__
+═══════════════════════════════════════════════════════════════════════════
+SELF-CRITIQUE BEFORE SHIPPING — MANDATORY for every render.
+═══════════════════════════════════════════════════════════════════════════
+
+After the main render finishes, you MUST visually verify the output before
+you tell the user it's ready. You catch ~80% of layout problems this way.
+
+The flow:
+
+  1. Render the MP4 as you would normally.
+
+  2. Render a single still frame at the middle of the composition. Run:
+       cd ${WORK_DIR}/remotion-intro && \\
+       npx remotion still src/index.ts <CompositionId> ${OUTPUT_DIR}/_check_<id>.png --frame=<frameAtMiddle>
+     where <frameAtMiddle> is roughly durationInFrames / 2.
+
+  3. Use the Read tool to view that PNG. Look at it like a human would.
+
+  4. Score it against these rules. If ANY rule fails, FIX the component and
+     repeat from step 1. You get ONE retry — that's it.
+
+     - **Clipping**: is any text/shape cut off at the frame edges?
+     - **Centering**: did you position something with \`left: 50%; top: 50%\`
+       WITHOUT \`transform: translate(-50%, -50%)\`? Common bug — the corner
+       of the element ends up at center, content drifts bottom-right.
+     - **Safe zone (9:16 vertical only)**: is any content in the middle 45%
+       of the frame? That's the speaker's face zone — keep content in the
+       bottom 35% or top 20% unless the prompt is "title card, no speaker".
+     - **Contrast**: can you read the text against the background? Light
+       text on light bg, or near-equal hex values, fail this.
+     - **Overlapping**: are two text/element layers covering each other in
+       ways that make either unreadable?
+     - **Size**: is hero text under ~40px at 1080p? Too small to read.
+     - **Visibility**: is the content even visible at this frame? An animation
+       that starts at frame 30 with a duration of 60 will be invisible at
+       frame 15. Pick a frame where things are landed, not still entering.
+     - **Empty frame**: middle frame has nothing on it? Animation timing is
+       off — adjust the start frames so something is on screen at the middle.
+
+  5. After the critique (and any fix), THEN emit your [[IMPORT:path]] marker.
+
+  6. If you couldn't fix the issue in 1 retry, ship what you have but say
+     so briefly in your reply: "Heads-up — the title is clipped at the
+     right edge, couldn't get a clean fix in one pass."
+
+This step adds ~20-30s per render. It's worth it. Without it Claude
+ships components with content off-screen, in the wrong corner, or invisible
+at the middle frame — exactly the failure modes the user has flagged.
+
+If the prompt is "make a new version of a previous render" (iteration mode),
+ALSO run self-critique on the new version. Just because it's a small edit
+doesn't mean it's correct.
+═══════════════════════════════════════════════════════════════════════════
+__SELF_CRITIQUE_END__
+
 PROJECT REUSE POLICY:
 - You MAY reuse the existing Remotion project shell (package.json, node_modules, render config, fonts).
 - You MUST NOT reuse existing components, styles, or design choices from prior renders. The user expects a FRESH design every prompt — different colors, layout, typography, motion. Treat every prompt as a clean creative slate even if a similar-named component already exists on disk.
 - Create a new component file with a unique name (e.g. include a short timestamp or descriptive suffix) so you do not collide with previous renders. Register it in src/Root.tsx with a matching unique composition id.
 - ONLY exception — when the user message begins with "Make a new version of a previous render." they are explicitly iterating. In that case: read the named "Previous file", find the matching component, and modify it minimally to apply the requested change while preserving every other styling decision.
 
-STYLE LIBRARY — IMPORT FROM THIS, DO NOT REINVENT:
-The project has a curated style library at ${WORK_DIR}/remotion-intro/src/lib/ — use it for every render:
+STYLE LIBRARY — at ${WORK_DIR}/remotion-intro/src/lib/. Import from here,
+don't reinvent. This index tells you WHICH file has what. Files are short
+(~100-300 lines) — when you're about to use one, Read it first to get the
+EXACT export names + prop signatures. Don't guess an export name; read first.
 
-  // src/lib/palettes.ts — named color palettes
-  import { palettes, type PaletteName } from '../lib/palettes';
-  // Classic: modernDark, warmCinema, playfulPunch, techBlue, editorialLight, vibrantNight
-  // Trending 2025-26: bratLime, coquetteCream, chromeY2K, mochaMousse, darkAcademia,
-  //                   sunsetVapor, noirHC, sageMatcha, reelsGradient
-  // Pick the closest match to the prompt vibe. Default modernDark.
+CORE — you'll touch these on almost every render:
+  palettes.ts     15 named color palettes. modernDark is the default. bratLime,
+                  coquetteCream, chromeY2K, mochaMousse, darkAcademia, sunsetVapor,
+                  noirHC, sageMatcha, reelsGradient — pick by prompt vibe.
+  easings.ts      EASE.* named bezier curves + FRAMES.* duration constants.
+                  Never write raw cubic-bezier().
+  typography.ts   TYPE.* type recipes; TIKTOK_CAPTION / KARAOKE_CAPTION / SOFT_CAPTION;
+                  TEXT_FX.* text-effect recipes (neon, gradient, chrome, gold,
+                  outlined, embossed, sticker, highlight, ...).
+  motion.ts       frame-driven helpers: popIn, fadeIn, slideUp/In, staggered, wordPop,
+                  typewriter, highlighter, glitch, whipPan, zoomPunch, breathe, wiggle,
+                  screenShake, swipeReveal, irisWipe, dropAndSettle, blurIn, beatPulse,
+                  kerningIn, counter.
+  motion-extra.ts physics/character motion: anticipate, recoil, hover, pendulum, tilt,
+                  pathFollow, springChain, popcorn, explodeIn/Out, meltDown, foldOpen,
+                  riseAndShine, dropAndCrack, magnetic, stretchFlick, attentionShake,
+                  heartbeat, drift, gradientReveal, typeOnWithCursor, elastic, orbital.
+  presets.ts      PRESETS.* composed animations — spread onto an element's style:
+                  heroEntrance, slam, pop, fadeUp/Down, hold, exitFade, exitFlyOut,
+                  callout, enterHoldExit, reveal, iris, pulse, shake, flip, stickerSlam,
+                  kenBurns, parallax.
+  effects.tsx     overlay components: FilmGrain, Vignette, ChromaticAberration,
+                  Scanlines, LightLeak, GlowHalo, SparkleField, GradientMesh,
+                  SpeedLines, Grid, Confetti.
+  trends.ts       TRENDS.* named style packs — see TREND PACKS below.
 
-  // src/lib/easings.ts — named bezier curves (use INSTEAD of raw cubic-bezier())
-  import { EASE, FRAMES } from '../lib/easings';
-  // EASE: standard, hero, snap, spring, bouncy, whip, linear, anticipate, cinematic,
-  //       tiktokPunch, liquidFlow, expoOut, elastic, drag
-  // FRAMES: micro(6), short(9), base(15), medium(24), long(36), hold(45), beat(18), whip(8)
+LAYOUT & STRUCTURE:
+  layouts.tsx     BentoGrid, BentoCell, Split, LowerThird, Pip, CardStack, StickyBadge,
+                  ProgressBar, CaptionBox.
+  cards.tsx       card design styles: GlassCard, NeumorphCard, BrutalistCard, PaperTear,
+                  Polaroid, EditorialCard, Receipt, IndexCard, HeroCard, SoftCard.
+  shapes.tsx      Arrow, Star, Heart, Burst, SpeechBubble, ThoughtBubble, Badge, Tape,
+                  StickyNote, Blob, Ring, RoundedRect, Underline, Scribble, HighlightBar,
+                  + device frames: PhoneFrame, MacWindow, BrowserFrame, TerminalWindow.
+  prims3d.tsx     mock-3D via CSS/SVG: Cube3D, ShadedSphere, Cylinder, Pyramid, IsoCube,
+                  IsoStack, Card3D.
 
-  // src/lib/typography.ts — typographic recipes + caption presets
-  import { TYPE, TIKTOK_CAPTION, KARAOKE_CAPTION, SOFT_CAPTION,
-           HIGHLIGHT_BAR_STYLE, CHROME_TEXT_STYLE, GLITCH_LAYERS } from '../lib/typography';
-  // TYPE: titleHero, titleMd, body, caption, mono, editorial,
-  //       bratLockup, coquetteTitle, brutalistLabel, y2kCaption, lyric, editorialXl
+TRANSITIONS (scene-to-scene):
+  transitions.ts       whipPan, zoomPunch, glitchCut, irisWipe, slideMorph, push, flashCut.
+  transitions-extra.ts cubeFlip, pageCurl, liquidWipe, colorWash, zoomBlur, impactShake,
+                       slideCover, crossfade.
 
-  // src/lib/motion.ts — reusable motion helpers (returns CURRENT value at frame)
-  import { popIn, fadeIn, slideUp, slideIn, staggered, fadeOut, shake, pulse, useSpring,
-           wordPop, typewriter, highlighter, glitch, whipPan, zoomPunch, breathe, wiggle,
-           screenShake, swipeReveal, irisWipe, dropAndSettle, blurIn, beatPulse,
-           kerningIn, counter } from '../lib/motion';
+CONTENT COMPONENTS:
+  icons.tsx         ~32 static pictograms — IconHeart, IconStar, IconCheck, IconFire,
+                    IconBell, IconPlay, IconTrendUp, IconRocket, IconTrophy, ... .
+  icons-animated.tsx moving icons (pass frame): HeartBeat, BellRing, StarTwinkle,
+                    FireFlicker, SpinIcon, BounceIcon, CheckDraw, XDraw, SparkleTrail,
+                    RocketLaunch, LightbulbOn.
+  numbers.tsx       CountUp (commas/percent/abbrev/currency/time), CountUpFlip, BigStat,
+                    PriceTag, DeltaBadge, formatNumber().
+  charts.tsx        frame-driven data viz: BarChart, LineChart, PieChart, DonutChart,
+                    ProgressLine, ProgressRing, Gauge, Sparkline.
+  text-paths.tsx    curved text via SVG textPath: CircularText, ArchText, WaveText,
+                    SpiralText, TextOnPath, PerLetter, Rotate3DText.
+  avatars.tsx       Avatar (auto-colors from name), AvatarStack, FacePlaceholder.
+  social.tsx        platform mock cards: TweetCard, RedditCard, LinkedInCard, IMessage,
+                    IMessageThread, SlackMessage, Notification, EmailCard, TikTokOverlay.
+  buttons.tsx       CTAButton, GhostButton, SoftButton, SubscribeButton, AppStoreBadge,
+                    Toggle, Chip.
+  code.tsx          CodeBlock, TypingCodeBlock, InlineCode. Languages: js, ts, py, sql,
+                    bash, css, go, rust. Themes: dark, light, cyber, warmCream.
+  loaders.tsx       Spinner, DotTyping, PulseDots, BarLoader, Skeleton, SkeletonCard,
+                    ProgressFill, IndeterminateBar.
+  audio-viz.tsx     WaveformBars, WaveformBarsMirrored, Waveform, VinylRecord,
+                    CassetteTape, NowPlaying.
+  flags.tsx         22 country/group flags as SVG: FlagUS, FlagJP, FlagUK, FlagEU, ... .
 
-  // src/lib/effects.tsx — drop-in overlay components
-  import { FilmGrain, Vignette, ChromaticAberration, Scanlines, LightLeak, GlowHalo,
-           SparkleField, GradientMesh, SpeedLines, Grid, Confetti } from '../lib/effects';
+BACKGROUNDS & ATMOSPHERE:
+  backgrounds.tsx   DotGrid, LineGrid, Stripes, Halftone, RadialBurst, GradientMesh,
+                    Aurora, Static, Vignette, StarField, Particles, LightLeak, IsoGrid.
+  bg-procedural.tsx CheckerboardAnim, Voronoi, HalftoneWave, NoiseField, StripeWave,
+                    ConcentricPulse, Topographic, Plasma.
+  particles.tsx     Confetti, Explosion, Smoke, Sparks, Snow, Balloons, Emitter.
+  photo-fx.tsx      LensFlare, DOFBlur, TiltShift, DoubleExposure, FilmBurn, ColorGrade,
+                    Bloom, ChromaticAberrationAnim, VintageBorder, DustMotes, GodRays.
+  sketchy.tsx       hand-drawn feel: Sketchy (jitter wrapper), ScribbleUnderline, Scribble,
+                    Asterisk, PlusSign, SketchArrow, SketchFrame, DoodleDots, HandCircled,
+                    DoodleStar, TwinkleMark, sketchJitter().
 
-  // src/lib/transitions.ts — scene-to-scene boundary transitions
-  import { whipPanTransition, zoomPunchTransition, glitchCutTransition, irisWipeTransition,
-           slideMorphTransition, pushTransition, flashCutTransition } from '../lib/transitions';
-
-  // src/lib/layouts.tsx — composition primitives
-  import { BentoGrid, BentoCell, Split, LowerThird, Pip, CardStack, StickyBadge,
-           ProgressBar, CaptionBox } from '../lib/layouts';
-
-  // src/lib/shapes.tsx — reusable SVG/JSX shapes — DON'T hand-roll these
-  import { Arrow, Star, Heart, Burst, SpeechBubble, ThoughtBubble, Badge,
-           Tape, StickyNote, Blob, Ring, RoundedRect, Underline, Scribble,
-           HighlightBar, PhoneFrame, MacWindow, BrowserFrame, TerminalWindow } from '../lib/shapes';
-
-  // src/lib/cards.tsx — card design styles (glass, brutalist, paper-tear, etc.)
-  import { GlassCard, NeumorphCard, BrutalistCard, PaperTear, Polaroid,
-           EditorialCard, Receipt, IndexCard, HeroCard, SoftCard } from '../lib/cards';
-
-  // src/lib/icons.tsx — common pictograms as React SVG. Don't reinvent.
-  // IconCheck, IconX, IconPlus, IconMinus, IconCircleCheck, IconCircleX,
-  // IconWarning, IconInfo, IconHeart, IconStar, IconThumbsUp, IconShare,
-  // IconBookmark, IconBell, IconChat, IconPlay, IconPause, IconSkipForward,
-  // IconVolumeOn, IconVolumeMute, IconTrendUp, IconTrendDown, IconArrowUp,
-  // IconCamera, IconVideo, IconImage, IconMic, IconClock, IconCalendar,
-  // IconUser, IconDollar, IconLightbulb, IconFire, IconSparkle, IconSearch,
-  // IconSettings, IconHome, IconLock, IconRocket, IconTrophy
-  import { IconHeart, IconStar, IconBell, IconFire, IconCheck } from '../lib/icons';
-
-  // src/lib/charts.tsx — animated data viz (frame-driven reveals).
-  // BarChart, LineChart, PieChart, DonutChart, ProgressLine, ProgressRing,
-  // Gauge, Sparkline — all take { frame, start, dur, data } props.
-  import { BarChart, DonutChart, ProgressRing } from '../lib/charts';
-
-  // src/lib/backgrounds.tsx — drop-in fullscreen backdrops.
-  // DotGrid, LineGrid (with optional perspective), Stripes, Halftone,
-  // RadialBurst, GradientMesh, Aurora, Static, Vignette, StarField,
-  // Particles, LightLeak, IsoGrid
-  import { DotGrid, GradientMesh, Aurora, StarField } from '../lib/backgrounds';
-
-  // src/lib/avatars.tsx — circle/square user pics with auto-color from name
-  // Avatar, AvatarStack, FacePlaceholder
-  import { Avatar, AvatarStack } from '../lib/avatars';
-
-  // src/lib/social.tsx — platform mock cards. TweetCard, RedditCard,
-  // LinkedInCard, iMessage, iMessageThread, SlackMessage, Notification,
-  // EmailCard, TikTokOverlay. Pass content via props — no reverse-
-  // engineering Twitter's CSS each time.
-  import { TweetCard, IMessage, IMessageThread, SlackMessage, Notification, TikTokOverlay } from '../lib/social';
-
-  // src/lib/text-paths.tsx — curved / arched / wavy / spiral text via SVG textPath.
-  // CircularText, ArchText (up/down), WaveText, SpiralText, TextOnPath (custom d),
-  // PerLetter (wrap each char in styled span), Rotate3DText (Y-axis rig).
-  import { CircularText, ArchText, WaveText, Rotate3DText } from '../lib/text-paths';
-
-  // src/lib/presets.ts — named composed animations. Spread onto style.
-  // PRESETS.heroEntrance | slam | pop | fadeUp | fadeDown | hold | exitFade |
-  // exitFlyOut | callout | enterHoldExit | reveal | iris | pulse | shake |
-  // flip | stickerSlam | kenBurns | parallax
-  //   <div style={{ ...PRESETS.heroEntrance(frame, {start:0, dur:24}) }}>
-  import { PRESETS } from '../lib/presets';
-
-  // src/lib/transitions-extra.ts — more scene transitions.
-  // cubeFlipTransition, pageCurlTransition, liquidWipeTransition,
-  // colorWashTransition, zoomBlurTransition, impactShakeTransition,
-  // slideCoverTransition, crossfadeTransition
-  import { cubeFlipTransition, pageCurlTransition, zoomBlurTransition } from '../lib/transitions-extra';
-
-  // src/lib/icons-animated.tsx — same icons but moving. Pass frame.
-  // HeartBeat, BellRing, StarTwinkle, FireFlicker, SpinIcon, BounceIcon,
-  // ShakeIcon, CheckDraw, XDraw, TrendDraw, SparkleTrail, RocketLaunch, LightbulbOn
-  import { HeartBeat, CheckDraw, SparkleTrail } from '../lib/icons-animated';
-
-  // src/lib/numbers.tsx — counters with formatting (commas, %, K/M/B, $).
-  // CountUp, CountUpFlip (odometer-style), BigStat, PriceTag, DeltaBadge.
-  // Also: formatNumber(n, format, decimals, prefix, suffix) helper.
-  import { CountUp, BigStat, PriceTag, DeltaBadge } from '../lib/numbers';
-
-  // src/lib/particles.tsx — particle effects. Confetti, Explosion, Smoke,
-  // Sparks, Snow, Balloons, generic Emitter.
-  import { Confetti, Explosion, Smoke, Sparks } from '../lib/particles';
-
-  // src/lib/loaders.tsx — Spinner, DotTyping, PulseDots, BarLoader,
-  // Skeleton, SkeletonCard, ProgressFill, IndeterminateBar.
-  import { Spinner, DotTyping, Skeleton } from '../lib/loaders';
-
-  // src/lib/code.tsx — code blocks with syntax-style coloring. CODE_THEMES
-  // (dark, light, cyber, warmCream). CodeBlock, TypingCodeBlock (typewriter
-  // reveal with caret), InlineCode chip.
-  import { CodeBlock, TypingCodeBlock, InlineCode, CODE_THEMES } from '../lib/code';
-
-  // src/lib/buttons.tsx — CTAButton (gradient pill), GhostButton, SoftButton,
-  // SubscribeButton (YouTube red), AppStoreBadge ('apple'|'google'), Toggle,
-  // Chip.
-  import { CTAButton, GhostButton, SubscribeButton, AppStoreBadge, Toggle, Chip } from '../lib/buttons';
-
-  // src/lib/audio-viz.tsx — audio-style visualizations (no real audio).
-  // WaveformBars, WaveformBarsMirrored, Waveform (sine line), VinylRecord
-  // (spinning), CassetteTape (spinning reels), NowPlaying pill.
-  import { WaveformBars, Waveform, VinylRecord, NowPlaying } from '../lib/audio-viz';
-
-  // src/lib/motion-extra.ts — physics-y, character-animation feel.
-  //   anticipate (slingshot wind-up), recoil (kick after impact),
-  //   hover (gentle infinite), pendulum (damped swing), tilt (3D mouse-ish),
-  //   pathFollow (along a bezier), springChain (staggered springs),
-  //   popcorn (random-order stagger), explodeIn / explodeOut (parts fly in/out),
-  //   meltDown (drip), foldOpen (paper unfold), riseAndShine (slow rise+glow),
-  //   dropAndCrack (fall + impact spike, exposes impactFrame for cracks),
-  //   magnetic (slide-to-target with overshoot), stretchFlick (squash+bounce),
-  //   attentionShake (look-at-me wobble), heartbeat (double-beat scale),
-  //   drift (perlin-ish random walk), gradientReveal (mask wipe),
-  //   typeOnWithCursor (typewriter + caret blink state), elastic (overshoot 0→1),
-  //   orbital (circle around a point).
-  import { anticipate, recoil, hover, squashStretch, tilt, pathFollow,
-           explodeIn, magnetic, heartbeat, drift, orbital, foldOpen } from '../lib/motion-extra';
-
-  // src/lib/code.tsx — now supports js, ts, py, sql, bash, css, go, rust.
-  // Same imports as before; just pass language="ts" / "sql" / etc.
-
-  // src/lib/sketchy.tsx — hand-drawn / wobble motion + decorations.
-  // sketchJitter (helper), ScribbleUnderline, Scribble (closed loop),
-  // Asterisk, PlusSign, SketchArrow, SketchFrame, DoodleDots,
-  // HandCircled (wraps element in wobbly circle), Sketchy (wraps in jitter),
-  // DoodleStar, TwinkleMark.
-  import { Sketchy, ScribbleUnderline, SketchArrow, SketchFrame,
-           Asterisk, DoodleStar, HandCircled } from '../lib/sketchy';
-
-  // src/lib/photo-fx.tsx — photographic effects.
-  // LensFlare, DOFBlur (wrap), TiltShift, DoubleExposure, FilmBurn,
-  // ColorGrade (presets: tealOrange, cool, warm, vintage, noir, cyber, sepia),
-  // Bloom, ChromaticAberrationAnim, VintageBorder, DustMotes, GodRays.
-  import { LensFlare, FilmBurn, ColorGrade, GodRays, DustMotes } from '../lib/photo-fx';
-
-  // src/lib/bg-procedural.tsx — generative animated backgrounds.
-  // CheckerboardAnim, Voronoi, HalftoneWave, NoiseField, StripeWave,
-  // ConcentricPulse, Topographic, Plasma.
-  import { CheckerboardAnim, Voronoi, HalftoneWave, Plasma, ConcentricPulse } from '../lib/bg-procedural';
-
-  // src/lib/flags.tsx — country flags as SVG. Top 22.
-  // FlagUS, FlagUK, FlagJP, FlagFR, FlagDE, FlagIT, FlagES, FlagCA, FlagAU,
-  // FlagBR, FlagIN, FlagCN, FlagKR, FlagMX, FlagNL, FlagSE, FlagNO, FlagRU,
-  // FlagCH, FlagPride, FlagTrans, FlagEU.
-  import { FlagUS, FlagJP, FlagUK } from '../lib/flags';
-
-  // src/lib/prims3d.tsx — mock-3D primitives via CSS/SVG.
-  // Cube3D (animated rotation), ShadedSphere, Cylinder, Pyramid,
-  // IsoCube, IsoStack, Card3D.
-  import { Cube3D, ShadedSphere, IsoCube, IsoStack } from '../lib/prims3d';
-
-  // src/lib/typography.ts — also exports TEXT_FX with text-effect recipes:
-  // TEXT_FX.outlined(stroke, w, fill) | outlineOnly | neon(color) | softGlow |
-  // hardDrop | stackDrop | gradient(top,bot) | chrome | gold | holographic |
-  // embossed | debossed | letterpress | sticker | tapeStrip | highlight |
-  // underline | strikethrough | magazineCondensed | wideTrack(px)
-  // Apply like:  <h1 style={{ ...TYPE.titleHero, ...TEXT_FX.neon('#ff3d8a') }}>
-
-  // src/lib/trends.ts — NAMED STYLE PACKS — bundles of palette+type+motion+effects.
-  // Read TRENDS to see all packs. Pick by keyword match to the user's prompt.
-  import { TRENDS, type TrendName } from '../lib/trends';
+Import-extension rule: .tsx files export JSX components; .ts files export
+functions/objects. effects/layouts/shapes/cards/icons/charts/etc are .tsx;
+palettes/easings/motion/presets/trends are .ts.
 
 TREND PACKS (composed recipes — pick one based on user's prompt keywords):
   - tiktokKineticCaption — DEFAULT. Word-by-word pops for talking-head/podcast clips.
@@ -1617,6 +1637,8 @@ const server = http.createServer((req, res) => {
       const message = payload.message;
       const context = payload.context || null;
       const reqId   = payload.reqId || crypto.randomUUID();
+      // Self-critique step is opt-out via panel setting. Default true.
+      const selfCritique = (payload.selfCritique !== undefined) ? !!payload.selfCritique : true;
       if (!message) { res.writeHead(400); res.end('{"error":"empty message"}'); return; }
 
       let fullMessage = message;
@@ -1639,12 +1661,25 @@ const server = http.createServer((req, res) => {
       // events as they happen, so the bridge can push real-time progress to
       // the panel via SSE. The final assistant message is collected and
       // returned to the panel in the original /chat response shape.
+      //
+      // The SELF_CRITIQUE_BEGIN/END markers wrap the visual auto-fix loop
+      // instructions. We either strip them or keep their content based on
+      // the panel setting.
+      let resolvedSystemPrompt;
+      if (selfCritique) {
+        resolvedSystemPrompt = SYSTEM_PROMPT
+          .replace(/__SELF_CRITIQUE_BEGIN__\n?/g, '')
+          .replace(/__SELF_CRITIQUE_END__\n?/g, '');
+      } else {
+        resolvedSystemPrompt = SYSTEM_PROMPT
+          .replace(/__SELF_CRITIQUE_BEGIN__[\s\S]*?__SELF_CRITIQUE_END__\n?/g, '');
+      }
       const args = [
         '-p',
         '--output-format', 'stream-json',
         '--verbose',
         '--permission-mode', 'bypassPermissions',
-        '--append-system-prompt', SYSTEM_PROMPT,
+        '--append-system-prompt', resolvedSystemPrompt,
         '--no-session-persistence',
       ];
       args.push(fullMessage);
@@ -1672,6 +1707,10 @@ const server = http.createServer((req, res) => {
           req.once('aborted', onAbort);
 
           proc.stderr.on('data', d => stderr += d);
+          // Track BOTH byte-level activity AND status-text changes so a
+          // hung tool_use that just dribbles heartbeats can still be killed.
+          let lastStatus = '';
+          let lastStatusChangedAt = Date.now();
           proc.stdout.on('data', chunk => {
             lastActivity = Date.now();
             lineBuf += chunk.toString();
@@ -1683,7 +1722,13 @@ const server = http.createServer((req, res) => {
               let evt;
               try { evt = JSON.parse(line); } catch { continue; }
               const status = streamEventToStatus(evt);
-              if (status) broadcastProgress(status, null, reqId);
+              if (status) {
+                broadcastProgress(status, null, reqId);
+                if (status !== lastStatus) {
+                  lastStatus = status;
+                  lastStatusChangedAt = Date.now();
+                }
+              }
               if (evt.type === 'result' && typeof evt.result === 'string') finalReply = evt.result;
               if (evt.type === 'assistant' && evt.message && Array.isArray(evt.message.content)) {
                 for (const blk of evt.message.content) {
@@ -1693,17 +1738,25 @@ const server = http.createServer((req, res) => {
             }
           });
 
-          // Idle watchdog
-          const IDLE_TIMEOUT_MS = 3 * 60 * 1000;
+          // Idle watchdog — tightened from 3min → 90s. ALSO kills if the
+          // SAME status text has been broadcasting for 90s (catches hung
+          // tool_use that keeps dribbling identical heartbeats).
+          const IDLE_TIMEOUT_MS = 90 * 1000;
+          const STATUS_STUCK_MS = 90 * 1000;
           const idleCheck = setInterval(() => {
             if (resolved) { clearInterval(idleCheck); return; }
             const idle = Date.now() - lastActivity;
+            const stuck = Date.now() - lastStatusChangedAt;
             if (idle > IDLE_TIMEOUT_MS) {
               console.log('  [chat] idle ' + Math.round(idle/1000) + 's' + (retry ? ' (retry)' : '') + ' — killing claude');
               idleKilled = true;
               try { proc.kill('SIGKILL'); } catch {}
+            } else if (stuck > STATUS_STUCK_MS && lastStatus) {
+              console.log('  [chat] status stuck on "' + lastStatus + '" for ' + Math.round(stuck/1000) + 's — killing claude');
+              idleKilled = true;
+              try { proc.kill('SIGKILL'); } catch {}
             }
-          }, 30000);
+          }, 10000);
 
           // Hard timeout
           const HARD_TIMEOUT_MS = 10 * 60 * 1000;
