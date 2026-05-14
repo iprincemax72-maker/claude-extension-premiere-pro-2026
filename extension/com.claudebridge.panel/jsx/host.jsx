@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "4.5";
+var HOST_JSX_VERSION = "4.6";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -628,16 +628,20 @@ function ccAutoEditApply(payloadJson) {
             }
             if (!insertTime) { skipped.push({ index: i, file: it.file, reason: "could not build Time" }); continue; }
 
-            // 5. Insert.
+            // 5. Place. MUST use overwriteClip, not insertClip — insertClip
+            //    ripple-inserts and shifts the timeline, which desyncs every
+            //    graphic placed after it (and can shove the underlying video).
+            //    overwriteClip drops the graphic onto the (empty) overlay
+            //    track at the exact time, shifting nothing.
             var placed = false;
             try {
-                if (track.insertClip) { track.insertClip(item, insertTime); placed = true; }
-                else if (track.overwriteClip) { track.overwriteClip(item, insertTime); placed = true; }
+                if (track.overwriteClip) { track.overwriteClip(item, insertTime); placed = true; }
+                else if (track.insertClip) { track.insertClip(item, insertTime); placed = true; }
             } catch (placeErr) {
                 skipped.push({ index: i, file: it.file, reason: "place error: " + String(placeErr) });
                 continue;
             }
-            if (!placed) { skipped.push({ index: i, file: it.file, reason: "no insertClip method" }); continue; }
+            if (!placed) { skipped.push({ index: i, file: it.file, reason: "no overwriteClip method" }); continue; }
 
             applied.push({
                 index: i, file: it.file,
@@ -854,14 +858,27 @@ function ccUndo(count) {
         if (typeof app.executeCommand !== "function") {
             return JSON.stringify({ ok: false, error: "executeCommand unavailable", attempts: attempts });
         }
+        // VERIFY undo actually happened. executeCommand can exist but be a
+        // no-op for "Undo" — without a check we'd report success when nothing
+        // changed. Each ripple-delete shortened the sequence, so a real Undo
+        // lengthens it again: measure seq duration before/after.
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        function durTicks() {
+            try { return (seq && seq.end != null) ? Number(seq.end) : null; } catch (e) { return null; }
+        }
+        var before = durTicks();
         attempts.push("executeCommand");
         var done = 0;
         for (var i = 0; i < n; i++) {
             var ok = _ccSafe(function () { app.executeCommand("Undo"); return true; });
             if (ok) done++; else break;
         }
-        if (done < 1) {
-            return JSON.stringify({ ok: false, error: "executeCommand(Undo) had no effect", attempts: attempts });
+        var after = durTicks();
+        // If the timeline didn't change at all, executeCommand("Undo") is a
+        // no-op on this build — report failure so the panel falls back to the
+        // bridge's osascript undo.
+        if (before != null && after != null && before === after) {
+            return JSON.stringify({ ok: false, error: "executeCommand(Undo) had no effect on the timeline", attempts: attempts });
         }
         return JSON.stringify({ ok: true, count: done, attempts: attempts });
     } catch (e) {

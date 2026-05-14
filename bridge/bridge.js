@@ -274,7 +274,7 @@ function analyseTranscriptWithClaude(transcript, opts) {
       '"kind" must be: filler | false_start | mistake. start and end are seconds.',
     ].join('\n');
 
-    const sysPrompt = 'You are a careful audio editing assistant. Return ONLY valid JSON. No tool use — just read the transcript and emit cut ranges. Be CONSERVATIVE: only cut clear, obvious mistakes (fillers, stutters, false starts, exact repeats). When in doubt, do not cut. Cutting real speech is far worse than missing a stutter. Returning an empty cut list is a valid, good answer for clean speech.';
+    const sysPrompt = 'You are a skilled video editor cleaning up a talking-head clip. Return ONLY valid JSON. No tool use — just read the transcript and emit cut ranges. Edit like a human making a tight final cut: confidently remove clear flubs, redos, fillers and abandoned rambles — but never cut coherent real content or deliberate rhetorical repetition. An empty cut list is fine for genuinely clean speech.';
 
     // Pure text-in / JSON-out — Haiku is plenty and 3-5x faster than the
     // user's default model (which could be Opus and was timing out on
@@ -714,15 +714,20 @@ function detectMoments(sentences, density, styleOverride, reqId, log) {
       log && log(`transcript ${sentences.length} sentences → sampled to ${sentsForPrompt.length} (stride ${stride}) for Claude`);
     }
     const transcriptForClaude = sentsForPrompt.map(s =>
-      `[${s.i}] ${s.startSec.toFixed(1)}s-${s.endSec.toFixed(1)}s: ${s.text}`
+      `[${s.i}] ${s.text}`
     ).join('\n');
 
     const system = [
       'You are a motion-graphics editor reviewing a transcript of a video clip.',
       'You decide where on-screen text/graphics would HELP the viewer — not where to flex.',
       '',
+      'Each transcript line is:  [N] the words spoken   — N is the line index.',
+      '',
       'Output a JSON array of "moments". Each moment is an opportunity for a motion graphic.',
-      'Each moment is an object: { id, type, startSec, endSec, label, payload, confidence }',
+      'Each moment is an object: { id, type, startIndex, endIndex, label, payload, confidence }',
+      '  startIndex / endIndex = the [N] line numbers this moment covers. For a',
+      '  single-line moment, startIndex === endIndex. NEVER output seconds — only',
+      '  the integer [N] line indices straight from the transcript.',
       '',
       'Moment types (pick the BEST fit; do not stretch to fit):',
       '  - stat       : a specific number/percentage/measurement was stated. payload: { number: "43%", subject: "growth" }',
@@ -737,19 +742,25 @@ function detectMoments(sentences, density, styleOverride, reqId, log) {
       'RULES:',
       (isFull
         ? '  1. FULL-COVERAGE MODE: cover the ENTIRE timeline with NO gaps. Every span of speech gets a moment. Where something "key" happens (a stat, name, list, quote) use that special type. Where the speaker is just talking with nothing special, STILL make a moment — use type "fact", "callout", or "quote" with the best short phrase from that span. Leave NO gap longer than 2.5 seconds anywhere in the video.'
-        : '  1. Do NOT add motion graphics to every sentence. Most sentences should NOT become moments.'),
-      '  2. Aim for ~' + targetCount + ' moments total across the whole transcript.',
+        : '  1. You MUST return about ' + targetCount + ' moments — spread them across the whole transcript. This is not optional. Even ordinary conversational speech has lines worth a graphic: a punchy line is a "quote", an emphasis phrase is a "callout", any informative statement is a "fact", a rhetorical question is a "question". If there is no stat/name/list, fall back to quote/callout/fact — there is ALWAYS something. An empty or near-empty array is a FAILURE.'),
+      '  2. Return approximately ' + targetCount + ' moments total — not far fewer.',
       (isFull
-        ? '  3. confidence: in full-coverage mode include everything, even confidence ~0.4. The point is wall-to-wall coverage.'
-        : '  3. confidence is 0..1. Only include moments with confidence >= 0.6.'),
-      '  4. startSec/endSec must come directly from the timestamps in the transcript I gave you.',
+        ? '  3. confidence: in full-coverage mode include everything, even confidence ~0.4.'
+        : '  3. confidence is 0..1. Aim high, but it is fine to include solid picks at ~0.5 to reach the target count. The user WANTS graphics on this video.'),
+      '  4. startIndex/endIndex are the [N] line numbers from the transcript — integers, not seconds.',
       '  5. id is a short unique string like "m1", "m2", etc.',
       '  6. label is a 2-6 word human description for logs.',
       '  7. The audio plays normally underneath — the graphic SUPPORTS the speech, doesn\'t replace it.',
-      '  8. Return ONLY the JSON array. No prose, no markdown fences, no commentary.',
+      '  8. OUTPUT FORMAT — this is critical: output ONE moment per line, each',
+      '     line a COMPLETE compact single-line JSON object. NO array brackets,',
+      '     NO commas between lines, NO markdown fences, NO prose. Keep payload',
+      '     strings short and plain (no double-quote characters inside them).',
+      '     Exactly like this (one object per line):',
+      '     {"id":"m1","type":"callout","startIndex":2,"endIndex":3,"label":"Key point","payload":{"text":"THE BIG IDEA"},"confidence":0.8}',
+      '     {"id":"m2","type":"fact","startIndex":5,"endIndex":6,"label":"Supporting fact","payload":{"text":"a short fact"},"confidence":0.7}',
     ].join('\n');
 
-    const user = 'TRANSCRIPT (sentence index, time range, text):\n' + transcriptForClaude;
+    const user = 'TRANSCRIPT (one line per spoken segment, [N] is the line index):\n' + transcriptForClaude;
     const fullPrompt = system + '\n\n' + user;
 
     let stdout = '';
@@ -826,17 +837,67 @@ function detectMoments(sentences, density, styleOverride, reqId, log) {
       if (_activeAutoedit) _activeAutoedit.children.delete(proc);
       log(`moments: ${evt} code=${code} ${_mel()} stdout=${stdout.length}B`);
       if (stderr) log('moments stderr: ' + stderr.slice(-500));
-      // Strip any markdown fences or pre-amble Claude might have added
-      const cleaned = stdout
-        .replace(/^[\s\S]*?(\[)/, '$1')         // drop everything before first [
-        .replace(/(\])[\s\S]*$/, '$1')          // drop everything after last ]
-        .trim();
+      log('moments RAW stdout: ' + JSON.stringify(stdout.slice(0, 600)));
+
+      // Multi-strategy parse. Claude's big nested JSON arrays kept breaking
+      // mid-output (one unescaped quote killed all moments). So we ask for
+      // JSONL (one compact object per line) and parse defensively:
+      //   1) JSONL — parse each line independently; a bad line loses only
+      //      itself.  2) fall back to a whole-array parse.  3) fall back to
+      //      object-by-object regex recovery.
       let parsed = [];
-      try { parsed = JSON.parse(cleaned); } catch (e) {
-        log('moments parse fail: ' + e.message);
-        log('moments cleaned snippet: ' + cleaned.slice(0, 500));
+      for (const rawLine of stdout.split('\n')) {
+        let t = rawLine.trim();
+        if (!t || t[0] !== '{') continue;
+        t = t.replace(/,\s*$/, '');           // tolerate a trailing comma
+        try {
+          const m = JSON.parse(t);
+          if (m && typeof m.type === 'string') parsed.push(m);
+        } catch (_) { /* skip just this line */ }
+      }
+      if (parsed.length) {
+        log('moments parsed ' + parsed.length + ' via JSONL');
+      } else {
+        const arrM = stdout.match(/\[[\s\S]*\]/);
+        if (arrM) {
+          try {
+            const a = JSON.parse(arrM[0]);
+            if (Array.isArray(a)) parsed = a.filter(m => m && typeof m.type === 'string');
+          } catch (_) { /* fall through */ }
+        }
+        if (!parsed.length) {
+          const objs = stdout.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g) || [];
+          for (const o of objs) {
+            try { const m = JSON.parse(o); if (m && typeof m.type === 'string') parsed.push(m); }
+            catch (_) {}
+          }
+          log('moments recovered ' + parsed.length + ' via object-regex');
+        } else {
+          log('moments parsed ' + parsed.length + ' via array fallback');
+        }
       }
       if (!Array.isArray(parsed)) parsed = [];
+      log('moments after parse: ' + parsed.length + ' (before sanity filter)');
+
+      // Resolve startIndex/endIndex -> real seconds. Claude reliably says
+      // "this moment covers line 3" but does NOT reliably copy float
+      // timestamps (it was returning 0.0 for everything). So it now returns
+      // line indices and we look up the true startSec/endSec here.
+      parsed = parsed.map(m => {
+        if (!m || typeof m !== 'object') return m;
+        let si = (typeof m.startIndex === 'number') ? m.startIndex
+               : (typeof m.endIndex === 'number') ? m.endIndex : null;
+        let ei = (typeof m.endIndex === 'number') ? m.endIndex : si;
+        if (si === null) return m; // leave as-is; sanity filter will drop it
+        si = Math.max(0, Math.min(sentences.length - 1, Math.round(si)));
+        ei = Math.max(si, Math.min(sentences.length - 1, Math.round(ei)));
+        const a = sentences[si], b = sentences[ei];
+        if (a && b && typeof a.startSec === 'number' && typeof b.endSec === 'number') {
+          m.startSec = a.startSec;
+          m.endSec = b.endSec;
+        }
+        return m;
+      });
       // Sanity filter
       parsed = parsed.filter(m =>
         m && typeof m === 'object'
@@ -845,7 +906,10 @@ function detectMoments(sentences, density, styleOverride, reqId, log) {
         && typeof m.endSec === 'number'
         && m.startSec < m.endSec
         && m.endSec - m.startSec < 30
-        && (m.confidence == null || m.confidence >= 0.6)
+        // 0.4 floor (was 0.6): the prompt now intentionally lets Claude
+        // include solid ~0.5 picks to hit the target count. A 0.6 floor
+        // was silently dropping them and leaving the user with 0 graphics.
+        && (m.confidence == null || m.confidence >= 0.4)
       );
       log(`moments: parsed ${parsed.length} moments`);
       resolve(parsed);
@@ -2487,10 +2551,15 @@ const server = http.createServer((req, res) => {
             _activeAutoedit = null;
             return;
           }
+          // runWhisper returns segments as { start, end, text } with start/end
+          // ALREADY in seconds. The old code read seg.offsets.from/to — a
+          // field that does not exist on runWhisper's output — so every
+          // sentence got startSec=endSec=0, which is why Auto-Edit produced
+          // nothing usable.
           sentences = transcriptRaw.map((seg, i) => ({
             i,
-            startSec: inP + (seg.offsets?.from || 0) / 1000,
-            endSec:   inP + (seg.offsets?.to   || 0) / 1000,
+            startSec: inP + (typeof seg.start === 'number' ? seg.start : 0),
+            endSec:   inP + (typeof seg.end   === 'number' ? seg.end   : 0),
             text:     (seg.text || '').trim(),
           })).filter(s => s.text.length > 0);
           log(`normalised from whisper: ${sentences.length} sentence units`);
