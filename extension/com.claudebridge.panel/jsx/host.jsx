@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "4.1";
+var HOST_JSX_VERSION = "4.3";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -388,6 +388,35 @@ function ccApplyAutoCuts(cutsJson) {
         // so we accumulate a running offset and subtract it from later cuts.
         cuts.sort(function (a, b) { return a.start - b.start; });
 
+        // Merge overlapping / near-touching cuts. The silence pass and the
+        // transcript pass each produce their own cut list, and where they
+        // overlap you get two cuts covering the same span. Applying those
+        // one-by-one ripples the timeline twice over the same region and
+        // leaves a 1-frame sliver between them. Collapse them up front.
+        var mergedCuts = [];
+        for (var mi = 0; mi < cuts.length; mi++) {
+            var mc = cuts[mi];
+            if (typeof mc.start !== "number" || typeof mc.end !== "number" || mc.end <= mc.start) continue;
+            if (mergedCuts.length) {
+                var prevC = mergedCuts[mergedCuts.length - 1];
+                if (mc.start <= prevC.end + frameDur * 1.5) {
+                    if (mc.end > prevC.end) prevC.end = mc.end;
+                    continue;
+                }
+            }
+            mergedCuts.push({ start: mc.start, end: mc.end });
+        }
+        note("merged " + cuts.length + " cuts -> " + mergedCuts.length + " after overlap collapse");
+        cuts = mergedCuts;
+
+        // Read the sequence's current duration in ticks — used to MEASURE how
+        // much each extract() actually removed, instead of trusting our own
+        // frame math (which drifts and leaves slivers).
+        function seqDurTicks() {
+            try { if (seq.end != null) return Number(seq.end); } catch (e) {}
+            return null;
+        }
+
         var applied = 0, failed = 0;
         var shiftOffset = 0;
         for (var i = 0; i < cuts.length; i++) {
@@ -397,12 +426,29 @@ function ccApplyAutoCuts(cutsJson) {
             // shift from all previously-applied cuts.
             var rawStart = (timelineStart + (c.start - inPt)) - shiftOffset;
             var rawEnd   = (timelineStart + (c.end   - inPt)) - shiftOffset;
-            // Snap to frame boundaries: start DOWN to nearest frame, end UP
-            // to nearest frame. Prevents 1-frame slivers from ripple-delete.
-            var tStart = Math.floor(rawStart * fps) / fps;
-            var tEnd   = Math.ceil( rawEnd   * fps) / fps;
-            if (tEnd <= tStart) { failed++; continue; }
-            note("cut[" + i + "] raw " + rawStart.toFixed(3) + "→" + rawEnd.toFixed(3) + " snapped " + tStart.toFixed(3) + "→" + tEnd.toFixed(3) + " (" + (tEnd - tStart).toFixed(3) + "s)  shift=" + shiftOffset.toFixed(2));
+            // ── Frame snapping — kill the 1-frame sliver ───────────────────
+            // The old approach passed frame-boundary seconds (e.g. 77/23.976)
+            // to setInPoint/setOutPoint. That's a float on the EXACT edge —
+            // Premiere can round it to frame 76 OR 77 depending on float bits,
+            // and when it rounds the end DOWN you get a 1-frame leftover.
+            //
+            // Fix: (1) work in integer frame numbers, (2) extend the cut end
+            // by ONE extra frame — it's the end of a silence/filler so eating
+            // one extra frame there is invisible, and it guarantees the sliver
+            // gets consumed, (3) hand setIn/OutPoint the MIDPOINT of the target
+            // frame, which Premiere cannot round to anything but that frame.
+            var startFrame = Math.floor(rawStart * fps);
+            var endFrame   = Math.ceil(rawEnd  * fps) + 1;   // +1 frame kills the sliver
+            if (startFrame < 0) startFrame = 0;
+            if (endFrame <= startFrame) { failed++; continue; }
+            // Hand setIn/OutPoint a value 0.25 frames into the target frame.
+            // 0.5 (the midpoint) sits exactly on the rounding tie-point, so
+            // Premiere can snap it either way; 0.25 lands on `frame` under
+            // both floor() and round-to-nearest. Unambiguous.
+            var tStart = (startFrame + 0.25) / fps;
+            var tEnd   = (endFrame   + 0.25) / fps;
+            var cutDur = (endFrame - startFrame) / fps;      // computed fallback only
+            note("cut[" + i + "] raw " + rawStart.toFixed(3) + "→" + rawEnd.toFixed(3) + " frames " + startFrame + "→" + endFrame + " (" + cutDur.toFixed(3) + "s)  shift=" + shiftOffset.toFixed(3));
 
             // Set sequence in/out — try several signatures because the API
             // varies (seconds vs Time vs Time-string vs ticks).
@@ -421,6 +467,7 @@ function ccApplyAutoCuts(cutsJson) {
             if (!inOk || !outOk) { failed++; note("could not set in/out points"); continue; }
 
             // Now extract — removes the in/out range across all tracks and ripples
+            var durBefore = seqDurTicks();
             var extracted = false;
             try {
                 if (qeSeq.extract) { qeSeq.extract(); extracted = true; note("  qeSeq.extract() ok"); }
@@ -432,7 +479,18 @@ function ccApplyAutoCuts(cutsJson) {
             }
             if (extracted) {
                 applied++;
-                shiftOffset += (tEnd - tStart);
+                // MEASURE what extract() actually removed, don't trust our
+                // frame math. The difference between computed and actual is
+                // exactly what leaves slivers on every following cut.
+                var durAfter = seqDurTicks();
+                if (durBefore != null && durAfter != null && durBefore > durAfter) {
+                    var measured = (durBefore - durAfter) / 254016000000;
+                    shiftOffset += measured;
+                    note("  removed (measured) " + measured.toFixed(4) + "s  shift now " + shiftOffset.toFixed(3));
+                } else {
+                    shiftOffset += cutDur;
+                    note("  removed (computed) " + cutDur.toFixed(4) + "s  shift now " + shiftOffset.toFixed(3));
+                }
             } else {
                 failed++;
             }
@@ -448,8 +506,19 @@ function ccApplyAutoCuts(cutsJson) {
             else if (origOut && typeof origOut === "number" && seq.setOutPoint) seq.setOutPoint(origOut);
         } catch (e) {}
 
+        // Dump the step log to a file so the actual frame numbers + measured
+        // removals can be inspected after the fact.
+        try {
+            var _lf = new File("/Users/anshdhakad/PremiereClaude/output/autocut-apply-" + (new Date()).getTime() + ".log");
+            _lf.open("w"); _lf.write(debug.steps.join("\n")); _lf.close();
+        } catch (eLog) {}
+
         return JSON.stringify({ ok: true, applied: applied, failed: failed, debug: debug });
     } catch (e) {
+        try {
+            var _lf2 = new File("/Users/anshdhakad/PremiereClaude/output/autocut-apply-ERR-" + (new Date()).getTime() + ".log");
+            _lf2.open("w"); _lf2.write(String(e) + "\n\n" + debug.steps.join("\n")); _lf2.close();
+        } catch (eLog2) {}
         return JSON.stringify({ ok: false, error: String(e), debug: debug });
     }
 }
@@ -765,64 +834,30 @@ function ccUndo(count) {
             return JSON.stringify({ ok: false, error: "no app", attempts: attempts });
         }
 
-        // Try each available undo path once to see what works on this system
-        var undoFn = null;
-        // (1) Direct menuFunctionId — most common
-        if (typeof app.menuFunctionId === "function") {
-            attempts.push("menuFunctionId");
-            // Try a handful of known IDs across PPro releases
-            var menuIds = [101, 16, 7, 0xA01];
-            for (var mi = 0; mi < menuIds.length && !undoFn; mi++) {
-                (function (id) {
-                    var ok = _ccSafe(function () { app.menuFunctionId(id); return true; });
-                    if (ok) undoFn = function () { app.menuFunctionId(id); };
-                })(menuIds[mi]);
-                if (undoFn) { attempts.push("menuFunctionId(" + menuIds[mi] + ")"); break; }
-            }
+        // ONLY in-process undo: app.executeCommand("Undo"). It's a named
+        // command so a wrong call is a no-op, not a misfire.
+        //
+        // The old code did two dangerous things, both removed:
+        //  - probed app.menuFunctionId by *firing* a list of guessed IDs.
+        //    menuFunctionId doesn't throw on a bad ID, it just runs whatever
+        //    menu command that ID maps to — so probing fired random commands.
+        //  - wrote a .sh script and called File.execute() on it. execute()
+        //    OPENS a file in its default handler app (here: Antigravity),
+        //    it does not run it — so the keystroke never reached Premiere.
+        // The reliable cross-app fallback (osascript) now lives in the Node
+        // bridge's /undo endpoint, which the panel calls if this returns
+        // ok:false.
+        if (typeof app.executeCommand !== "function") {
+            return JSON.stringify({ ok: false, error: "executeCommand unavailable", attempts: attempts });
         }
-        // (2) executeCommand("Undo")
-        if (!undoFn && typeof app.executeCommand === "function") {
-            attempts.push("executeCommand");
-            var ok2 = _ccSafe(function () { app.executeCommand("Undo"); return true; });
-            if (ok2) undoFn = function () { app.executeCommand("Undo"); };
+        attempts.push("executeCommand");
+        var done = 0;
+        for (var i = 0; i < n; i++) {
+            var ok = _ccSafe(function () { app.executeCommand("Undo"); return true; });
+            if (ok) done++; else break;
         }
-        // (3) Send Cmd+Z to Premiere via osascript (macOS) / PowerShell (Win)
-        if (!undoFn) {
-            attempts.push("system-keystroke");
-            var isMac = ($.os || "").toLowerCase().indexOf("mac") >= 0 || File.fs === "Macintosh";
-            if (isMac) {
-                undoFn = function () {
-                    try {
-                        var script = 'tell application "System Events" to keystroke "z" using command down';
-                        var f = new File(Folder.temp + "/_pp_undo.sh");
-                        f.open("w");
-                        f.write('#!/bin/sh\nosascript -e \'' + script + '\'\n');
-                        f.close();
-                        f.execute();
-                    } catch (e) {}
-                };
-            } else {
-                undoFn = function () {
-                    try {
-                        var bat = new File(Folder.temp + "/_pp_undo.ps1");
-                        bat.open("w");
-                        bat.write('Add-Type -AssemblyName System.Windows.Forms\n[System.Windows.Forms.SendKeys]::SendWait("^z")\n');
-                        bat.close();
-                        bat.execute();
-                    } catch (e) {}
-                };
-            }
-        }
-
-        if (!undoFn) {
-            return JSON.stringify({ ok: false, error: "no undo path worked", attempts: attempts });
-        }
-
-        // Already consumed one undo from the path-probing call. Apply the rest.
-        var done = 1;
-        for (var i = 1; i < n; i++) {
-            var ok3 = _ccSafe(function () { undoFn(); return true; });
-            if (ok3) done++; else break;
+        if (done < 1) {
+            return JSON.stringify({ ok: false, error: "executeCommand(Undo) had no effect", attempts: attempts });
         }
         return JSON.stringify({ ok: true, count: done, attempts: attempts });
     } catch (e) {

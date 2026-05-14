@@ -139,12 +139,17 @@ function runWhisper(wavPath, audioDuration) {
     if (!bin || !model) return reject(new Error('whisper-cli or model not installed'));
 
     const outBase = wavPath.replace(/\.wav$/, '');
+    // NOTE: we deliberately do NOT use -ml 1 / -sow for "word-level" timing.
+    // That combo produces broken timestamps in this whisper.cpp build — past
+    // ~8s every word collapses onto a single point (verified in autocut logs).
+    // Segment-level output has RELIABLE timestamps and is actually better for
+    // detecting repeated sentences / false starts (which is sentence-shaped).
+    // -ml 60 keeps segments to readable phrase chunks instead of long runs.
     const args = [
       '-m', model,
       '-f', wavPath,
       '-oj',           // JSON output
-      '-sow',          // split on word
-      '-ml', '1',      // max 1 segment per line — gives word-level timing
+      '-ml', '60',     // max ~60 chars per segment — phrase-level chunks
       '-of', outBase,
       '-t', '4',       // threads
       '-pp',           // print progress
@@ -232,7 +237,9 @@ function analyseTranscriptWithClaude(transcript, opts) {
     }
 
     const userMsg = [
-      'Here is a word-level transcript of a talking-head clip. Each line is one word with its start-end in seconds.',
+      'Here is a transcript of a talking-head clip, broken into short phrase',
+      'segments. Each line is [start-end in seconds] followed by the words said',
+      'in that span.',
       '',
       transcriptText.slice(0, 16000), // bumped cap — longer clips need full context
       '',
@@ -240,8 +247,18 @@ function analyseTranscriptWithClaude(transcript, opts) {
       '',
       ...lookFor,
       '',
-      'For each cut, use the timestamps shown in the transcript (be generous on the END to include the breath/pause).',
-      'It is BETTER to cut a slightly-too-long span than to leave a stutter in. Lean toward MORE cuts, not fewer.',
+      'TIMESTAMP RULES:',
+      '- Each cut\'s start/end must fall WITHIN the [start-end] range of the',
+      '  segment(s) it covers. If a false start is the first half of a segment,',
+      '  estimate the split point proportionally inside that segment\'s range.',
+      '- If two adjacent segments are a redo of each other (segment A says a',
+      '  phrase, segment B says it better), cut the WHOLE of segment A — use',
+      '  A\'s start and A\'s end.',
+      '- Be generous on the END of a cut to include the trailing breath/pause.',
+      '- It is BETTER to cut a slightly-too-long span than leave a stutter in.',
+      '  Lean toward MORE cuts, not fewer — but every cut must be a genuine',
+      '  flub/redo/filler, NOT deliberate rhetorical repetition (e.g. "when you',
+      '  lose, especially when you lose" is intentional emphasis — do NOT cut).',
       '',
       'Output EXACTLY this JSON, nothing else (no prose, no fences, no commentary):',
       '{"cuts":[{"start":2.30,"end":3.10,"kind":"false_start","reason":"truncated word \'th-\' before restart"}],"summary":"Found 3 fillers and 5 false starts."}',
@@ -251,9 +268,13 @@ function analyseTranscriptWithClaude(transcript, opts) {
 
     const sysPrompt = 'You are an audio editing assistant. Return ONLY valid JSON. No tool use — just read the transcript and emit cut ranges. Be AGGRESSIVE about catching false starts and self-corrections; the user is editing a talking-head video and wants a clean final cut.';
 
+    // Pure text-in / JSON-out — Haiku is plenty and 3-5x faster than the
+    // user's default model (which could be Opus and was timing out on
+    // 12-minute transcripts). Force Haiku here.
     const args = [
       '-p',
       '--output-format', 'json',
+      '--model', 'claude-haiku-4-5-20251001',
       '--permission-mode', 'bypassPermissions',
       '--append-system-prompt', sysPrompt,
       '--no-session-persistence',
@@ -266,12 +287,16 @@ function analyseTranscriptWithClaude(transcript, opts) {
     let stderrBuf = '';
     proc.stderr.on('data', d => stderrBuf += d.toString());
 
+    // Timeout scales with transcript length — a 12-minute clip's transcript
+    // needs more than the old hard 60s. 60s base + ~1s per segment, capped
+    // at 4 minutes.
+    const timeoutMs = Math.min(240000, 60000 + transcript.length * 1000);
     let done = false;
     const finish = (result) => { if (done) return; done = true; clearTimeout(killer); resolve(result); };
     const killer = setTimeout(() => {
       try { proc.kill('SIGKILL'); } catch {}
-      finish({ cuts: [], summary: 'analysis timed out (60s)' });
-    }, 60000);
+      finish({ cuts: [], summary: 'analysis timed out (' + Math.round(timeoutMs/1000) + 's)' });
+    }, timeoutMs);
 
     proc.on('error', () => finish({ cuts: [], summary: 'claude unavailable' }));
     proc.on('close', () => {
@@ -1979,6 +2004,75 @@ const server = http.createServer((req, res) => {
   // Manual update trigger from the panel — pulls latest files from GitHub raw
   if (req.method === 'POST' && req.url === '/update') {
     handleUpdateRequest(req, res);
+    return;
+  }
+
+  // Reliable cross-app Undo. The panel calls this when the in-process
+  // ccUndo (app.executeCommand) isn't available. We drive Premiere's
+  // Edit > Undo menu item via osascript run as a REAL process — not via
+  // ExtendScript File.execute(), which opens the .sh file in the user's
+  // default editor instead of running it.
+  //
+  // Clicking menu item 1 of the Edit menu (always "Undo …", whatever the
+  // last action was named) is more robust than sending a Cmd+Z keystroke,
+  // which can land in a text field instead of the timeline.
+  //
+  // Requires macOS Accessibility permission for the process running node.
+  if (req.method === 'POST' && req.url === '/undo') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      let count = 1;
+      try { count = parseInt(JSON.parse(body || '{}').count, 10) || 1; } catch {}
+      count = Math.max(1, Math.min(200, count));
+
+      const osaLines = [
+        'tell application "System Events"',
+        '  set ppList to (every process whose name contains "Premiere Pro")',
+        '  if (count of ppList) is 0 then error "Premiere Pro is not running"',
+        '  set pp to item 1 of ppList',
+        '  set frontmost of pp to true',
+        '  delay 0.25',
+        '  set editMenu to menu 1 of (menu bar item "Edit" of menu bar 1 of pp)',
+        '  repeat ' + count + ' times',
+        '    click menu item 1 of editMenu',
+        '    delay 0.06',
+        '  end repeat',
+        'end tell',
+      ];
+      const args = [];
+      for (const l of osaLines) { args.push('-e', l); }
+
+      let errOut = '';
+      let osa;
+      try {
+        osa = spawn('osascript', args);
+      } catch (e) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: String(e) }));
+        return;
+      }
+      osa.stderr.on('data', d => { errOut += d; });
+      osa.on('error', (e) => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: String(e) }));
+      });
+      osa.on('close', (code) => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        if (code === 0) {
+          res.end(JSON.stringify({ ok: true, count }));
+        } else {
+          const msg = errOut.trim();
+          const isPerm = /not allowed|assistive|accessibility|-1719|-25211/i.test(msg);
+          res.end(JSON.stringify({
+            ok: false,
+            error: isPerm
+              ? 'macOS blocked the undo — grant Accessibility permission to the bridge. System Settings > Privacy & Security > Accessibility.'
+              : (msg || ('osascript exited ' + code)),
+          }));
+        }
+      });
+    });
     return;
   }
 
