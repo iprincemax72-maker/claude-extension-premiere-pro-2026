@@ -45,7 +45,12 @@ console.log('ffmpeg bin: ' + FFMPEG_BIN);
 // `onProgress(0..1)` fires as ffmpeg's "time=" reports advance through the clip.
 function detectSilences(clipPath, clipDuration, onProgress) {
   return new Promise((resolve, reject) => {
-    const args = ['-i', clipPath, '-af', 'silencedetect=noise=-30dB:d=0.6', '-f', 'null', '-'];
+    // Measured on a real clip: noise=-30dB:d=0.6 flagged 55% of the whole
+    // video as "silence" — it was catching quiet speech, room tone and
+    // breaths, not just dead air. noise=-45dB:d=1.5 flags 35% of that same
+    // clip: -45dB only catches near-true-silence, and d=1.5 ignores the
+    // natural 0.5-1s gaps that are part of normal speech rhythm.
+    const args = ['-i', clipPath, '-af', 'silencedetect=noise=-45dB:d=1.5', '-f', 'null', '-'];
     const ff = spawn(FFMPEG_BIN, args);
     let stderr = '';
     const timeRe = /time=([\d:.]+)/g;
@@ -224,15 +229,19 @@ function analyseTranscriptWithClaude(transcript, opts) {
     if (findRepeats) {
       lookFor.push(
         'REPEATED SENTENCES, FALSE STARTS, AND SELF-CORRECTIONS to remove:',
-        '  These are the MOST IMPORTANT cuts. Be AGGRESSIVE about catching them.',
-        '  - PARTIAL-WORD false start: "maybe it was th-" then "maybe it was the fear" → CUT "maybe it was th-".',
-        '    Watch for words that whisper transcribed as truncated stems: "th", "wha", "becau", "som", "rememb", short fragments ending in a consonant before the speaker restarts.',
-        '  - PHRASE REDO: "I went to the store — I went to the grocery store" → CUT the first version, keep the more complete second.',
-        '  - SELF-CORRECTION: "the red car, no, the blue car" → CUT "the red car, no,".',
-        '  - REPEATED FILLER PHRASES: "so, so the thing is" → CUT the first "so,".',
-        '  - HESITATION RESTART: speaker says a word, pauses 0.5s+, then says it again. CUT the first attempt.',
-        '  - When in doubt about whether a fragment is a false start, LOOK at the next sentence. If the speaker is restating a similar phrase, the first one IS a false start — CUT IT.',
-        '  Cuts should INCLUDE the partial fragment AND the pause/breath that follows it, up until the speaker resumes.'
+        '  BE CONSERVATIVE. Only cut when you are CLEARLY sure it is a mistake.',
+        '  When in doubt, DO NOT CUT. A missed stutter is fine; cutting real',
+        '  speech is not. Most segments are NOT mistakes — expect to cut few.',
+        '  - PARTIAL-WORD false start: "maybe it was th-" then "maybe it was the fear"',
+        '    → cut ONLY "th-" and the gap before the restart. Keep it tight.',
+        '  - PHRASE REDO: the SAME phrase said twice back-to-back → cut the first.',
+        '    Only if it is genuinely the same phrase restarted, not a similar idea.',
+        '  - SELF-CORRECTION: "the red car, no, the blue car" → cut "the red car, no,".',
+        '  - REPEATED FILLER PHRASES: "so, so the thing is" → cut the first "so,".',
+        '  Each cut must be SHORT — a false start is usually under 2 seconds. If a',
+        '  cut would be longer than ~3 seconds, you are probably cutting real',
+        '  content; do not make it. NEVER cut a complete, coherent sentence just',
+        '  because a later sentence is on a similar topic — that is not a redo.'
       );
     }
 
@@ -251,14 +260,14 @@ function analyseTranscriptWithClaude(transcript, opts) {
       '- Each cut\'s start/end must fall WITHIN the [start-end] range of the',
       '  segment(s) it covers. If a false start is the first half of a segment,',
       '  estimate the split point proportionally inside that segment\'s range.',
-      '- If two adjacent segments are a redo of each other (segment A says a',
-      '  phrase, segment B says it better), cut the WHOLE of segment A — use',
-      '  A\'s start and A\'s end.',
-      '- Be generous on the END of a cut to include the trailing breath/pause.',
-      '- It is BETTER to cut a slightly-too-long span than leave a stutter in.',
-      '  Lean toward MORE cuts, not fewer — but every cut must be a genuine',
-      '  flub/redo/filler, NOT deliberate rhetorical repetition (e.g. "when you',
-      '  lose, especially when you lose" is intentional emphasis — do NOT cut).',
+      '- Keep cuts TIGHT — cover only the flubbed words plus the gap before the',
+      '  restart. Do not pad. Do not cut whole sentences.',
+      '- It is BETTER to leave a small stutter in than to cut real speech.',
+      '  When unsure, return NO cut. Fewer, precise cuts — not more.',
+      '- NEVER cut deliberate rhetorical repetition (e.g. "when you lose,',
+      '  especially when you lose" is intentional emphasis — do NOT cut).',
+      '- It is completely fine to return an empty cuts array if the speaker is',
+      '  clean. Do not invent cuts to seem useful.',
       '',
       'Output EXACTLY this JSON, nothing else (no prose, no fences, no commentary):',
       '{"cuts":[{"start":2.30,"end":3.10,"kind":"false_start","reason":"truncated word \'th-\' before restart"}],"summary":"Found 3 fillers and 5 false starts."}',
@@ -266,7 +275,7 @@ function analyseTranscriptWithClaude(transcript, opts) {
       '"kind" must be: filler | false_start | mistake. start and end are seconds.',
     ].join('\n');
 
-    const sysPrompt = 'You are an audio editing assistant. Return ONLY valid JSON. No tool use — just read the transcript and emit cut ranges. Be AGGRESSIVE about catching false starts and self-corrections; the user is editing a talking-head video and wants a clean final cut.';
+    const sysPrompt = 'You are a careful audio editing assistant. Return ONLY valid JSON. No tool use — just read the transcript and emit cut ranges. Be CONSERVATIVE: only cut clear, obvious mistakes (fillers, stutters, false starts, exact repeats). When in doubt, do not cut. Cutting real speech is far worse than missing a stutter. Returning an empty cut list is a valid, good answer for clean speech.';
 
     // Pure text-in / JSON-out — Haiku is plenty and 3-5x faster than the
     // user's default model (which could be Opus and was timing out on
@@ -2297,12 +2306,17 @@ const server = http.createServer((req, res) => {
         const inP  = (typeof clipIn  === 'number') ? clipIn  : 0;
         const outP = (typeof clipOut === 'number') ? clipOut : Number.MAX_SAFE_INTEGER;
         log(`clip used range in source: [${inP.toFixed(3)}, ${outP.toFixed(3)}] (${(outP - inP).toFixed(2)}s on timeline)`);
+        // Leave a natural breath at each end of a silence instead of removing
+        // the whole thing — cutting a silence down to zero makes a hard,
+        // jarring jump-cut and removes the speaker's pacing. We keep 0.3s on
+        // each side, so a 2.0s pause becomes a 1.4s cut and still feels human.
+        const SILENCE_PAD = 0.3;
         const silenceCuts = allSilences
           .map(c => {
-            // Clip the silence to the [inP, outP] window
-            const start = Math.max(c.start, inP);
-            const end   = Math.min(c.end,   outP);
-            if (end - start < 0.3) return null;  // sliver — skip
+            // Clip the silence to the [inP, outP] window, then pad inward.
+            const start = Math.max(c.start, inP) + SILENCE_PAD;
+            const end   = Math.min(c.end,   outP) - SILENCE_PAD;
+            if (end - start < 0.4) return null;  // too short after padding — skip
             const dur = end - start;
             return {
               start, end, duration: dur, kind: 'silence',
