@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "4.4";
+var HOST_JSX_VERSION = "4.5";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -388,18 +388,15 @@ function ccApplyAutoCuts(cutsJson) {
         // so we accumulate a running offset and subtract it from later cuts.
         cuts.sort(function (a, b) { return a.start - b.start; });
 
-        // Merge cuts that are close together. Two reasons:
-        //  1. The silence pass and the transcript pass overlap — same span
-        //     covered twice → ripples twice → sliver.
-        //  2. THE BIG ONE: ffmpeg flags dense micro-pauses, so two "real"
-        //     cuts can be separated by just 1-5 frames of audio. That tiny
-        //     island isn't speech (a real word is longer) — it's a breath,
-        //     click or noise blip — and it survives every extract as the
-        //     1-frame sliver the user keeps seeing.
-        // So: if the GAP between two cuts is shorter than MERGE_GAP_SEC,
-        // swallow the island into one combined cut. 0.25s is shorter than
-        // any intelligible word but long enough to keep real speech.
-        var MERGE_GAP_SEC = 0.25;
+        // Merge cuts that are close together. When several cuts land within a
+        // second or two of each other, the bits of footage BETWEEN them
+        // survive as tiny 0.3-1.5s orphan clips — the "sliver" field the user
+        // keeps seeing. A fragment that short between two cuts is never a
+        // coherent thought worth keeping; collapsing the cuts together
+        // (cutting the island too) gives one clean cut instead of a row of
+        // stutter-clips. 1.5s is long enough to preserve a real short
+        // sentence but kills the orphan-fragment field.
+        var MERGE_GAP_SEC = 1.5;
         var mergedCuts = [];
         for (var mi = 0; mi < cuts.length; mi++) {
             var mc = cuts[mi];
