@@ -1016,103 +1016,208 @@ function momentTypeToTrendPack(type, idx) {
 // Render each moment as its own short MP4 by calling remotion render with
 // the AutoEditMoment composition and JSON-encoded props. Returns an array
 // of { ok, file, atSec, type, label, durationSec, reason? } in moment order.
-function renderMomentsParallel(moments, reqId, log, onProgress) {
+// Readable one-liner describing what a moment should show — fed to Claude.
+function _momentPayloadText(m) {
+  const p = (m && m.payload) || {};
+  if (typeof p.text === 'string' && p.text) return p.text;
+  if (p.number) return String(p.number) + (p.subject ? ' — ' + p.subject : '');
+  if (p.name) return String(p.name) + (p.subtitle ? ' (' + p.subtitle + ')' : '');
+  if (Array.isArray(p.items) && p.items.length) return p.items.join(' | ');
+  if (p.title) return String(p.title);
+  if (p.quote) return String(p.quote);
+  return m.label || m.type || 'graphic';
+}
+
+// AUTO EDIT — custom-generate each moment's motion graphic. For every moment
+// we spawn an agentic Claude that WRITES a fresh Remotion composition (no
+// templates) and renders it to a transparent .mov overlay. 4 run in
+// parallel; a moment that fails gets ONE retry, then is skipped. Returns the
+// same shape renderMomentsParallel did so the /autoedit endpoint is unchanged.
+function generateMomentsParallel(moments, reqId, log, onProgress) {
   const MAX_INFLIGHT = 4;
-  const REMOTION_DIR = path.join(WORK_DIR, 'remotion-intro');
   const cacheDir = path.join(OUTPUT_DIR, 'cache');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
 
   const tasks = moments.map((m, idx) => {
-    // Duration: a touch longer than the speech window, capped 2.5..6s.
     const speechDur = Math.max(0.5, m.endSec - m.startSec);
     const durationSec = Math.min(6, Math.max(2.5, speechDur + 0.6));
-    const durationFrames = Math.floor(durationSec * 30); // assume 30fps comp
-    // Hash for caching
-    const propsJson = JSON.stringify({ moment: m, durationFrames });
-    const hash = crypto.createHash('md5').update(propsJson).digest('hex').slice(0, 10);
-    const outFile = path.join(cacheDir, `ae_${reqId.slice(0, 8)}_${idx}_${hash}.mp4`);
-    return { idx, moment: m, propsJson, outFile, durationSec, durationFrames };
+    const durationFrames = Math.round(durationSec * 30);
+    const outFile = path.join(cacheDir, `ae_${reqId.slice(0, 8)}_${idx}_${Date.now()}.mov`);
+    return { idx, moment: m, outFile, durationSec, durationFrames };
   });
 
   let done = 0;
   const total = tasks.length;
   const results = new Array(total);
 
-  function runOne(task) {
+  function buildPrompt(task) {
+    const m = task.moment;
+    return [
+      'Create a motion-graphic OVERLAY for a video. It will be placed on a',
+      'track ABOVE the speaker\'s footage, so it MUST have a fully transparent',
+      'background — only the graphic elements are visible.',
+      '',
+      'THE MOMENT (pulled from the video transcript):',
+      '  type: ' + (m.type || 'fact'),
+      '  show this: ' + _momentPayloadText(m),
+      '  on screen for: ' + task.durationSec.toFixed(1) + 's (' + task.durationFrames + ' frames @ 30fps)',
+      '',
+      'BUILD IT:',
+      '- Write a FRESH Remotion composition from scratch. Do NOT copy or import',
+      '  a template from src/templates/. Build the animation yourself.',
+      '- DO use the style library at ' + WORK_DIR + '/remotion-intro/src/lib/',
+      '  for easings, palettes, typography and motion helpers — read the files',
+      '  you need first to get exact export names.',
+      '- 1920x1080, 30fps, EXACTLY ' + task.durationFrames + ' frames.',
+      '- TRANSPARENT background — this is CRITICAL. The composition root must',
+      '  have NO opaque background (no solid-color AbsoluteFill behind it).',
+      '  Render with EXACTLY this codec config so the alpha channel survives:',
+      '      --codec prores --prores-profile 4444',
+      '  ProRes 422 (the default) has NO alpha and will black out the video.',
+      '  You MUST pass --prores-profile 4444. After rendering, the file\'s',
+      '  pixel format must be yuva444p10le (alpha-capable) — verify with',
+      '  ffprobe if unsure and re-render if it is not.',
+      '- It is an OVERLAY, not a full-screen card: keep it to a lower-third,',
+      '  corner, or side panel as fits the type. It supports the speech, it',
+      '  does not cover the speaker.',
+      '- It MUST animate in at the start and out before the end — never static.',
+      '- Render the final file to EXACTLY this path:',
+      '  ' + task.outFile,
+      '',
+      'When finished, the file at ' + task.outFile + ' must exist on disk.',
+      'Emit [[IMPORT:' + task.outFile + ']] when done.',
+    ].join('\n');
+  }
+
+  function runOne(task, isRetry) {
     return new Promise((resolve) => {
-      if (fs.existsSync(task.outFile)) {
-        log(`render[${task.idx}] cache hit ${task.moment.type}`);
-        results[task.idx] = {
-          ok: true, file: task.outFile, atSec: task.moment.startSec,
-          type: task.moment.type, label: task.moment.label || '',
-          durationSec: task.durationSec, trendPack: task.moment.trendPack,
-        };
-        done++; if (onProgress) onProgress(done, total);
-        resolve();
-        return;
-      }
-
-      const propsArg = '--props=' + task.propsJson;
+      const tag = `gen[${task.idx}]${isRetry ? ' (retry)' : ''}`;
       const args = [
-        'remotion', 'render', 'src/index.ts', 'AutoEditMoment',
-        task.outFile, propsArg,
-        '--codec', 'h264',
-        '--log', 'error',
-        '--frames', `0-${task.durationFrames - 1}`,
+        '-p',
+        '--output-format', 'stream-json',
+        '--verbose',
+        '--permission-mode', 'bypassPermissions',
+        '--append-system-prompt', SYSTEM_PROMPT,
+        '--no-session-persistence',
+        buildPrompt(task),
       ];
-      const proc = spawn('npx', args, { cwd: REMOTION_DIR, env: process.env });
+      // stdin 'ignore' — otherwise the claude CLI blocks waiting for stdin.
+      const proc = spawn('claude', args, {
+        cwd: WORK_DIR, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
+      });
       if (_activeAutoedit) _activeAutoedit.children.add(proc);
+      log(`${tag} spawned pid=${proc.pid} ${task.moment.type}`);
 
-      const HARD_TIMEOUT_MS = 60000;
-      let killed = false;
-      const killer = setTimeout(() => { killed = true; try { proc.kill('SIGKILL'); } catch {} }, HARD_TIMEOUT_MS);
+      let lineBuf = '';
+      let lastActivity = Date.now();
+      let finished = false;
 
-      let errBuf = '';
-      proc.stderr.on('data', d => { errBuf += d; });
-      proc.on('close', (code) => {
-        clearTimeout(killer);
+      proc.stdout.on('data', chunk => {
+        lastActivity = Date.now();
+        lineBuf += chunk.toString();
+        let nl;
+        while ((nl = lineBuf.indexOf('\n')) >= 0) {
+          const line = lineBuf.slice(0, nl).trim();
+          lineBuf = lineBuf.slice(nl + 1);
+          if (!line) continue;
+          let evt; try { evt = JSON.parse(line); } catch { continue; }
+          const status = streamEventToStatus(evt);
+          if (status) broadcastProgress('Graphic ' + (task.idx + 1) + ': ' + status, null, reqId);
+        }
+      });
+      proc.stderr.on('data', () => { lastActivity = Date.now(); });
+
+      // Generation legitimately goes quiet while Claude thinks/renders. Kill
+      // only on a real stall (5 min no output) or a 12-min hard cap.
+      const IDLE_MS = 5 * 60 * 1000;
+      const HARD_MS = 12 * 60 * 1000;
+      const startedAt = Date.now();
+      const watchdog = setInterval(() => {
+        if (finished) { clearInterval(watchdog); return; }
+        if (Date.now() - lastActivity > IDLE_MS || Date.now() - startedAt > HARD_MS) {
+          log(`${tag} watchdog kill (idle/hard cap)`);
+          try { proc.kill('SIGKILL'); } catch {}
+        }
+      }, 10000);
+
+      const conclude = () => {
+        if (finished) return;
+        finished = true;
+        clearInterval(watchdog);
         if (_activeAutoedit) _activeAutoedit.children.delete(proc);
-        if (code === 0 && fs.existsSync(task.outFile)) {
-          log(`render[${task.idx}] ok ${task.moment.type} -> ${task.outFile}`);
-          results[task.idx] = {
+        const fileExists = fs.existsSync(task.outFile) && (() => {
+          try { return fs.statSync(task.outFile).size > 1000; } catch { return false; }
+        })();
+        if (!fileExists) {
+          log(`${tag} produced no output file`);
+          resolve({ ok: false, atSec: task.moment.startSec, type: task.moment.type, label: task.moment.label || '', reason: 'no output' });
+          return;
+        }
+        // Verify the .mov actually has an alpha channel. ProRes 422 (no
+        // alpha) would black out the video underneath — that's a fail, not
+        // a usable graphic, so it goes to retry/skip like any other failure.
+        let hasAlpha = false;
+        try {
+          const pf = require('child_process').execFileSync(
+            FFMPEG_BIN.replace(/ffmpeg$/, 'ffprobe'),
+            ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=pix_fmt', '-of', 'csv=p=0', task.outFile],
+            { encoding: 'utf8', timeout: 15000 },
+          ).trim();
+          hasAlpha = /yuva|rgba|argb|\ba\b/i.test(pf);
+          if (!hasAlpha) log(`${tag} output is OPAQUE (pix_fmt=${pf}) — needs ProRes 4444`);
+        } catch (e) {
+          // ffprobe failed — don't hard-fail on that alone; accept the file.
+          hasAlpha = true;
+        }
+        if (hasAlpha) {
+          log(`${tag} ok -> ${task.outFile}`);
+          resolve({
             ok: true, file: task.outFile, atSec: task.moment.startSec,
             type: task.moment.type, label: task.moment.label || '',
-            durationSec: task.durationSec, trendPack: task.moment.trendPack,
-          };
+            durationSec: task.durationSec,
+          });
         } else {
-          const reason = killed ? 'timeout' : `exit ${code}`;
-          log(`render[${task.idx}] fail ${reason} stderr=${errBuf.slice(-400)}`);
-          results[task.idx] = {
-            ok: false, atSec: task.moment.startSec, type: task.moment.type,
-            label: task.moment.label || '', reason,
-          };
+          try { fs.unlinkSync(task.outFile); } catch {}
+          resolve({ ok: false, atSec: task.moment.startSec, type: task.moment.type, label: task.moment.label || '', reason: 'opaque (no alpha)' });
         }
-        done++; if (onProgress) onProgress(done, total);
-        resolve();
-      });
+      };
+      proc.on('exit', conclude);
+      proc.on('close', conclude);
       proc.on('error', (e) => {
-        clearTimeout(killer);
-        if (_activeAutoedit) _activeAutoedit.children.delete(proc);
-        log(`render[${task.idx}] spawn err ${e.message}`);
-        results[task.idx] = { ok: false, atSec: task.moment.startSec, type: task.moment.type, label: task.moment.label || '', reason: e.message };
-        done++; if (onProgress) onProgress(done, total);
-        resolve();
+        log(`${tag} spawn error ${e.message}`);
+        if (!finished) { finished = true; clearInterval(watchdog); resolve({ ok: false, atSec: task.moment.startSec, type: task.moment.type, label: task.moment.label || '', reason: e.message }); }
       });
     });
   }
 
-  // Pool: keep up to MAX_INFLIGHT promises in flight at any time.
-  return new Promise((resolveAll) => {
-    let next = 0;
-    let active = 0;
-    function pump() {
-      while (active < MAX_INFLIGHT && next < tasks.length) {
-        const t = tasks[next++]; active++;
-        runOne(t).then(() => { active--; if (next < tasks.length) pump(); else if (active === 0) resolveAll(results); });
-      }
+  // Per task: try once, retry once on failure, then give up (skip).
+  async function runWithRetry(task) {
+    let r = await runOne(task, false);
+    if (!r.ok && !(_activeAutoedit && _activeAutoedit.aborted)) {
+      r = await runOne(task, true);
     }
-    if (!tasks.length) resolveAll([]); else pump();
-  });
+    results[task.idx] = r;
+    done++;
+    if (onProgress) onProgress(done, total);
+  }
+
+  // Pool: up to MAX_INFLIGHT generations running at once.
+  return (async () => {
+    if (!tasks.length) return [];
+    const queue = tasks.slice();
+    const workers = [];
+    for (let w = 0; w < Math.min(MAX_INFLIGHT, queue.length); w++) {
+      workers.push((async () => {
+        while (queue.length) {
+          if (_activeAutoedit && _activeAutoedit.aborted) break;
+          const task = queue.shift();
+          await runWithRetry(task);
+        }
+      })());
+    }
+    await Promise.all(workers);
+    return results;
+  })();
 }
 
 // Real-time progress — bridge parses Claude's stream-json events and pushes
@@ -2610,18 +2715,13 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        // ── 5. Pick trend pack per moment (with rotation for variety) ─────
-        const PACK_ROTATION = ['tiktokKineticCaption', 'editorialBrutalist', 'modernDark-soft'];
-        for (let i = 0; i < filtered.length; i++) {
-          if (styleOverride && styleOverride !== 'auto') filtered[i].trendPack = styleOverride;
-          else if (!filtered[i].trendPack) filtered[i].trendPack = momentTypeToTrendPack(filtered[i].type, i);
-        }
-
-        // ── 6. Render each moment as its own short MP4 ────────────────────
-        broadcastProgress('Rendering motion graphics', 40, reqId);
-        const renderResults = await renderMomentsParallel(filtered, reqId, log, (done, total) => {
+        // ── 5. Custom-generate each moment's graphic ──────────────────────
+        // Claude writes a fresh Remotion composition per moment — no
+        // templates. Slow (minutes each) but every graphic is bespoke.
+        broadcastProgress('Generating motion graphics', 40, reqId);
+        const renderResults = await generateMomentsParallel(filtered, reqId, log, (done, total) => {
           const pct = 40 + Math.floor((done / total) * 50);
-          broadcastProgress(`Rendering motion graphics (${done}/${total})`, pct, reqId);
+          broadcastProgress(`Generating motion graphics (${done}/${total})`, pct, reqId);
         });
 
         const applied = renderResults.filter(r => r.ok);
