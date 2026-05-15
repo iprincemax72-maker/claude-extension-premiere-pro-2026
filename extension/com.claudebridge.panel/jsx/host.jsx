@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "4.6";
+var HOST_JSX_VERSION = "4.7";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -293,8 +293,75 @@ function ccGetSelectedClip() {
 
         var pi = _ccSafe(function () { return found.projectItem; });
         var path = "";
+        var pathSource = "none";
         if (pi) {
+            // 1. Direct DOM method — works in most cases.
             path = _ccSafe(function () { return pi.getMediaPath && pi.getMediaPath(); }) || "";
+            if (path) pathSource = "getMediaPath";
+
+            // 2. Premiere column metadata. On some builds getMediaPath returns
+            //    empty for nested sequences, multi-cam sources, subclips and a
+            //    few MOV variants; the intrinsic media-path column still has
+            //    the real path.
+            if (!path) {
+                path = _ccSafe(function () {
+                    return pi.getColumnMetadata && pi.getColumnMetadata("Column.Intrinsic.MediaPath");
+                }) || "";
+                if (path) pathSource = "columnMetadata";
+            }
+
+            // 3. XMP metadata — Premiere stores a file path in xmpDM:filePath
+            //    for some clips. Pull it out with a regex; only accept it if
+            //    it looks like an actual filesystem path.
+            if (!path) {
+                path = _ccSafe(function () {
+                    if (!pi.getXMPMetadata) return "";
+                    var xmp = pi.getXMPMetadata();
+                    if (!xmp) return "";
+                    var patterns = [
+                        /<xmpDM:filePath>([^<]+)<\/xmpDM:filePath>/i,
+                        /<filePath[^>]*>([^<]+)<\/filePath>/i,
+                    ];
+                    for (var i = 0; i < patterns.length; i++) {
+                        var m = xmp.match(patterns[i]);
+                        if (m && m[1] && (m[1].indexOf("/") >= 0 || m[1].indexOf("\\") >= 0)) {
+                            return m[1].replace(/^file:\/\//, "");
+                        }
+                    }
+                    return "";
+                }) || "";
+                if (path) pathSource = "xmp";
+            }
+
+            // 4. QE walk — enable QE, find the QE item whose nodeId matches,
+            //    read its filePath. Often works when DOM/metadata fail.
+            if (!path) {
+                path = _ccSafe(function () {
+                    if (typeof app.enableQE === "function") app.enableQE();
+                    if (typeof qe === "undefined" || !qe || !qe.project) return "";
+                    var targetId = _ccSafe(function () { return pi.nodeId; });
+                    if (!targetId) return "";
+                    function walk(parent, depth) {
+                        if (!parent || depth > 8) return "";
+                        var n = _ccSafe(function () { return parent.numItems; });
+                        if (typeof n !== "number") return "";
+                        for (var i = 0; i < n; i++) {
+                            var ch = _ccSafe(function () { return parent.getItemAt(i); });
+                            if (!ch) continue;
+                            var chId = _ccSafe(function () { return ch.nodeId; });
+                            if (chId === targetId) {
+                                var fp = _ccSafe(function () { return ch.filePath; });
+                                if (fp) return fp;
+                            }
+                            var sub = walk(ch, depth + 1);
+                            if (sub) return sub;
+                        }
+                        return "";
+                    }
+                    return walk(qe.project, 0) || "";
+                }) || "";
+                if (path) pathSource = "qe";
+            }
         }
 
         var clipStart = _ccSafe(function () { return found.start && found.start.seconds; });
@@ -307,6 +374,7 @@ function ccGetSelectedClip() {
             ok: true,
             name: found.name || "",
             path: path,
+            pathSource: pathSource,
             track: trackKind + (trackIdx + 1),
             trackKind: trackKind,
             trackIdx: trackIdx,
