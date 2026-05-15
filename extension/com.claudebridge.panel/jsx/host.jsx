@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "4.8";
+var HOST_JSX_VERSION = "4.9";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -481,66 +481,133 @@ function ccApplyAutoCuts(cutsJson) {
         note("merged " + cuts.length + " cuts -> " + mergedCuts.length + " (gap<" + MERGE_GAP_SEC + "s collapsed)");
         cuts = mergedCuts;
 
-        // NEW CUT MECHANISM (host.jsx 4.8+): razor + razor + ripple-delete,
-        // exactly the way a human editor describes it. Replaces the old
-        // setInPoint/setOutPoint + qeSeq.extract() approach which had fuzzy
-        // boundary semantics — extract() decides internally where to actually
-        // cut, and the result was wrong frame + 1-frame slivers no matter how
-        // we snapped the in/out points.
+        // Razor + ripple-delete — exactly the "two cuts then delete the piece"
+        // mechanism. extract() has too many ambiguous boundary issues; we go
+        // razor-first and only fall through to extract() if EVERY razor
+        // attempt (multiple time formats, multiple APIs) genuinely produces
+        // no edit on the timeline.
         //
-        // Now per cut:
-        //   1. Snap start and end to integer-frame boundaries (no half-frames,
-        //      no +0.25 tricks).
-        //   2. Razor every video and audio track at the start frame.
-        //   3. Razor every video and audio track at the end frame.
-        //   4. On each track, find the resulting track-item whose start lands
-        //      on the start frame, and remove it with ripple-delete.
-        //
-        // Cuts are processed in REVERSE chronological order — applying the
-        // last cut first means earlier cuts' timeline coordinates stay
-        // valid (nothing before them has moved). That removes shift-tracking
-        // entirely; no shiftOffset, no drift, no rounding bookkeeping.
+        // The previous razor attempt in 4.8 looked like it failed because we
+        // trusted "didn't throw" = "worked". It doesn't — razor can silently
+        // no-op on a wrong time format. Here we VERIFY by counting track
+        // items before/after each attempt. If the count went up, it worked.
         var TICKS_PER_SEC = 254016000000;
-        function timeAtSec(sec) {
-            // Premiere razor accepts either a ticks string or a Time object,
-            // depending on version. Build both — caller tries whichever.
-            return {
-                ticks: String(Math.round(sec * TICKS_PER_SEC)),
-                makeTime: function () {
-                    try { var t = new Time(); t.seconds = sec; return t; } catch (e) { return null; }
-                },
-            };
+
+        function seqDurTicks() {
+            try { if (seq.end != null) return Number(seq.end); } catch (e) {}
+            return null;
         }
 
-        function razorAllTracksAt(sec) {
-            var t = timeAtSec(sec);
-            function tryRazor(track) {
-                if (!track || !track.razor) return false;
-                // Try ticks-string, then Time object, then seconds-number.
-                if (_ccSafe(function () { track.razor(t.ticks); return true; })) return true;
-                var tm = t.makeTime();
-                if (tm && _ccSafe(function () { track.razor(tm);    return true; })) return true;
-                if (_ccSafe(function () { track.razor(sec);         return true; })) return true;
-                return false;
-            }
+        function totalItemCount() {
+            var n = 0;
             var nv = _ccSafe(function () { return qeSeq.numVideoTracks; }) || 0;
             var na = _ccSafe(function () { return qeSeq.numAudioTracks; }) || 0;
             for (var i = 0; i < nv; i++) {
-                var trk = _ccSafe(function () { return qeSeq.getVideoTrackAt(i); });
-                if (trk) tryRazor(trk);
+                var t = _ccSafe(function () { return qeSeq.getVideoTrackAt(i); });
+                if (t) n += _ccSafe(function () { return t.numItems; }) || 0;
             }
             for (var i = 0; i < na; i++) {
-                var trk = _ccSafe(function () { return qeSeq.getAudioTrackAt(i); });
-                if (trk) tryRazor(trk);
+                var t = _ccSafe(function () { return qeSeq.getAudioTrackAt(i); });
+                if (t) n += _ccSafe(function () { return t.numItems; }) || 0;
             }
+            return n;
+        }
+
+        function secondsToTimecode(sec) {
+            var f = Math.round(fps);
+            var totalFrames = Math.round(sec * fps);
+            var ff = totalFrames % f;
+            var totalSecs = Math.floor(totalFrames / f);
+            var ss = totalSecs % 60;
+            var mm = Math.floor(totalSecs / 60) % 60;
+            var hh = Math.floor(totalSecs / 3600);
+            function p(n) { return n < 10 ? "0" + n : "" + n; }
+            return p(hh) + ":" + p(mm) + ":" + p(ss) + ":" + p(ff);
+        }
+
+        // Verified add-edit at a given time. Tries (in order): qeSeq.addEdit
+        // after moving the playhead, qeTrack.razor with TICKS, then with
+        // TIMECODE, then with seconds, then with a Time object. After EACH
+        // attempt, checks whether the track-item count actually increased.
+        // Returns the label of the method that worked, or false if nothing
+        // does. Caches the working method per call so subsequent cuts skip
+        // the trial-and-error and just use what we already proved works.
+        var _razorMethodCache = null;
+        function addEditAtTime(sec) {
+            var before = totalItemCount();
+            var ticks = String(Math.round(sec * TICKS_PER_SEC));
+            var tc = secondsToTimecode(sec);
+            var tObj = null;
+            try { tObj = new Time(); tObj.seconds = sec; } catch (e) {}
+
+            function tryMethod(label, fn) {
+                _ccSafe(fn);
+                var after = totalItemCount();
+                if (after > before) {
+                    note("    razor[" + label + "] worked (items " + before + " → " + after + ")");
+                    return true;
+                }
+                return false;
+            }
+
+            // If a previous cut figured out which method works, use that.
+            if (_razorMethodCache) {
+                if (_razorMethodCache(ticks, tc, tObj, sec)) {
+                    var after = totalItemCount();
+                    if (after > before) return true;
+                }
+            }
+
+            // Try qeSeq.addEdit via playhead — splits ALL tracks at once.
+            if (tryMethod("addEdit", function () {
+                if (seq.setPlayerPosition) seq.setPlayerPosition(ticks);
+                if (qeSeq.addEdit) qeSeq.addEdit();
+            })) {
+                _razorMethodCache = function (tk) {
+                    if (seq.setPlayerPosition) seq.setPlayerPosition(tk);
+                    if (qeSeq.addEdit) qeSeq.addEdit();
+                };
+                return true;
+            }
+
+            // Per-track razor — try each time format on EACH track in turn.
+            var nv = _ccSafe(function () { return qeSeq.numVideoTracks; }) || 0;
+            var na = _ccSafe(function () { return qeSeq.numAudioTracks; }) || 0;
+
+            function razorAllWith(arg) {
+                for (var i = 0; i < nv; i++) {
+                    var t = _ccSafe(function () { return qeSeq.getVideoTrackAt(i); });
+                    if (t && typeof t.razor === "function") _ccSafe(function () { t.razor(arg); });
+                }
+                for (var i = 0; i < na; i++) {
+                    var t = _ccSafe(function () { return qeSeq.getAudioTrackAt(i); });
+                    if (t && typeof t.razor === "function") _ccSafe(function () { t.razor(arg); });
+                }
+            }
+
+            if (tryMethod("razor(ticks)",    function () { razorAllWith(ticks); })) {
+                _razorMethodCache = function (tk) { razorAllWith(tk); };
+                return true;
+            }
+            if (tryMethod("razor(tc)",       function () { razorAllWith(tc);    })) {
+                _razorMethodCache = function (tk, tcArg) { razorAllWith(tcArg); };
+                return true;
+            }
+            if (tryMethod("razor(seconds)",  function () { razorAllWith(sec);   })) {
+                _razorMethodCache = function (tk, tcArg, tmArg, secArg) { razorAllWith(secArg); };
+                return true;
+            }
+            if (tObj && tryMethod("razor(Time)", function () { razorAllWith(tObj); })) {
+                _razorMethodCache = function (tk, tcArg, tmArg) { razorAllWith(tmArg); };
+                return true;
+            }
+
+            note("    razor: NO method increased item count");
+            return false;
         }
 
         function rippleDeleteSegmentAt(startSec, endSec) {
-            // After razoring at start + end, the segment between them is its
-            // own track-item on each track. Find it (start ≈ startSec, end ≈
-            // endSec) and remove with ripple. Frame-tolerance allows for tiny
-            // float imprecision in Premiere's reported start/end.
-            var tol = (1 / fps) * 0.4; // ~40% of a frame either way
+            var tol = (1 / fps) * 0.7;
             var anyRemoved = false;
             function processTrack(track) {
                 if (!track) return;
@@ -555,57 +622,138 @@ function ccApplyAutoCuts(cutsJson) {
                     if (Math.abs(s - startSec) < tol && Math.abs(e - endSec) < tol) {
                         var ok = _ccSafe(function () { item.remove(true, false); return true; });
                         if (ok) anyRemoved = true;
-                        return; // ripple shifted things — indices invalid past here
+                        return;
                     }
                 }
             }
             var nv = _ccSafe(function () { return qeSeq.numVideoTracks; }) || 0;
             var na = _ccSafe(function () { return qeSeq.numAudioTracks; }) || 0;
-            for (var i = 0; i < nv; i++) {
-                var trk = _ccSafe(function () { return qeSeq.getVideoTrackAt(i); });
-                processTrack(trk);
-            }
-            for (var i = 0; i < na; i++) {
-                var trk = _ccSafe(function () { return qeSeq.getAudioTrackAt(i); });
-                processTrack(trk);
-            }
+            for (var i = 0; i < nv; i++) processTrack(_ccSafe(function () { return qeSeq.getVideoTrackAt(i); }));
+            for (var i = 0; i < na; i++) processTrack(_ccSafe(function () { return qeSeq.getAudioTrackAt(i); }));
             return anyRemoved;
         }
 
-        // Sort DESCENDING so we cut from the end of the timeline back to the
-        // start — that way earlier cuts' positions are unaffected by ripples
-        // from later cuts.
-        cuts.sort(function (a, b) { return b.start - a.start; });
+        // Diagnostic — dump the timeline state at the start of the run.
+        // Helps identify if the apparent "wrong place" cuts are actually
+        // wrong, or if our reported timeline coords don't match Premiere's.
+        (function dumpTimeline() {
+            var nv = _ccSafe(function () { return qeSeq.numVideoTracks; }) || 0;
+            var na = _ccSafe(function () { return qeSeq.numAudioTracks; }) || 0;
+            note("timeline state: " + nv + " video tracks, " + na + " audio tracks");
+            for (var i = 0; i < Math.min(nv, 2); i++) {
+                var trk = _ccSafe(function () { return qeSeq.getVideoTrackAt(i); });
+                if (!trk) continue;
+                var n = _ccSafe(function () { return trk.numItems; }) || 0;
+                note("  V" + (i + 1) + ": " + n + " items");
+                for (var j = 0; j < Math.min(n, 5); j++) {
+                    var it = _ccSafe(function () { return trk.getItemAt(j); });
+                    if (!it) continue;
+                    var s = _ccSafe(function () { return it.start && it.start.seconds; });
+                    var e = _ccSafe(function () { return it.end   && it.end.seconds;   });
+                    if (typeof s === "number" && typeof e === "number") {
+                        note("    item[" + j + "] timeline " + s.toFixed(3) + "→" + e.toFixed(3));
+                    }
+                }
+            }
+            for (var i = 0; i < Math.min(na, 2); i++) {
+                var trk = _ccSafe(function () { return qeSeq.getAudioTrackAt(i); });
+                if (!trk) continue;
+                var n = _ccSafe(function () { return trk.numItems; }) || 0;
+                note("  A" + (i + 1) + ": " + n + " items");
+            }
+        })();
 
+        // First try razor on cut 0 to determine if razor actually works on
+        // this Premiere build. If yes → razor for all cuts (descending order,
+        // no shift bookkeeping). If no → fall through to extract().
+        cuts.sort(function (a, b) { return b.start - a.start; }); // descending for razor
         var applied = 0, failed = 0;
+        var razorProven = null; // null = untested, true/false after probe
+
         for (var i = 0; i < cuts.length; i++) {
             var c = cuts[i];
             if (typeof c.start !== "number" || typeof c.end !== "number") { failed++; continue; }
-            // Timeline positions, frame-snapped (no fractional frames).
             var rawStart = timelineStart + (c.start - inPt);
             var rawEnd   = timelineStart + (c.end   - inPt);
             var startFrame = Math.round(rawStart * fps);
             var endFrame   = Math.round(rawEnd   * fps);
             if (startFrame < 0) startFrame = 0;
-            if (endFrame <= startFrame) { failed++; note("cut[" + i + "] zero-length after snap, skip"); continue; }
+            if (endFrame <= startFrame) { failed++; continue; }
             var startSec = startFrame / fps;
             var endSec   = endFrame   / fps;
-            note("cut[" + i + "] frames " + startFrame + "→" + endFrame + " (" + ((endFrame - startFrame) / fps).toFixed(3) + "s)");
+            note("cut[" + i + "] src " + c.start.toFixed(3) + "→" + c.end.toFixed(3)
+                + "  tl " + rawStart.toFixed(3) + "→" + rawEnd.toFixed(3)
+                + "  frames " + startFrame + "→" + endFrame
+                + " (" + ((endFrame - startFrame) / fps).toFixed(3) + "s)");
 
-            // 1. Razor every track at start
-            razorAllTracksAt(startSec);
-            note("  razor @ " + startSec.toFixed(3));
-            // 2. Razor every track at end
-            razorAllTracksAt(endSec);
-            note("  razor @ " + endSec.toFixed(3));
-            // 3. Find the segment between the razors on each track and ripple-delete it
-            var removed = rippleDeleteSegmentAt(startSec, endSec);
-            if (removed) {
+            // Razor at start
+            var razored1 = addEditAtTime(startSec);
+            // If the very first razor attempt produced nothing, razor is
+            // unusable on this build — stop trying and break to extract path.
+            if (razorProven === null) {
+                razorProven = razored1;
+                if (!razorProven) {
+                    note("  razor unproven on first attempt — switching to extract() for all cuts");
+                    break;
+                }
+            }
+            if (!razored1) { failed++; note("  razor @ start failed"); continue; }
+            // Razor at end
+            if (!addEditAtTime(endSec)) { failed++; note("  razor @ end failed"); continue; }
+            // Remove the segment now between the two edits
+            if (rippleDeleteSegmentAt(startSec, endSec)) {
                 applied++;
-                note("  ripple-deleted ok");
+                note("  removed via razor+ripple");
             } else {
                 failed++;
-                note("  no matching track-item found between razors");
+                note("  razor edits made but no matching segment found to remove");
+            }
+        }
+
+        // Fallback: razor was proven unusable → use extract() for all cuts.
+        if (razorProven === false) {
+            cuts.sort(function (a, b) { return a.start - b.start; }); // ascending for extract
+            var shiftOffset = 0;
+            applied = 0; failed = 0;
+            for (var i = 0; i < cuts.length; i++) {
+                var c = cuts[i];
+                if (typeof c.start !== "number" || typeof c.end !== "number") { failed++; continue; }
+                var rawStart = (timelineStart + (c.start - inPt)) - shiftOffset;
+                var rawEnd   = (timelineStart + (c.end   - inPt)) - shiftOffset;
+                var startFrame = Math.floor(rawStart * fps);
+                var endFrame   = Math.ceil(rawEnd   * fps) + 1;
+                if (startFrame < 0) startFrame = 0;
+                if (endFrame <= startFrame) { failed++; continue; }
+                var tStart = (startFrame + 0.25) / fps;
+                var tEnd   = (endFrame   + 0.25) / fps;
+                var cutDur = (endFrame - startFrame) / fps;
+                note("[extract] cut[" + i + "] frames " + startFrame + "→" + endFrame + " (" + cutDur.toFixed(3) + "s) shift=" + shiftOffset.toFixed(3));
+                var inOk = _ccSafe(function () { seq.setInPoint(tStart);  return true; });
+                var outOk = _ccSafe(function () { seq.setOutPoint(tEnd); return true; });
+                if ((!inOk || !outOk) && typeof Time !== "undefined") {
+                    try {
+                        var inT = new Time(); inT.seconds = tStart;
+                        var outT = new Time(); outT.seconds = tEnd;
+                        if (!inOk  && seq.setInPointAsTime)  { seq.setInPointAsTime(inT);   inOk  = true; }
+                        if (!outOk && seq.setOutPointAsTime) { seq.setOutPointAsTime(outT); outOk = true; }
+                    } catch (e2) {}
+                }
+                if (!inOk || !outOk) { failed++; continue; }
+                var durBefore = seqDurTicks();
+                var ok = _ccSafe(function () { qeSeq.extract(); return true; });
+                if (!ok) ok = _ccSafe(function () { seq.extract(); return true; });
+                if (ok) {
+                    var durAfter = seqDurTicks();
+                    if (durBefore != null && durAfter != null && durBefore > durAfter) {
+                        shiftOffset += (durBefore - durAfter) / TICKS_PER_SEC;
+                    } else {
+                        shiftOffset += cutDur;
+                    }
+                    applied++;
+                    note("  extract ok, shift " + shiftOffset.toFixed(3));
+                } else {
+                    failed++;
+                }
             }
         }
 
