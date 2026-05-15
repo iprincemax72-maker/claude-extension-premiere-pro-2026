@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "4.7";
+var HOST_JSX_VERSION = "4.8";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -481,90 +481,131 @@ function ccApplyAutoCuts(cutsJson) {
         note("merged " + cuts.length + " cuts -> " + mergedCuts.length + " (gap<" + MERGE_GAP_SEC + "s collapsed)");
         cuts = mergedCuts;
 
-        // Read the sequence's current duration in ticks — used to MEASURE how
-        // much each extract() actually removed, instead of trusting our own
-        // frame math (which drifts and leaves slivers).
-        function seqDurTicks() {
-            try { if (seq.end != null) return Number(seq.end); } catch (e) {}
-            return null;
+        // NEW CUT MECHANISM (host.jsx 4.8+): razor + razor + ripple-delete,
+        // exactly the way a human editor describes it. Replaces the old
+        // setInPoint/setOutPoint + qeSeq.extract() approach which had fuzzy
+        // boundary semantics — extract() decides internally where to actually
+        // cut, and the result was wrong frame + 1-frame slivers no matter how
+        // we snapped the in/out points.
+        //
+        // Now per cut:
+        //   1. Snap start and end to integer-frame boundaries (no half-frames,
+        //      no +0.25 tricks).
+        //   2. Razor every video and audio track at the start frame.
+        //   3. Razor every video and audio track at the end frame.
+        //   4. On each track, find the resulting track-item whose start lands
+        //      on the start frame, and remove it with ripple-delete.
+        //
+        // Cuts are processed in REVERSE chronological order — applying the
+        // last cut first means earlier cuts' timeline coordinates stay
+        // valid (nothing before them has moved). That removes shift-tracking
+        // entirely; no shiftOffset, no drift, no rounding bookkeeping.
+        var TICKS_PER_SEC = 254016000000;
+        function timeAtSec(sec) {
+            // Premiere razor accepts either a ticks string or a Time object,
+            // depending on version. Build both — caller tries whichever.
+            return {
+                ticks: String(Math.round(sec * TICKS_PER_SEC)),
+                makeTime: function () {
+                    try { var t = new Time(); t.seconds = sec; return t; } catch (e) { return null; }
+                },
+            };
         }
 
+        function razorAllTracksAt(sec) {
+            var t = timeAtSec(sec);
+            function tryRazor(track) {
+                if (!track || !track.razor) return false;
+                // Try ticks-string, then Time object, then seconds-number.
+                if (_ccSafe(function () { track.razor(t.ticks); return true; })) return true;
+                var tm = t.makeTime();
+                if (tm && _ccSafe(function () { track.razor(tm);    return true; })) return true;
+                if (_ccSafe(function () { track.razor(sec);         return true; })) return true;
+                return false;
+            }
+            var nv = _ccSafe(function () { return qeSeq.numVideoTracks; }) || 0;
+            var na = _ccSafe(function () { return qeSeq.numAudioTracks; }) || 0;
+            for (var i = 0; i < nv; i++) {
+                var trk = _ccSafe(function () { return qeSeq.getVideoTrackAt(i); });
+                if (trk) tryRazor(trk);
+            }
+            for (var i = 0; i < na; i++) {
+                var trk = _ccSafe(function () { return qeSeq.getAudioTrackAt(i); });
+                if (trk) tryRazor(trk);
+            }
+        }
+
+        function rippleDeleteSegmentAt(startSec, endSec) {
+            // After razoring at start + end, the segment between them is its
+            // own track-item on each track. Find it (start ≈ startSec, end ≈
+            // endSec) and remove with ripple. Frame-tolerance allows for tiny
+            // float imprecision in Premiere's reported start/end.
+            var tol = (1 / fps) * 0.4; // ~40% of a frame either way
+            var anyRemoved = false;
+            function processTrack(track) {
+                if (!track) return;
+                var n = _ccSafe(function () { return track.numItems; });
+                if (typeof n !== "number" || n <= 0) return;
+                for (var j = 0; j < n; j++) {
+                    var item = _ccSafe(function () { return track.getItemAt(j); });
+                    if (!item) continue;
+                    var s = _ccSafe(function () { return item.start && item.start.seconds; });
+                    var e = _ccSafe(function () { return item.end   && item.end.seconds;   });
+                    if (typeof s !== "number" || typeof e !== "number") continue;
+                    if (Math.abs(s - startSec) < tol && Math.abs(e - endSec) < tol) {
+                        var ok = _ccSafe(function () { item.remove(true, false); return true; });
+                        if (ok) anyRemoved = true;
+                        return; // ripple shifted things — indices invalid past here
+                    }
+                }
+            }
+            var nv = _ccSafe(function () { return qeSeq.numVideoTracks; }) || 0;
+            var na = _ccSafe(function () { return qeSeq.numAudioTracks; }) || 0;
+            for (var i = 0; i < nv; i++) {
+                var trk = _ccSafe(function () { return qeSeq.getVideoTrackAt(i); });
+                processTrack(trk);
+            }
+            for (var i = 0; i < na; i++) {
+                var trk = _ccSafe(function () { return qeSeq.getAudioTrackAt(i); });
+                processTrack(trk);
+            }
+            return anyRemoved;
+        }
+
+        // Sort DESCENDING so we cut from the end of the timeline back to the
+        // start — that way earlier cuts' positions are unaffected by ripples
+        // from later cuts.
+        cuts.sort(function (a, b) { return b.start - a.start; });
+
         var applied = 0, failed = 0;
-        var shiftOffset = 0;
         for (var i = 0; i < cuts.length; i++) {
             var c = cuts[i];
             if (typeof c.start !== "number" || typeof c.end !== "number") { failed++; continue; }
-            // Original timeline positions, then subtract the cumulative ripple
-            // shift from all previously-applied cuts.
-            var rawStart = (timelineStart + (c.start - inPt)) - shiftOffset;
-            var rawEnd   = (timelineStart + (c.end   - inPt)) - shiftOffset;
-            // ── Frame snapping — kill the 1-frame sliver ───────────────────
-            // The old approach passed frame-boundary seconds (e.g. 77/23.976)
-            // to setInPoint/setOutPoint. That's a float on the EXACT edge —
-            // Premiere can round it to frame 76 OR 77 depending on float bits,
-            // and when it rounds the end DOWN you get a 1-frame leftover.
-            //
-            // Fix: (1) work in integer frame numbers, (2) extend the cut end
-            // by ONE extra frame — it's the end of a silence/filler so eating
-            // one extra frame there is invisible, and it guarantees the sliver
-            // gets consumed, (3) hand setIn/OutPoint the MIDPOINT of the target
-            // frame, which Premiere cannot round to anything but that frame.
-            var startFrame = Math.floor(rawStart * fps);
-            var endFrame   = Math.ceil(rawEnd  * fps) + 1;   // +1 frame kills the sliver
+            // Timeline positions, frame-snapped (no fractional frames).
+            var rawStart = timelineStart + (c.start - inPt);
+            var rawEnd   = timelineStart + (c.end   - inPt);
+            var startFrame = Math.round(rawStart * fps);
+            var endFrame   = Math.round(rawEnd   * fps);
             if (startFrame < 0) startFrame = 0;
-            if (endFrame <= startFrame) { failed++; continue; }
-            // Hand setIn/OutPoint a value 0.25 frames into the target frame.
-            // 0.5 (the midpoint) sits exactly on the rounding tie-point, so
-            // Premiere can snap it either way; 0.25 lands on `frame` under
-            // both floor() and round-to-nearest. Unambiguous.
-            var tStart = (startFrame + 0.25) / fps;
-            var tEnd   = (endFrame   + 0.25) / fps;
-            var cutDur = (endFrame - startFrame) / fps;      // computed fallback only
-            note("cut[" + i + "] raw " + rawStart.toFixed(3) + "→" + rawEnd.toFixed(3) + " frames " + startFrame + "→" + endFrame + " (" + cutDur.toFixed(3) + "s)  shift=" + shiftOffset.toFixed(3));
+            if (endFrame <= startFrame) { failed++; note("cut[" + i + "] zero-length after snap, skip"); continue; }
+            var startSec = startFrame / fps;
+            var endSec   = endFrame   / fps;
+            note("cut[" + i + "] frames " + startFrame + "→" + endFrame + " (" + ((endFrame - startFrame) / fps).toFixed(3) + "s)");
 
-            // Set sequence in/out — try several signatures because the API
-            // varies (seconds vs Time vs Time-string vs ticks).
-            var inOk = false, outOk = false;
-            try { seq.setInPoint(tStart);  inOk  = true; } catch (e) { note("setInPoint(num) failed: " + e); }
-            try { seq.setOutPoint(tEnd);   outOk = true; } catch (e) { note("setOutPoint(num) failed: " + e); }
-            if (!inOk || !outOk) {
-                // Try with Time objects
-                try {
-                    var inT = new Time(); inT.seconds = tStart;
-                    var outT = new Time(); outT.seconds = tEnd;
-                    if (!inOk  && seq.setInPointAsTime)  { seq.setInPointAsTime(inT);   inOk  = true; }
-                    if (!outOk && seq.setOutPointAsTime) { seq.setOutPointAsTime(outT); outOk = true; }
-                } catch (e2) { note("setIn/OutPointAsTime failed: " + e2); }
-            }
-            if (!inOk || !outOk) { failed++; note("could not set in/out points"); continue; }
-
-            // Now extract — removes the in/out range across all tracks and ripples
-            var durBefore = seqDurTicks();
-            var extracted = false;
-            try {
-                if (qeSeq.extract) { qeSeq.extract(); extracted = true; note("  qeSeq.extract() ok"); }
-            } catch (e3) { note("qeSeq.extract failed: " + e3); }
-            if (!extracted) {
-                // Fallback to seq.extract() if QE didn't have it
-                try { if (seq.extract) { seq.extract(); extracted = true; note("  seq.extract() ok"); } }
-                catch (e4) { note("seq.extract failed: " + e4); }
-            }
-            if (extracted) {
+            // 1. Razor every track at start
+            razorAllTracksAt(startSec);
+            note("  razor @ " + startSec.toFixed(3));
+            // 2. Razor every track at end
+            razorAllTracksAt(endSec);
+            note("  razor @ " + endSec.toFixed(3));
+            // 3. Find the segment between the razors on each track and ripple-delete it
+            var removed = rippleDeleteSegmentAt(startSec, endSec);
+            if (removed) {
                 applied++;
-                // MEASURE what extract() actually removed, don't trust our
-                // frame math. The difference between computed and actual is
-                // exactly what leaves slivers on every following cut.
-                var durAfter = seqDurTicks();
-                if (durBefore != null && durAfter != null && durBefore > durAfter) {
-                    var measured = (durBefore - durAfter) / 254016000000;
-                    shiftOffset += measured;
-                    note("  removed (measured) " + measured.toFixed(4) + "s  shift now " + shiftOffset.toFixed(3));
-                } else {
-                    shiftOffset += cutDur;
-                    note("  removed (computed) " + cutDur.toFixed(4) + "s  shift now " + shiftOffset.toFixed(3));
-                }
+                note("  ripple-deleted ok");
             } else {
                 failed++;
+                note("  no matching track-item found between razors");
             }
         }
 
