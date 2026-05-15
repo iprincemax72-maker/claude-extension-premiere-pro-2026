@@ -2186,6 +2186,73 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Add Edit — same as Cmd+K / Shift+C in Premiere. We use osascript to
+  // click the Sequence > "Add Edit to All Tracks" menu item directly, which
+  // is the SAME path Premiere takes when the user hits the shortcut.
+  // Bypasses the QE razor() API entirely (which was a silent no-op on this
+  // Premiere build). The panel calls this AFTER positioning the playhead.
+  if (req.method === 'POST' && req.url === '/addedit') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      // Two candidates — "Add Edit to All Tracks" is the all-tracks variant
+      // (Cmd+Shift+K). "Add Edit" (Cmd+K) only razors targeted tracks. We
+      // try the all-tracks one first; fall through to "Add Edit" if not found.
+      const osaLines = [
+        'tell application "System Events"',
+        '  set ppList to (every process whose name contains "Premiere Pro")',
+        '  if (count of ppList) is 0 then error "Premiere not running"',
+        '  set pp to item 1 of ppList',
+        '  set frontmost of pp to true',
+        '  tell pp',
+        '    try',
+        '      click menu item "Add Edit to All Tracks" of menu "Sequence" of menu bar 1',
+        '    on error',
+        '      try',
+        '        click menu item "Add Edit" of menu "Sequence" of menu bar 1',
+        '      on error errMsg',
+        '        error "Add Edit menu item not found: " & errMsg',
+        '      end try',
+        '    end try',
+        '  end tell',
+        'end tell',
+      ];
+      const args = [];
+      for (const l of osaLines) { args.push('-e', l); }
+
+      let errOut = '';
+      let osa;
+      try {
+        osa = spawn('osascript', args);
+      } catch (e) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: String(e) }));
+        return;
+      }
+      osa.stderr.on('data', d => { errOut += d; });
+      osa.on('error', (e) => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: String(e) }));
+      });
+      osa.on('close', (code) => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        if (code === 0) {
+          res.end(JSON.stringify({ ok: true }));
+        } else {
+          const msg = errOut.trim();
+          const isPerm = /not allowed|assistive|accessibility|-1719|-25211/i.test(msg);
+          res.end(JSON.stringify({
+            ok: false,
+            error: isPerm
+              ? 'macOS blocked the Add Edit click — grant Accessibility permission. System Settings > Privacy & Security > Accessibility.'
+              : (msg || ('osascript exited ' + code)),
+          }));
+        }
+      });
+    });
+    return;
+  }
+
   // Debug-log sink. ExtendScript's File.write proved unreliable (0-byte
   // files), so host.jsx returns its debug.steps to the panel and the panel
   // POSTs them here to be written where they can actually be read.

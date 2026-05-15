@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "4.9";
+var HOST_JSX_VERSION = "5.0";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -1089,6 +1089,119 @@ function ccProbeTranscript() {
 
 // Trigger Premiere's Edit > Undo N times. Tries several APIs in order
 // because the right one varies across Premiere versions and OS.
+// Auto-Cut orchestrated cut primitives — used by the panel's new applyAutoCuts
+// which drives Premiere's NATIVE "Add Edit" command (via osascript on the
+// bridge) for the actual razor, instead of trying to coax QE's broken razor.
+// The panel calls these between bridge /addedit hits.
+
+// Position the playhead at an EXACT frame boundary. Returns the snapped
+// seconds value so the caller can use the same number for the razor + remove.
+function ccSetPlayhead(timeSec) {
+    try {
+        if (typeof app === "undefined" || !app || !app.project) return JSON.stringify({ ok: false, error: "no project" });
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) return JSON.stringify({ ok: false, error: "no active sequence" });
+
+        var fps = 30;
+        try {
+            var settings = seq.getSettings && seq.getSettings();
+            if (settings && settings.videoFrameRate && settings.videoFrameRate.ticks) {
+                fps = 254016000000 / Number(settings.videoFrameRate.ticks);
+            }
+        } catch (e) {}
+        if (!fps || fps < 1 || fps > 240) fps = 30;
+
+        // Snap to exact integer frame, then compute ticks at that frame boundary
+        // using the sequence's own ticksPerFrame so we land EXACTLY on a frame.
+        var frame = Math.round(Number(timeSec) * fps);
+        if (frame < 0) frame = 0;
+        var ticksPerFrame = 254016000000 / fps;
+        try {
+            var setSettings = seq.getSettings && seq.getSettings();
+            if (setSettings && setSettings.videoFrameRate && setSettings.videoFrameRate.ticks) {
+                ticksPerFrame = Number(setSettings.videoFrameRate.ticks);
+            }
+        } catch (e) {}
+        var ticks = Math.round(frame * ticksPerFrame);
+        var ticksStr = String(ticks);
+
+        var ok = _ccSafe(function () { seq.setPlayerPosition(ticksStr); return true; });
+        if (!ok) return JSON.stringify({ ok: false, error: "setPlayerPosition failed" });
+        return JSON.stringify({ ok: true, frame: frame, seconds: frame / fps, ticks: ticksStr });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e) });
+    }
+}
+
+// After the panel has razored at startSec and endSec via osascript Add Edit,
+// find the resulting track-item on each track and remove it with ripple.
+// Frame-aligned matching with a generous tolerance.
+function ccRippleDeleteAt(startSec, endSec) {
+    var debug = { steps: [] };
+    function note(s) { debug.steps.push(String(s)); }
+    try {
+        if (typeof app === "undefined" || !app || !app.project) return JSON.stringify({ ok: false, error: "no project", debug: debug });
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) return JSON.stringify({ ok: false, error: "no active sequence", debug: debug });
+
+        var fps = 30;
+        try {
+            var settings = seq.getSettings && seq.getSettings();
+            if (settings && settings.videoFrameRate && settings.videoFrameRate.ticks) {
+                fps = 254016000000 / Number(settings.videoFrameRate.ticks);
+            }
+        } catch (e) {}
+        if (!fps || fps < 1 || fps > 240) fps = 30;
+
+        if (typeof app.enableQE === "function") app.enableQE();
+        var qeSeq = (typeof qe !== "undefined" && qe && qe.project && qe.project.getActiveSequence)
+            ? qe.project.getActiveSequence() : null;
+        if (!qeSeq) return JSON.stringify({ ok: false, error: "QE unavailable", debug: debug });
+
+        var startSnap = Math.round(Number(startSec) * fps) / fps;
+        var endSnap   = Math.round(Number(endSec)   * fps) / fps;
+        var tol = (1 / fps) * 0.7;
+        note("ripple " + startSnap.toFixed(3) + "→" + endSnap.toFixed(3) + " tol=" + tol.toFixed(4));
+
+        var anyRemoved = false;
+        function processTrack(track, label) {
+            if (!track) return;
+            var n = _ccSafe(function () { return track.numItems; });
+            if (typeof n !== "number" || n <= 0) return;
+            for (var j = 0; j < n; j++) {
+                var item = _ccSafe(function () { return track.getItemAt(j); });
+                if (!item) continue;
+                var s = _ccSafe(function () { return item.start && item.start.seconds; });
+                var e = _ccSafe(function () { return item.end   && item.end.seconds;   });
+                if (typeof s !== "number" || typeof e !== "number") continue;
+                if (Math.abs(s - startSnap) < tol && Math.abs(e - endSnap) < tol) {
+                    var ok = _ccSafe(function () { item.remove(true, false); return true; });
+                    if (ok) {
+                        note("  removed " + label + " item " + s.toFixed(3) + "→" + e.toFixed(3));
+                        anyRemoved = true;
+                    } else {
+                        note("  " + label + " item matched but remove() refused");
+                    }
+                    return;
+                }
+            }
+            note("  no " + label + " item matched at this range");
+        }
+
+        var nv = _ccSafe(function () { return qeSeq.numVideoTracks; }) || 0;
+        var na = _ccSafe(function () { return qeSeq.numAudioTracks; }) || 0;
+        for (var i = 0; i < nv; i++) {
+            processTrack(_ccSafe(function () { return qeSeq.getVideoTrackAt(i); }), "V" + (i + 1));
+        }
+        for (var i = 0; i < na; i++) {
+            processTrack(_ccSafe(function () { return qeSeq.getAudioTrackAt(i); }), "A" + (i + 1));
+        }
+        return JSON.stringify({ ok: anyRemoved, removed: anyRemoved, debug: debug });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e), debug: debug });
+    }
+}
+
 function ccUndo(count) {
     var attempts = [];
     try {
