@@ -96,24 +96,9 @@ function detectSilences(clipPath, clipDuration, onProgress) {
   });
 }
 
-// Resolve whisper-cli binary + ggml model path. Both must exist for transcript
-// mode to work. Falls through several known locations.
-function resolveWhisper() {
-  const binCandidates  = ['/opt/homebrew/bin/whisper-cli', '/usr/local/bin/whisper-cli'];
-  const modelCandidates = [
-    '/opt/homebrew/share/whisper-cpp/ggml-base.bin',
-    '/usr/local/share/whisper-cpp/ggml-base.bin',
-    path.join(os.homedir(), '.cache/whisper/ggml-base.bin'),
-  ];
-  let bin = null, model = null;
-  for (const p of binCandidates)   { try { if (fs.existsSync(p)) { bin = p; break; } } catch {} }
-  for (const p of modelCandidates) { try { if (fs.existsSync(p)) { model = p; break; } } catch {} }
-  return { bin, model };
-}
-
-// Extract clip audio to a 16kHz mono WAV (whisper's preferred input), trimmed
+// Extract clip audio to a 16kHz mono WAV (what parakeet-mlx ingests), trimmed
 // to [inP, outP] of the source. Returns path to the temp wav.
-function extractAudioForWhisper(clipPath, inP, outP) {
+function extractAudioForTranscription(clipPath, inP, outP) {
   return new Promise((resolve, reject) => {
     const outPath = path.join(OUTPUT_DIR, '_autocut_audio_' + Date.now() + '.wav');
     const args = [
@@ -135,65 +120,82 @@ function extractAudioForWhisper(clipPath, inP, outP) {
   });
 }
 
-// Run whisper-cli on a wav. Returns array of word-level segments:
-//   [{ start: 0.0, end: 0.5, text: "Hello" }, ...]
-// Hard timeout scales with clip duration (allow ~1s per second of audio + 30s).
-function runWhisper(wavPath, audioDuration) {
+// Find the parakeet-mlx CLI. Installed via `uv tool install parakeet-mlx`
+// which puts it in ~/.local/bin.
+function resolveParakeet() {
+  const candidates = [
+    path.join(os.homedir(), '.local', 'bin', 'parakeet-mlx'),
+    '/opt/homebrew/bin/parakeet-mlx',
+    '/usr/local/bin/parakeet-mlx',
+  ];
+  for (const p of candidates) {
+    try { if (fs.existsSync(p)) return p; } catch {}
+  }
+  // Last resort — let PATH find it
+  return 'parakeet-mlx';
+}
+
+// NVIDIA Parakeet TDT via parakeet-mlx — runs natively on Apple Silicon,
+// ~20x realtime, leaderboard-#1 accuracy for English, clean punctuation +
+// sentence-level segments with confidence. Returns segments in the
+// { start, end, text } shape downstream code expects.
+function runParakeet(wavPath, audioDuration) {
   return new Promise((resolve, reject) => {
-    const { bin, model } = resolveWhisper();
-    if (!bin || !model) return reject(new Error('whisper-cli or model not installed'));
+    const bin = resolveParakeet();
+    const outDir = path.dirname(wavPath);
+    const baseName = path.basename(wavPath, path.extname(wavPath));
+    const jsonOut = path.join(outDir, baseName + '.json');
+    try { fs.unlinkSync(jsonOut); } catch {}
 
-    const outBase = wavPath.replace(/\.wav$/, '');
-    // NOTE: we deliberately do NOT use -ml 1 / -sow for "word-level" timing.
-    // That combo produces broken timestamps in this whisper.cpp build — past
-    // ~8s every word collapses onto a single point (verified in autocut logs).
-    // Segment-level output has RELIABLE timestamps and is actually better for
-    // detecting repeated sentences / false starts (which is sentence-shaped).
-    // -ml 60 keeps segments to readable phrase chunks instead of long runs.
-    const args = [
-      '-m', model,
-      '-f', wavPath,
-      '-oj',           // JSON output
-      '-ml', '60',     // max ~60 chars per segment — phrase-level chunks
-      '-of', outBase,
-      '-t', '4',       // threads
-      '-pp',           // print progress
-      '-nt',           // no timestamps in stdout (we read JSON)
-    ];
-
-    const proc = spawn(bin, args);
+    const args = ['--output-format', 'json', '--output-dir', outDir, wavPath];
+    const proc = spawn(bin, args, { env: process.env });
     let stderr = '';
     proc.stderr.on('data', d => stderr += d.toString().slice(-2000));
-    proc.stdout.on('data', () => {}); // drain so it doesn't block
+    proc.stdout.on('data', () => {}); // drain
 
-    const cap = Math.min(15 * 60 * 1000, Math.max(60000, audioDuration * 1500 + 30000));
-    const killer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} reject(new Error('whisper timeout after ' + Math.round(cap/1000) + 's')); }, cap);
+    // ~20x realtime cached; first run downloads the model (~600MB) and takes
+    // longer. Cap is generous to absorb the first-run download case.
+    const cap = Math.min(15 * 60 * 1000, Math.max(120000, audioDuration * 800 + 60000));
+    const killer = setTimeout(() => {
+      try { proc.kill('SIGKILL'); } catch {}
+      reject(new Error('parakeet timeout after ' + Math.round(cap / 1000) + 's'));
+    }, cap);
 
     proc.on('error', e => { clearTimeout(killer); reject(e); });
     proc.on('close', code => {
       clearTimeout(killer);
-      const jsonPath = outBase + '.json';
-      if (code !== 0 || !fs.existsSync(jsonPath)) {
-        reject(new Error('whisper exit ' + code + ': ' + stderr.slice(-300)));
+      if (code !== 0 || !fs.existsSync(jsonOut)) {
+        reject(new Error('parakeet exit ' + code + ': ' + stderr.slice(-300)));
         return;
       }
       try {
-        const j = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-        const segs = (j.transcription || []).map(s => {
-          // whisper-cli timestamps are in milliseconds inside `offsets`
-          const start = s.offsets && typeof s.offsets.from === 'number' ? s.offsets.from / 1000 : 0;
-          const end   = s.offsets && typeof s.offsets.to   === 'number' ? s.offsets.to   / 1000 : 0;
-          return { start, end, text: (s.text || '').trim() };
-        }).filter(s => s.text);
-        // Cleanup
-        try { fs.unlinkSync(jsonPath); } catch {}
-        try { fs.unlinkSync(wavPath);  } catch {}
+        const j = JSON.parse(fs.readFileSync(jsonOut, 'utf8'));
+        const segs = (j.sentences || []).map(s => ({
+          start: typeof s.start === 'number' ? s.start : 0,
+          end:   typeof s.end   === 'number' ? s.end   : 0,
+          text:  (s.text || '').trim(),
+        })).filter(s => s.text && s.end > s.start);
+        try { fs.unlinkSync(jsonOut); } catch {}
+        try { fs.unlinkSync(wavPath); } catch {}
         resolve(segs);
       } catch (e) {
-        reject(new Error('whisper json parse: ' + e.message));
+        reject(new Error('parakeet json parse: ' + e.message));
       }
     });
   });
+}
+
+// Transcription is parakeet-mlx, period. If it's not installed, fail loud
+// with the install command so the user knows exactly what to do — don't
+// silently degrade to a worse engine.
+async function runTranscribe(wavPath, audioDuration) {
+  const bin = resolveParakeet();
+  const found = bin && (bin.includes('/') ? fs.existsSync(bin) : false);
+  if (!found) {
+    throw new Error('parakeet-mlx is not installed. Install it with:  uv tool install parakeet-mlx');
+  }
+  console.log('  [transcribe] parakeet-mlx');
+  return runParakeet(wavPath, audioDuration);
 }
 
 // Ask Claude (small, fast call) to scan the transcript for fillers + false
@@ -356,7 +358,7 @@ function analyseTranscriptWithClaude(transcript, opts) {
   });
 }
 
-// Master transcript path — local whisper + claude analyze. Replaces the old
+// Master transcript path — local parakeet + claude analyze. Replaces the old
 // "Claude does everything" implementation that hung forever.
 async function transcriptCutsLocal(clipPath, clipDuration, clipIn, clipOut, silenceCuts, reqId, opts) {
   opts = opts || {};
@@ -368,25 +370,25 @@ async function transcriptCutsLocal(clipPath, clipDuration, clipIn, clipOut, sile
   // 1. Extract audio chunk
   broadcastProgress('Extracting audio', 20, reqId);
   let wavPath;
-  try { wavPath = await extractAudioForWhisper(clipPath, clipIn, clipOut); }
+  try { wavPath = await extractAudioForTranscription(clipPath, clipIn, clipOut); }
   catch (e) {
     log(`audio extract failed: ${e.message}`);
     console.log('  [autocut] audio extract failed: ' + e.message);
     return { cuts: silenceCuts, transcribed: false, summary: null };
   }
 
-  // 2. Whisper transcribe
-  broadcastProgress('Transcribing (whisper)', 35, reqId);
+  // 2. Transcribe (parakeet-mlx)
+  broadcastProgress('Transcribing', 35, reqId);
   let transcript;
-  try { transcript = await runWhisper(wavPath, audioDur); }
+  try { transcript = await runTranscribe(wavPath, audioDur); }
   catch (e) {
-    log(`whisper failed: ${e.message}`);
-    console.log('  [autocut] whisper failed: ' + e.message);
+    log(`transcribe failed: ${e.message}`);
+    console.log('  [autocut] transcribe failed: ' + e.message);
     try { fs.unlinkSync(wavPath); } catch {}
     return { cuts: silenceCuts, transcribed: false, summary: null };
   }
-  console.log('  [autocut] whisper transcribed ' + transcript.length + ' segments');
-  log(`whisper produced ${transcript.length} segments (word-level)`);
+  console.log('  [autocut] parakeet transcribed ' + transcript.length + ' segments');
+  log(`parakeet produced ${transcript.length} sentence segments`);
   // Dump the transcript so we can see exactly what Claude saw. Limit lines.
   for (let i = 0; i < Math.min(transcript.length, 500); i++) {
     const s = transcript[i];
@@ -411,7 +413,7 @@ async function transcriptCutsLocal(clipPath, clipDuration, clipIn, clipOut, sile
   const fillerCuts = analysis.cuts
     .filter(c => typeof c.start === 'number' && typeof c.end === 'number' && c.end > c.start)
     .map(c => ({
-      start: c.start + clipIn,   // whisper saw [clipIn, clipOut] audio, so 0 in transcript = clipIn in source
+      start: c.start + clipIn,   // parakeet saw [clipIn, clipOut] audio, so 0 in transcript = clipIn in source
       end:   c.end   + clipIn,
       kind:  c.kind || 'filler',
       reason: c.reason || c.kind || 'cut',
@@ -435,207 +437,6 @@ async function transcriptCutsLocal(clipPath, clipDuration, clipIn, clipOut, sile
     transcribed: true,
     summary: analysis.summary ? (analysis.summary + ' + ' + silenceCuts.length + ' pauses.') : null,
   };
-}
-
-// (legacy claude-does-everything path below — kept for fallback if needed)
-function transcriptAnalyse(clipPath, clipDuration, silenceCuts) {
-  return new Promise(resolve => {
-    const silenceJson = JSON.stringify(silenceCuts.map(c => ({
-      start: +c.start.toFixed(3),
-      end: +c.end.toFixed(3),
-      duration: +c.duration.toFixed(3),
-    })));
-
-    const userMsg = [
-      'TASK: auto-cut a talking-head video. You MUST transcribe and analyse — do not stop at silence detection.',
-      '',
-      'Source media file:  ' + clipPath,
-      'Duration:           ' + (typeof clipDuration === 'number' ? clipDuration.toFixed(2) + 's' : 'unknown'),
-      'Output dir:         ' + OUTPUT_DIR,
-      '',
-      'PRE-COMPUTED SILENCES (ffmpeg silencedetect, ≥0.6s @ -30dB). These are already confirmed — include them in final output:',
-      silenceJson,
-      '',
-      'STEPS — do every one:',
-      '',
-      'STEP 1 — TRANSCRIBE with WORD-LEVEL TIMESTAMPS.',
-      '  Try these paths in order, stop at the first that works:',
-      '  (a) asr-transcribe-to-text skill (Qwen3-ASR via MLX on macOS) — preferred.',
-      '  (b) whisper.cpp at /opt/homebrew/bin/whisper-cli with a base/small model.',
-      '  (c) `python -m whisper` or `faster-whisper` if installed.',
-      '  (d) Last resort: extract audio with ffmpeg → `ffmpeg -y -i "' + clipPath + '" -ac 1 -ar 16000 "' + OUTPUT_DIR + '/_autocut_audio.wav"`, then transcribe that wav.',
-      '  Only set "transcribed": false if ALL four paths fail. Note which path you used in your reasoning.',
-      '',
-      'STEP 2 — ANALYSE the transcript for cuts:',
-      '   - FILLER words: "um", "uh", "like" (as filler, not comparison), "you know", "I mean", "sorta", "kinda", redundant "actually"/"basically".',
-      '   - FALSE STARTS / REPEATS: speaker starts a sentence, stops, restarts a similar phrase. Cut the FIRST broken attempt, keep the better take.',
-      '   - SELF-CORRECTIONS: "I went to — sorry, I came from..." — cut the wrong half.',
-      '   Use word-level timestamps for tight cut boundaries. Include the trailing breath after a filler so the edit feels natural.',
-      '',
-      'STEP 3 — MERGE with silence cuts. If a filler-cut range overlaps a silence range, merge them and use the more descriptive reason.',
-      '',
-      'STEP 4 — DOUBLE-CHECK every proposed cut:',
-      '   - Would it orphan part of a word? Drop it.',
-      '   - Would it remove meaningful content? Drop it.',
-      '   - Be CONSERVATIVE. When unsure, skip.',
-      '',
-      'STEP 5 — Sort cuts by start time ascending.',
-      '',
-      'OUTPUT — your FINAL assistant message must be EXACTLY this JSON. No prose, no code fences, no commentary, nothing else:',
-      '{',
-      '  "transcribed": true,',
-      '  "cuts": [',
-      '    { "start": 2.30, "end": 3.10, "kind": "silence",     "reason": "long pause (0.8s)" },',
-      '    { "start": 5.20, "end": 5.62, "kind": "filler",      "reason": "um" },',
-      '    { "start": 14.0, "end": 16.4, "kind": "false_start", "reason": "restarted sentence" }',
-      '  ],',
-      '  "summary": "Found 6 pauses, 4 fillers, 2 false starts. Would remove 9.8s."',
-      '}',
-      '',
-      '"kind" must be one of: silence, filler, false_start, mistake. Do all reasoning silently — only emit the JSON in your final message.',
-    ].join('\n');
-
-    const sysPrompt = 'You are an audio editor\'s assistant inside an Adobe Premiere panel. You return ONLY valid JSON when asked — no prose. You use installed Claude Code skills (asr-transcribe-to-text, ffmpeg, etc.) freely. You are conservative about what to cut: when in doubt, keep the content.';
-
-    const args = [
-      '-p',
-      '--output-format', 'stream-json',
-      '--verbose',
-      '--permission-mode', 'bypassPermissions',
-      '--append-system-prompt', sysPrompt,
-      '--no-session-persistence',
-      userMsg,
-    ];
-
-    const proc = spawn('claude', args, { cwd: WORK_DIR, env: process.env });
-    let stderr = '';
-    let lineBuf = '';
-    let finalReply = '';
-    let didResolve = false;
-
-    // Stash this proc as the active autocut so a cancel call can kill it
-    _activeAutocut = proc;
-
-    proc.stderr.on('data', d => stderr += d);
-
-    // Hard timeout — Claude can hang on a stuck transcription tool. Kill the
-    // subprocess after 3 minutes and fall back to silence-only cuts.
-    const HARD_TIMEOUT_MS = 3 * 60 * 1000;
-    const killer = setTimeout(() => {
-      if (didResolve) return;
-      console.log('  [autocut] hard timeout — killing claude after ' + (HARD_TIMEOUT_MS/1000) + 's');
-      try { proc.kill('SIGKILL'); } catch {}
-      didResolve = true;
-      _activeAutocut = null;
-      resolve({ cuts: silenceCuts, transcribed: false, summary: null });
-    }, HARD_TIMEOUT_MS);
-
-    // Idle watchdog — if no stream-json event has arrived in 60s, claude is
-    // either hung or waiting on a tool that won't return. Kill it.
-    let lastActivity = Date.now();
-    const IDLE_TIMEOUT_MS = 90 * 1000;
-    const idleCheck = setInterval(() => {
-      if (didResolve) { clearInterval(idleCheck); return; }
-      if (Date.now() - lastActivity > IDLE_TIMEOUT_MS) {
-        console.log('  [autocut] idle ' + Math.round((Date.now() - lastActivity)/1000) + 's — killing claude');
-        try { proc.kill('SIGKILL'); } catch {}
-      }
-    }, 15000);
-
-    // Step inside the 18-92% transcript-stage budget — each tool call bumps
-    // the bar by a fixed amount, capped at 90% so we don't pretend to be done.
-    let stagePct = 18;
-    const stepBump = (status) => {
-      if (!status) return;
-      if (/^Transcrib/.test(status))            stagePct = Math.max(stagePct, 25);
-      else if (/^Reading|^Running ffmpeg/.test(status)) stagePct = Math.min(58, stagePct + 4);
-      else if (/^Analys/.test(status))          stagePct = Math.max(stagePct, 62);
-      else if (/^Double-check/.test(status))    stagePct = Math.max(stagePct, 88);
-      else                                       stagePct = Math.min(90, stagePct + 3);
-      broadcastProgress(status, stagePct);
-    };
-
-    proc.stdout.on('data', chunk => {
-      lastActivity = Date.now();
-      lineBuf += chunk.toString();
-      let nl;
-      while ((nl = lineBuf.indexOf('\n')) >= 0) {
-        const line = lineBuf.slice(0, nl).trim();
-        lineBuf = lineBuf.slice(nl + 1);
-        if (!line) continue;
-        let evt;
-        try { evt = JSON.parse(line); } catch { continue; }
-        const status = streamEventToStatus(evt);
-        if (status) stepBump(status);
-        if (evt.type === 'result' && typeof evt.result === 'string') finalReply = evt.result;
-        if (evt.type === 'assistant' && evt.message && Array.isArray(evt.message.content)) {
-          for (const blk of evt.message.content) {
-            if (blk.type === 'text' && typeof blk.text === 'string') finalReply = blk.text;
-          }
-        }
-      }
-    });
-
-    proc.on('error', () => {
-      if (didResolve) return; didResolve = true;
-      clearTimeout(killer); clearInterval(idleCheck); _activeAutocut = null;
-      resolve({ cuts: silenceCuts, transcribed: false, summary: null });
-    });
-
-    proc.on('close', () => {
-      if (didResolve) return;
-      clearTimeout(killer); clearInterval(idleCheck); _activeAutocut = null;
-      // Parse Claude's reply as JSON. Tolerant: strict → code-fenced → first {…} block.
-      let parsed = null;
-      const reply = (finalReply || '').trim();
-      console.log('  [autocut] claude reply length: ' + reply.length);
-      console.log('  [autocut] claude reply preview: ' + reply.slice(0, 200).replace(/\n/g, ' '));
-      // 1) Strict JSON
-      try { parsed = JSON.parse(reply); } catch {}
-      // 2) ```json ... ``` fenced block
-      if (!parsed) {
-        const fence = reply.match(/```(?:json)?\s*([\s\S]+?)```/);
-        if (fence) { try { parsed = JSON.parse(fence[1].trim()); } catch {} }
-      }
-      // 3) First {...} run that parses
-      if (!parsed) {
-        const starts = [];
-        for (let i = 0; i < reply.length; i++) if (reply[i] === '{') starts.push(i);
-        for (const s of starts) {
-          // Try expanding ends backwards for the largest matching parse
-          for (let e = reply.length; e > s + 1; e--) {
-            const chunk = reply.slice(s, e);
-            if (chunk[chunk.length - 1] !== '}') continue;
-            try { parsed = JSON.parse(chunk); if (parsed && Array.isArray(parsed.cuts)) break; parsed = null; } catch {}
-          }
-          if (parsed && Array.isArray(parsed.cuts)) break;
-        }
-      }
-      if (!parsed || !Array.isArray(parsed.cuts)) {
-        console.log('  [autocut] JSON parse failed — falling back to silence-only');
-        didResolve = true;
-        resolve({ cuts: silenceCuts, transcribed: false, summary: null });
-        return;
-      }
-      didResolve = true;
-      // Sanitize cuts
-      const safeClipDur = (typeof clipDuration === 'number' && clipDuration > 0) ? clipDuration : Number.MAX_SAFE_INTEGER;
-      const cuts = parsed.cuts
-        .filter(c => typeof c.start === 'number' && typeof c.end === 'number' && c.end > c.start && c.end <= safeClipDur + 0.5)
-        .map(c => ({
-          start: +c.start.toFixed(3),
-          end: +c.end.toFixed(3),
-          kind: c.kind || 'cut',
-          reason: c.reason || 'cut',
-        }))
-        .sort((a, b) => a.start - b.start);
-      resolve({
-        cuts,
-        transcribed: !!parsed.transcribed,
-        summary: parsed.summary || ('Found ' + cuts.length + ' cuts.'),
-      });
-    });
-  });
 }
 
 // Auto-transcode files Premiere Pro refuses (webm, vp8, vp9) to MP4 H.264.
@@ -2572,7 +2373,7 @@ const server = http.createServer((req, res) => {
           : (wantSilence ? 'No pauses detected.' : null);
 
         if (wantTranscript) {
-          // Local-whisper pipeline: ffmpeg → whisper-cli → claude (text in,
+          // Local pipeline: ffmpeg → parakeet-mlx → claude (text in,
           // JSON out). What Claude looks for is governed by `wantFillers` and
           // `wantRepeats` so the user can opt into them independently.
           log(`running transcript analysis — fillers=${wantFillers} repeats=${wantRepeats}`);
@@ -2693,7 +2494,7 @@ const server = http.createServer((req, res) => {
         }
 
         // ── 1. Get transcript. Prefer Premiere's own captions (instant) ───
-        //      and only fall back to whisper (~30-60s) if they're missing.
+        //      and only fall back to parakeet (~5-10s) if they're missing.
         let sentences;
         if (Array.isArray(premiereCaptions) && premiereCaptions.length >= 3) {
           log(`using Premiere captions: ${premiereCaptions.length} sentences`);
@@ -2704,15 +2505,15 @@ const server = http.createServer((req, res) => {
             .filter(s => s.text.length > 0);
           log(`normalised from captions: ${sentences.length} sentence units`);
         } else {
-          // Whisper fallback
+          // Transcribe fallback when Premiere captions aren't available
           broadcastProgress('Extracting audio', 5, reqId);
           if (_activeAutoedit.aborted) throw new Error('cancelled');
-          const wavPath = await extractAudioForWhisper(clipPath, inP, outP);
+          const wavPath = await extractAudioForTranscription(clipPath, inP, outP);
 
-          broadcastProgress('Transcribing with whisper', 12, reqId);
+          broadcastProgress('Transcribing', 12, reqId);
           if (_activeAutoedit.aborted) throw new Error('cancelled');
-          const transcriptRaw = await runWhisper(wavPath, totalDur);
-          log(`whisper transcript: ${(transcriptRaw || []).length} segments`);
+          const transcriptRaw = await runTranscribe(wavPath, totalDur);
+          log(`parakeet transcript: ${(transcriptRaw || []).length} sentence segments`);
 
           if (!transcriptRaw || transcriptRaw.length < 3) {
             broadcastProgressDone(reqId);
@@ -2721,18 +2522,15 @@ const server = http.createServer((req, res) => {
             _activeAutoedit = null;
             return;
           }
-          // runWhisper returns segments as { start, end, text } with start/end
-          // ALREADY in seconds. The old code read seg.offsets.from/to — a
-          // field that does not exist on runWhisper's output — so every
-          // sentence got startSec=endSec=0, which is why Auto-Edit produced
-          // nothing usable.
+          // The transcriber returns segments as { start, end, text } with
+          // start/end already in seconds.
           sentences = transcriptRaw.map((seg, i) => ({
             i,
             startSec: inP + (typeof seg.start === 'number' ? seg.start : 0),
             endSec:   inP + (typeof seg.end   === 'number' ? seg.end   : 0),
             text:     (seg.text || '').trim(),
           })).filter(s => s.text.length > 0);
-          log(`normalised from whisper: ${sentences.length} sentence units`);
+          log(`normalised from parakeet: ${sentences.length} sentence units`);
         }
 
         if (sentences.length < 3) {
