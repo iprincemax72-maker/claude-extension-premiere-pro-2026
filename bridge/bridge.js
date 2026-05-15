@@ -2626,9 +2626,10 @@ const UPDATE_TARGETS = [
   { url: GITHUB_RAW + '/bridge/bridge.js',                                 dest: __filename, label: 'bridge', needsBridgeRestart: true },
 ];
 
-async function checkForUpdates() {
+async function checkForUpdates(opts) {
+  const force = !!(opts && opts.force);
   const result = { ok: true, updated: [], bridgeChanged: false, premiereRestartNeeded: false, skipped: false };
-  if (process.env.CLAUDE_BRIDGE_NO_UPDATE === '1') {
+  if (!force && process.env.CLAUDE_BRIDGE_NO_UPDATE === '1') {
     console.log('Auto-update skipped (CLAUDE_BRIDGE_NO_UPDATE=1).\n');
     result.skipped = true;
     return result;
@@ -2676,13 +2677,24 @@ async function checkForUpdates() {
 
 // Manual update trigger from the panel
 async function handleUpdateRequest(req, res) {
-  try {
-    const result = await checkForUpdates();
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(result));
-  } catch (e) {
-    res.writeHead(500); res.end(JSON.stringify({ ok: false, error: String(e) }));
-  }
+  let body = '';
+  req.on('data', c => body += c);
+  req.on('end', async () => {
+    let force = false;
+    try {
+      const payload = body ? JSON.parse(body) : {};
+      force = !!payload.force;
+    } catch {}
+    try {
+      // A button click in the panel passes force:true so it bypasses
+      // CLAUDE_BRIDGE_NO_UPDATE (which exists only to stop automatic pulls).
+      const result = await checkForUpdates({ force });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500); res.end(JSON.stringify({ ok: false, error: String(e) }));
+    }
+  });
 }
 
 server.listen(PORT, '127.0.0.1', () => {
