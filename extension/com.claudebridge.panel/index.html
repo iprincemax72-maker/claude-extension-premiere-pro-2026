@@ -2405,7 +2405,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">8.8</span>
+    <span class="version-tag" id="versionTag">8.9</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -4475,7 +4475,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '8.8';
+  const PANEL_VERSION = '8.9';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -6253,14 +6253,90 @@ async function refreshStatus() {
   return false;
 }
 
-// Make the status pill clickable to manually retry / spawn the bridge.
-// Solves "stuck on Connecting…" — user can always force a fresh attempt.
+// Make the status pill clickable. Behaviour depends on connection state:
+//   - disconnected → retry / spawn the bridge
+//   - connected    → open a small menu with "Restart bridge" + "Refresh"
 statusEl.style.cursor = 'pointer';
-statusEl.title = 'Click to retry / start the bridge';
+statusEl.title = 'Click for bridge actions';
+
+function _closeStatusMenu() {
+  const m = document.getElementById('statusMenu');
+  if (m) m.remove();
+  document.removeEventListener('click', _onDocClickForMenu, true);
+}
+function _onDocClickForMenu(ev) {
+  const m = document.getElementById('statusMenu');
+  if (!m) return;
+  if (m.contains(ev.target) || statusEl.contains(ev.target)) return;
+  _closeStatusMenu();
+}
+
+async function _restartBridge() {
+  _closeStatusMenu();
+  statusEl.className = 'pill';
+  if (statusText) statusText.textContent = 'Restarting…';
+  try {
+    const r = await fetch(BRIDGE + '/restart', { method: 'POST' });
+    // Old bridges won't have /restart — surface a clear message
+    if (r.status === 404) {
+      if (statusText) statusText.textContent = 'old bridge';
+      alert('Bridge is too old to self-restart. Kill the node process in your terminal and rerun it manually.');
+      return;
+    }
+    // Response may or may not parse — bridge exits ~300ms after responding
+    try { await r.json(); } catch {}
+  } catch {
+    // Expected: the connection drops as the bridge exits. Not an error.
+  }
+  // Poll until the new bridge is up (up to ~10s).
+  let attempts = 0;
+  const poll = setInterval(async () => {
+    attempts++;
+    try {
+      const p = await fetch(BRIDGE + '/ping', { method: 'GET' });
+      if (p.ok) {
+        clearInterval(poll);
+        refreshStatus();
+        return;
+      }
+    } catch {}
+    if (attempts > 40) {
+      clearInterval(poll);
+      if (statusText) statusText.textContent = 'restart failed';
+    }
+  }, 250);
+}
+
+function _openStatusMenu() {
+  _closeStatusMenu();
+  const rect = statusEl.getBoundingClientRect();
+  const menu = document.createElement('div');
+  menu.id = 'statusMenu';
+  menu.style.cssText =
+    'position:fixed;top:' + (rect.bottom + 6) + 'px;right:12px;z-index:300;' +
+    'background:var(--bg-elevated);border:1px solid var(--border);' +
+    'border-radius:8px;padding:4px;min-width:160px;' +
+    'box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+  menu.innerHTML =
+    '<button type="button" data-act="restart" style="display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--text);font-size:12px;padding:6px 8px;border-radius:5px;cursor:pointer">Restart bridge</button>' +
+    '<button type="button" data-act="refresh" style="display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--text);font-size:12px;padding:6px 8px;border-radius:5px;cursor:pointer">Refresh status</button>';
+  for (const b of menu.querySelectorAll('button')) {
+    b.addEventListener('mouseenter', () => b.style.background = 'rgba(255,255,255,0.06)');
+    b.addEventListener('mouseleave', () => b.style.background = 'transparent');
+  }
+  menu.addEventListener('click', (ev) => {
+    const act = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-act');
+    if (act === 'restart') _restartBridge();
+    else if (act === 'refresh') { _closeStatusMenu(); refreshStatus(); }
+  });
+  document.body.appendChild(menu);
+  // Close on outside click — defer so this click doesn't immediately fire it
+  setTimeout(() => document.addEventListener('click', _onDocClickForMenu, true), 0);
+}
+
 statusEl.addEventListener('click', async () => {
   if (statusEl.classList.contains('ok')) {
-    // Already connected — just refresh the context
-    refreshStatus();
+    _openStatusMenu();
     return;
   }
   await startBridgeAndWait({ force: true });

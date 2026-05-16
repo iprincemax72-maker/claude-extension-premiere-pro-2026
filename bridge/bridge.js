@@ -2313,6 +2313,47 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ────────────────────────────────────────────────────────────────────────
+  // SELF-RESTART — spawn a detached copy of this process, then exit. The new
+  // process inherits the parent's stdio so the user still sees logs in their
+  // terminal. The Studio child is killed first so the new instance can
+  // re-bind the studio port cleanly. ~300ms delay between response and
+  // process.exit gives the response time to flush.
+  // ────────────────────────────────────────────────────────────────────────
+  if (req.method === 'POST' && req.url === '/restart') {
+    try {
+      // Kill the studio child if any — the new bridge will respawn on demand
+      try { if (_studioProc) _studioProc.kill('SIGTERM'); } catch {}
+      _studioProc = null; _studioReady = false;
+
+      // Spawn the replacement BEFORE we respond — if spawning fails we want
+      // to error out cleanly and stay alive.
+      const child = spawn(process.execPath, [__filename, ...process.argv.slice(2)], {
+        cwd: process.cwd(),
+        env: process.env,
+        detached: true,
+        stdio: 'inherit',
+      });
+      child.unref();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, restartingIn: 300 }));
+
+      // Give the response a moment to flush, then quit so the new process
+      // can bind the port. The new bridge needs to wait for port to be free
+      // — it has a small retry loop on listen() failure, but the OS
+      // typically releases an SO_REUSEADDR socket immediately.
+      setTimeout(() => {
+        try { server.close(); } catch {}
+        process.exit(0);
+      }, 300);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: String(e) }));
+    }
+    return;
+  }
+
   // Self-test: run several claude-spawn variants from INSIDE the bridge
   // process to find which one actually works here. Every variant works when
   // run standalone — so the failure is specific to this process context.
@@ -2999,15 +3040,32 @@ async function handleUpdateRequest(req, res) {
   });
 }
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log('Claude Bridge v2 running at http://localhost:' + PORT);
-  console.log('Session ID: ' + SESSION_ID);
-  console.log('Work dir:   ' + WORK_DIR);
-  console.log('Output dir: ' + OUTPUT_DIR);
-  console.log('Open Premiere Pro → Window → Extensions → Claude');
-  console.log('(keep this terminal open)\n');
-  checkForUpdates().catch(e => console.error('Update check error:', e.message));
+// Retry listen() up to ~10x if the port is still held by the previous
+// instance — used during /restart self-replacement so the new bridge can
+// bind cleanly even if the old one hasn't fully released the socket yet.
+let _listenAttempts = 0;
+function _tryListen() {
+  server.listen(PORT, '127.0.0.1', () => {
+    console.log('Claude Bridge v2 running at http://localhost:' + PORT);
+    console.log('Session ID: ' + SESSION_ID);
+    console.log('Work dir:   ' + WORK_DIR);
+    console.log('Output dir: ' + OUTPUT_DIR);
+    console.log('Open Premiere Pro → Window → Extensions → Claude');
+    console.log('(keep this terminal open)\n');
+    checkForUpdates().catch(e => console.error('Update check error:', e.message));
+  });
+}
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE' && _listenAttempts < 10) {
+    _listenAttempts++;
+    console.log('Port ' + PORT + ' busy (try ' + _listenAttempts + '/10), retrying in 300ms…');
+    setTimeout(_tryListen, 300);
+  } else {
+    console.error('Bridge listen failed:', err);
+    process.exit(1);
+  }
 });
+_tryListen();
 
 // Kill the Remotion Studio child when the bridge exits so it doesn't leak.
 function _shutdownStudio() {
