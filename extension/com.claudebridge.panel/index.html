@@ -1575,6 +1575,79 @@
   .autocut-btn:disabled { opacity: 0.45; cursor: not-allowed; }
   .autocut-btn.busy { color: var(--accent); border-color: var(--accent-line); }
 
+  /* ───── PREVIEW (REMOTION STUDIO IFRAME) ───── */
+  .preview-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 250;
+    background: var(--bg);
+    display: none;
+    flex-direction: column;
+  }
+  .preview-overlay.show { display: flex; }
+  .preview-bar {
+    height: 36px;
+    flex: 0 0 36px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+  }
+  .preview-bar-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    margin-right: auto;
+  }
+  .preview-bar-status {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .preview-bar-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 3px 9px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .preview-bar-btn:hover { background: rgba(255,255,255,0.05); }
+  .preview-frame-wrap {
+    flex: 1 1 auto;
+    position: relative;
+    min-height: 0;
+  }
+  .preview-frame {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #0a0a0a;
+  }
+  .preview-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--text-muted);
+    font-size: 12px;
+    gap: 10px;
+  }
+  .preview-loading.hidden { display: none; }
+  .preview-spinner {
+    width: 28px; height: 28px;
+    border: 2px solid rgba(255,255,255,0.1);
+    border-top-color: var(--text);
+    border-radius: 50%;
+    animation: previewSpin 0.9s linear infinite;
+  }
+  @keyframes previewSpin { to { transform: rotate(360deg); } }
+
   /* Auto-Cut review card — list of proposed cuts, each with Apply / Skip */
   /* ───── AUTO-CUT MODAL ───── */
   .autocut-modal {
@@ -2332,7 +2405,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">8.5</span>
+    <span class="version-tag" id="versionTag">8.6</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -2353,6 +2426,11 @@
         <line x1="12" y1="19" x2="20" y2="19"/>
       </svg>
     </button>
+    <button class="icon-btn" id="previewBtn" type="button" title="Live preview — Remotion Studio in panel" aria-label="Preview" style="margin-right:4px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+    </button>
     <button class="icon-btn" id="historyBtn" type="button" title="History — past renders" aria-label="History">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="9"/>
@@ -2363,6 +2441,23 @@
       <span class="led"></span>
       <span class="status-text">Connecting…</span>
     </div>
+  </div>
+</div>
+
+<!-- ───── REMOTION STUDIO LIVE PREVIEW (iframe overlay) ───── -->
+<div class="preview-overlay" id="previewOverlay" aria-hidden="true">
+  <div class="preview-bar">
+    <span class="preview-bar-title">Live Preview · Remotion Studio</span>
+    <span class="preview-bar-status" id="previewStatus">starting…</span>
+    <button class="preview-bar-btn" id="previewReloadBtn" type="button" title="Reload iframe">↻</button>
+    <button class="preview-bar-btn" id="previewCloseBtn" type="button" title="Close preview">Close</button>
+  </div>
+  <div class="preview-frame-wrap">
+    <div class="preview-loading" id="previewLoading">
+      <div class="preview-spinner"></div>
+      <div id="previewLoadingMsg">Booting Remotion Studio…</div>
+    </div>
+    <iframe class="preview-frame" id="previewFrame" title="Remotion Studio" src="about:blank"></iframe>
   </div>
 </div>
 
@@ -3323,6 +3418,12 @@ async function getPremiereContext() {
 async function importIntoPremiere(absPath, mode) {
   const escapedPath = absPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   const escapedMode = (mode || 'overlay').replace(/[^a-z]/gi, '');
+  // Fire a panel-side event so the video-pane preview can show the clip too.
+  try {
+    document.dispatchEvent(new CustomEvent('cc-render-complete', {
+      detail: { filePath: absPath, mode: mode || 'overlay' },
+    }));
+  } catch {}
   const raw = await evalES('ccImportToTimeline("' + escapedPath + '","' + escapedMode + '")');
   try { return JSON.parse(raw); } catch { return { ok:false, error:'parse failed', path:absPath }; }
 }
@@ -4029,6 +4130,154 @@ document.getElementById('historyClose').addEventListener('click', closeHistory);
 renderHistoryBadge();
 
 /* ═══════════════════════════════════════════════════════════════════════
+   LIVE PREVIEW — Remotion Studio iframe + auto-rendered video pane
+   ═══════════════════════════════════════════════════════════════════════ */
+(function setupLivePreview() {
+  const btn       = document.getElementById('previewBtn');
+  const overlay   = document.getElementById('previewOverlay');
+  const frame     = document.getElementById('previewFrame');
+  const loading   = document.getElementById('previewLoading');
+  const loadMsg   = document.getElementById('previewLoadingMsg');
+  const status    = document.getElementById('previewStatus');
+  const reloadBtn = document.getElementById('previewReloadBtn');
+  const closeBtn  = document.getElementById('previewCloseBtn');
+  if (!btn || !overlay) return;
+
+  let pollTimer = null;
+  let studioUrl = null;
+
+  function setStatus(t) { if (status) status.textContent = t; }
+  function setLoadMsg(t) { if (loadMsg) loadMsg.textContent = t; }
+  function showLoading(on) { if (loading) loading.classList.toggle('hidden', !on); }
+
+  async function openPreview() {
+    overlay.classList.add('show');
+    overlay.setAttribute('aria-hidden', 'false');
+    showLoading(true);
+    setLoadMsg('Booting Remotion Studio…');
+    setStatus('starting…');
+
+    try {
+      const r = await fetch('http://localhost:3737/studio/start', { method: 'POST' });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || 'failed to start');
+      studioUrl = j.url;
+
+      // Poll /studio/status until Studio is actually serving HTTP.
+      let attempts = 0;
+      const maxAttempts = 60; // ~30s
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(async () => {
+        attempts++;
+        try {
+          // The status endpoint marks ready when stdout shows the listening
+          // line, but to be safe ALSO probe the Studio HTTP directly.
+          const s = await fetch('http://localhost:3737/studio/status').then(r => r.json());
+          let serverUp = !!s.ready;
+          if (!serverUp) {
+            try {
+              const probe = await fetch(studioUrl, { method: 'GET' });
+              serverUp = probe.ok || probe.status === 200;
+            } catch {}
+          }
+          if (serverUp) {
+            clearInterval(pollTimer); pollTimer = null;
+            setStatus('connected');
+            setLoadMsg('Loading…');
+            frame.src = studioUrl;
+            frame.onload = () => showLoading(false);
+            // safety: hide loader after 4s even if onload doesn't fire
+            setTimeout(() => showLoading(false), 4000);
+            return;
+          }
+          if (attempts >= maxAttempts) {
+            clearInterval(pollTimer); pollTimer = null;
+            setStatus('timed out');
+            setLoadMsg('Studio took too long to start. Try Reload.');
+          } else {
+            setStatus('booting · ' + attempts + 's');
+          }
+        } catch (e) {
+          if (attempts >= maxAttempts) {
+            clearInterval(pollTimer); pollTimer = null;
+            setStatus('error');
+            setLoadMsg('Could not reach Studio: ' + (e && e.message || e));
+          }
+        }
+      }, 500);
+    } catch (e) {
+      setStatus('error');
+      setLoadMsg('Failed to start: ' + (e && e.message || e));
+    }
+  }
+
+  async function closePreview() {
+    overlay.classList.remove('show');
+    overlay.setAttribute('aria-hidden', 'true');
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    frame.src = 'about:blank';
+    // Leave Studio running in background so re-open is instant. User can
+    // explicitly stop via long-press (future) or by quitting the bridge.
+  }
+
+  btn.addEventListener('click', () => {
+    if (overlay.classList.contains('show')) closePreview();
+    else openPreview();
+  });
+  if (closeBtn) closeBtn.addEventListener('click', closePreview);
+  if (reloadBtn) reloadBtn.addEventListener('click', () => {
+    if (studioUrl) {
+      showLoading(true);
+      setLoadMsg('Reloading…');
+      frame.src = studioUrl + '?_t=' + Date.now();
+      setTimeout(() => showLoading(false), 1500);
+    }
+  });
+})();
+
+/* ───── VIDEO PANE — auto-show finished render at top of chat ───── */
+(function setupRenderVideoPane() {
+  // After each successful render, the chat receives an [[IMPORT:/path/to.mp4]]
+  // marker. Hook into the existing render-complete signal so we can also
+  // surface the finished clip in a small player at the top of the chat.
+  // Implementation: listen for a custom event that the chat dispatch fires.
+  document.addEventListener('cc-render-complete', (e) => {
+    try {
+      const detail = e.detail || {};
+      const filePath = detail.filePath;
+      if (!filePath) return;
+      injectVideoCard(filePath);
+    } catch {}
+  });
+
+  function injectVideoCard(filePath) {
+    const host = document.getElementById('chatList') || document.body;
+    if (!host) return;
+    // Remove previous pane (keep only the most recent)
+    const prev = document.getElementById('renderVideoCard');
+    if (prev) prev.remove();
+    const card = document.createElement('div');
+    card.id = 'renderVideoCard';
+    card.style.cssText =
+      'margin:8px 12px 4px;padding:6px;background:var(--bg-elevated);' +
+      'border:1px solid var(--border);border-radius:10px;';
+    const fileUrl = 'file://' + filePath;
+    card.innerHTML =
+      '<video controls preload="metadata" style="width:100%;border-radius:6px;display:block;background:#000" src="' +
+      fileUrl.replace(/"/g, '%22') + '"></video>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 4px 2px;">' +
+      '<span style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">' +
+      filePath.split('/').pop() + '</span>' +
+      '<button type="button" id="renderVideoClose" style="background:transparent;border:1px solid var(--border);color:var(--text);' +
+      'border-radius:5px;padding:2px 7px;font-size:10px;cursor:pointer">Close</button>' +
+      '</div>';
+    host.prepend(card);
+    const close = document.getElementById('renderVideoClose');
+    if (close) close.addEventListener('click', () => card.remove());
+  }
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════
    LOGS PANEL — live tail of bridge stdout + active autoedit/autocut logs
    ═══════════════════════════════════════════════════════════════════════ */
 (function setupLogsPanel() {
@@ -4187,7 +4436,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '8.5';
+  const PANEL_VERSION = '8.6';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');

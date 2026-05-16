@@ -28,6 +28,12 @@ let _activeAutocut = null;
 // can kill it. Holds { children: Set<ChildProcess>, aborted: bool }.
 let _activeAutoedit = null;
 
+// REMOTION STUDIO — singleton subprocess managed by /studio/* endpoints.
+const STUDIO_PORT = 7374;
+let _studioProc = null;
+let _studioReady = false;
+let _studioStartedAt = 0;
+
 // Resolve an absolute path to ffmpeg — falls back to bare 'ffmpeg' if no
 // absolute path is found. Needed because the bridge may be auto-spawned by
 // CEP with a minimal PATH that doesn't include brew bins.
@@ -2237,6 +2243,76 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ────────────────────────────────────────────────────────────────────────
+  // REMOTION STUDIO — live preview inside the panel via iframe.
+  // The panel opens an iframe to http://localhost:STUDIO_PORT; this bridge
+  // owns the studio subprocess so the panel doesn't have to spawn anything.
+  // ────────────────────────────────────────────────────────────────────────
+  if (req.method === 'POST' && req.url === '/studio/start') {
+    try {
+      if (_studioProc && _studioProc.exitCode === null) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, already: true, port: STUDIO_PORT, url: 'http://localhost:' + STUDIO_PORT }));
+        return;
+      }
+      // Spawn `npx remotion studio` from the Remotion project dir. --no-open
+      // and --browser=none stop it from launching the system browser.
+      _studioProc = spawn(
+        'npx',
+        ['remotion', 'studio', '--port=' + STUDIO_PORT, '--no-open', '--browser=none'],
+        { cwd: WORK_DIR, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] }
+      );
+      _studioReady = false;
+      _studioStartedAt = Date.now();
+      _studioProc.stdout.on('data', (d) => {
+        const s = d.toString();
+        // Studio prints "Server ready" / "Local:" when bound. Either marker = ready.
+        if (/server ready|local:|listening/i.test(s)) _studioReady = true;
+      });
+      _studioProc.stderr.on('data', (d) => {
+        // Treat stderr noise the same — sometimes Studio logs to stderr
+        const s = d.toString();
+        if (/server ready|local:|listening/i.test(s)) _studioReady = true;
+      });
+      _studioProc.on('exit', () => { _studioProc = null; _studioReady = false; });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, port: STUDIO_PORT, url: 'http://localhost:' + STUDIO_PORT }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: String(e) }));
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && req.url === '/studio/stop') {
+    try {
+      if (_studioProc) {
+        try { _studioProc.kill('SIGTERM'); } catch {}
+        _studioProc = null;
+        _studioReady = false;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: String(e) }));
+    }
+    return;
+  }
+
+  if (req.method === 'GET' && req.url === '/studio/status') {
+    const running = !!(_studioProc && _studioProc.exitCode === null);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      running,
+      ready: running && _studioReady,
+      port: STUDIO_PORT,
+      url: 'http://localhost:' + STUDIO_PORT,
+      uptimeMs: running ? Date.now() - _studioStartedAt : 0,
+    }));
+    return;
+  }
+
   // Self-test: run several claude-spawn variants from INSIDE the bridge
   // process to find which one actually works here. Every variant works when
   // run standalone — so the failure is specific to this process context.
@@ -2932,3 +3008,14 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log('(keep this terminal open)\n');
   checkForUpdates().catch(e => console.error('Update check error:', e.message));
 });
+
+// Kill the Remotion Studio child when the bridge exits so it doesn't leak.
+function _shutdownStudio() {
+  if (_studioProc) {
+    try { _studioProc.kill('SIGTERM'); } catch {}
+    _studioProc = null;
+  }
+}
+process.on('SIGTERM', () => { _shutdownStudio(); process.exit(0); });
+process.on('SIGINT',  () => { _shutdownStudio(); process.exit(0); });
+process.on('exit',    () => { _shutdownStudio(); });
