@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "5.0";
+var HOST_JSX_VERSION = "5.1";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -1199,6 +1199,91 @@ function ccRippleDeleteAt(startSec, endSec) {
         return JSON.stringify({ ok: anyRemoved, removed: anyRemoved, debug: debug });
     } catch (e) {
         return JSON.stringify({ ok: false, error: String(e), debug: debug });
+    }
+}
+
+// Total QE track-item count across all video + audio tracks. The panel uses
+// this to verify whether a razor actually took effect (count goes up by ≥1
+// per razored track if it worked).
+function ccCountItems() {
+    try {
+        if (typeof app === "undefined" || !app || !app.project) return JSON.stringify({ ok: false, count: 0 });
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) return JSON.stringify({ ok: false, count: 0 });
+        if (typeof app.enableQE === "function") app.enableQE();
+        var qeSeq = (typeof qe !== "undefined" && qe && qe.project && qe.project.getActiveSequence)
+            ? qe.project.getActiveSequence() : null;
+        if (!qeSeq) return JSON.stringify({ ok: false, count: 0 });
+        var n = 0;
+        var nv = _ccSafe(function () { return qeSeq.numVideoTracks; }) || 0;
+        var na = _ccSafe(function () { return qeSeq.numAudioTracks; }) || 0;
+        for (var i = 0; i < nv; i++) {
+            var t = _ccSafe(function () { return qeSeq.getVideoTrackAt(i); });
+            if (t) n += _ccSafe(function () { return t.numItems; }) || 0;
+        }
+        for (var i = 0; i < na; i++) {
+            var t = _ccSafe(function () { return qeSeq.getAudioTrackAt(i); });
+            if (t) n += _ccSafe(function () { return t.numItems; }) || 0;
+        }
+        return JSON.stringify({ ok: true, count: n });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e), count: 0 });
+    }
+}
+
+// Ensure every video + audio track is "targeted" so Add Edit (Cmd+K) razors
+// them. By default Premiere only targets the track header(s) the user
+// clicked. Many Add Edit failures are silent because no tracks were targeted.
+function ccTargetAllTracks() {
+    try {
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) return JSON.stringify({ ok: false, error: "no seq" });
+        var nv = _ccSafe(function () { return seq.videoTracks && seq.videoTracks.numTracks; }) || 0;
+        var na = _ccSafe(function () { return seq.audioTracks && seq.audioTracks.numTracks; }) || 0;
+        for (var i = 0; i < nv; i++) {
+            var t = _ccSafe(function () { return seq.videoTracks[i]; });
+            if (t && t.setTargeted) _ccSafe(function () { t.setTargeted(true, true); });
+        }
+        for (var i = 0; i < na; i++) {
+            var t = _ccSafe(function () { return seq.audioTracks[i]; });
+            if (t && t.setTargeted) _ccSafe(function () { t.setTargeted(true, true); });
+        }
+        return JSON.stringify({ ok: true, videoTracks: nv, audioTracks: na });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e) });
+    }
+}
+
+// Try multiple in-process ways to trigger Premiere's Add Edit at the current
+// playhead. Verifies by item-count delta. Returns which method (if any)
+// actually razored, so the caller can skip the bridge osascript round-trip
+// when in-process works.
+function ccTryRazorAtPlayhead() {
+    try {
+        var beforeRes = JSON.parse(ccCountItems());
+        var before = (beforeRes && typeof beforeRes.count === "number") ? beforeRes.count : 0;
+
+        function delta() {
+            var r = JSON.parse(ccCountItems());
+            return (r && typeof r.count === "number") ? r.count - before : 0;
+        }
+
+        // app.executeCommand named variants — different Premiere builds
+        // expose different names; try the common ones. Each is verified by
+        // item-count delta so a wrong name that silently no-ops doesn't
+        // false-claim success. Avoid menuFunctionId trial-and-error — wrong
+        // IDs can fire destructive menu commands.
+        var names = ["Add Edit to All Tracks", "Add Edit", "AddEditToAllTracks", "AddEdit"];
+        if (typeof app.executeCommand === "function") {
+            for (var n = 0; n < names.length; n++) {
+                _ccSafe(function () { app.executeCommand(names[n]); });
+                var d = delta();
+                if (d > 0) return JSON.stringify({ ok: true, method: "executeCommand:" + names[n], delta: d });
+            }
+        }
+        return JSON.stringify({ ok: false, method: "none", delta: 0 });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e) });
     }
 }
 

@@ -2186,6 +2186,42 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Add Edit via keyboard shortcut Cmd+Shift+K (default Premiere binding
+  // for "Add Edit to All Tracks"). Sometimes works when menu-click doesn't.
+  if (req.method === 'POST' && req.url === '/addedit-keystroke') {
+    const osaLines = [
+      'tell application "System Events"',
+      '  set ppList to (every process whose name contains "Premiere Pro")',
+      '  if (count of ppList) is 0 then error "Premiere not running"',
+      '  set pp to item 1 of ppList',
+      '  set frontmost of pp to true',
+      '  delay 0.05',
+      '  keystroke "k" using {command down, shift down}',
+      'end tell',
+    ];
+    const args = [];
+    for (const l of osaLines) { args.push('-e', l); }
+    let errOut = '';
+    let osa;
+    try { osa = spawn('osascript', args); }
+    catch (e) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: String(e) }));
+      return;
+    }
+    osa.stderr.on('data', d => { errOut += d; });
+    osa.on('error', (e) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: String(e) }));
+    });
+    osa.on('close', (code) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      if (code === 0) res.end(JSON.stringify({ ok: true }));
+      else res.end(JSON.stringify({ ok: false, error: errOut.trim() || ('exit ' + code) }));
+    });
+    return;
+  }
+
   // Add Edit — same as Cmd+K / Shift+C in Premiere. We use osascript to
   // click the Sequence > "Add Edit to All Tracks" menu item directly, which
   // is the SAME path Premiere takes when the user hits the shortcut.

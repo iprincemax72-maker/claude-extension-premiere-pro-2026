@@ -2332,7 +2332,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">7.9</span>
+    <span class="version-tag" id="versionTag">8.0</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -3374,22 +3374,18 @@ async function getSelectedClipInfo() {
   try { return JSON.parse(raw); } catch { return { ok:false, error:'parse failed' }; }
 }
 
-// Auto-Cut application — orchestrates Premiere's NATIVE Add Edit command
-// (the same one that Cmd+K / Shift+C triggers manually) via the bridge's
-// osascript path. Per cut:
-//   1. ccSetPlayhead(startSec)        — DOM, snaps to exact frame
-//   2. POST /addedit                  — osascript clicks Sequence > Add Edit
-//   3. ccSetPlayhead(endSec)
-//   4. POST /addedit
-//   5. ccRippleDeleteAt(startSec, endSec)  — finds the segment and deletes
-//
-// Cuts processed in DESCENDING order so earlier cuts' coordinates stay
-// valid (later razors don't shift earlier content).
+// Auto-Cut application — orchestrates Premiere's native razor command.
+// Tries methods in order, verifying each by track-item-count delta so a
+// silent no-op doesn't pretend success:
+//   A. ccTryRazorAtPlayhead (ExtendScript app.executeCommand)
+//   B. POST /addedit-keystroke (osascript Cmd+Shift+K)
+//   C. POST /addedit (osascript menu click)
+// Whichever works on the first cut gets cached and used for the rest.
 async function applyAutoCuts(cuts) {
   const steps = [];
   function log(s) { steps.push(s); }
 
-  // Get clip selection context (timelineStart + source inPoint).
+  // Selection context.
   let sel;
   try { sel = JSON.parse(await evalES('ccGetSelectedClip()')); }
   catch (e) { return { ok: false, error: 'ccGetSelectedClip parse: ' + e.message }; }
@@ -3398,7 +3394,15 @@ async function applyAutoCuts(cuts) {
   const inPt          = (typeof sel.inPoint       === 'number') ? sel.inPoint       : 0;
   log(`sel: name=${sel.name} timelineStart=${timelineStart} inPt=${inPt}`);
 
-  // Merge cuts within 1.5s of each other — collapses orphan fragments.
+  // Target all tracks so "Add Edit" actually razors them (Premiere's default
+  // Add Edit only acts on targeted tracks — most silent no-ops come from
+  // here).
+  try {
+    const t = JSON.parse(await evalES('ccTargetAllTracks()'));
+    log(`targeted all tracks: V=${t.videoTracks} A=${t.audioTracks}`);
+  } catch (e) { log('targetAllTracks failed: ' + e.message); }
+
+  // Merge close cuts.
   const MERGE_GAP_SEC = 1.5;
   const sorted = (cuts || []).slice().filter(c =>
     isFinite(c.start) && isFinite(c.end) && c.end > c.start
@@ -3406,16 +3410,63 @@ async function applyAutoCuts(cuts) {
   const merged = [];
   for (const c of sorted) {
     const prev = merged[merged.length - 1];
-    if (prev && c.start <= prev.end + MERGE_GAP_SEC) {
-      prev.end = Math.max(prev.end, c.end);
-    } else {
-      merged.push({ start: c.start, end: c.end });
-    }
+    if (prev && c.start <= prev.end + MERGE_GAP_SEC) prev.end = Math.max(prev.end, c.end);
+    else merged.push({ start: c.start, end: c.end });
   }
   log(`merged ${sorted.length} → ${merged.length} cuts (gap<${MERGE_GAP_SEC}s collapsed)`);
+  merged.sort((a, b) => b.start - a.start); // DESCENDING
 
-  // DESCENDING order so each cut's timeline coords stay accurate.
-  merged.sort((a, b) => b.start - a.start);
+  // razorMethod: 'extendscript' | 'keystroke' | 'menu' | null (still probing)
+  let razorMethod = null;
+
+  async function countItems() {
+    try { return (JSON.parse(await evalES('ccCountItems()')).count) || 0; }
+    catch { return 0; }
+  }
+
+  // Razor at the current playhead, verifying by track-item count delta.
+  // Tries cached method first; if not yet decided, walks all 3.
+  async function razorAtPlayhead(tag) {
+    const before = await countItems();
+
+    async function tryExtendScript() {
+      try {
+        const r = JSON.parse(await evalES('ccTryRazorAtPlayhead()'));
+        if (r.ok && r.delta > 0) return r.method;
+      } catch {}
+      return null;
+    }
+    async function tryKeystroke() {
+      try {
+        await fetch(BRIDGE + '/addedit-keystroke', { method: 'POST' });
+        const after = await countItems();
+        if (after > before) return 'keystroke';
+      } catch {}
+      return null;
+    }
+    async function tryMenu() {
+      try {
+        await fetch(BRIDGE + '/addedit', { method: 'POST' });
+        const after = await countItems();
+        if (after > before) return 'menu';
+      } catch {}
+      return null;
+    }
+
+    if (razorMethod === 'extendscript') return (await tryExtendScript()) ? 'extendscript' : null;
+    if (razorMethod === 'keystroke')   return (await tryKeystroke())     ? 'keystroke'   : null;
+    if (razorMethod === 'menu')        return (await tryMenu())          ? 'menu'        : null;
+
+    // Probing — try them all on this first cut, lock in whichever works.
+    const es = await tryExtendScript();
+    if (es) { razorMethod = 'extendscript'; log(`  ${tag} razor probe → extendscript (${es})`); return 'extendscript'; }
+    const ks = await tryKeystroke();
+    if (ks) { razorMethod = 'keystroke';   log(`  ${tag} razor probe → keystroke`);            return 'keystroke';   }
+    const mn = await tryMenu();
+    if (mn) { razorMethod = 'menu';        log(`  ${tag} razor probe → menu click`);           return 'menu';        }
+    log(`  ${tag} razor probe → NOTHING worked`);
+    return null;
+  }
 
   let applied = 0, failed = 0;
   for (let i = 0; i < merged.length; i++) {
@@ -3424,51 +3475,31 @@ async function applyAutoCuts(cuts) {
     const tEnd   = timelineStart + (c.end   - inPt);
     log(`cut[${i}] src ${c.start.toFixed(3)}→${c.end.toFixed(3)}  tl ${tStart.toFixed(3)}→${tEnd.toFixed(3)}`);
 
-    // 1. Playhead at start
-    let ph1;
+    let ph1, ph2;
     try { ph1 = JSON.parse(await evalES('ccSetPlayhead(' + tStart + ')')); }
-    catch (e) { failed++; log('  ✗ setPlayhead start parse: ' + e.message); continue; }
+    catch (e) { failed++; log('  ✗ setPlayhead start: ' + e.message); continue; }
     if (!ph1.ok) { failed++; log('  ✗ setPlayhead start: ' + ph1.error); continue; }
     log(`  ph1 frame=${ph1.frame} sec=${ph1.seconds.toFixed(3)}`);
 
-    // 2. Add Edit via bridge osascript
-    let ae1;
-    try {
-      const r1 = await fetch(BRIDGE + '/addedit', { method: 'POST' });
-      ae1 = await r1.json();
-    } catch (e) { failed++; log('  ✗ addedit start fetch: ' + e.message); continue; }
-    if (!ae1.ok) { failed++; log('  ✗ addedit start: ' + ae1.error); continue; }
+    const m1 = await razorAtPlayhead('start');
+    if (!m1) { failed++; log('  ✗ razor at start did not change item count — aborting batch'); break; }
 
-    // 3. Playhead at end
-    let ph2;
     try { ph2 = JSON.parse(await evalES('ccSetPlayhead(' + tEnd + ')')); }
-    catch (e) { failed++; log('  ✗ setPlayhead end parse: ' + e.message); continue; }
+    catch (e) { failed++; log('  ✗ setPlayhead end: ' + e.message); continue; }
     if (!ph2.ok) { failed++; log('  ✗ setPlayhead end: ' + ph2.error); continue; }
     log(`  ph2 frame=${ph2.frame} sec=${ph2.seconds.toFixed(3)}`);
 
-    // 4. Add Edit again
-    let ae2;
-    try {
-      const r2 = await fetch(BRIDGE + '/addedit', { method: 'POST' });
-      ae2 = await r2.json();
-    } catch (e) { failed++; log('  ✗ addedit end fetch: ' + e.message); continue; }
-    if (!ae2.ok) { failed++; log('  ✗ addedit end: ' + ae2.error); continue; }
+    const m2 = await razorAtPlayhead('end');
+    if (!m2) { failed++; log('  ✗ razor at end did not change item count'); continue; }
 
-    // 5. Ripple-delete the segment between the two razors
     let rd;
     try { rd = JSON.parse(await evalES('ccRippleDeleteAt(' + ph1.seconds + ',' + ph2.seconds + ')')); }
-    catch (e) { failed++; log('  ✗ ripple-delete parse: ' + e.message); continue; }
-    if (rd.ok && rd.removed) {
-      applied++;
-      log('  ✓ razored + ripple-deleted');
-    } else {
-      failed++;
-      log('  ✗ no segment found to delete (razored but no matching item)');
-    }
+    catch (e) { failed++; log('  ✗ ripple-delete: ' + e.message); continue; }
+    if (rd.ok && rd.removed) { applied++; log('  ✓ razored (' + m1 + ') + ripple-deleted'); }
+    else { failed++; log('  ✗ razored but no matching item to ripple-delete'); }
   }
 
-  log(`done — applied=${applied} failed=${failed} total=${merged.length}`);
-  // Ship log to bridge so we can debug afterwards.
+  log(`done — applied=${applied} failed=${failed} total=${merged.length} method=${razorMethod || 'none'}`);
   fetch(BRIDGE + '/applylog', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -4193,7 +4224,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '7.9';
+  const PANEL_VERSION = '8.0';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
