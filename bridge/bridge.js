@@ -33,6 +33,7 @@ const STUDIO_PORT = 7374;
 let _studioProc = null;
 let _studioReady = false;
 let _studioStartedAt = 0;
+let _studioRecentOutput = ''; // ring-buffered tail of stdout+stderr for debugging
 
 // Resolve an absolute path to ffmpeg — falls back to bare 'ffmpeg' if no
 // absolute path is found. Needed because the bridge may be auto-spawned by
@@ -2255,26 +2256,39 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ ok: true, already: true, port: STUDIO_PORT, url: 'http://localhost:' + STUDIO_PORT }));
         return;
       }
-      // Spawn `npx remotion studio` from the Remotion project dir. --no-open
-      // and --browser=none stop it from launching the system browser.
+      // Spawn `npx remotion studio` from the Remotion project dir.
+      // Remotion CLI parses flags space-separated (NOT --port=N), and the
+      // valid no-browser flag is --no-open. --port=N would be silently
+      // ignored and the studio would fall back to the default port 3000.
       _studioProc = spawn(
         'npx',
-        ['remotion', 'studio', '--port=' + STUDIO_PORT, '--no-open', '--browser=none'],
+        ['remotion', 'studio', '--port', String(STUDIO_PORT), '--no-open'],
         { cwd: WORK_DIR, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] }
       );
       _studioReady = false;
       _studioStartedAt = Date.now();
+      _studioRecentOutput = '';
+      const _appendOutput = (s) => {
+        _studioRecentOutput = (_studioRecentOutput + s).slice(-4000);
+        // Also tee to bridge stdout so user's terminal shows what's happening
+        process.stdout.write('[studio] ' + s);
+      };
       _studioProc.stdout.on('data', (d) => {
         const s = d.toString();
-        // Studio prints "Server ready" / "Local:" when bound. Either marker = ready.
-        if (/server ready|local:|listening/i.test(s)) _studioReady = true;
+        _appendOutput(s);
+        // Studio prints "Server ready" / "Local:" / a localhost URL when bound.
+        if (/server ready|local:|listening|localhost:\d+|http:\/\/127\.0\.0\.1:\d+/i.test(s)) _studioReady = true;
       });
       _studioProc.stderr.on('data', (d) => {
-        // Treat stderr noise the same — sometimes Studio logs to stderr
         const s = d.toString();
-        if (/server ready|local:|listening/i.test(s)) _studioReady = true;
+        _appendOutput(s);
+        if (/server ready|local:|listening|localhost:\d+|http:\/\/127\.0\.0\.1:\d+/i.test(s)) _studioReady = true;
       });
-      _studioProc.on('exit', () => { _studioProc = null; _studioReady = false; });
+      _studioProc.on('exit', (code) => {
+        _appendOutput('[studio exited with code ' + code + ']\n');
+        _studioProc = null;
+        _studioReady = false;
+      });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, port: STUDIO_PORT, url: 'http://localhost:' + STUDIO_PORT }));
     } catch (e) {
@@ -2309,6 +2323,7 @@ const server = http.createServer((req, res) => {
       port: STUDIO_PORT,
       url: 'http://localhost:' + STUDIO_PORT,
       uptimeMs: running ? Date.now() - _studioStartedAt : 0,
+      output: _studioRecentOutput,
     }));
     return;
   }
