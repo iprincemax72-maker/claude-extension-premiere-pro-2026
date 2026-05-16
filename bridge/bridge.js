@@ -28,12 +28,6 @@ let _activeAutocut = null;
 // can kill it. Holds { children: Set<ChildProcess>, aborted: bool }.
 let _activeAutoedit = null;
 
-// REMOTION STUDIO — singleton subprocess managed by /studio/* endpoints.
-const STUDIO_PORT = 7374;
-let _studioProc = null;
-let _studioReady = false;
-let _studioStartedAt = 0;
-let _studioRecentOutput = ''; // ring-buffered tail of stdout+stderr for debugging
 
 // Resolve an absolute path to ffmpeg — falls back to bare 'ffmpeg' if no
 // absolute path is found. Needed because the bridge may be auto-spawned by
@@ -2245,115 +2239,13 @@ const server = http.createServer((req, res) => {
   }
 
   // ────────────────────────────────────────────────────────────────────────
-  // REMOTION STUDIO — live preview inside the panel via iframe.
-  // The panel opens an iframe to http://localhost:STUDIO_PORT; this bridge
-  // owns the studio subprocess so the panel doesn't have to spawn anything.
-  // ────────────────────────────────────────────────────────────────────────
-  if (req.method === 'POST' && req.url === '/studio/start') {
-    try {
-      if (_studioProc && _studioProc.exitCode === null) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, already: true, port: STUDIO_PORT, url: 'http://localhost:' + STUDIO_PORT }));
-        return;
-      }
-      // Spawn the remotion CLI directly from the project's node_modules.
-      // Two reasons:
-      //   1. WORK_DIR is ~/PremiereClaude, but the Remotion project is at
-      //      ~/PremiereClaude/remotion-intro — npx invoked from WORK_DIR
-      //      fails with "could not determine executable to run".
-      //   2. Going through the local .bin shim is faster than `npx` (no
-      //      registry resolution at all) and avoids any PATH ambiguity.
-      // Remotion CLI parses flags space-separated (NOT --port=N), and
-      // --no-open suppresses the browser launch.
-      const REMOTION_PROJECT = path.join(WORK_DIR, 'remotion-intro');
-      const REMOTION_BIN = path.join(REMOTION_PROJECT, 'node_modules', '.bin', 'remotion');
-      if (!fs.existsSync(REMOTION_BIN)) {
-        _studioRecentOutput = '[studio] remotion binary not found at ' + REMOTION_BIN + '\n';
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: 'Remotion not installed at ' + REMOTION_BIN }));
-        return;
-      }
-      _studioProc = spawn(
-        REMOTION_BIN,
-        ['studio', '--port', String(STUDIO_PORT), '--no-open'],
-        { cwd: REMOTION_PROJECT, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] }
-      );
-      _studioReady = false;
-      _studioStartedAt = Date.now();
-      _studioRecentOutput = '';
-      const _appendOutput = (s) => {
-        _studioRecentOutput = (_studioRecentOutput + s).slice(-4000);
-        // Also tee to bridge stdout so user's terminal shows what's happening
-        process.stdout.write('[studio] ' + s);
-      };
-      _studioProc.stdout.on('data', (d) => {
-        const s = d.toString();
-        _appendOutput(s);
-        // Studio prints "Server ready" / "Local:" / a localhost URL when bound.
-        if (/server ready|local:|listening|localhost:\d+|http:\/\/127\.0\.0\.1:\d+/i.test(s)) _studioReady = true;
-      });
-      _studioProc.stderr.on('data', (d) => {
-        const s = d.toString();
-        _appendOutput(s);
-        if (/server ready|local:|listening|localhost:\d+|http:\/\/127\.0\.0\.1:\d+/i.test(s)) _studioReady = true;
-      });
-      _studioProc.on('exit', (code) => {
-        _appendOutput('[studio exited with code ' + code + ']\n');
-        _studioProc = null;
-        _studioReady = false;
-      });
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, port: STUDIO_PORT, url: 'http://localhost:' + STUDIO_PORT }));
-    } catch (e) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: false, error: String(e) }));
-    }
-    return;
-  }
-
-  if (req.method === 'POST' && req.url === '/studio/stop') {
-    try {
-      if (_studioProc) {
-        try { _studioProc.kill('SIGTERM'); } catch {}
-        _studioProc = null;
-        _studioReady = false;
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true }));
-    } catch (e) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: false, error: String(e) }));
-    }
-    return;
-  }
-
-  if (req.method === 'GET' && req.url === '/studio/status') {
-    const running = !!(_studioProc && _studioProc.exitCode === null);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      running,
-      ready: running && _studioReady,
-      port: STUDIO_PORT,
-      url: 'http://localhost:' + STUDIO_PORT,
-      uptimeMs: running ? Date.now() - _studioStartedAt : 0,
-      output: _studioRecentOutput,
-    }));
-    return;
-  }
-
-  // ────────────────────────────────────────────────────────────────────────
   // SELF-RESTART — spawn a detached copy of this process, then exit. The new
   // process inherits the parent's stdio so the user still sees logs in their
-  // terminal. The Studio child is killed first so the new instance can
-  // re-bind the studio port cleanly. ~300ms delay between response and
-  // process.exit gives the response time to flush.
+  // terminal. ~300ms delay between response and process.exit gives the
+  // response time to flush before the port is released.
   // ────────────────────────────────────────────────────────────────────────
   if (req.method === 'POST' && req.url === '/restart') {
     try {
-      // Kill the studio child if any — the new bridge will respawn on demand
-      try { if (_studioProc) _studioProc.kill('SIGTERM'); } catch {}
-      _studioProc = null; _studioReady = false;
-
       // Spawn the replacement BEFORE we respond — if spawning fails we want
       // to error out cleanly and stay alive.
       const child = spawn(process.execPath, [__filename, ...process.argv.slice(2)], {
@@ -3095,13 +2987,3 @@ server.on('error', (err) => {
 });
 _tryListen();
 
-// Kill the Remotion Studio child when the bridge exits so it doesn't leak.
-function _shutdownStudio() {
-  if (_studioProc) {
-    try { _studioProc.kill('SIGTERM'); } catch {}
-    _studioProc = null;
-  }
-}
-process.on('SIGTERM', () => { _shutdownStudio(); process.exit(0); });
-process.on('SIGINT',  () => { _shutdownStudio(); process.exit(0); });
-process.on('exit',    () => { _shutdownStudio(); });
