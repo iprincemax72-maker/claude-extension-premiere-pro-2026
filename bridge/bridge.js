@@ -2256,14 +2256,27 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ ok: true, already: true, port: STUDIO_PORT, url: 'http://localhost:' + STUDIO_PORT }));
         return;
       }
-      // Spawn `npx remotion studio` from the Remotion project dir.
-      // Remotion CLI parses flags space-separated (NOT --port=N), and the
-      // valid no-browser flag is --no-open. --port=N would be silently
-      // ignored and the studio would fall back to the default port 3000.
+      // Spawn the remotion CLI directly from the project's node_modules.
+      // Two reasons:
+      //   1. WORK_DIR is ~/PremiereClaude, but the Remotion project is at
+      //      ~/PremiereClaude/remotion-intro — npx invoked from WORK_DIR
+      //      fails with "could not determine executable to run".
+      //   2. Going through the local .bin shim is faster than `npx` (no
+      //      registry resolution at all) and avoids any PATH ambiguity.
+      // Remotion CLI parses flags space-separated (NOT --port=N), and
+      // --no-open suppresses the browser launch.
+      const REMOTION_PROJECT = path.join(WORK_DIR, 'remotion-intro');
+      const REMOTION_BIN = path.join(REMOTION_PROJECT, 'node_modules', '.bin', 'remotion');
+      if (!fs.existsSync(REMOTION_BIN)) {
+        _studioRecentOutput = '[studio] remotion binary not found at ' + REMOTION_BIN + '\n';
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'Remotion not installed at ' + REMOTION_BIN }));
+        return;
+      }
       _studioProc = spawn(
-        'npx',
-        ['remotion', 'studio', '--port', String(STUDIO_PORT), '--no-open'],
-        { cwd: WORK_DIR, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] }
+        REMOTION_BIN,
+        ['studio', '--port', String(STUDIO_PORT), '--no-open'],
+        { cwd: REMOTION_PROJECT, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] }
       );
       _studioReady = false;
       _studioStartedAt = Date.now();
