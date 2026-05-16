@@ -2332,7 +2332,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">9.4</span>
+    <span class="version-tag" id="versionTag">9.5</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -3323,12 +3323,6 @@ async function getPremiereContext() {
 async function importIntoPremiere(absPath, mode) {
   const escapedPath = absPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   const escapedMode = (mode || 'overlay').replace(/[^a-z]/gi, '');
-  // Fire a panel-side event so the video-pane preview can show the clip too.
-  try {
-    document.dispatchEvent(new CustomEvent('cc-render-complete', {
-      detail: { filePath: absPath, mode: mode || 'overlay' },
-    }));
-  } catch {}
   const raw = await evalES('ccImportToTimeline("' + escapedPath + '","' + escapedMode + '")');
   try { return JSON.parse(raw); } catch { return { ok:false, error:'parse failed', path:absPath }; }
 }
@@ -4034,78 +4028,6 @@ historyBtn.addEventListener('click', () => {
 document.getElementById('historyClose').addEventListener('click', closeHistory);
 renderHistoryBadge();
 
-/* ═══════════════════════════════════════════════════════════════════════
-   VIDEO PANE — auto-show finished render at top of chat
-   ═══════════════════════════════════════════════════════════════════════ */
-(function setupRenderVideoPane() {
-  // After each successful render, the chat receives an [[IMPORT:/path/to.mp4]]
-  // marker. Hook into the existing render-complete signal so we can also
-  // surface the finished clip in a small player at the top of the chat.
-  // Implementation: listen for a custom event that the chat dispatch fires.
-  document.addEventListener('cc-render-complete', (e) => {
-    try {
-      const detail = e.detail || {};
-      const filePath = detail.filePath;
-      if (!filePath) return;
-      injectVideoCard(filePath);
-    } catch {}
-  });
-
-  function injectVideoCard(filePath) {
-    const host = document.getElementById('chatList') || document.body;
-    if (!host) return;
-    const prev = document.getElementById('renderVideoCard');
-    if (prev) prev.remove();
-
-    const fileName = filePath.split('/').pop() || filePath;
-    const ext = (fileName.split('.').pop() || '').toLowerCase();
-    // .mov is almost always ProRes (often 4444 w/ alpha) from our pipeline;
-    // the browser cannot decode ProRes, so <video> shows a black frame. Skip
-    // the embed for those and show a compact "ready" badge instead.
-    const browserDecodable = ext === 'mp4' || ext === 'webm';
-
-    const card = document.createElement('div');
-    card.id = 'renderVideoCard';
-    card.style.cssText =
-      'margin:6px 12px 2px;padding:4px;background:var(--bg-elevated);' +
-      'border:1px solid var(--border);border-radius:8px;';
-
-    const nameHtml =
-      '<span style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;min-width:0">' +
-      fileName + '</span>';
-    const revealBtnHtml =
-      '<button type="button" id="renderVideoReveal" style="background:transparent;border:1px solid var(--border);color:var(--text);' +
-      'border-radius:5px;padding:2px 7px;font-size:10px;cursor:pointer;flex:0 0 auto">Reveal</button>';
-    const closeBtnHtml =
-      '<button type="button" id="renderVideoClose" style="background:transparent;border:1px solid var(--border);color:var(--text);' +
-      'border-radius:5px;padding:2px 7px;font-size:10px;cursor:pointer;flex:0 0 auto">Close</button>';
-
-    if (browserDecodable) {
-      const fileUrl = 'file://' + filePath;
-      card.innerHTML =
-        '<video controls preload="metadata" style="width:100%;max-height:140px;border-radius:5px;display:block;background:#000;object-fit:contain" src="' +
-        fileUrl.replace(/"/g, '%22') + '"></video>' +
-        '<div style="display:flex;align-items:center;gap:6px;padding:4px 2px 0;">' +
-        nameHtml + revealBtnHtml + closeBtnHtml + '</div>';
-    } else {
-      card.innerHTML =
-        '<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;">' +
-        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);flex:0 0 auto"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>' +
-        nameHtml + revealBtnHtml + closeBtnHtml + '</div>';
-    }
-
-    host.prepend(card);
-    const close = document.getElementById('renderVideoClose');
-    if (close) close.addEventListener('click', () => card.remove());
-    const reveal = document.getElementById('renderVideoReveal');
-    if (reveal) reveal.addEventListener('click', () => {
-      try {
-        const cs = window.cep_node && window.cep_node.require && window.cep_node.require('child_process');
-        if (cs && cs.exec) cs.exec('open -R ' + JSON.stringify(filePath));
-      } catch {}
-    });
-  }
-})();
 
 /* ═══════════════════════════════════════════════════════════════════════
    LOGS PANEL — live tail of bridge stdout + active autoedit/autocut logs
@@ -4266,7 +4188,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '9.4';
+  const PANEL_VERSION = '9.5';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
