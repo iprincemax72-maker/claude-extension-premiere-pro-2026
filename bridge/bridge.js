@@ -881,6 +881,13 @@ function generateMomentsParallel(moments, reqId, log, onProgress) {
       '      (Striped Slam, Zoom Punch, Iris Open, Page Tear, etc. — pick the',
       '      reveal pattern that fits the moment\'s energy and adapt it to your',
       '      overlay\'s in/out animation, not as a TransitionSeries.)',
+      '  For TEXT-DRIVEN overlays (titles, captions, callouts, stats), the',
+      '  presets here are battle-tested drop-ins — copy the component you',
+      '  want, then customize:',
+      '    ~/.claude/skills/remotion-text-presets/references/text-presets-catalog.md',
+      '      (Tilted Slam, Word Pop Caption, Letter Cascade, Typewriter Pro,',
+      '      Marker Underline, Counter Count-Up — pass `bg="transparent"` for',
+      '      overlays so the ProRes 4444 alpha survives.)',
       '- DO use the style library at ' + WORK_DIR + '/remotion-intro/src/lib/',
       '  for easings, palettes, typography and motion helpers — read the files',
       '  you need first to get exact export names.',
@@ -1240,6 +1247,31 @@ then write code that follows the pattern.
                                   Diagonal Reveal, Emerald Burst, Vertical
                                   Shutter, Glitch Slam. Animation math
                                   reference is in references/animation-math.md.
+
+  remotion-transitions-extra/     5 ADDITIONAL transitions beyond the base
+                                  skill: Iris Open, Page Tear, Camera Shake
+                                  Cut, Color Wash, Hex Mosaic Flip. Triggers:
+                                  "iris", "circular reveal", "page tear",
+                                  "rip", "smash cut shake", "color wash",
+                                  "tile flip", "mosaic", "grid transition".
+                                  Catalog in references/transition-catalog-
+                                  extra.md. CRITICAL: read references/
+                                  architecture.md before building a NEW
+                                  custom transition — it explains the wrap-
+                                  stacking gotcha that silently breaks
+                                  cover/reveal mechanics.
+
+  remotion-text-presets/          6 production-tested text animation presets
+                                  for "title moments": Tilted Slam, Word Pop
+                                  Caption, Letter Cascade, Typewriter Pro,
+                                  Marker Underline, Counter Count-Up. Triggers:
+                                  "title slam", "tilted text", "TikTok caption",
+                                  "kinetic text", "letter by letter", "type-
+                                  writer", "typing", "marker underline",
+                                  "highlight", "counter", "count-up",
+                                  "animated number", "stat reveal". Catalog
+                                  with full source + customization tips:
+                                  references/text-presets-catalog.md.
 
   remotion-ads/                   If the user asks for an "Instagram reel",
                                   "video ad", "explainer video", "carousel",
@@ -1759,7 +1791,12 @@ const server = http.createServer((req, res) => {
         promptText,
       ];
 
-      const proc = spawn('claude', args, { cwd: WORK_DIR, env: process.env });
+      // stdin 'ignore' — otherwise the claude CLI emits a stderr warning
+      // ("Warning: no stdin data received in 3s, proceeding without it.")
+      // which the panel surfaces as if it were a fatal error.
+      const proc = spawn('claude', args, {
+        cwd: WORK_DIR, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
+      });
       let stdout = '', stderr = '', done = false;
 
       const finish = (expanded) => {
@@ -1811,7 +1848,10 @@ const server = http.createServer((req, res) => {
       }
 
       const args = COMPLETION_ARGS.concat([prefix]);
-      const proc = spawn('claude', args, { cwd: WORK_DIR, env: process.env });
+      // stdin 'ignore' — kill the "no stdin data received in 3s" warning.
+      const proc = spawn('claude', args, {
+        cwd: WORK_DIR, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
+      });
       let stdout = '', stderr = '', done = false;
 
       const finish = (completion) => {
@@ -2033,7 +2073,13 @@ const server = http.createServer((req, res) => {
       // can retry if idleKilled=true and reply is empty.
       function runClaudeOnce(retry) {
         return new Promise(resolve => {
-          const proc = spawn('claude', args, { cwd: WORK_DIR, env: process.env });
+          // stdin 'ignore' — without it the claude CLI emits a benign stderr
+          // warning ("Warning: no stdin data received in 3s") that the panel
+          // surfaces as an error mid-animation. This is the main /chat path,
+          // so it was the most visible offender.
+          const proc = spawn('claude', args, {
+            cwd: WORK_DIR, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
+          });
           let stderr = '';
           let lineBuf = '';
           let finalReply = '';
@@ -2048,7 +2094,15 @@ const server = http.createServer((req, res) => {
           };
           req.once('aborted', onAbort);
 
-          proc.stderr.on('data', d => stderr += d);
+          // Filter out the benign "no stdin data received in 3s" warning — it
+          // is harmless (claude proceeds anyway) but if it ever leaks through
+          // it surfaces in the panel as an "Error:" alarm. Belt-and-braces
+          // alongside stdio:['ignore',...].
+          proc.stderr.on('data', d => {
+            const s = d.toString();
+            if (/no stdin data received in \d+s/i.test(s)) return;
+            stderr += s;
+          });
           // Track BOTH byte-level activity AND status-text changes so a
           // hung tool_use that just dribbles heartbeats can still be killed.
           let lastStatus = '';
