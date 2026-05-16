@@ -1997,6 +1997,75 @@ const server = http.createServer((req, res) => {
           + fullMessage;
       }
 
+      // ──────────────────────────────────────────────────────────────────
+      // VARIATION DIRECTIVE — solves the "same prompt 3 times produces
+      // the same Helvetica + same easing + same palette" problem. Each
+      // request gets a random combination of (palette, font family,
+      // motion style, layout) so claude doesn't converge to its defaults.
+      // ──────────────────────────────────────────────────────────────────
+      const _pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+      const VARIATION_PALETTE = _pick([
+        'neon-cyber (electric blue, hot pink, neon green on near-black)',
+        'retro-warm (sunset orange, cream, deep burgundy)',
+        'brutalist-mono (pure black + pure white + ONE accent color of your choice)',
+        'soft-pastel (mint, coral, lavender on off-white)',
+        'club-strobe (saturated magenta + electric cyan on charcoal)',
+        'editorial (paper-cream + ink-black + a single muted accent)',
+        'forest-deep (deep teal, moss green, warm gold)',
+        'bauhaus (primary red, primary blue, primary yellow on black)',
+        'cyberpunk (acid yellow, hot magenta, electric blue on black)',
+        'minimalist-sand (sand beige, soft black, single warm accent)',
+        'y2k-chrome (chrome silver + holographic pinks/blues + black)',
+        'monochrome-warm (varied warm greys with one pop color)',
+      ]);
+      const VARIATION_FONT = _pick([
+        'Helvetica Neue (clean, modern, neutral)',
+        'Inter or system-ui (geometric, readable)',
+        'Playfair Display (high-contrast serif, editorial)',
+        'JetBrains Mono or Menlo (monospace, technical)',
+        'Bebas Neue or condensed sans (tall, athletic, punchy)',
+        'Cormorant Garamond (elegant serif, classic)',
+        'Space Mono (mono with a tech / web3 vibe)',
+        'Georgia (warm serif, magazine feel)',
+        'a heavy 900-weight grotesque (Inter Black, Helvetica Black) — bold display',
+        'a thin/light weight (Helvetica Light, Inter Thin) — quiet sophistication',
+      ]);
+      const VARIATION_MOTION = _pick([
+        'snap cuts and hard frame-jumps (no smooth interpolation)',
+        'smooth spring physics (damping ~12, stiffness ~140 — feels alive)',
+        'aggressive overshoot springs (damping 8, stiffness 220 — bouncy)',
+        'cubic ease-in-out (cinematic, contemplative)',
+        'micro-bounce on every element (1.05 → 1.0 punch)',
+        'staggered cascade where pieces enter at different times (50ms apart)',
+        'glitch jitter for the first 8-12 frames before settling',
+        'slow drift / float / breathe (subtle continuous motion)',
+        'whip-fast in (under 6 frames) then long hold',
+      ]);
+      const VARIATION_LAYOUT = _pick([
+        'center-aligned, vertically symmetric (classic balance)',
+        'asymmetric — push the focal element off-center to the rule-of-thirds intersection',
+        'top-anchored with the focal element near the top third',
+        'bottom-anchored (good for talking-head overlays)',
+        'edge-aligned, hugging one side of the frame',
+        'diagonal composition — orient elements along an implied diagonal line',
+        'extreme negative space — small element on a mostly-empty frame',
+      ]);
+      const _seed = Math.random().toString(36).slice(2, 8);
+      fullMessage =
+        '[VARIATION DIRECTIVE — seed ' + _seed + ', expires this render only]\n' +
+        'Make this run visually DISTINCT. Even if the user has run a similar prompt\n' +
+        'before, use the following constraints to push the design away from your\n' +
+        'defaults. These are non-negotiable creative anchors:\n\n' +
+        '  · PALETTE — ' + VARIATION_PALETTE + '\n' +
+        '  · TYPOGRAPHY — ' + VARIATION_FONT + '\n' +
+        '  · MOTION — ' + VARIATION_MOTION + '\n' +
+        '  · LAYOUT — ' + VARIATION_LAYOUT + '\n\n' +
+        'Pick a fresh composition name (do NOT reuse one that already exists in\n' +
+        'Root.tsx). Write a fresh component from scratch — do not import an old\n' +
+        'one and just tweak props.\n\n' +
+        '────────────────────────────────────────────────\n\n' +
+        fullMessage;
+
       // Stream-JSON output gives us a JSONL feed of system/tool/assistant
       // events as they happen, so the bridge can push real-time progress to
       // the panel via SSE. The final assistant message is collected and
