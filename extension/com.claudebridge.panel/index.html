@@ -2332,7 +2332,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">8.0</span>
+    <span class="version-tag" id="versionTag">8.1</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -2366,42 +2366,9 @@
   </div>
 </div>
 
-<!-- Auto-Cut options modal -->
-<div class="autocut-modal" id="autocutModal">
-  <div class="autocut-modal-card">
-    <div class="autocut-modal-title">What should I cut?</div>
-    <div class="autocut-modal-subtitle">Pick one or both. Both work together.</div>
-
-    <label class="autocut-opt" data-opt="silence">
-      <input type="checkbox" id="optSilence" checked>
-      <div class="autocut-opt-text">
-        <div class="autocut-opt-name">Silence</div>
-        <div class="autocut-opt-desc">Cut every pause longer than 0.6s</div>
-      </div>
-    </label>
-
-    <label class="autocut-opt" data-opt="fillers">
-      <input type="checkbox" id="optFillers">
-      <div class="autocut-opt-text">
-        <div class="autocut-opt-name">Filler words</div>
-        <div class="autocut-opt-desc">"um", "uh", "like", "you know", "I mean". Transcribes audio — slower (~30-90s).</div>
-      </div>
-    </label>
-
-    <label class="autocut-opt" data-opt="repeats">
-      <input type="checkbox" id="optRepeats">
-      <div class="autocut-opt-text">
-        <div class="autocut-opt-name">Repeated sentences &amp; words</div>
-        <div class="autocut-opt-desc">False starts ("maybe it was th- maybe it was the fear"), self-corrections, redo takes. Transcribes audio.</div>
-      </div>
-    </label>
-
-    <div class="autocut-modal-actions">
-      <button id="autocutModalCancel" type="button" class="autocut-modal-cancel">Cancel</button>
-      <button id="autocutModalGo" type="button" class="autocut-modal-go">Cut</button>
-    </div>
-  </div>
-</div>
+<!-- Auto-Cut UI removed (v8.1) — Premiere's built-in transcript editor and
+     dedicated plugins like Phantom / Gling handle in-timeline cutting better
+     than we ever could via the QE API. -->
 
 <!-- AUTO EDIT Modal -->
 <div class="autocut-modal" id="autoeditModal">
@@ -2685,10 +2652,6 @@
         <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
         <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Claude takes its time, ~3-5 min">Slow</button>
       </div>
-      <button class="autocut-btn" id="autocutBtn" type="button" title="Auto-cut: detect pauses and false starts on the selected clip">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
-        Auto-Cut
-      </button>
       <button class="autocut-btn" id="autoeditBtn" type="button" title="Auto-Edit: read the speech of the selected clip and drop motion graphics on V2/V3 at the right beats">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h16"/><circle cx="19" cy="12" r="2.5" fill="currentColor"/></svg>
         Auto-Edit
@@ -4224,7 +4187,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '8.0';
+  const PANEL_VERSION = '8.1';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
