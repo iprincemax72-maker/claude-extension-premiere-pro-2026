@@ -1262,17 +1262,64 @@ then write code that follows the pattern.
                                   stacking gotcha that silently breaks
                                   cover/reveal mechanics.
 
-  remotion-text-presets/          6 production-tested text animation presets
-                                  for "title moments": Tilted Slam, Word Pop
-                                  Caption, Letter Cascade, Typewriter Pro,
-                                  Marker Underline, Counter Count-Up. Triggers:
-                                  "title slam", "tilted text", "TikTok caption",
-                                  "kinetic text", "letter by letter", "type-
-                                  writer", "typing", "marker underline",
-                                  "highlight", "counter", "count-up",
-                                  "animated number", "stat reveal". Catalog
-                                  with full source + customization tips:
+  remotion-text-presets/          11 production-tested text animation
+                                  presets: Tilted Slam, Word Pop Caption,
+                                  Letter Cascade, Typewriter Pro, Marker
+                                  Underline, Counter Count-Up, Glitch Text,
+                                  Neon Glow, 3D Extrude, Stamp Impact,
+                                  Karaoke Lyric. Triggers: "title slam",
+                                  "tilted text", "TikTok caption", "kinetic
+                                  text", "letter by letter", "typewriter",
+                                  "marker underline", "counter", "count-up",
+                                  "glitch text", "neon sign", "3D text",
+                                  "stamp", "karaoke / lyric video". Catalog:
                                   references/text-presets-catalog.md.
+
+  remotion-lower-thirds/          5 lower-third / name-card presets:
+                                  NewsBroadcast (CNN-red), MinimalBauhaus
+                                  (thin line), RetroVhs (RGB-split mono),
+                                  EditorialItalic (magazine serif),
+                                  GlitchLowerThird (damaged feed). Triggers:
+                                  "lower third", "name card", "chyron",
+                                  "speaker tag", "introduce X", "name +
+                                  role". Catalog: references/lower-thirds-
+                                  catalog.md.
+
+  remotion-callouts/              5 emphasis / callout components:
+                                  HandDrawnArrow, HighlightCircle,
+                                  PullQuote, SpeechBubble, QuestionCard.
+                                  Triggers: "arrow pointing", "circle this",
+                                  "highlight", "pull quote", "speech
+                                  bubble", "question card", "callout".
+                                  Catalog: references/callouts-catalog.md.
+
+  remotion-backgrounds/           4 animated full-frame backdrops:
+                                  AnimatedGradient (mesh drift),
+                                  ParticleField, NoiseGrain (TV static),
+                                  WavyLines (parallax sine). Triggers:
+                                  "animated background", "gradient bg",
+                                  "particle field", "noise / grain",
+                                  "film texture", "wavy lines". Catalog:
+                                  references/backgrounds-catalog.md.
+
+  remotion-stats/                 4 animated data-reveal components:
+                                  BarChartRace, ProgressRing,
+                                  ComparisonBars, StatCardGrid. Triggers:
+                                  "bar chart", "chart race", "progress
+                                  ring", "X percent", "before vs after",
+                                  "comparison", "stat tiles / dashboard",
+                                  "metric reveal", "animated chart".
+                                  Catalog: references/stats-catalog.md.
+
+  remotion-stingers/              4 brand-moment stingers: BrandReveal
+                                  (mask-wipe logotype), EndCard (Like &
+                                  Subscribe outro), ChapterBumper ("PART
+                                  02" cinematic title), SponsorPlate
+                                  ("BROUGHT TO YOU BY"). Triggers: "brand
+                                  reveal", "logo intro", "end card",
+                                  "outro", "chapter title", "part 2
+                                  bumper", "sponsor plate". Catalog:
+                                  references/stingers-catalog.md.
 
   remotion-ads/                   If the user asks for an "Instagram reel",
                                   "video ad", "explainer video", "carousel",
