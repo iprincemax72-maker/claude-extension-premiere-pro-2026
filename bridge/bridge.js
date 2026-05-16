@@ -2223,11 +2223,25 @@ const server = http.createServer((req, res) => {
           proc.on('close', code => {
             if (aborted) return done({ ok:false, aborted:true });
             if (code !== 0) {
+              // Build the best error message we can — stderr if present,
+              // else mine the last few stream-json lines for an error event,
+              // else fall back to the generic 'exit code N' so at least the
+              // user knows what kind of failure to retry against.
+              let err = stderr.trim();
+              if (!err && lineBuf) {
+                // Sometimes the final partial line in lineBuf has the error
+                err = ('partial: ' + lineBuf.slice(-400)).trim();
+              }
+              if (!err) {
+                err = 'Claude exited with code ' + code + (idleKilled
+                  ? ' (idle-killed — try a simpler request or use Fast mode)'
+                  : '. Possible causes: quota / network / auth. Try again.');
+              }
               return done({
                 ok: false,
                 reply: finalReply,
                 idleKilled,
-                error: stderr.trim() || ('claude exited with code ' + code),
+                error: err,
               });
             }
             done({ ok:true, reply: finalReply });
