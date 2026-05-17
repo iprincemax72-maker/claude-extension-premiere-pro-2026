@@ -120,11 +120,15 @@ All have detailed commit messages explaining the WHY. Nothing pushed to remote. 
 
 ## Bridge / panel state at end of session
 
-- **Bridge:** running (one instance, sentinel-protected, log at `~/All Claude Work/PremiereClaude/bridge.log`).
-- **Panel:** v10.16 live at `~/Library/Application Support/Adobe/CEP/extensions/com.claudebridge.panel/index.html`. All the night's fixes (copy-strip, remove-missing, no-blank-rows, confirm-stack guard, panel-switch guards) in place.
-- **Repo mirror:** synced at `~/All Claude Work/claude-extension-premiere-pro-2026/`. 4 new commits, none pushed, working tree clean.
+> **Note:** this section reflects state at the END of the polish loop too, not just the initial wrap. Panel went from v10.16 → v10.17 (focus restore) → v10.18 (lightbox createElement) during the loop.
 
-When you reopen the panel in Premiere, you should see version `10.16` in the header and "Bridge live" in the top-right pill. If the pill says "offline," `cd ~/All\ Claude\ Work/PremiereClaude && nohup node bridge.js > bridge.log 2>&1 &` and refresh.
+- **Bridge:** running (one instance, sentinel-protected, log at `~/All Claude Work/PremiereClaude/bridge.log`). Audio-codec=no-audio flag fix from earlier in the night still in place across all 4 SYSTEM_PROMPT instances.
+- **Panel:** v10.18 live at `~/Library/Application Support/Adobe/CEP/extensions/com.claudebridge.panel/index.html`. All initial-wrap fixes (copy-strip, remove-missing, no-blank-rows, confirm-stack guard, panel-switch guards) PLUS polish-loop fixes (focus restoration after Esc, lightbox DOM construction instead of innerHTML string-concat).
+- **Repo mirror:** synced at `~/All Claude Work/claude-extension-premiere-pro-2026/`. 50+ new commits across the night, none pushed, working tree clean.
+- **Skills:** all 22 Remotion skills with production-quality SKILL.md. INDEX.md + TUTORIAL.md + CHEAT-SHEET.md added. 5 cross-skill compositions render-verified (Showreel, ShowreelV, ShowreelExplainer, ProductIntro, StressTest).
+- **Validation:** all 4 test passes (typecheck + 3 panel audits) report 0 critical / 0 minor / 0 nits.
+
+When you reopen the panel in Premiere, you should see version `10.18` in the header and "Bridge live" in the top-right pill. If the pill says "offline," `cd ~/All\ Claude\ Work/PremiereClaude && nohup node bridge.js > bridge.log 2>&1 &` and refresh.
 
 — Claude (1M-context Opus 4.7)
 
