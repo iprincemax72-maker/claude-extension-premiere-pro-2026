@@ -327,6 +327,29 @@ curl -s http://127.0.0.1:3737/ping
 # Expected: {"ok":true,"session":"<uuid>","outputDir":"..."}
 ```
 
+### Validation suite
+
+Four test passes guard the panel + the Remotion skills. Run them after any change to `index.html`, `bridge.js`, or the v2 skill source files:
+
+```bash
+# 1. Strict TypeScript check on all 24 skill source files + the 3 showreel templates.
+#    Catches prop-naming bugs and JSX-case issues that the render itself tolerates.
+bash tests/skill-sources-typecheck.sh
+
+# 2. Panel audit pt1 — boot, version, chips, history, render, lightbox, status pill at 4 viewports.
+python3 tests/panel-audit.py
+
+# 3. Panel audit pt2 — remove-missing, confirm-stack guard, settings↔history toggle, tab cycling.
+python3 tests/panel-audit-edge-cases.py
+
+# 4. Panel audit pt3 — unicode-heavy history (emoji/CJK/RTL/Devanagari/600-char), narrow + wide
+#    viewports, corrupt localStorage JSON, 100-row history stress, settings double-click race,
+#    Esc during confirm modal, composer focus restore, close-all-but-one tabs.
+python3 tests/panel-audit-edge-cases-pt3.py
+```
+
+Each must report 0 critical / 0 minor before a release. The version assertion in pt1 loosely matches "10." so legitimate version bumps don't break the audit (you'd see it flag a missing/stale version, not a wrong number).
+
 ---
 
 ## HARD-WON KNOWLEDGE (don't relearn these)
