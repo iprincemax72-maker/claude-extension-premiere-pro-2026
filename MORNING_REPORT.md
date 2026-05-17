@@ -157,6 +157,8 @@ Version bumped to v10.17 in both the version-tag span and the `PANEL_VERSION` co
   - **Pt3 report:** 0 critical / 0 minor / 0 nits.
   - Pt1 + Pt2 also re-run, still 0/0.
 
+**05:23 — Panel v10.18: lightbox no longer builds img/video tags via string concat.** Found a defense-in-depth issue in `openLightbox`: it built `<video src="..." controls...>` and `<img src="...">` via string concat into `innerHTML`. The `src` comes from a localStorage history entry — if a path ever contains a `"` (e.g. a render saved under a path with a stray quote), the attribute parse would break and the tag would be malformed. Replaced with `createElement` + `setAttribute` — DOM construction is immune to that whole class of bug. Bumped to v10.18. All three panel audits still pass clean (0/0/0).
+
 **05:19 — Visual inspection caught a LAYOUT bug in my ProductIntro + TUTORIAL.md.** The product-intro mid-frame showed ProgressRing alone — the WordPopCaption that should have been above it was completely invisible. Diagnosis: WordPopCaption renders its OWN `AbsoluteFill` with `justifyContent: center` and a fill background; stacking it inside another AbsoluteFill via z-index doesn't position the caption above the visual — it just overlays one on top of the other.
 
 Fixed two ways:
