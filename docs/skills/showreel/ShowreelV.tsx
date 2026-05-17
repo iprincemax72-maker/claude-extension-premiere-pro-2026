@@ -19,7 +19,7 @@ import React from "react";
 import { AbsoluteFill, Sequence } from "remotion";
 import { CoquetteIntro } from "./trend-packs";
 import { POVCaption } from "./hooks";
-import { iMessageBubble, CornerWatermark, LikeBurst } from "./social-ui";
+import { iMessageBubble as IMessageBubble, CornerWatermark, LikeBurst } from "./social-ui";
 import { HeartEyes } from "./reactions";
 import { NumberedList } from "./lists";
 import { SubscribeArrow } from "./ctas";
@@ -46,7 +46,7 @@ export const ShowreelV: React.FC = () => {
       {/* SCENE 3: chat moment */}
       <Sequence from={135} durationInFrames={60}>
         <AbsoluteFill>
-          <iMessageBubble text="WAIT WHAT" />
+          <IMessageBubble text="WAIT WHAT" />
           <AbsoluteFill style={{ zIndex: 1, pointerEvents: "none" }}>
             <CornerWatermark handle="@anshdhakad" position="bottom-left" />
           </AbsoluteFill>

@@ -157,6 +157,12 @@ Version bumped to v10.17 in both the version-tag span and the `PANEL_VERSION` co
   - **Pt3 report:** 0 critical / 0 minor / 0 nits.
   - Pt1 + Pt2 also re-run, still 0/0.
 
+**04:57 — Caught TWO more bugs via strict typecheck + built reusable typecheck script.** Ran `tsc --strict` on all 24 skill sources + both showreels. Found:
+  1. `Showreel.tsx`: `<WaitZoomHook word="LAUNCH" />` — wrong prop name (component takes `text` + `punchWord`, not `word`). Rendered at runtime because Remotion ignores unknown props, but strict types caught it.
+  2. `ShowreelV.tsx`: `<iMessageBubble />` (lowercase) — JSX treats lowercase tags as HTML intrinsics. Component name was lowercase by accident in the original source. Fixed with import alias: `import { iMessageBubble as IMessageBubble } from "./social-ui"`.
+  
+Both fixed, both re-rendered cleanly. Added `tests/skill-sources-typecheck.sh` — strict tsc check over all 24 skill sources + showreels. Exits non-zero on any error. **All 24 skill sources + both showreels now type-check clean.** This is the missing piece — prevents the prop-name and JSX-case bugs from sneaking through render (which is permissive).
+
 **04:54 — Second showreel (vertical 1080×1920) rendered. Caught a real bug in my own showreel code.** Built `ShowreelV.tsx` for TikTok aspect, mixing 8 different skill families:
   - 0–60: CoquetteIntro (trend-packs)
   - 60–135: POVCaption (hooks) + CornerWatermark (social-ui) layered overlay

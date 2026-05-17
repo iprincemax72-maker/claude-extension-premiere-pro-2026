@@ -35,7 +35,7 @@ export const Showreel: React.FC = () => {
         <AbsoluteFill>
           <ParticleField count={80} color="#22d3ee" bg="#000814" />
           <AbsoluteFill style={{ zIndex: 1 }}>
-            <WaitZoomHook word="LAUNCH" bg="transparent" />
+            <WaitZoomHook text="get ready to LAUNCH" punchWord="LAUNCH" bg="transparent" />
           </AbsoluteFill>
         </AbsoluteFill>
       </Sequence>
