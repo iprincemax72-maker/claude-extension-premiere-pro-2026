@@ -114,6 +114,19 @@ function ccImportToTimeline(path, mode) {
             return JSON.stringify(result);
         }
 
+        // 2b. Tag the imported project item with the Rose color label so
+        // the user can tell AI-generated clips apart from their own
+        // editing. Index 6 == Rose in Premiere's default label palette.
+        // Wrapped in _ccSafe — if a Premiere build exposes a different
+        // method name, just skip silently rather than crash the import.
+        _ccSafe(function () {
+            if (typeof item.setColorLabel === "function") {
+                item.setColorLabel(6);
+            } else if (typeof item.colorLabel !== "undefined") {
+                item.colorLabel = 6;
+            }
+        });
+
         // 3. Need a sequence
         var seq = _ccSafe(function () { return app.project.activeSequence; });
         if (!seq) {
