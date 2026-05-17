@@ -3501,7 +3501,11 @@ log.addEventListener('keydown', (e) => {
    Returns Promise<boolean>. Esc / outside-click = cancel; Enter = OK. */
 function ccConfirm({ title, message, okLabel = 'OK', cancelLabel = 'Cancel', danger = false } = {}) {
   return new Promise((resolve) => {
-    // Build the modal each call so multiple confirms don't fight over state
+    // If a confirm is already open, dismiss it (rapid-click guard) so we
+    // don't stack multiple modals on top of each other.
+    document.querySelectorAll('.cc-confirm').forEach(el => {
+      try { el.remove(); } catch {}
+    });
     const wrap = document.createElement('div');
     wrap.className = 'cc-confirm';
     wrap.innerHTML =
@@ -4518,6 +4522,9 @@ renderHistory = function() {
 };
 
 function openHistory() {
+  // Close any other slide-in panel first so they don't stack
+  try { const s = document.getElementById('settingsPanel'); if (s) s.classList.remove('show'); } catch {}
+  try { const l = document.getElementById('logsPanel'); if (l) l.classList.remove('show'); } catch {}
   renderHistory();
   applyHistoryFilter();
   historyPanel.classList.add('show');
@@ -5089,7 +5096,12 @@ syncSettingsUI();
 const settingsPanel = document.getElementById('settingsPanel');
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsClose = document.getElementById('settingsClose');
-function openSettings()  { if (settingsPanel) settingsPanel.classList.add('show'); }
+function openSettings()  {
+  // Close any other slide-in panel first so they don't stack and intercept clicks
+  try { const h = document.getElementById('historyPanel'); if (h) h.classList.remove('show'); } catch {}
+  try { const l = document.getElementById('logsPanel'); if (l) l.classList.remove('show'); } catch {}
+  if (settingsPanel) settingsPanel.classList.add('show');
+}
 function closeSettings() { if (settingsPanel) settingsPanel.classList.remove('show'); }
 if (settingsBtn)   settingsBtn.addEventListener('click', openSettings);
 if (settingsClose) settingsClose.addEventListener('click', closeSettings);
