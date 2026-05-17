@@ -11,11 +11,16 @@ function _ccSafe(fn) {
 }
 
 function ccGetContext() {
-    var ctx = { projectName: "", sequenceName: "", playheadSeconds: null, selectedClips: [] };
+    var ctx = { projectName: "", projectPath: "", sequenceName: "", playheadSeconds: null, selectedClips: [] };
     try {
         if (typeof app === "undefined" || !app || !app.project) return JSON.stringify(ctx);
 
         ctx.projectName = _ccSafe(function () { return app.project.name || ""; }) || "";
+        // Project file path (e.g. "/Users/…/Vera Vid 13/Vera Vid 13.pproj").
+        // Used by the bridge to render outputs INTO the project folder so
+        // renders are colocated with the project for easy cleanup. Empty if
+        // the project hasn't been saved to disk yet.
+        ctx.projectPath = _ccSafe(function () { return app.project.path || ""; }) || "";
 
         var seq = _ccSafe(function () { return app.project.activeSequence; });
         if (seq) {

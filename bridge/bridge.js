@@ -1470,7 +1470,7 @@ animation), THEN start blank and use the library directly.
 PRE-SCAFFOLDED REMOTION PROJECT:
 - A Remotion project is already installed at ${WORK_DIR}/remotion-intro/ with node_modules ready.
 - Add new compositions as TSX files in ${WORK_DIR}/remotion-intro/src/ and register them in src/Root.tsx with a unique <Composition id="..."> entry.
-- Render with: \`cd ${WORK_DIR}/remotion-intro && npx remotion render src/index.ts <CompositionId> ${OUTPUT_DIR}/<filename>.mp4 --codec=h264 --audio-codec=no-audio\` — the no-audio flag is REQUIRED unless the composition actually has <Audio> elements.
+- Render with: \`cd ${WORK_DIR}/remotion-intro && npx remotion render src/index.ts <CompositionId> "<OUTPUT_DIR>/<filename>.mp4" --codec=h264 --audio-codec=no-audio\` — the no-audio flag is REQUIRED unless the composition actually has <Audio> elements. <OUTPUT_DIR> = the "Output dir for any rendered files" path from the [PREMIERE CONTEXT] block at the top of the user's message (NOT the global default). If no context is provided fall back to ${OUTPUT_DIR}. Quote the path because it may contain spaces (e.g. "Vera Vid 13/Claude Animations/...").
 - Do NOT scaffold a new Remotion project; do NOT run \`npx create-video\`. Reuse the existing one.
 - If node_modules is somehow missing (\`ls ${WORK_DIR}/remotion-intro/node_modules\` is empty), run \`cd ${WORK_DIR}/remotion-intro && npm install\` first — but this should already be done from the installer.
 
@@ -1981,6 +1981,27 @@ const server = http.createServer((req, res) => {
       if (!['fast', 'default', 'slow'].includes(renderMode)) renderMode = 'default';
       if (!message) { res.writeHead(400); res.end('{"error":"empty message"}'); return; }
 
+      // Resolve the output dir for THIS render. If the panel sent the
+      // project's on-disk path, render INTO the project folder so the
+      // user can delete a project + all its renders together. Falls back
+      // to the global OUTPUT_DIR when no project is saved.
+      let renderOutputDir = OUTPUT_DIR;
+      let renderOutputNote = '';
+      if (context && typeof context.projectPath === 'string' && context.projectPath.trim()) {
+        try {
+          const projectFolder = path.dirname(context.projectPath);
+          // Sanity check: the parent must exist (project file is on disk)
+          if (fs.existsSync(projectFolder)) {
+            const candidate = path.join(projectFolder, 'Claude Animations');
+            fs.mkdirSync(candidate, { recursive: true });
+            renderOutputDir = candidate;
+            renderOutputNote = ' (next to the open project — easy to delete with the project later)';
+          }
+        } catch (e) {
+          // Fall back to OUTPUT_DIR silently
+        }
+      }
+
       let fullMessage = message;
       if (context) {
         const ctxLines = [
@@ -1992,7 +2013,8 @@ const server = http.createServer((req, res) => {
         if (context.selectedClips && context.selectedClips.length) {
           ctxLines.push('Selected clips: ' + context.selectedClips.join(', '));
         }
-        ctxLines.push('Output dir for any rendered files: ' + OUTPUT_DIR);
+        ctxLines.push('Output dir for any rendered files: ' + renderOutputDir + renderOutputNote);
+        ctxLines.push('IMPORTANT: render the final file into THE FOLDER ABOVE, not the global PremiereClaude/output. The user wants renders colocated with the open project.');
         ctxLines.push('');
         fullMessage = ctxLines.join('\n') + '\n' + message;
       }
