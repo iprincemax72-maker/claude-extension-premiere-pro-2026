@@ -157,6 +157,17 @@ Version bumped to v10.17 in both the version-tag span and the `PANEL_VERSION` co
   - **Pt3 report:** 0 critical / 0 minor / 0 nits.
   - Pt1 + Pt2 also re-run, still 0/0.
 
+**04:54 — Second showreel (vertical 1080×1920) rendered. Caught a real bug in my own showreel code.** Built `ShowreelV.tsx` for TikTok aspect, mixing 8 different skill families:
+  - 0–60: CoquetteIntro (trend-packs)
+  - 60–135: POVCaption (hooks) + CornerWatermark (social-ui) layered overlay
+  - 135–195: iMessageBubble (social-ui) + persistent watermark
+  - 195–255: HeartEyes (reactions)
+  - 255–315: NumberedList (lists) 3-item vertical-native
+  - 315–375: LikeBurst (social-ui)
+  - 375–435: AnimatedGradient (backgrounds) + SubscribeArrow (ctas) end
+
+First render failed with "Cannot read properties of undefined (reading 'startsWith')" at frame 60. **Caught a real prop-naming bug in my own code**: I called `<CornerWatermark text="..." corner="..." />` but the actual API is `<CornerWatermark handle="..." position="..." />` — caught by Remotion's real component, not just types. Fixed by renaming, re-rendered cleanly. Output: `/tmp/test-renders/showreel-v.mp4`, 14.5s, 1080×1920, 2.8 MB. **This is the value of verifying skills actually render against real renderer** — types would have caught this if I'd type-checked, but the test composition I just wrote skipped strict mode. Sources snapshotted into `docs/skills/showreel/`.
+
 **04:52 — Cross-skill SHOWREEL rendered.** Built `Showreel.tsx` that strings 5 different skill families into one 410-frame timeline as a real production sanity check:
   - 0–75: **BrandReveal** (stingers) — "CRUX" + tagline mask-wipe
   - 75–155: **WaitZoomHook** (hooks) "LAUNCH" over **ParticleField** (backgrounds) tech-cyan particles
