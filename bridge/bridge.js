@@ -2373,6 +2373,44 @@ const server = http.createServer((req, res) => {
   }
 
   // ────────────────────────────────────────────────────────────────────────
+  // CONFIG — auto-update flag. GET returns current value; POST { enabled }
+  // writes a sentinel file to persist the preference across bridge
+  // restarts. checkForUpdates() reads this file at launch.
+  // ────────────────────────────────────────────────────────────────────────
+  if (req.method === 'GET' && req.url === '/config/auto-update') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      enabled: !isAutoUpdateDisabled(),
+      envForced: process.env.CLAUDE_BRIDGE_NO_UPDATE === '1',
+    }));
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/config/auto-update') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      let payload = {};
+      try { payload = JSON.parse(body || '{}'); } catch {}
+      const enabled = !!payload.enabled;
+      try {
+        if (enabled) {
+          // Remove the disable flag → auto-update resumes
+          try { if (fs.existsSync(NO_AUTO_UPDATE_FLAG)) fs.unlinkSync(NO_AUTO_UPDATE_FLAG); } catch {}
+        } else {
+          // Write the disable flag → auto-update skipped on next launch
+          try { fs.writeFileSync(NO_AUTO_UPDATE_FLAG, 'disabled at ' + new Date().toISOString() + '\n'); } catch {}
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, enabled, envForced: process.env.CLAUDE_BRIDGE_NO_UPDATE === '1' }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: String(e) }));
+      }
+    });
+    return;
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
   // SELF-RESTART — spawn a detached copy of this process, then exit. The new
   // process inherits the parent's stdio so the user still sees logs in their
   // terminal. ~300ms delay between response and process.exit gives the
@@ -3023,11 +3061,19 @@ const UPDATE_TARGETS = [
   { url: GITHUB_RAW + '/bridge/bridge.js',                                 dest: __filename, label: 'bridge', needsBridgeRestart: true },
 ];
 
+// Persistent auto-update flag — written by the panel's settings toggle so
+// the preference survives bridge restarts. File present = auto-update OFF.
+const NO_AUTO_UPDATE_FLAG = path.join(WORK_DIR, '.no-auto-update');
+function isAutoUpdateDisabled() {
+  if (process.env.CLAUDE_BRIDGE_NO_UPDATE === '1') return true;
+  try { return fs.existsSync(NO_AUTO_UPDATE_FLAG); } catch { return false; }
+}
+
 async function checkForUpdates(opts) {
   const force = !!(opts && opts.force);
   const result = { ok: true, updated: [], bridgeChanged: false, premiereRestartNeeded: false, skipped: false };
-  if (!force && process.env.CLAUDE_BRIDGE_NO_UPDATE === '1') {
-    console.log('Auto-update skipped (CLAUDE_BRIDGE_NO_UPDATE=1).\n');
+  if (!force && isAutoUpdateDisabled()) {
+    console.log('Auto-update skipped (disabled via env var or settings flag).\n');
     result.skipped = true;
     return result;
   }
