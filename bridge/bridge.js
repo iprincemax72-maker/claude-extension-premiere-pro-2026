@@ -453,10 +453,76 @@ const PREMIERE_IMPORTABLE_EXTS = new Set([
   '.png', '.jpg', '.jpeg', '.tif', '.tiff', '.gif', '.webp',
   '.wav', '.mp3', '.aac', '.m4a',
 ]);
-function ensurePremiereImportable(absPath) {
+
+// Video containers that might carry an unwanted silent audio track from
+// Remotion's default render. Pure motion-graphic overlays should never
+// have audio; we strip it unconditionally so Premiere doesn't get a
+// useless empty waveform on the source clip.
+const VIDEO_STRIPABLE_EXTS = new Set([
+  '.mp4', '.mov', '.m4v', '.mkv', '.avi', '.mts', '.mxf', '.webm',
+]);
+
+// Use ffprobe to detect any audio stream, then ffmpeg -c:v copy -an to
+// strip it (fast, no re-encode). On any failure the original file is
+// left untouched. Always resolves — non-destructive on errors.
+function stripAudioInPlace(absPath) {
   return new Promise(resolve => {
     try {
+      if (!absPath || !fs.existsSync(absPath)) { resolve(false); return; }
+      const ext = path.extname(absPath).toLowerCase();
+      if (!VIDEO_STRIPABLE_EXTS.has(ext)) { resolve(false); return; }
+      const ffprobeBin = FFMPEG_BIN.replace(/ffmpeg(\.exe)?$/, 'ffprobe$1');
+      const probe = spawn(ffprobeBin, [
+        '-v', 'error',
+        '-select_streams', 'a',
+        '-show_entries', 'stream=codec_type',
+        '-of', 'csv=p=0',
+        absPath,
+      ]);
+      let pbuf = '';
+      probe.stdout.on('data', d => pbuf += d.toString());
+      probe.on('error', () => resolve(false));
+      probe.on('close', () => {
+        if (!pbuf.trim()) { resolve(false); return; }
+        const tmpOut = absPath.replace(/\.([^.]+)$/, '.__noaudio.$1');
+        const ff = spawn(FFMPEG_BIN, [
+          '-y', '-i', absPath,
+          '-c:v', 'copy', '-an',
+          '-map_metadata', '0',
+          tmpOut,
+        ]);
+        let stderr = '';
+        ff.stderr.on('data', d => stderr += d.toString().slice(-1500));
+        ff.on('error', () => { try { fs.unlinkSync(tmpOut); } catch {} resolve(false); });
+        ff.on('close', code => {
+          if (code === 0 && fs.existsSync(tmpOut)) {
+            try {
+              fs.renameSync(tmpOut, absPath);
+              console.log('  audio stripped from ' + path.basename(absPath));
+              resolve(true);
+            } catch (e) {
+              try { fs.unlinkSync(tmpOut); } catch {}
+              resolve(false);
+            }
+          } else {
+            try { fs.existsSync(tmpOut) && fs.unlinkSync(tmpOut); } catch {}
+            resolve(false);
+          }
+        });
+      });
+    } catch (e) {
+      resolve(false);
+    }
+  });
+}
+
+function ensurePremiereImportable(absPath) {
+  return new Promise(async resolve => {
+    try {
       if (!absPath || !fs.existsSync(absPath)) { resolve(absPath); return; }
+      // Strip any audio track first — Claude's output should be pure
+      // visual / overlay and never carry a silent waveform.
+      await stripAudioInPlace(absPath);
       const ext = path.extname(absPath).toLowerCase();
       if (PREMIERE_IMPORTABLE_EXTS.has(ext)) { resolve(absPath); return; }
       // Anything else — transcode to mp4
@@ -3133,7 +3199,11 @@ function isAutoUpdateDisabled() {
 async function checkForUpdates(opts) {
   const force = !!(opts && opts.force);
   const result = { ok: true, updated: [], bridgeChanged: false, premiereRestartNeeded: false, skipped: false };
-  if (!force && isAutoUpdateDisabled()) {
+  // The .no-auto-update sentinel is the user's explicit "leave my files
+  // alone" signal — it MUST win even when force=true (manual ↻). The user
+  // was losing local dev edits whenever the panel called /update with
+  // force, so we treat the sentinel as the absolute opt-out.
+  if (isAutoUpdateDisabled()) {
     console.log('Auto-update skipped (disabled via env var or settings flag).\n');
     result.skipped = true;
     return result;
