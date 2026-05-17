@@ -2400,7 +2400,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10</span>
+    <span class="version-tag" id="versionTag">10.2</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -4469,7 +4469,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10';
+  const PANEL_VERSION = '10.2';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -4819,18 +4819,6 @@ function openSettings()  { if (settingsPanel) settingsPanel.classList.add('show'
 function closeSettings() { if (settingsPanel) settingsPanel.classList.remove('show'); }
 if (settingsBtn)   settingsBtn.addEventListener('click', openSettings);
 if (settingsClose) settingsClose.addEventListener('click', closeSettings);
-// Esc closes any open slide-in panel (settings/history/logs). Skips if a
-// cc-confirm modal is showing — the modal owns its own Esc semantics.
-document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
-  if (document.querySelector('.cc-confirm.show')) return;
-  const s = document.getElementById('settingsPanel');
-  const h = document.getElementById('historyPanel');
-  const l = document.getElementById('logsPanel');
-  if (s && s.classList.contains('show')) { s.classList.remove('show'); return; }
-  if (h && h.classList.contains('show')) { h.classList.remove('show'); return; }
-  if (l && l.classList.contains('show')) { l.classList.remove('show'); return; }
-});
 
 // Boot intro — click anywhere on it to dismiss early; otherwise auto-hides
 // when the CSS animation ends (~1.8s). Then remove it from the DOM so it
