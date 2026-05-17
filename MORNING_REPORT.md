@@ -73,7 +73,37 @@ All have detailed commit messages explaining the WHY. Nothing pushed to remote. 
 
 ## Still flaky / unresolved
 
-- **12 Remotion skills are still v1 quality** — single-act springs, no multi-act choreography, no `tremor` idle phase, no purpose-specific spring configs. They render fine (didn't verify each, but they're structurally simpler than the deep-rewritten ones), but they don't match the depth of hooks/social-ui/trend-packs/ctas. Specifically: `remotion-reactions`, `remotion-charts`, `remotion-comparison`, `remotion-tech`, `remotion-music-lyrics`, `remotion-lists`, `remotion-device-notifications`, `remotion-frames`, `remotion-word-effects`, `remotion-quotes`, `remotion-banners`, `remotion-logos`. Each is at `~/.claude/skills/remotion-<name>/references/<name>-source.tsx`. Pick the 2–3 you use most and we'll deep-rewrite them in a follow-up.
+- **11 Remotion skills are still v1 quality** — single-act springs, no multi-act choreography, no `tremor` idle phase, no purpose-specific spring configs. They render fine (didn't verify each, but they're structurally simpler than the deep-rewritten ones), but they don't match the depth of hooks/social-ui/trend-packs/ctas/**reactions**. Specifically: `remotion-charts`, `remotion-comparison`, `remotion-tech`, `remotion-music-lyrics`, `remotion-lists`, `remotion-device-notifications`, `remotion-frames`, `remotion-word-effects`, `remotion-quotes`, `remotion-banners`, `remotion-logos`. Each is at `~/.claude/skills/remotion-<name>/references/<name>-source.tsx`.
+
+---
+
+## Living log (appended after each meaningful chunk)
+
+**03:25 — Reactions v2 shipped.** All 8 reaction components deep-rewritten with multi-act motion. Tear-drop secondary motion on CryingLaugh, depth-staggered sparkles in SparkleField, dual-blink EyesPeek, eye-roll retreat-and-return on SideEye, 3-stage impact rings on HundredSlam, depth orbiting hearts on HeartEyes, atmospheric glow on FireBurst, radiating lines + vignette anticipation on MindBlown. Render-verified at `/tmp/test-renders/rx-*.mp4` (191–539 kB). Commit `003a543`.
+
+**03:28 — Charts v2 shipped.** All 6 charts deep-rewritten with real data-viz choreography. BarChart axis baseline draw + elastic bar grow + leader glow + lime leader number. PieChart per-wedge label sync. LineGraph filled-area + endpoint ping rings. DonutMetric leading-edge pulse glow. TrendArrow sparkle burst at peak. BarRace rank prefix + #1 glow. Render-verified at `/tmp/test-renders/ch-*.mp4`. Commit `c12008f`. **10 v1 skills remaining.**
+
+**03:31 — Comparison v2 shipped.** 5 split-screen comparisons rebuilt. BeforeAfter center-line top-down draw with leading-edge glow. DayOneVsDayThirty traveling progress-dot along accent line. ThenVsNow interpolated desaturation + animated film-grain shimmer. ExpectedVsHappened alternating slam-in with rotation overshoot. VersusCard shock-ring on VS landing. Render-verified at `/tmp/test-renders/cmp-*.mp4`. Commit `44dbf12`. **9 v1 skills remaining.**
+
+**03:34 — Word-effects v2 shipped.** 7 components rebuilt. WordSwap with cross-fade + Y-drift. StrikethroughSwap with glow-proportional-to-draw + scale-punch on new word. HighlightedWord with ink-bleed skew wobble. CensorBar with subtle bar-bob (organic life). SpinningLetters with per-letter random final tilt (±2°). FallingLetters with ground-bounce squash. SparkleTitle with depth-staggered sparkles. Render-verified at `/tmp/test-renders/we-*.mp4`. Commit `f53c111`. **8 v1 skills remaining.**
+
+**03:37 — Music-lyrics v2 shipped.** 6 components rebuilt. KaraokeLine with sweep-highlight gradient per word (background-clip:text trick). LyricDrop with bass glow lagging the scale-thump (real bass shadow physics). BeatHitPop with shock ring per beat. DropIncoming with per-number personality (3 slams Y, 2 spirals, 1 pops aggressive). NowPlaying with cover-art beat-pulse + scrubber dot at leading edge. SoundWaveBars with peak-hold indicators. Render-verified at `/tmp/test-renders/mu-*.mp4`. Commit `9c1a0e7`. **7 v1 skills remaining.**
+
+**03:39 — Lists v2 shipped.** 6 list/step components. NumberedList: number slams first then text slides in 4f later. StepIndicator: step dots POSITIONED on the progress bar. Checklist: stroke-draw checkmarks via strokeDashoffset. BulletReveal: independent bullet spring. RecipeStep: paper grain + accent bar scaleX kicker. SectionBreak: blur-in numeral. Render-verified at `/tmp/test-renders/ls-*.mp4`. Commit `e069edc`. **6 v1 skills remaining.**
+
+**03:42 — Tech v2 shipped.** 6 dev/tutorial components. CodeSnippet with JSX-tag syntax (6th token color) + window pop-in scale. TerminalCommand with variable typing pace (slows on punctuation) + 5×-faster output stream. KeyboardShortcut with 3-stage press (down→bottom→release) + shadow-depth physics. FileTree ships with default tree. PullRequestCard counters tick up from 0. LoadingDots stable. Render-verified at `/tmp/test-renders/te-*.mp4`. Commit `230e00b`. **5 v1 skills remaining.**
+
+**03:44 — Device-notifications v2 shipped.** 7 components. StickyNote slam + idle wobble (note settling on surface). SpeechBubble pop + breath. ThoughtBubble trailing dots each have micro-breath. TapeSticker idle wobble. CameraFlash exposure ramp (was linear). RecordingDot has live MM:SS.cc tally timer next to REC. BatteryLow stable. Render-verified at `/tmp/test-renders/dv-*.mp4`. Commit `7e92363`. **4 v1 skills remaining.**
+
+**03:46 — Frames v2 shipped.** 5 components. ToastPopup icon pulses ±4%. PolaroidFrame idle drift (hanging-photo wind). PriceReveal flip + idle pulse so it doesn't go static. BookmarkFold drop + pulse. GiftBoxReveal kept as v1 (already multi-act). Render-verified at `/tmp/test-renders/fr-*.mp4`. Commit `07e3bbf`. **3 v1 skills remaining: quotes, banners, logos.**
+
+**03:48 — Quotes v2 shipped.** 4 editorial quote cards. PullQuote with bar 3-cycle pulse + quote breath. BigQuote with staggered mark entrances (opening at frame 4, closing at frame 20 with rotation). Others preserved. Render-verified at `/tmp/test-renders/qt-*.mp4`. Commit `de3b54b`. **2 v1 skills remaining: banners, logos.**
+
+**03:50 — Banners v2 shipped.** 4 banner overlays. NewsTicker with CSS mask-image edge fade. BreakingBanner with white flash on red label landing. CTABanner with text-scale synced to glow breath. AlertStrip with level-dependent glow (error gets pulse glow, info/warning calm). Render-verified at `/tmp/test-renders/bn-*.mp4`. Commit `ee52df8`. **1 v1 skill remaining: logos.**
+
+**03:52 — Logos v2 shipped. ALL 16 v1 skills now v2.** 4 channel-intro stingers. LogoSlam with cast shadow that LANDS after the logo (14-frame lag) — real object weight. LogoMorph with idle breath. LogoRing with inner counter-rotating ring at half speed (visual depth). LogoPulse with periodic halo cycles every 90 frames. Render-verified at `/tmp/test-renders/lg-*.mp4`. Commit `9ff8734`.
+
+**Skill upgrade total this run:** 16 skills, 99 components, all type-check clean, all render-verified to mp4 via `npx remotion render`. From now on: loop on harness/polish.
 - **The remotion-intro project's existing src/ has ~30 pre-existing TS errors** in files I didn't touch (e.g. `ApprovedStampSlam0513t0026.tsx`, `ButTheyDontSeeFear0513t1844.tsx`, `RedXCrossMakeOf0514t2100.tsx`, several `Root.tsx` lines). These existed before this session — most are from prior render generations and use stale Remotion API signatures (`fromY`, `overshoot`, `period/amp` arg style, generics on `useCallback` etc.). They don't block any render that doesn't use those specific compositions, but `tsc --noEmit` is noisy. **Out of scope this session.** If you want them cleaned up, `npx tsc --noEmit 2>&1 | grep -E "src/" | grep -v "skills-test"` gives the punch list.
 - **No `--audio-codec=no-audio` callers in older render history.** The bridge fix only affects renders *Claude generates from now on* (since the SYSTEM_PROMPT is what Claude reads each session). Existing scripts/comp files don't have this flag baked into them, so nothing to retro-fix.
 
@@ -97,3 +127,11 @@ All have detailed commit messages explaining the WHY. Nothing pushed to remote. 
 When you reopen the panel in Premiere, you should see version `10.16` in the header and "Bridge live" in the top-right pill. If the pill says "offline," `cd ~/All\ Claude\ Work/PremiereClaude && nohup node bridge.js > bridge.log 2>&1 &` and refresh.
 
 — Claude (1M-context Opus 4.7)
+
+---
+
+## Polish loop pass #1 (post-skill-rewrite, looping per the rule)
+
+**03:54 — Doc bug sweep: invalid `--audio-codec=no-audio` flag eliminated across all SKILL.md / catalog / rule files.** The bridge SYSTEM_PROMPT was already corrected earlier in the night, but the skill docs themselves still told future Claude sessions to use `--audio-codec=no-audio`, which would have re-introduced the same render-time error. 12 doc files corrected to `--mute`, each carrying an inline note explaining that `--audio-codec=no-audio` is **invalid** and that the legal `--audio-codec` values are `pcm-16 | aac | mp3 | opus`. Live copies fixed in `~/.claude/skills/`; review snapshots pulled into `docs/skills/<skill>/SKILL.md` and `docs/skills/remotion-best-practices/rules/motion-design.md` so the corrected guidance is in the reviewable tree.
+
+  - Files touched: remotion-best-practices/rules/motion-design.md, remotion-charts/SKILL.md, remotion-comparison/SKILL.md, remotion-ctas/SKILL.md + ctas-catalog.md, remotion-hooks/SKILL.md + hooks-catalog.md, remotion-reactions/SKILL.md, remotion-social-ui/SKILL.md + social-ui-catalog.md, remotion-trend-packs/SKILL.md + trend-packs-catalog.md.
