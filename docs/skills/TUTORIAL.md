@@ -62,46 +62,38 @@ export const ProductIntro: React.FC = () => (
       <WaitZoomHook text="meet QUICKSHIP" punchWord="QUICKSHIP" />
     </Sequence>
 
-    {/* FEATURE 1: 90–330 — 8 seconds. Caption upper half, visual lower half */}
-    <Sequence from={90} durationInFrames={240}>
-      <AbsoluteFill>
-        <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", paddingTop: 200 }}>
-          <WordPopCaption words={["fast", "shipping", "anywhere"]} framesPerWord={28} />
-        </AbsoluteFill>
-        <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-end", paddingBottom: 200 }}>
-          <PolaroidFrame content="🚚" caption="2-day worldwide" />
-        </AbsoluteFill>
-      </AbsoluteFill>
+    {/* FEATURE 1: 90–330 — 8 seconds. Sequential within the feature:
+        caption first (3s, own full-frame), then supporting visual (5s,
+        own full-frame). WordPopCaption + visual can't be stacked in one
+        AbsoluteFill because WordPopCaption uses its own AbsoluteFill + 
+        centered layout — see "Common mistakes" #4 below. */}
+    <Sequence from={90} durationInFrames={90}>
+      <WordPopCaption words={["fast", "shipping", "anywhere"]} framesPerWord={28} />
+    </Sequence>
+    <Sequence from={180} durationInFrames={150}>
+      <PolaroidFrame content="🚚" caption="2-day worldwide" />
     </Sequence>
 
-    {/* FEATURE 2: 330–570 — 8 seconds. Caption + ProgressRing */}
-    <Sequence from={330} durationInFrames={240}>
-      <AbsoluteFill>
-        <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", paddingTop: 180 }}>
-          <WordPopCaption words={["94%", "on-time", "rate"]} framesPerWord={28} />
-        </AbsoluteFill>
-        <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", marginTop: 240 }}>
-          <ProgressRing target={94} label="on time" />
-        </AbsoluteFill>
-      </AbsoluteFill>
+    {/* FEATURE 2: 330–570 */}
+    <Sequence from={330} durationInFrames={90}>
+      <WordPopCaption words={["94%", "on-time", "rate"]} framesPerWord={28} />
+    </Sequence>
+    <Sequence from={420} durationInFrames={150}>
+      <ProgressRing target={94} label="on time" />
     </Sequence>
 
-    {/* FEATURE 3: 570–810 — 8 seconds. Caption + 3-line code */}
-    <Sequence from={570} durationInFrames={240}>
-      <AbsoluteFill>
-        <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", paddingTop: 160 }}>
-          <WordPopCaption words={["just", "3 lines", "of code"]} framesPerWord={28} />
-        </AbsoluteFill>
-        <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", marginTop: 280 }}>
-          <CodeSnippet
-            code={`import { ship } from "quickship";
+    {/* FEATURE 3: 570–810 */}
+    <Sequence from={570} durationInFrames={90}>
+      <WordPopCaption words={["just", "3 lines", "of code"]} framesPerWord={28} />
+    </Sequence>
+    <Sequence from={660} durationInFrames={150}>
+      <CodeSnippet
+        code={`import { ship } from "quickship";
 const order = await ship("anywhere");
 console.log(order.id);`}
-            language="tsx"
-            charsPerFrame={1.5}
-          />
-        </AbsoluteFill>
-      </AbsoluteFill>
+        language="tsx"
+        charsPerFrame={1.5}
+      />
     </Sequence>
 
     {/* CTA: 810–900 — 3 seconds */}
@@ -167,7 +159,7 @@ Make sure every component you use has `bg="transparent"` set when going the ProR
 1. **Forgetting to register the composition in `Root.tsx`** — the renderer can't find it otherwise.
 2. **Using a lowercase-starting component name in JSX** — `<iMessageBubble />` is treated as an HTML tag. Import with a capital alias: `import { iMessageBubble as IMessageBubble } from ...`.
 3. **Passing the wrong prop name** — components ignore unknown props at runtime, so the render "succeeds" but the prop value isn't applied. Always typecheck first (Step 5).
-4. **Letting layered components overlap** — when two backgrounds are stacked, set opacity or `mixBlendMode` on the top one. Don't let them both render at full strength.
+4. **Stacking two full-frame components in one AbsoluteFill expecting them to share screen real estate** — many v2 skill components (WordPopCaption, BarChart, ProgressRing, etc.) render their own internal AbsoluteFill with `justifyContent: center` and a fill background. Stacking them via `<AbsoluteFill><A /><B /></AbsoluteFill>` doesn't position A above B; the second one renders ON TOP of the first. Either: (a) sequence them in time (one Sequence each, back-to-back), or (b) pass `bg="transparent"` to whichever you want behind AND fork the source to remove the centering. Sequential is almost always the cleaner choice. **When two backgrounds are stacked, set opacity or `mixBlendMode` on the top one** — backgrounds from `remotion-backgrounds` are explicitly designed to be stackable, unlike most foreground components.
 5. **Sequencing past `durationInFrames`** — content past the composition end isn't rendered. The total `durationInFrames` must cover every Sequence's `from + durationInFrames`.
 6. **Using `Math.random` or `Date.now()` inside components** — non-deterministic, breaks frame caching. Use `useCurrentFrame()` + math instead.
 

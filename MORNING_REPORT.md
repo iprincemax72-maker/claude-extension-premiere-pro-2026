@@ -157,6 +157,14 @@ Version bumped to v10.17 in both the version-tag span and the `PANEL_VERSION` co
   - **Pt3 report:** 0 critical / 0 minor / 0 nits.
   - Pt1 + Pt2 also re-run, still 0/0.
 
+**05:19 — Visual inspection caught a LAYOUT bug in my ProductIntro + TUTORIAL.md.** The product-intro mid-frame showed ProgressRing alone — the WordPopCaption that should have been above it was completely invisible. Diagnosis: WordPopCaption renders its OWN `AbsoluteFill` with `justifyContent: center` and a fill background; stacking it inside another AbsoluteFill via z-index doesn't position the caption above the visual — it just overlays one on top of the other.
+
+Fixed two ways:
+  1. ProductIntro.tsx + TUTORIAL.md: switched from the broken "stack inside one Sequence" pattern to SEQUENTIAL beats — `<Sequence durationInFrames={90}><WordPopCaption /></Sequence>` then `<Sequence from={X+90}><Visual /></Sequence>`. Cleaner and matches how the components are actually designed.
+  2. TUTORIAL.md "Common mistakes" #4: documented this as a real gotcha. Most v2 foreground components have internal AbsoluteFill + centering, so stacking 2+ of them in one parent AbsoluteFill doesn't work like CSS positioning would. Only `remotion-backgrounds` components are explicitly stackable (and they need `opacity` / `mixBlendMode` if layered).
+
+Re-rendered ProductIntro post-fix — now shows clean ring at frame 450 (mid-Feature-2). Caption appeared and resolved cleanly in its own beat from frames 330–420.
+
 **05:16 — Visual inspection caught a doc-drift bug in remotion-tech.** Extracted mid-frame PNGs from all 5 showreel renders for visual review. The stress-test shows CodeSnippet with an "80-char line" claim from the SKILL.md actually wrapping to two lines! My anti-pattern said "lines >80 clip", but at exactly 80 chars they wrap. Calculated the real fit: 32px mono font in a 1400-maxWidth container with 30px pre-padding = ~70 chars actual cap. Updated `remotion-tech/SKILL.md` to say "~70 characters" with the math explained inline. Stress-test render itself stays — it deliberately renders at the doc-claimed limit, and now serves as the proof that the new lower cap (70) is correct.
 
 **05:12 — Built + render-verified the TUTORIAL.md example. Caught one more bug in my own doc.** Wrote `ProductIntro.tsx` matching the QUICKSHIP example from `TUTORIAL.md` and tried to render. Typecheck immediately caught:

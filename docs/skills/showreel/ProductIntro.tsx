@@ -18,46 +18,37 @@ export const ProductIntro: React.FC = () => (
       <WaitZoomHook text="meet QUICKSHIP" punchWord="QUICKSHIP" />
     </Sequence>
 
-    {/* FEATURE 1: 90–330 */}
-    <Sequence from={90} durationInFrames={240}>
-      <AbsoluteFill>
-        <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", paddingTop: 200 }}>
-          <WordPopCaption words={["fast", "shipping", "anywhere"]} framesPerWord={28} />
-        </AbsoluteFill>
-        <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-end", paddingBottom: 200 }}>
-          <PolaroidFrame content="🚚" caption="2-day worldwide" />
-        </AbsoluteFill>
-      </AbsoluteFill>
+    {/* FEATURE 1: 90–330. Sequential within the feature: caption first
+        (own full-frame), then the supporting visual (own full-frame).
+        Stacking WordPopCaption + visual in one AbsoluteFill doesn't work
+        because WordPopCaption fills its frame and centers its own content. */}
+    <Sequence from={90} durationInFrames={90}>
+      <WordPopCaption words={["fast", "shipping", "anywhere"]} framesPerWord={28} />
+    </Sequence>
+    <Sequence from={180} durationInFrames={150}>
+      <PolaroidFrame content="🚚" caption="2-day worldwide" />
     </Sequence>
 
     {/* FEATURE 2: 330–570 */}
-    <Sequence from={330} durationInFrames={240}>
-      <AbsoluteFill>
-        <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", paddingTop: 180 }}>
-          <WordPopCaption words={["94%", "on-time", "rate"]} framesPerWord={28} />
-        </AbsoluteFill>
-        <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", marginTop: 240 }}>
-          <ProgressRing target={94} label="on time" />
-        </AbsoluteFill>
-      </AbsoluteFill>
+    <Sequence from={330} durationInFrames={90}>
+      <WordPopCaption words={["94%", "on-time", "rate"]} framesPerWord={28} />
+    </Sequence>
+    <Sequence from={420} durationInFrames={150}>
+      <ProgressRing target={94} label="on time" />
     </Sequence>
 
     {/* FEATURE 3: 570–810 */}
-    <Sequence from={570} durationInFrames={240}>
-      <AbsoluteFill>
-        <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", paddingTop: 160 }}>
-          <WordPopCaption words={["just", "3 lines", "of code"]} framesPerWord={28} />
-        </AbsoluteFill>
-        <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", marginTop: 280 }}>
-          <CodeSnippet
-            code={`import { ship } from "quickship";
+    <Sequence from={570} durationInFrames={90}>
+      <WordPopCaption words={["just", "3 lines", "of code"]} framesPerWord={28} />
+    </Sequence>
+    <Sequence from={660} durationInFrames={150}>
+      <CodeSnippet
+        code={`import { ship } from "quickship";
 const order = await ship("anywhere");
 console.log(order.id);`}
-            language="tsx"
-            charsPerFrame={1.5}
-          />
-        </AbsoluteFill>
-      </AbsoluteFill>
+        language="tsx"
+        charsPerFrame={1.5}
+      />
     </Sequence>
 
     {/* CTA: 810–900 */}
