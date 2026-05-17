@@ -900,11 +900,13 @@ function generateMomentsParallel(moments, reqId, log, onProgress) {
       '- TRANSPARENT background — this is CRITICAL. The composition root must',
       '  have NO opaque background (no solid-color AbsoluteFill behind it).',
       '  Render with EXACTLY this codec config so the alpha channel survives:',
-      '      --codec prores --prores-profile 4444',
+      '      --codec prores --prores-profile 4444 --audio-codec=no-audio',
       '  ProRes 422 (the default) has NO alpha and will black out the video.',
-      '  You MUST pass --prores-profile 4444. After rendering, the file\'s',
-      '  pixel format must be yuva444p10le (alpha-capable) — verify with',
-      '  ffprobe if unsure and re-render if it is not.',
+      '  You MUST pass --prores-profile 4444. The --audio-codec=no-audio',
+      '  flag is REQUIRED — without it Remotion adds a silent stereo track',
+      '  and Premiere shows an empty waveform on the source. After',
+      '  rendering, the file\'s pixel format must be yuva444p10le (alpha-',
+      '  capable) — verify with ffprobe if unsure and re-render if it is not.',
       '- It is an OVERLAY, not a full-screen card: keep it to a lower-third,',
       '  corner, or side panel as fits the type. It supports the speech, it',
       '  does not cover the speaker.',
@@ -1346,6 +1348,13 @@ OUTPUT FORMAT REQUIREMENTS (critical — Premiere can't import some formats):
 - For still images → PNG.
 - File extensions MUST match codec: h264 → .mp4, prores → .mov, png → .png. The panel parses the extension to decide how to import.
 - Always pass an explicit \`--codec\` so it doesn't default to webm.
+- ★ NO EMPTY AUDIO TRACK ★ — Unless the composition genuinely USES audio
+  (i.e. you wrapped <Audio src={…}/> components in it, or it's part of an
+  ad with a voiceover track), pass \`--audio-codec=no-audio\` to every
+  render. Without it, Remotion writes a silent stereo track to the output
+  and the user sees an empty L/R waveform on the Premiere source monitor
+  — looks broken even though nothing's wrong. Skip the audio track
+  entirely when there's nothing to play.
 
 ★★★ TRANSPARENCY — READ THIS, IT IS THE #1 THING PEOPLE GET WRONG ★★★
 If the request mentions "transparent", "no background", "remove the
@@ -1461,7 +1470,7 @@ animation), THEN start blank and use the library directly.
 PRE-SCAFFOLDED REMOTION PROJECT:
 - A Remotion project is already installed at ${WORK_DIR}/remotion-intro/ with node_modules ready.
 - Add new compositions as TSX files in ${WORK_DIR}/remotion-intro/src/ and register them in src/Root.tsx with a unique <Composition id="..."> entry.
-- Render with: \`cd ${WORK_DIR}/remotion-intro && npx remotion render src/index.ts <CompositionId> ${OUTPUT_DIR}/<filename>.mp4\`
+- Render with: \`cd ${WORK_DIR}/remotion-intro && npx remotion render src/index.ts <CompositionId> ${OUTPUT_DIR}/<filename>.mp4 --codec=h264 --audio-codec=no-audio\` — the no-audio flag is REQUIRED unless the composition actually has <Audio> elements.
 - Do NOT scaffold a new Remotion project; do NOT run \`npx create-video\`. Reuse the existing one.
 - If node_modules is somehow missing (\`ls ${WORK_DIR}/remotion-intro/node_modules\` is empty), run \`cd ${WORK_DIR}/remotion-intro && npm install\` first — but this should already be done from the installer.
 
