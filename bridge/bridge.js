@@ -8,7 +8,11 @@ const os = require('os');
 
 const PORT = 3737;
 const SESSION_ID = crypto.randomUUID();
-const WORK_DIR = path.join(os.homedir(), 'PremiereClaude');
+// WORK_DIR pins to wherever bridge.js itself lives, so the bridge always
+// finds the remotion-intro project sitting next to it — even if the user
+// has moved/renamed the parent folder. Override with the env var if you
+// need to point it somewhere else.
+const WORK_DIR = process.env.CLAUDE_BRIDGE_WORK_DIR || __dirname;
 const OUTPUT_DIR = path.join(WORK_DIR, 'output');
 const PANEL_DIR = (process.platform === 'win32')
   ? path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Adobe', 'CEP', 'extensions', 'com.claudebridge.panel')
