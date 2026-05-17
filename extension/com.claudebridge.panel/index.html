@@ -2217,7 +2217,52 @@
     transform: translate3d(0, 0, 0);
   }
   /* List body — small upward reveal with extra delay */
-  .history-panel .history-list {
+  .history-panel .history-search-wrap {
+    position: relative;
+    margin: 0 18px 8px;
+    display: flex;
+    align-items: center;
+  }
+  .history-search-wrap .history-search-icon {
+    position: absolute;
+    left: 12px;
+    width: 14px; height: 14px;
+    color: var(--text-dim);
+    pointer-events: none;
+  }
+  #historySearch {
+    width: 100%;
+    padding: 9px 36px 9px 36px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 12.5px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+  }
+  #historySearch:focus {
+    border-color: var(--accent-line);
+    background: var(--surface-2);
+  }
+  #historySearch::placeholder { color: var(--text-faint); }
+  #historySearchClear {
+    position: absolute;
+    right: 8px;
+    width: 22px; height: 22px;
+    background: transparent;
+    border: 0;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+  }
+  #historySearchClear:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+  #historySearchClear svg { width: 11px; height: 11px; }
+  .history-list {
     opacity: 0;
     transform: translate3d(0, 12px, 0);
     transition: opacity 0.3s var(--ease-out) 0.08s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.08s;
@@ -2400,7 +2445,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.3</span>
+    <span class="version-tag" id="versionTag">10.4</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -2491,6 +2536,13 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M18 6L6 18M6 6l12 12"/>
       </svg>
+    </button>
+  </div>
+  <div class="history-search-wrap">
+    <svg class="history-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    <input id="historySearch" type="text" placeholder="Search history — prompt or filename" autocomplete="off" autocorrect="off" spellcheck="false" />
+    <button id="historySearchClear" type="button" aria-label="Clear" title="Clear (Esc)" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
     </button>
   </div>
   <div class="history-list" id="historyList"></div>
@@ -4328,9 +4380,19 @@ async function pickFileNative(hintPath) {
   });
 }
 
+// Wrap renderHistory so the active search filter survives re-renders
+// (e.g. after Locate all, Delete, Use prompt — anything that re-renders).
+const _origRenderHistory = renderHistory;
+renderHistory = function() {
+  _origRenderHistory.apply(this, arguments);
+  try { applyHistoryFilter(); } catch {}
+};
+
 function openHistory() {
   renderHistory();
+  applyHistoryFilter();
   historyPanel.classList.add('show');
+  setTimeout(() => { try { document.getElementById('historySearch').focus(); } catch {} }, 200);
 }
 function closeHistory() {
   historyPanel.classList.remove('show');
@@ -4339,6 +4401,57 @@ historyBtn.addEventListener('click', () => {
   historyPanel.classList.contains('show') ? closeHistory() : openHistory();
 });
 document.getElementById('historyClose').addEventListener('click', closeHistory);
+
+/* Search across the rendered history rows. We filter the DOM directly
+   instead of re-rendering — keeps the action-button event handlers
+   intact and avoids flicker on every keystroke. */
+function applyHistoryFilter() {
+  const inp = document.getElementById('historySearch');
+  const q = (inp && inp.value || '').trim().toLowerCase();
+  const rows = document.querySelectorAll('#historyList .history-item');
+  let shown = 0;
+  rows.forEach(row => {
+    const text = (row.textContent || '').toLowerCase();
+    const match = !q || text.includes(q);
+    row.style.display = match ? '' : 'none';
+    if (match) shown++;
+  });
+  // Toggle the clear-X button
+  const clearBtn = document.getElementById('historySearchClear');
+  if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
+  // If the search wipes all rows, show a helper note inside the list
+  let note = document.getElementById('historySearchEmpty');
+  if (q && shown === 0 && rows.length > 0) {
+    if (!note) {
+      note = document.createElement('div');
+      note.id = 'historySearchEmpty';
+      note.className = 'history-empty';
+      note.textContent = 'No matches.';
+      document.getElementById('historyList').appendChild(note);
+    }
+  } else if (note) {
+    note.remove();
+  }
+}
+(function bindHistorySearch() {
+  const inp = document.getElementById('historySearch');
+  if (!inp) return;
+  inp.addEventListener('input', applyHistoryFilter);
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && inp.value) {
+      e.preventDefault();
+      e.stopPropagation();
+      inp.value = '';
+      applyHistoryFilter();
+    }
+  });
+  const clearBtn = document.getElementById('historySearchClear');
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    inp.value = '';
+    applyHistoryFilter();
+    inp.focus();
+  });
+})();
 renderHistoryBadge();
 
 
@@ -4501,7 +4614,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.3';
+  const PANEL_VERSION = '10.4';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
