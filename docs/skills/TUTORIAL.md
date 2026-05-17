@@ -47,7 +47,8 @@ All clear.
 ```tsx
 import React from "react";
 import { AbsoluteFill, Sequence } from "remotion";
-import { WaitZoomHook, WordPopCaption } from "./hooks";
+import { WaitZoomHook } from "./hooks";
+import { WordPopCaption } from "./text-presets";
 import { PolaroidFrame } from "./frames";
 import { ProgressRing } from "./stats";
 import { CodeSnippet } from "./tech";
