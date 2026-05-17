@@ -157,6 +157,8 @@ Version bumped to v10.17 in both the version-tag span and the `PANEL_VERSION` co
   - **Pt3 report:** 0 critical / 0 minor / 0 nits.
   - Pt1 + Pt2 also re-run, still 0/0.
 
+**05:07 — Stress-test composition rendered.** Built `StressTest.tsx` that pushes 5 v2 skill components to their documented caps + edge prop values: NumberedList at the 7-item cap, KaraokeLine with mixed unicode (Latin + CJK 歌 + emoji 🎵), CodeSnippet at the 80-char line limit, BarChart at the 6-category cap, TypewriterPro with all punctuation classes. Rendered to `/tmp/test-renders/stress-test.mp4` — 690 frames @ 30fps, 1920×1080, 1.6 MB. **All edge cases render cleanly** — confirms the anti-pattern documentation matches actual component behavior. No silent bugs at the boundary values.
+
 **05:02 — Full validation suite passing clean.** Ran all 4 test passes back-to-back:
   - `tests/skill-sources-typecheck.sh` — 24 skill sources strict-typed clean
   - `tests/panel-audit.py` (pt1) — 0 critical / 0 minor / 0 nit
