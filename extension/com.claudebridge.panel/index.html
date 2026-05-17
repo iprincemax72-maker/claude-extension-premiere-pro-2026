@@ -762,15 +762,26 @@
     margin-top: 6px;
   }
   .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px 18px;
     margin-top: 4px;
     width: 100%;
     max-width: 100%;
     padding: 0 6px;
     box-sizing: border-box;
+  }
+  @media (max-width: 640px) { .chips { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 420px) { .chips { grid-template-columns: 1fr; } }
+  .chips-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .chips-section.hidden { display: none !important; }
+  .chip-more {
+    grid-column: 1 / -1;
+    justify-self: center;
   }
   .chip.hidden { display: none; }
   /* .chip.extra is just a marker — visibility is governed by .hidden in JS so
@@ -791,27 +802,31 @@
   }
   .chips-section-title {
     width: 100%;
+    text-align: center;
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-dim);
-    margin: 14px 0 6px;
+    margin: 0 0 8px;
     padding: 0 2px;
     opacity: 0.85;
     animation: fadeUp 0.55s var(--ease-out) backwards;
   }
-  .chips-section-title:first-child { margin-top: 6px; }
   .chips-section-title.hidden { display: none !important; }
   .chips-section-row {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 5px;
     width: 100%;
-    margin-bottom: 4px;
   }
   .chips-section-row.hidden { display: none !important; }
+  .chips-section-row .chip {
+    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
+  }
   .chip {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -3394,13 +3409,18 @@ function renderChips(container) {
     if (sectionIsExtra) title.classList.add('extra');
     if (sectionIsExtra && !chipsExpanded) title.classList.add('hidden');
     title.style.animationDelay = (0.22 + gi * 0.04) + 's';
-    container.appendChild(title);
+
+    const section = document.createElement('div');
+    section.className = 'chips-section';
+    if (sectionIsExtra) section.classList.add('extra');
+    if (sectionIsExtra && !chipsExpanded) section.classList.add('hidden');
+    section.appendChild(title);
 
     const row = document.createElement('div');
     row.className = 'chips-section-row';
-    if (sectionIsExtra) row.classList.add('extra');
-    if (sectionIsExtra && !chipsExpanded) row.classList.add('hidden');
-    container.appendChild(row);
+    section.appendChild(row);
+
+    container.appendChild(section);
 
     grp.items.forEach((it, i) => {
       const c = document.createElement('div');
