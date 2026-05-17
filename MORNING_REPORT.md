@@ -137,3 +137,22 @@ When you reopen the panel in Premiere, you should see version `10.16` in the hea
   - Files touched: remotion-best-practices/rules/motion-design.md, remotion-charts/SKILL.md, remotion-comparison/SKILL.md, remotion-ctas/SKILL.md + ctas-catalog.md, remotion-hooks/SKILL.md + hooks-catalog.md, remotion-reactions/SKILL.md, remotion-social-ui/SKILL.md + social-ui-catalog.md, remotion-trend-packs/SKILL.md + trend-packs-catalog.md.
 
 **03:59 — Callouts skill: rendered all 5 components + beefed up SKILL.md.** The callouts skill (HandDrawnArrow, HighlightCircle, PullQuote, SpeechBubble, QuestionCard) was one of the few that never got the night's render verification. Built `TestRootCallouts.tsx` + `test-index-callouts.ts`; all 5 rendered cleanly to `/tmp/test-renders/co-*.mp4` with `--mute --codec h264`. ffprobe-verified: 1920×1080, h264, 30fps, silent AAC track (Premiere-friendly). Then rewrote the SKILL.md from a thin 31-line stub into a real production guide: anti-patterns (don't stack arrow+circle, don't use circle on small text, don't put bubble at top-of-frame with `tail: bl`, etc.), composition recipes (pointing-at-UI, circle-a-face, big-quote-moment, comic reaction, Q&A intro), common prop overrides, render notes with the `--mute` correction and a note that `--mute` keeps a silent AAC track (post-process with `ffmpeg -an` if you really need no audio track at all), audio cue points per component, and pairing recipes (HighlightCircle + WatchThisStamp, PullQuote → BigQuote, SpeechBubble + LikeBurst).
+
+**04:05 — Panel v10.17: focus restoration after slide-in panel close.** Pt3 audit (new file: `tests/panel-audit-edge-cases-pt3.py`) found a real UX bug: after pressing Esc with the history panel open, focus stayed on the now-hidden `historySearch` input — meaning the user's next keystroke went nowhere visible. Fixed in three places in `index.html`:
+- Global Esc handler at ~5110: after `classList.remove('show')`, call `restoreFocus()` which focuses `#input` (the composer).
+- `closeHistory()`: focus `#input` after hiding the panel.
+- `closeSettings()`: same.
+Version bumped to v10.17 in both the version-tag span and the `PANEL_VERSION` const. Live panel + extension repo mirror both updated.
+
+**Pt3 audit findings, full set:**
+  - 🟢 Unicode-heavy history (emoji, CJK, RTL Arabic, Devanagari + combining marks, 600-char prompt) renders 5/5 rows without overflowing the viewport.
+  - 🟢 Narrow viewport 600×760 keeps composer + 3-col chip grid usable.
+  - 🟢 Wide viewport 2560×1440 chip grid scales to 4 cols (doesn't grotesquely stretch).
+  - 🟢 Corrupt localStorage JSON: panel still mounts, history opens with 0 rows.
+  - 🟢 100-row history stress: all 100 rendered.
+  - 🟢 Settings double-click race: no stuck overlay.
+  - 🟢 Esc during confirm modal closes the modal.
+  - 🟢 Focus correctly returns to `#input` after Esc-closing history (the v10.17 fix).
+  - 🟢 close-all-but-one tabs leaves exactly 1 active.
+  - **Pt3 report:** 0 critical / 0 minor / 0 nits.
+  - Pt1 + Pt2 also re-run, still 0/0.
