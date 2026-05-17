@@ -1758,6 +1758,36 @@ const server = http.createServer((req, res) => {
   // panel polls this every 5s; if mtime changes, the panel reloads itself.
   // Single-shot fetch, no persistent connection — safe replacement for the
   // dev SSE we ripped out in v3.3.
+  // Compare local panel version vs GitHub raw — used by the panel to
+  // show an "Update Available" pill. Returns BOTH versions so the
+  // panel can decide whether to nudge.
+  if (req.method === 'GET' && req.url === '/check-update') {
+    (async () => {
+      const out = { ok: true, localVersion: null, remoteVersion: null, updateAvailable: false };
+      try {
+        const localPath = path.join(PANEL_DIR, 'index.html');
+        const local = fs.readFileSync(localPath, 'utf8');
+        const mL = local.match(/PANEL_VERSION\s*=\s*['"]([^'"]+)['"]/);
+        if (mL) out.localVersion = mL[1];
+        if (typeof fetch === 'function') {
+          const r = await fetch(GITHUB_RAW + '/extension/com.claudebridge.panel/index.html?nc=' + Date.now(),
+                               { headers: { 'Cache-Control': 'no-cache' } });
+          if (r.ok) {
+            const txt = await r.text();
+            const mR = txt.match(/PANEL_VERSION\s*=\s*['"]([^'"]+)['"]/);
+            if (mR) out.remoteVersion = mR[1];
+          }
+        }
+        if (out.localVersion && out.remoteVersion && out.localVersion !== out.remoteVersion) {
+          out.updateAvailable = true;
+        }
+      } catch (e) { out.ok = false; out.error = String(e); }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(out));
+    })();
+    return;
+  }
+
   if (req.method === 'GET' && req.url === '/version') {
     try {
       const panelPath = path.join(
