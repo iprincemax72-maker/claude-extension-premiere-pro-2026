@@ -966,11 +966,12 @@ function generateMomentsParallel(moments, reqId, log, onProgress) {
       '- TRANSPARENT background — this is CRITICAL. The composition root must',
       '  have NO opaque background (no solid-color AbsoluteFill behind it).',
       '  Render with EXACTLY this codec config so the alpha channel survives:',
-      '      --codec prores --prores-profile 4444 --audio-codec=no-audio',
+      '      --codec prores --prores-profile 4444 --mute',
       '  ProRes 422 (the default) has NO alpha and will black out the video.',
-      '  You MUST pass --prores-profile 4444. The --audio-codec=no-audio',
-      '  flag is REQUIRED — without it Remotion adds a silent stereo track',
-      '  and Premiere shows an empty waveform on the source. After',
+      '  You MUST pass --prores-profile 4444. The --mute flag silences any',
+      '  audio track (without it Remotion adds silent stereo and Premiere',
+      '  shows an empty waveform). The bridge ALSO post-processes with',
+      '  ffmpeg -an to strip the silent track entirely after render. After',
       '  rendering, the file\'s pixel format must be yuva444p10le (alpha-',
       '  capable) — verify with ffprobe if unsure and re-render if it is not.',
       '- It is an OVERLAY, not a full-screen card: keep it to a lower-third,',
@@ -1416,11 +1417,14 @@ OUTPUT FORMAT REQUIREMENTS (critical — Premiere can't import some formats):
 - Always pass an explicit \`--codec\` so it doesn't default to webm.
 - ★ NO EMPTY AUDIO TRACK ★ — Unless the composition genuinely USES audio
   (i.e. you wrapped <Audio src={…}/> components in it, or it's part of an
-  ad with a voiceover track), pass \`--audio-codec=no-audio\` to every
-  render. Without it, Remotion writes a silent stereo track to the output
-  and the user sees an empty L/R waveform on the Premiere source monitor
-  — looks broken even though nothing's wrong. Skip the audio track
-  entirely when there's nothing to play.
+  ad with a voiceover track), pass \`--mute\` to every render. Without it,
+  Remotion writes a silent stereo track to the output and the user sees
+  an empty L/R waveform on the Premiere source monitor. (The bridge ALSO
+  runs ffmpeg -an post-process to strip the silent track after render,
+  so even if you forget, audio gets removed before Premiere sees it.)
+  IMPORTANT: \`--audio-codec=no-audio\` is NOT a valid Remotion flag — it
+  errors with "Audio codec must be one of pcm-16, aac, mp3, opus". Use
+  \`--mute\` instead.
 
 ★★★ TRANSPARENCY — READ THIS, IT IS THE #1 THING PEOPLE GET WRONG ★★★
 If the request mentions "transparent", "no background", "remove the
@@ -1536,7 +1540,7 @@ animation), THEN start blank and use the library directly.
 PRE-SCAFFOLDED REMOTION PROJECT:
 - A Remotion project is already installed at ${WORK_DIR}/remotion-intro/ with node_modules ready.
 - Add new compositions as TSX files in ${WORK_DIR}/remotion-intro/src/ and register them in src/Root.tsx with a unique <Composition id="..."> entry.
-- Render with: \`cd ${WORK_DIR}/remotion-intro && npx remotion render src/index.ts <CompositionId> "<OUTPUT_DIR>/<filename>.mp4" --codec=h264 --audio-codec=no-audio\` — the no-audio flag is REQUIRED unless the composition actually has <Audio> elements. <OUTPUT_DIR> = the "Output dir for any rendered files" path from the [PREMIERE CONTEXT] block at the top of the user's message (NOT the global default). If no context is provided fall back to ${OUTPUT_DIR}. Quote the path because it may contain spaces (e.g. "Vera Vid 13/Claude Animations/...").
+- Render with: \`cd ${WORK_DIR}/remotion-intro && npx remotion render src/index.ts <CompositionId> "<OUTPUT_DIR>/<filename>.mp4" --codec=h264 --mute\` — \`--mute\` is REQUIRED unless the composition actually has <Audio> elements; it silences any audio track Remotion would otherwise add. (NOTE: \`--audio-codec=no-audio\` does NOT exist as a flag and errors out — use \`--mute\` instead. The bridge also post-strips audio with ffmpeg -an, so the final file Premiere sees has no audio stream at all.) <OUTPUT_DIR> = the "Output dir for any rendered files" path from the [PREMIERE CONTEXT] block at the top of the user's message (NOT the global default). If no context is provided fall back to ${OUTPUT_DIR}. Quote the path because it may contain spaces (e.g. "Vera Vid 13/Claude Animations/...").
 - Do NOT scaffold a new Remotion project; do NOT run \`npx create-video\`. Reuse the existing one.
 - If node_modules is somehow missing (\`ls ${WORK_DIR}/remotion-intro/node_modules\` is empty), run \`cd ${WORK_DIR}/remotion-intro && npm install\` first — but this should already be done from the installer.
 
