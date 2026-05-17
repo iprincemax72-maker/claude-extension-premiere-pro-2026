@@ -38,7 +38,7 @@ Six components built for developer / tutorial / tech-channel content. Render-ver
 
 ## Anti-patterns
 
-- **Don't** put a CodeSnippet line longer than ~80 characters. The mono font + padding fits ~80 chars at the default 1920×1080 canvas. Past 80 it horizontally clips. Wrap long lines manually with `\n`.
+- **Don't** put a CodeSnippet line longer than ~70 characters. The mono font (32px) + container padding (maxWidth 1400px, 30px pre-padding inside, 96px parent padding) fits ~70 chars at the default 1920×1080 canvas. Past 70 chars `whiteSpace: pre-wrap` will visibly wrap the line to a second row — confirmed by render at exactly 80 chars (the stress-test composition shows the wrap). Manually split long lines with `\n`.
 - **Don't** show real production code via CodeSnippet — viewers can't read code that fast even at slow `charsPerFrame`. Use short, illustrative snippets (3–8 lines), not the actual implementation.
 - **Don't** stack two KeyboardShortcuts in the same frame. Two competing keycap groups confuse — Cmd+S above and Cmd+Shift+S below reads as two unrelated shortcuts. Sequence them instead.
 - **Don't** use TerminalCommand for output >12 lines. The terminal box height is fixed and longer output overflows. For multi-screen output, sequence multiple TerminalCommands or use a FileTree if the result is a directory listing.

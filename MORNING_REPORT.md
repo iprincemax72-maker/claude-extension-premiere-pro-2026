@@ -157,6 +157,8 @@ Version bumped to v10.17 in both the version-tag span and the `PANEL_VERSION` co
   - **Pt3 report:** 0 critical / 0 minor / 0 nits.
   - Pt1 + Pt2 also re-run, still 0/0.
 
+**05:16 — Visual inspection caught a doc-drift bug in remotion-tech.** Extracted mid-frame PNGs from all 5 showreel renders for visual review. The stress-test shows CodeSnippet with an "80-char line" claim from the SKILL.md actually wrapping to two lines! My anti-pattern said "lines >80 clip", but at exactly 80 chars they wrap. Calculated the real fit: 32px mono font in a 1400-maxWidth container with 30px pre-padding = ~70 chars actual cap. Updated `remotion-tech/SKILL.md` to say "~70 characters" with the math explained inline. Stress-test render itself stays — it deliberately renders at the doc-claimed limit, and now serves as the proof that the new lower cap (70) is correct.
+
 **05:12 — Built + render-verified the TUTORIAL.md example. Caught one more bug in my own doc.** Wrote `ProductIntro.tsx` matching the QUICKSHIP example from `TUTORIAL.md` and tried to render. Typecheck immediately caught:
   > `Module './hooks' has no exported member 'WordPopCaption'.`
 
