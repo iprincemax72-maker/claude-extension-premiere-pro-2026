@@ -157,6 +157,8 @@ Version bumped to v10.17 in both the version-tag span and the `PANEL_VERSION` co
   - **Pt3 report:** 0 critical / 0 minor / 0 nits.
   - Pt1 + Pt2 also re-run, still 0/0.
 
+**04:58 — Third showreel: tutorial / explainer style.** Built `ShowreelExplainer.tsx` (19.3s landscape) — the long-form tutorial counterpart to the highlight-reel and vertical-TikTok showreels. Demonstrates a real production pattern: chapter intro → code → terminal → stat reveal (which functions as the B-roll between two tech components per the "don't chain 3+ tech components" anti-pattern) → section break → pull quote takeaway. Skills used: ChapterBumper (stingers) + WavyLines (backgrounds), CodeSnippet (tech), TerminalCommand (tech), ProgressRing (stats), SectionBreak (lists), PullQuote (callouts). Rendered to `/tmp/test-renders/showreel-explainer.mp4` — 580 frames @ 30fps, 1920×1080, 1.2 MB. Type-checked clean. **Three showreel templates now: highlight (landscape), TikTok (vertical), explainer (landscape long-form).**
+
 **04:57 — Caught TWO more bugs via strict typecheck + built reusable typecheck script.** Ran `tsc --strict` on all 24 skill sources + both showreels. Found:
   1. `Showreel.tsx`: `<WaitZoomHook word="LAUNCH" />` — wrong prop name (component takes `text` + `punchWord`, not `word`). Rendered at runtime because Remotion ignores unknown props, but strict types caught it.
   2. `ShowreelV.tsx`: `<iMessageBubble />` (lowercase) — JSX treats lowercase tags as HTML intrinsics. Component name was lowercase by accident in the original source. Fixed with import alias: `import { iMessageBubble as IMessageBubble } from "./social-ui"`.
