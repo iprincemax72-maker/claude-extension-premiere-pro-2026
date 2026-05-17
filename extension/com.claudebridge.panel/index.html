@@ -4200,19 +4200,33 @@ function renderHistory() {
   if (locateAll) {
     locateAll.addEventListener('click', async () => {
       locateAll.disabled = true;
-      const orig = locateAll.textContent;
+      locateAll.textContent = 'Pick folder…';
+      // Open a native FOLDER picker. User points to the directory that
+      // holds the renders; we then match each missing entry's basename
+      // inside it.
+      const folder = await pickFolderNative();
+      if (!folder) {
+        locateAll.textContent = 'Cancelled';
+        setTimeout(() => { locateAll.disabled = false; locateAll.textContent = 'Locate all'; }, 1500);
+        return;
+      }
       locateAll.textContent = 'Locating…';
       let fixed = 0;
       for (let i = 0; i < history.length; i++) {
         const e = history[i];
         const exists = !_fs || (function(){ try { return _fs.existsSync(e.path); } catch { return true; } })();
         if (exists) continue;
-        const newPath = await tryAutoRelocate(e);
-        if (newPath) { history[i].path = newPath; fixed++; }
+        const basename = (e.path || '').split('/').pop();
+        if (!basename) continue;
+        const candidate = folder.replace(/\/$/, '') + '/' + basename;
+        if (_fs && _fs.existsSync(candidate)) {
+          history[i].path = candidate;
+          fixed++;
+        }
       }
       if (fixed > 0) saveHistory();
-      locateAll.textContent = fixed > 0 ? ('Fixed ' + fixed) : 'None found';
-      setTimeout(() => { renderHistory(); }, 800);
+      locateAll.textContent = fixed > 0 ? ('Fixed ' + fixed) : 'No matches in folder';
+      setTimeout(() => { renderHistory(); }, 1200);
     });
   }
 }
@@ -4273,6 +4287,24 @@ async function tryAutoRelocate(e) {
     if (_fs.existsSync(candidate)) return candidate;
   } catch {}
   return null;
+}
+
+// Native FOLDER picker. CEP's showOpenDialog supports a chooseDirectory
+// flag. Returns the absolute folder path or null on cancel.
+async function pickFolderNative(hintPath) {
+  return new Promise((resolve) => {
+    try {
+      const csi = window.__adobe_cep__;
+      if (!csi || typeof csi.showOpenDialog !== 'function') return resolve(null);
+      const startDir = hintPath ? hintPath.replace(/\/[^/]*$/, '') : '';
+      const result = csi.showOpenDialog(false, true, 'Pick folder containing your renders', startDir, '');
+      try {
+        const parsed = typeof result === 'string' ? JSON.parse(result) : result;
+        if (parsed && parsed.data && parsed.data.length) { resolve(parsed.data[0]); return; }
+      } catch {}
+      resolve(null);
+    } catch { resolve(null); }
+  });
 }
 
 // Native file picker for the per-row Locate fallback. Uses CEP's fs API.
