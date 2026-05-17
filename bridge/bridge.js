@@ -3122,7 +3122,12 @@ async function checkForUpdates(opts) {
       const remote = Buffer.from(await r.arrayBuffer());
       let local = null;
       try { local = fs.readFileSync(target.dest); } catch {}
-      if (!local || !local.equals(remote)) {
+      // When force=true (manual ↻ click), ALWAYS rewrite — don't trust
+      // the byte-equal check. Saw a case where GitHub's CDN returned
+      // stale bytes that matched the local file even though the user
+      // saw a stale version in the panel. Forcing the write costs ~ms
+      // and guarantees the user gets the freshest copy.
+      if (force || !local || !local.equals(remote)) {
         fs.mkdirSync(path.dirname(target.dest), { recursive: true });
         fs.writeFileSync(target.dest, remote);
         result.updated.push(target.label);
