@@ -4819,6 +4819,18 @@ function openSettings()  { if (settingsPanel) settingsPanel.classList.add('show'
 function closeSettings() { if (settingsPanel) settingsPanel.classList.remove('show'); }
 if (settingsBtn)   settingsBtn.addEventListener('click', openSettings);
 if (settingsClose) settingsClose.addEventListener('click', closeSettings);
+// Esc closes any open slide-in panel (settings/history/logs). Skips if a
+// cc-confirm modal is showing — the modal owns its own Esc semantics.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (document.querySelector('.cc-confirm.show')) return;
+  const s = document.getElementById('settingsPanel');
+  const h = document.getElementById('historyPanel');
+  const l = document.getElementById('logsPanel');
+  if (s && s.classList.contains('show')) { s.classList.remove('show'); return; }
+  if (h && h.classList.contains('show')) { h.classList.remove('show'); return; }
+  if (l && l.classList.contains('show')) { l.classList.remove('show'); return; }
+});
 
 // Boot intro — click anywhere on it to dismiss early; otherwise auto-hides
 // when the CSS animation ends (~1.8s). Then remove it from the DOM so it
