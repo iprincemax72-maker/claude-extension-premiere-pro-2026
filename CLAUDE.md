@@ -159,6 +159,12 @@ Every function returns a JSON string. Every operation wrapped in try/catch — P
 - `ccImportFile(path)` — bin import only, no timeline placement (legacy fallback)
 - `ccGetSelectedClip()` — walks video then audio tracks, returns the selected clip's source path, duration, in/out points, timeline position
 - `ccApplyAutoCuts(cutsJson)` — applies a list of `{start, end}` cuts using QE's `extract()` (in/out + extract). Cuts run chronologically with a cumulative shift offset so ripple-deletes don't drift. Cumulative ripple math: every applied cut subtracts its duration from later cuts' timeline positions.
+- `ccAutoEditApply(payloadJson)` — applies a multi-edit autoedit payload (filler-cuts + graphic-overlay imports + B-roll moves) to the active sequence in one atomic batch.
+- `ccGetSequenceCaptions()` — returns the Premiere-side captions for the selected clip (if any) as `[{startSec, endSec, text}]`. Used by `/autoedit` to feed Claude the existing transcript without re-running Whisper.
+- `ccProbeTranscript()` — quick check for whether the selected clip has a transcript attached (returns `{hasTranscript: bool, count: n}`).
+- `ccSetPlayhead(timeSec)` — moves the sequence playhead to a frame-snapped time. Computes ticks from the sequence's own `ticksPerFrame` so it lands EXACTLY on a frame boundary, not between.
+- `ccRippleDeleteAt(startSec, endSec)` — ripple-delete an in/out range across all tracks (uses QE `extract()`). Used by individual auto-cut row Apply buttons.
+- `ccCountItems()` / `ccTargetAllTracks()` / `ccTryRazorAtPlayhead()` — internal helpers used by ccApplyAutoCuts to verify a razor-then-extract actually changed item counts (catches "extract did nothing" failures silently).
 - `ccUndo(count)` — probes multiple undo APIs: `app.menuFunctionId(101/16/7/0xA01)`, `app.executeCommand("Undo")`, OS-level Cmd+Z / Ctrl+Z via osascript / PowerShell SendKeys as last resort
 - `ccMaximizeFrame()` — toggles the panel's frame-maximize for the backtick (`` ` ``) shortcut
 - `ccVersion()` — returns `{ok, version}` so the panel can sanity-check jsx hot-reload took effect
