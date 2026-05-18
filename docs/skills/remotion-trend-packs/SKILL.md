@@ -139,7 +139,7 @@ Seven complete stylized title moments. Each is **modeled after the real visual i
 
 - **BratTitle → POVCaption** (`remotion-hooks`) — Brat opener then "POV:" body
 - **Y2KChromeTitle → SubscribeArrow** (`remotion-ctas`) — chrome intro then end-card
-- **EditorialBrutalist → LowerThird** (`remotion-lower-thirds`) — magazine cover then interview lower-third
+- **EditorialBrutalist → EditorialItalic** (`remotion-lower-thirds`) — magazine cover then editorial-italic lower-third for the interview
 - **MochaPodcastIntro → TypewriterPro** (`remotion-text-presets`) — calm intro then a quoted line
 - **GlitchHype → DropIncoming** (`remotion-music-lyrics`) — drop preamble then the literal 3-2-1 reveal
 - **VaporwaveSunset → LyricDrop** (`remotion-music-lyrics`) — synthwave intro then beat-thump lyric
