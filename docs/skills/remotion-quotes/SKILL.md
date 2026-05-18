@@ -39,7 +39,7 @@ Four editorial-style quote cards for podcasts, interviews, books, or pull-quote 
 - **Don't** use AuthorTagline as the only on-screen content. It's a corner accent meant to overlay other footage — by itself in an empty frame it feels lonely. Pair with body content (a talking head, a slideshow, etc.).
 - **Don't** override PullQuote's italic serif font. The accent bar + bold italic combo is the visual identity; sans-serif text with an accent bar reads as a generic blockquote, not editorial.
 - **Don't** chain three+ quote cards back-to-back. Quote-heavy content overwhelms; viewers tune out. Pair one quote with body footage / a stat reveal / a talking head between quotes.
-- **Don't** use QuoteWithAttribution without filling in `role`. The component reserves space for the role line; omitting it leaves an awkward gap below the name. If you only have a name, use AuthorTagline.
+- **Don't** rely on QuoteWithAttribution's default `role="creator"` for real attribution. If you don't pass `role`, the placeholder "creator" appears below the name — readers see a real-looking role that isn't true. Either pass the actual role, or pass `role=""` (the role line conditionally renders and collapses cleanly when empty).
 
 ## Composition Recipes
 
