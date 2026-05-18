@@ -133,6 +133,10 @@ console.log(sum(2, 3));`}
 
 // Larger PR card
 <PullRequestCard title="Big merge" adds={1242} removes={387} />
+
+// PR card with explicit state (open / merged / closed) — drives the
+// label color and the badge text
+<PullRequestCard title="Fix login bug" state="merged" adds={42} removes={8} />
 ```
 
 ## Render Notes
