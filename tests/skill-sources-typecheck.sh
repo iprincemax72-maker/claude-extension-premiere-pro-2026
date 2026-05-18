@@ -37,8 +37,12 @@ FILES=(
   src/skills-test/text-presets.tsx
   src/skills-test/trend-packs.tsx
   src/skills-test/word-effects.tsx
+  # Cross-skill showreel templates from docs/skills/showreel/
   src/skills-test/Showreel.tsx
   src/skills-test/ShowreelV.tsx
+  src/skills-test/ShowreelExplainer.tsx
+  src/skills-test/ProductIntro.tsx
+  src/skills-test/StressTest.tsx
 )
 
 echo "Type-checking ${#FILES[@]} skill source files..."
