@@ -2529,7 +2529,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.24</span>
+    <span class="version-tag" id="versionTag">10.25</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -4751,7 +4751,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.24';
+  const PANEL_VERSION = '10.25';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -6744,24 +6744,75 @@ function _openStatusMenu() {
   const rect = statusEl.getBoundingClientRect();
   const menu = document.createElement('div');
   menu.id = 'statusMenu';
+  // Glass-ish elevated menu with backdrop blur, accent-tinted icons,
+  // spring-in animation. Matches the rest of the panel aesthetic.
   menu.style.cssText =
-    'position:fixed;top:' + (rect.bottom + 6) + 'px;right:12px;z-index:300;' +
-    'background:var(--bg-elevated);border:1px solid var(--border);' +
-    'border-radius:8px;padding:4px;min-width:160px;' +
-    'box-shadow:0 8px 24px rgba(0,0,0,0.4);';
-  menu.innerHTML =
-    '<button type="button" data-act="restart" style="display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--text);font-size:12px;padding:6px 8px;border-radius:5px;cursor:pointer">Restart bridge</button>' +
-    '<button type="button" data-act="refresh" style="display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--text);font-size:12px;padding:6px 8px;border-radius:5px;cursor:pointer">Refresh status</button>';
+    'position:fixed;top:' + (rect.bottom + 8) + 'px;right:14px;z-index:300;' +
+    'background:rgba(20,20,24,0.96);' +
+    'backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);' +
+    'border:1px solid rgba(255,255,255,0.08);' +
+    'border-radius:12px;padding:6px;min-width:210px;' +
+    'box-shadow:0 16px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.25);' +
+    'opacity:0;transform:translateY(-4px) scale(0.97);' +
+    'transition:opacity 0.18s cubic-bezier(0.34,1.56,0.64,1), transform 0.18s cubic-bezier(0.34,1.56,0.64,1);' +
+    'font-family:var(--font-ui);';
+
+  const items = [
+    {
+      act: 'restart',
+      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>',
+      label: 'Restart bridge',
+      hint: 'Kill + respawn the node process',
+    },
+    {
+      act: 'refresh',
+      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.5-7.1"/><path d="M21 3v6h-6"/></svg>',
+      label: 'Refresh status',
+      hint: 'Re-ping the bridge',
+    },
+  ];
+
+  menu.innerHTML = items.map(it =>
+    '<button type="button" data-act="' + it.act + '" ' +
+    'style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;' +
+    'background:transparent;border:0;color:var(--text);font-size:12.5px;' +
+    'padding:9px 11px;border-radius:8px;cursor:pointer;font-family:inherit;' +
+    'transition:background 0.12s ease, color 0.12s ease;">' +
+      '<span class="cc-mi" style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;color:var(--accent);flex-shrink:0;pointer-events:none;transition:transform 0.18s cubic-bezier(0.34,1.56,0.64,1)">' + it.icon + '</span>' +
+      '<span style="flex:1;min-width:0;pointer-events:none">' +
+        '<div style="font-weight:500;line-height:1.2">' + it.label + '</div>' +
+        '<div style="font-size:10.5px;color:var(--text-faint);margin-top:2px;line-height:1.2">' + it.hint + '</div>' +
+      '</span>' +
+    '</button>'
+  ).join('');
+
   for (const b of menu.querySelectorAll('button')) {
-    b.addEventListener('mouseenter', () => b.style.background = 'rgba(255,255,255,0.06)');
-    b.addEventListener('mouseleave', () => b.style.background = 'transparent');
+    b.addEventListener('mouseenter', () => {
+      b.style.background = 'var(--accent-soft)';
+      const ico = b.querySelector('.cc-mi');
+      if (ico) ico.style.transform = 'scale(1.1) rotate(8deg)';
+    });
+    b.addEventListener('mouseleave', () => {
+      b.style.background = 'transparent';
+      const ico = b.querySelector('.cc-mi');
+      if (ico) ico.style.transform = 'scale(1) rotate(0deg)';
+    });
+    b.addEventListener('mousedown', () => { b.style.transform = 'scale(0.98)'; });
+    b.addEventListener('mouseup', () => { b.style.transform = ''; });
   }
   menu.addEventListener('click', (ev) => {
-    const act = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-act');
+    const btn = ev.target && ev.target.closest && ev.target.closest('button[data-act]');
+    if (!btn) return;
+    const act = btn.getAttribute('data-act');
     if (act === 'restart') _restartBridge();
     else if (act === 'refresh') { _closeStatusMenu(); refreshStatus(); }
   });
   document.body.appendChild(menu);
+  // Animate in next frame
+  requestAnimationFrame(() => {
+    menu.style.opacity = '1';
+    menu.style.transform = 'translateY(0) scale(1)';
+  });
   // Close on outside click — defer so this click doesn't immediately fire it
   setTimeout(() => document.addEventListener('click', _onDocClickForMenu, true), 0);
 }
