@@ -84,7 +84,10 @@ For full details (anti-patterns, recipes, audio cues, pairings) read the per-ski
 - **SubscribeArrow** / **BellRing** / **LikeSmash** / **ShareCallout** / **SaveBookmark** / **TapToFollow** (`remotion-ctas`) — V
 
 ### Callouts / emphasis
-- **HandDrawnArrow** / **HighlightCircle** / **PullQuote** / **SpeechBubble** / **QuestionCard** (`remotion-callouts`) — A
+- **HandDrawnArrow** / **HighlightCircle** / **PullQuote**¹ / **SpeechBubble**² / **QuestionCard** (`remotion-callouts`) — A
+
+> ¹ Naming collision: `remotion-callouts/PullQuote` (brackets-in, props `{text, attribution, color, accent, bg}`) and `remotion-quotes/PullQuote` (accent-bar italic, props `{quote, accent, textColor, bg, fontSize}`) are **different components**. Pick the visual you want, import from that skill, use that skill's prop shape. Don't mix.
+> ² Naming collision: `remotion-callouts/SpeechBubble` and `remotion-device-notifications/SpeechBubble` are also different components — same caveat applies.
 
 ### Frames / decorative overlays
 - **ToastPopup** / **PolaroidFrame** / **PriceReveal** / **BookmarkFold** / **GiftBoxReveal** (`remotion-frames`) — V
