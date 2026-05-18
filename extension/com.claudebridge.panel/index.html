@@ -2529,7 +2529,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.21</span>
+    <span class="version-tag" id="versionTag">10.22</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -4160,14 +4160,32 @@ function saveHistory() {
 function addHistoryEntry({prompt, path, mode, reply}) {
   if (!path) return;
   const kind = IMAGE_EXTS.has(extOf(path)) ? 'image' : 'video';
-  const entry = {
-    id: Date.now() + '_' + Math.random().toString(36).slice(2,7),
-    prompt: prompt || '',
-    reply: reply || '',
-    path, kind, mode: mode || '', t: Date.now(),
-  };
-  history.unshift(entry);
-  if (history.length > HISTORY_MAX) history = history.slice(0, HISTORY_MAX);
+  // De-dup by path. Renders are now logged twice — once immediately when
+  // the render lands (so it's never lost to a panel reload) and again when
+  // the user clicks Import (so we capture the placement mode). If a
+  // matching path already exists, UPDATE it in place — promote the existing
+  // entry to the top, fill in mode/reply if the new call has them but the
+  // old one didn't.
+  const existingIdx = history.findIndex(h => h && h.path === path);
+  if (existingIdx >= 0) {
+    const existing = history[existingIdx];
+    if (mode && !existing.mode) existing.mode = mode;
+    if (reply && !existing.reply) existing.reply = reply;
+    if (prompt && !existing.prompt) existing.prompt = prompt;
+    existing.t = Date.now();
+    // Move to top of history (most-recent-touched ordering).
+    history.splice(existingIdx, 1);
+    history.unshift(existing);
+  } else {
+    const entry = {
+      id: Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      prompt: prompt || '',
+      reply: reply || '',
+      path, kind, mode: mode || '', t: Date.now(),
+    };
+    history.unshift(entry);
+    if (history.length > HISTORY_MAX) history = history.slice(0, HISTORY_MAX);
+  }
   saveHistory();
   if (historyPanel.classList.contains('show')) renderHistory();
 }
@@ -4733,7 +4751,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.21';
+  const PANEL_VERSION = '10.22';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -5655,6 +5673,36 @@ function setRenderMode(m) {
       setTimeout(() => t.remove(), 250);
     }, isErr ? 5500 : 3500);
   }
+  // CRITICAL: never reload the panel mid-chat / mid-autocut / mid-autoedit.
+  // A 5-minute render gets nuked if location.reload() fires while the fetch
+  // is in flight — the response never arrives, the import card never builds,
+  // the user can't recover the render via the panel UI.
+  function _anyWorkInFlight() {
+    try {
+      return !!activeChatAbort || !!activeAutocut || !!activeAutoedit || !!expanding;
+    } catch { return false; }
+  }
+  // If a chat is busy when an update is requested, defer the reload — write
+  // the intent to localStorage so when the user finishes their current
+  // request and a fresh send happens, we can offer to reload then. For now
+  // we just toast that the update is deferred and exit cleanly.
+  function _safeReload(delayMs, toastMsg) {
+    if (_anyWorkInFlight()) {
+      toast('Update ready — will reload once your current chat finishes.');
+      // Poll every 2s; reload as soon as the work clears.
+      const poller = setInterval(() => {
+        if (!_anyWorkInFlight()) {
+          clearInterval(poller);
+          toast('Reloading to latest…');
+          setTimeout(() => location.reload(), 500);
+        }
+      }, 2000);
+      return;
+    }
+    if (toastMsg) toast(toastMsg);
+    setTimeout(() => location.reload(), delayMs);
+  }
+
   btn.addEventListener('click', async () => {
     if (btn.hasAttribute('disabled')) return;
     btn.setAttribute('disabled', '');
@@ -5668,26 +5716,29 @@ function setRenderMode(m) {
       const data = await r.json();
       if (!data.ok) throw new Error(data.error || 'update failed');
       const n = (data.updated || []).length;
-      // The /update endpoint compares ON-DISK files against GitHub. If we
-      // wrote new files to disk locally in this session (eg. dev edits),
-      // /update sees them as identical to GitHub and reports n=0 — but the
-      // running panel is still the OLD HTML loaded into memory. So ALWAYS
-      // reload after a click; the only "no reload" case is bridgeChanged
-      // (the bridge JS file changed and the user must restart node).
+      // The /update endpoint compares ON-DISK files against source-of-truth
+      // (local repo or GitHub). If we wrote new files to disk locally in
+      // this session (eg. dev edits), /update sees them as identical and
+      // reports n=0 — but the running panel may still be the OLD HTML
+      // loaded into memory. So we usually reload after a click; the only
+      // "no reload" case is bridgeChanged (bridge JS file changed and the
+      // user must restart node).
+      //
+      // SAFETY: _safeReload() is a guard. If the user is mid-chat /
+      // mid-autocut / mid-autoedit, the reload is DEFERRED until the
+      // current work finishes — otherwise the long-running fetch gets
+      // killed by location.reload() and the render/result is lost.
       if (data.bridgeChanged) {
         toast(
           (n > 0 ? 'Updated ' + n + ' file' + (n === 1 ? '' : 's') + '. ' : '') +
           'Restart the bridge to load the new code.'
         );
       } else if (data.premiereRestartNeeded) {
-        toast('Updated ' + n + ' file' + (n === 1 ? '' : 's') + '. Restart Premiere to load ExtendScript changes.');
-        setTimeout(() => location.reload(), 800);
+        _safeReload(800, 'Updated ' + n + ' file' + (n === 1 ? '' : 's') + '. Restart Premiere to load ExtendScript changes.');
       } else if (n === 0) {
-        toast('Reloading to latest…');
-        setTimeout(() => location.reload(), 400);
+        _safeReload(400, 'Reloading to latest…');
       } else {
-        toast('Updated. Reloading…');
-        setTimeout(() => location.reload(), 600);
+        _safeReload(600, 'Updated. Reloading…');
       }
     } catch (e) {
       toast('Update failed: ' + (e.message || e), true);
@@ -6929,6 +6980,17 @@ async function sendMessage() {
     if (data.imports && data.imports.length) {
       for (const p of data.imports) {
         addRenderPreview(placeholder.wrap, p, msg, replyText);
+        // CRITICAL: log to history immediately, BEFORE the user clicks Import.
+        // Previously history only got written on Import click — which meant
+        // any render that the user didn't manually import (panel reload,
+        // accidental close, render done while user was AFK) silently
+        // vanished from history. The file was still on disk but the user
+        // had no UI breadcrumb to find it. With `mode: ''` we mark it as
+        // "not yet imported"; if/when the user clicks Import the entry is
+        // updated to reflect placement. Either way the render is findable.
+        try {
+          addHistoryEntry({ prompt: msg || '', path: p, mode: '', reply: replyText || '' });
+        } catch {}
       }
     }
   } catch (err) {
@@ -7059,6 +7121,10 @@ async function sendContinuationChat(originalMsg, lastStatus) {
     if (data.imports && data.imports.length) {
       for (const p of data.imports) {
         addRenderPreview(placeholder.wrap, p, originalMsg, replyText);
+        // Log to history immediately (same reasoning as in sendMessage).
+        try {
+          addHistoryEntry({ prompt: originalMsg || '', path: p, mode: '', reply: replyText || '' });
+        } catch {}
       }
     }
   } catch (err) {
