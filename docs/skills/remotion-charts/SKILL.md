@@ -17,7 +17,7 @@ Six animated chart components for video data viz. Each accepts a plain data arra
 | Name | Best For | Mechanic | Data shape |
 |------|----------|----------|------------|
 | **BarChart** | Comparing 3–6 categories | Bars grow from bottom, labels above | `{label, value}[]` |
-| **PieChart** | Share-of-total | Wedges sweep-fill clockwise | `{label, value, color?}[]` |
+| **PieChart** | Share-of-total | Wedges sweep-fill clockwise | `data: {label, value}[]` + `colors?: string[]` (separate prop, not per-slice color) |
 | **LineGraph** | Trend over time | SVG path draws left-to-right | `{label, value}[]` (label is the x-axis tick, value is the y) |
 | **DonutMetric** | Single % stat | Ring fills + center counter ticks | `{value, label?}` |
 | **TrendArrow** | Up/down callout | Arrow rises with % counter alongside | `{ value: number, label?: string, direction?: "up" \| "down" }` |
@@ -67,11 +67,14 @@ Six animated chart components for video data viz. Each accepts a plain data arra
 **Market share pie:**
 ```tsx
 <Sequence durationInFrames={90}>
-  <PieChart data={[
-    { label: "iOS",     value: 56, color: "#22d3ee" },
-    { label: "Android", value: 38, color: "#10b981" },
-    { label: "Other",   value: 6,  color: "#a3a3a3" },
-  ]} />
+  <PieChart
+    data={[
+      { label: "iOS",     value: 56 },
+      { label: "Android", value: 38 },
+      { label: "Other",   value: 6 },
+    ]}
+    colors={["#22d3ee", "#10b981", "#a3a3a3"]}
+  />
 </Sequence>
 ```
 
@@ -146,11 +149,13 @@ If you only have a single snapshot (no reordering happens), use `BarChart` inste
 ## Common Prop Overrides
 
 ```tsx
-// Brand color per bar
-<BarChart data={[
-  { label: "Q1", value: 124, color: "#ff7a4d" },
-  { label: "Q2", value: 158, color: "#10b981" },
-]} />
+// Brand-color all bars (BarChart uses a single `color` prop for all bars —
+// it does NOT support per-row colors. If you need per-row colors, use
+// BarChartRace from `remotion-stats` instead.)
+<BarChart
+  data={[{ label: "Q1", value: 124 }, { label: "Q2", value: 158 }]}
+  color="#ff7a4d"
+/>
 
 // LineGraph with custom title (no separate y-axis-label prop)
 <LineGraph title="Sessions" data={[...]} />
