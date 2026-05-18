@@ -63,7 +63,7 @@ Six **call-to-action** components for video creators — the animated prompts th
 <Sequence from={endFrame - 90} durationInFrames={90}>
   <AbsoluteFill>
     <SubscribeArrow color="#ed2024" />
-    <BellRing accent="#ed2024" />
+    <BellRing color="#ed2024" />
   </AbsoluteFill>
 </Sequence>
 ```
@@ -120,8 +120,9 @@ Six **call-to-action** components for video creators — the animated prompts th
 // (valid: "down-right" | "down-left" | "up-right" | "up-left" | "down" | "right")
 <SubscribeArrow point="down-left" />
 
-// BellRing in custom accent
-<BellRing accent="#7c3aed" />
+// BellRing in custom color (bell + ripple share the color by default;
+// pass `rippleColor` to override the ripple separately)
+<BellRing color="#7c3aed" rippleColor="#ffd60a" />
 
 // LikeSmash with bigger heart
 <LikeSmash size={280} />
