@@ -166,7 +166,7 @@ If you only have a single snapshot (no reordering happens), use `BarChart` inste
   - LineGraph: path draw completes at ~70% of duration → "drawing" SFX, settle chime
   - DonutMetric: counter completes near end → "ding"
   - TrendArrow: arrow lands at ~40% of duration → "whoosh + impact"
-  - BarRace: each reorder visible 18–22 frames apart → light percussion per reorder
+  - BarRace: snapshots interpolate continuously, no discrete reorder events. With default `framesPerStep=30`, adjacent snapshots are 30f apart — place a tonal beat at each snapshot boundary (frame 0, 30, 60, …) for "X overtook Y" emphasis
 
 ## Pairing with other skills
 
