@@ -44,7 +44,7 @@ Six components for music videos, lyric drops, podcast intros, or beat-driven con
 - **Don't** set BPM higher than ~180 on LyricDrop. Above 180, the scale-loop period drops below 0.33s — the eye reads it as flicker, not bass.
 - **Don't** put a NowPlaying card in vertical 1080×1920. The 320×320 cover art + meta row + progress bar are tuned for landscape width. In vertical they get cropped or overlap.
 - **Don't** mix DropIncoming with another count-up component (e.g. CounterCountUp). Two timers competing visually is confusing.
-- **Don't** override SoundWaveBars `count` above ~12. Each bar uses `Math.sin(frame * speed * 0.3 + i)` — past 12 bars the wave pattern looks repetitive instead of organic.
+- **Don't** override SoundWaveBars `count` above ~12. Each bar uses `Math.abs(Math.sin(frame * speed * (0.7 + i * 0.13) + i * 1.5))` — the per-bar speed multiplier (`0.7 + i * 0.13`) diverges meaningfully across the first ~12 bars. Past 12 bars, the higher-i bars cycle so fast the eye reads them as flicker rather than organic motion.
 
 ## Composition Recipes
 
