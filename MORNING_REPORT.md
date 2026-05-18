@@ -25,9 +25,9 @@ Two-lane delivery, both meaningfully advanced:
 - **CLAUDE.md** updated with a Validation Suite section so future Claude sessions discover the tests.
 
 **By the numbers**
-- 80+ commits, all local (none pushed per your constraint).
+- 213 commits, all local (none pushed per your constraint).
 - 192 mp4 renders in `/tmp/test-renders/` totaling ~65 MB.
-- **29 distinct bugs caught and fixed** — split across:
+- **42+ distinct bugs caught and fixed** — split across:
   - 2 panel UX bugs (v10.17 focus restore, v10.18 lightbox createElement)
   - 2 my-own-tutorial bugs (WaitZoomHook prop name, lowercase JSX tag)
   - 3 invalid-flag/import doc bugs (audio-codec across 12 docs, sfx.md Audio import, animations.md missing imports)
@@ -109,6 +109,8 @@ All have detailed commit messages explaining the WHY. Nothing pushed to remote. 
 ---
 
 ## Living log (appended after each meaningful chunk)
+
+**07:58 — Second-pass SKILL.md audit caught 6 more doc-vs-source drift bugs.** After running all 4 validation passes clean, I re-read 5 SKILL.md files cold against their source files and committed fixes for: (1) `remotion-banners` anti-pattern claimed `bg` on CTABanner controlled the dark inner card — it doesn't, `bg` is the outer AbsoluteFill background; the dark `rgba(15,15,15,0.92)` is hardcoded. Rewrote to reflect actual behavior. (2) `remotion-frames` claimed PolaroidFrame renders URL content as `<Img>`, but source uses `background: url(...)`; also recipe showed bare `/photo.jpg` which doesn't resolve in Remotion — replaced with `staticFile()` pattern. (3) `remotion-quotes` claimed omitting `role` on QuoteWithAttribution leaves a gap — actually the default is "creator" which appears as fake role; conditional render collapses when `role=""`. (4) `remotion-logos` anti-pattern said "Don't override LogoRing's `ringSize`" but ringSize isn't a prop — reframed as size ceilings by aspect. (5) `remotion-logos` golden rule said LogoSlam's `brand` is optional — it's required in TypeScript; only LogoPulse's brand is optional. (6) `INDEX.md` didn't flag that `PullQuote` and `SpeechBubble` exist in TWO skills each with different props — footnoted both collisions. (7) `showreel/README.md` said "5 templates" but table has 6 (ShowreelMeme added later) — bumped to 6. (8) `TUTORIAL.md`'s See-also section missed ProductIntro.tsx (the finished version of the composition built in the tutorial!) and ShowreelMeme.tsx — added both. Also added 8 undocumented `cc*` ExtendScript functions to CLAUDE.md (ccAutoEditApply, ccGetSequenceCaptions, ccProbeTranscript, ccSetPlayhead, ccRippleDeleteAt, ccCountItems, ccTargetAllTracks, ccTryRazorAtPlayhead). 9 commits in this batch: c8f119a → be06b7f. All 4 validation passes still green.
 
 **03:25 — Reactions v2 shipped.** All 8 reaction components deep-rewritten with multi-act motion. Tear-drop secondary motion on CryingLaugh, depth-staggered sparkles in SparkleField, dual-blink EyesPeek, eye-roll retreat-and-return on SideEye, 3-stage impact rings on HundredSlam, depth orbiting hearts on HeartEyes, atmospheric glow on FireBurst, radiating lines + vignette anticipation on MindBlown. Render-verified at `/tmp/test-renders/rx-*.mp4` (191–539 kB). Commit `003a543`.
 
