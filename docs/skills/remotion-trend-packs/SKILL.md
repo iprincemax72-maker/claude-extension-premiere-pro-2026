@@ -70,7 +70,7 @@ Seven complete stylized title moments. Each is **modeled after the real visual i
     accent="#e63946"
   />
 </Sequence>
-<Sequence from={90}><LowerThird name="..." role="..." /></Sequence> {/* from remotion-lower-thirds */}
+<Sequence from={90}><EditorialItalic name="..." role="..." /></Sequence> {/* from remotion-lower-thirds */}
 ```
 
 **Drop reveal — Glitch into clean:**
