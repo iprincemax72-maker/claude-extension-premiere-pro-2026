@@ -66,7 +66,10 @@ Seven text-effect components that manipulate words/letters with frame-perfect mo
 **Highlight emphasis in a sentence:**
 ```tsx
 <Sequence durationInFrames={75}>
-  <HighlightedWord sentence="the only thing that matters is execution" target="execution" />
+  {/* highlightIndex is the WORD INDEX in the sentence (0-based).
+      "the only thing that matters is execution" has words at
+      indices 0-6; "execution" is index 6. */}
+  <HighlightedWord sentence="the only thing that matters is execution" highlightIndex={6} />
 </Sequence>
 ```
 
@@ -104,8 +107,8 @@ Seven text-effect components that manipulate words/letters with frame-perfect mo
 // WordSwap slower (more reading time)
 <WordSwap words={["a", "b", "c"]} framesPerWord={28} />
 
-// HighlightedWord brand color
-<HighlightedWord sentence="..." target="word" color="#ff7a4d" />
+// HighlightedWord brand color (uses highlightColor + highlightIndex)
+<HighlightedWord sentence="..." highlightIndex={2} highlightColor="#ff7a4d" />
 
 // Censor with custom caption
 <CensorBar word="censored" caption="REDACTED" />
