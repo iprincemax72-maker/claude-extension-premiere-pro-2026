@@ -145,9 +145,9 @@ CLAUDE.md     # This file — agent-facing
 | `/autocut` | POST | `{clipPath, clipDuration}` | `{cuts[], totalCut, transcribed, summary, method}` |
 | `/update` | POST | — | `{ok, updated[], bridgeChanged, premiereRestartNeeded}` — pulls from GitHub raw |
 | `/preview/<file>` | GET | — | Streams a file from `~/PremiereClaude/output/` with byte-range support |
-| `/panel` | GET | — | Serves `index.html` for dev-mode preview in Chrome |
-| `/dev/reload-stream` | GET | — | SSE — pushes `reload` + `jsx-reload` events when files change |
 | `/progress-stream` | GET | — | SSE — pushes `{ text, pct }` per work-stage event |
+
+> Removed in earlier cleanup: `/panel` (dev-mode index.html preview) and `/dev/reload-stream` (SSE file-watch reload). Both gone — see the comment at bridge.js line 1802.
 
 ### ExtendScript functions (`extension/com.claudebridge.panel/jsx/host.jsx`)
 
