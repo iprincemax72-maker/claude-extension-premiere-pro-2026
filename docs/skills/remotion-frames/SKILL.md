@@ -30,7 +30,7 @@ Five decorative frame / reveal cards for video editing. Render-verified to mp4.
 ## Golden rules
 
 1. All five accept a `startFrame` prop — combine with `<Sequence from={N}>` for precise timing.
-2. **PolaroidFrame `content` prop can be either** plain text OR a URL/local path. If it starts with `/`, `http`, or `file:`, it renders as `<Img src={...}>`. Otherwise it renders the string as text.
+2. **PolaroidFrame `content` prop can be either** plain text OR an image URL. If it starts with `/`, `http`, or `file:`, it renders as a CSS `background: url(...)` (NOT `<Img>`). For Remotion renders, that means: `http://...` URLs work directly, but local paths need to be served through `staticFile('photo.jpg')` rather than a bare `/photo.jpg` — pass the result of `staticFile()` as `content`. Plain-text content renders inside a pink-cyan gradient placeholder.
 3. Animations are `useCurrentFrame()` driven — frame-deterministic.
 4. **ToastPopup auto-dismisses** at `startFrame + holdFrames + ~14f` (slide-up animation). Default total visible duration is ~118 frames at 30fps.
 
@@ -57,11 +57,13 @@ Five decorative frame / reveal cards for video editing. Render-verified to mp4.
 </Sequence>
 ```
 
-**Memory-lane polaroid montage:**
+**Memory-lane polaroid montage** (images must live in `public/` so `staticFile` resolves them):
 ```tsx
-<Sequence from={0}  durationInFrames={90}><PolaroidFrame content="/photo1.jpg" caption="june 2024" tiltDeg={-7} /></Sequence>
-<Sequence from={90} durationInFrames={90}><PolaroidFrame content="/photo2.jpg" caption="august"     tiltDeg={4}  /></Sequence>
-<Sequence from={180} durationInFrames={90}><PolaroidFrame content="/photo3.jpg" caption="oct sunset" tiltDeg={-3} /></Sequence>
+import { staticFile } from "remotion";
+
+<Sequence from={0}  durationInFrames={90}><PolaroidFrame content={staticFile("photo1.jpg")} caption="june 2024" tiltDeg={-7} /></Sequence>
+<Sequence from={90} durationInFrames={90}><PolaroidFrame content={staticFile("photo2.jpg")} caption="august"     tiltDeg={4}  /></Sequence>
+<Sequence from={180} durationInFrames={90}><PolaroidFrame content={staticFile("photo3.jpg")} caption="oct sunset" tiltDeg={-3} /></Sequence>
 ```
 
 **Subscription price reveal:**
