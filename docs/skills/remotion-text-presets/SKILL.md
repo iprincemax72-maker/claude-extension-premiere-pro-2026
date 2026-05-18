@@ -11,7 +11,6 @@ description: Eleven production-tested text animation presets for Remotion — dr
 
 - [Source](./references/text-presets-source.tsx)
 - [Catalog](./references/text-presets-catalog.md) — full source + customization tips
-- [Animation Math](./references/animation-math.md) — spring configs, easing curves, stagger formulas
 
 ## The Eleven Presets
 
