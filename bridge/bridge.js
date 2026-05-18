@@ -2511,9 +2511,20 @@ const server = http.createServer((req, res) => {
     try {
       // Spawn the replacement BEFORE we respond — if spawning fails we want
       // to error out cleanly and stay alive.
+      //
+      // CRITICAL: pass CLAUDE_BRIDGE_NO_UPDATE=1 to the replacement. /restart
+      // means "refresh the running node process so my code edits take effect",
+      // NOT "re-sync files from the source repo to disk". The user was
+      // clicking /restart and getting their install reverted to whatever was
+      // in the repo at the time (because the new bridge ran auto-update on
+      // launch and copied repo→install). Now /restart leaves the install
+      // file alone and just reloads node. Use the manual ↻ Update button if
+      // you actually want auto-update to run.
+      const childEnv = Object.assign({}, process.env);
+      childEnv.CLAUDE_BRIDGE_NO_UPDATE = '1';
       const child = spawn(process.execPath, [__filename, ...process.argv.slice(2)], {
         cwd: process.cwd(),
-        env: process.env,
+        env: childEnv,
         detached: true,
         stdio: 'inherit',
       });
