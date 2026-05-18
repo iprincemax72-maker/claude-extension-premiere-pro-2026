@@ -59,7 +59,7 @@ Seven text-effect components that manipulate words/letters with frame-perfect mo
 **Replace / correct moment:**
 ```tsx
 <Sequence durationInFrames={75}>
-  <StrikethroughSwap original="impossible" replacement="possible" />
+  <StrikethroughSwap oldWord="impossible" newWord="possible" />
 </Sequence>
 ```
 
