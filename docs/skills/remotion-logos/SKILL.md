@@ -27,7 +27,7 @@ Four channel-logo / brand-intro stingers — drop in a single character/glyph or
 
 ## Golden rules
 
-1. All four take a single-character `glyph` prop (the brand monogram). LogoSlam and LogoPulse also take an optional `brand` name shown beneath.
+1. All four take a single-character `glyph` prop (the brand monogram). LogoSlam takes a **required** `brand` name (always pass one — TypeScript will error otherwise); LogoPulse takes an **optional** `brand` (pass `""` to hide the brand text).
 2. **The cast shadow on LogoSlam LAGS the logo by ~14 frames** — that's real physics (heavy object hits, then casts shadow). Don't "fix" the delay.
 3. Animations are `useCurrentFrame()` driven, no `useState`.
 4. **Default `bg` is `#0a0a0a`** on all four. For real-footage overlay, pass `bg="transparent"` and render with ProRes 4444.
@@ -36,7 +36,7 @@ Four channel-logo / brand-intro stingers — drop in a single character/glyph or
 
 - **Don't** use LogoSlam with `glyph` longer than 2 chars. The tile is sized for one big monogram letter (e.g. "C"). Two chars work tightly ("CX"); three+ chars clip. For longer brand names use LogoPulse with a `brand` text below the monogram.
 - **Don't** use LogoMorph for a permanent intro hold. The shape morphs from circle to rounded square and then stays — beyond ~120 frames you're holding on a static result. Use LogoPulse for held intros (its breathing loops cleanly).
-- **Don't** override LogoRing's `ringSize`. The component computes `size * 1.35` for a reason — at higher ratios the dashed ring renders off-screen on tighter compositions.
+- **Don't** size LogoRing so large that the internal ring (computed as `size * 1.35`, not a prop) overflows the canvas. At the default `size=420`, the dashed ring is 567px — fits comfortably in 1920×1080. If you bump `size` past ~700 in landscape (or ~520 in vertical 1080-wide), the ring renders off-screen.
 - **Don't** stack two logos in the same composition. The "this is the brand" moment is singular. If you need to introduce two brands (e.g. host + sponsor), sequence: 90f LogoSlam for brand A, then 90f LogoSlam for brand B, with a beat between.
 - **Don't** use LogoPulse for less than 90 frames. The breathing loop period is ~105 frames (`sin(f * 0.06)` → 2π/0.06) and the halo cycle is exactly 90 frames (`f % 90`) — anything shorter than 90f and the periodic halo doesn't fire at all, making LogoPulse indistinguishable from a static logo.
 
