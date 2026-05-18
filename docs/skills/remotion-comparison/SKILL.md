@@ -30,7 +30,7 @@ Five side-by-side comparison cards for transformation, versus, or "this vs that"
 
 ## Golden Rules
 
-1. Pass two text labels (and optionally two image URLs for the visual components).
+1. **All four split-screen components** (BeforeAfter, DayOneVsDayThirty, ThenVsNow, ExpectedVsHappened) auto-detect text-vs-image on each side. A value starting with `/`, `http`, or `file:` renders as an `<Img>` with the component's per-side filter; anything else renders as text on a colored gradient panel. VersusCard is labels-only (no image mode). For real photos use `staticFile("name.png")` so Remotion resolves the path.
 2. All animation is `useCurrentFrame()` + `interpolate()`/`spring()` — frame-deterministic.
 3. Render with `--mute` (correct Remotion flag; `--audio-codec=no-audio` is invalid).
 4. **Order matters.** Each component encodes a narrative arrow (Day1→Day30, Then→Now, Expected→Actual). Don't flip the labels expecting the same visual — the desaturated/aged side is always LEFT.
