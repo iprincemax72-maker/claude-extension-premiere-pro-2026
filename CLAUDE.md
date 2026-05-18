@@ -147,8 +147,16 @@ CLAUDE.md     # This file — agent-facing
 | `/autoedit` | POST | `{clipPath, clipDuration, clipIn?, clipOut?, density?, styleOverride?, premiereCaptions?, reqId?}` | `{ok, reqId, applied[], skipped[], summary, logFile}` — runs the multi-act autoedit pipeline (transcript → moment-picker → render graphics in parallel → return import payload) |
 | `/autoedit-cancel` | POST | — | `{ok}` — aborts the currently-running autoedit pipeline (kills all in-flight child renders) |
 | `/update` | POST | — | `{ok, updated[], bridgeChanged, premiereRestartNeeded}` — pulls from GitHub raw |
+| `/check-update` | GET | — | `{ok, localVersion, remoteVersion, updateAvailable}` — non-destructive version probe (doesn't write); used by the panel header to show an "update available" badge without forcing a pull |
+| `/version` | GET | — | `{mtime, session}` — panel's `index.html` mtime + the bridge session ID. Used by the panel's hot-reload heartbeat to detect when the file on disk has changed |
+| `/restart` | POST | — | `{ok, restartingIn}` — spawns a replacement bridge and exits after 300ms. Used by the auto-update flow when `bridgeChanged: true` |
 | `/preview/<file>` | GET | — | Streams a file from `~/PremiereClaude/output/` with byte-range support |
 | `/progress-stream` | GET | — | SSE — pushes `{ text, pct }` per work-stage event |
+| `/addedit` | POST | — | `{ok}` — osascript-driven menu click to run Premiere's "Add Edit to All Tracks" (Cmd+Shift+K), with fallthrough to "Add Edit" (Cmd+K) if the All-Tracks variant doesn't exist on the user's Premiere build |
+| `/addedit-keystroke` | POST | — | `{ok}` — fires the raw Cmd+Shift+K keystroke via System Events. Backup path for builds where the menu-click variant fails (different Premiere locale / accessibility permissions) |
+| `/applylog` | POST | `{steps: string[]}` | `{ok, file}` — appends a list of human-readable step strings to a new `autocut-apply-<ts>.log` in the output dir, so the panel can drop a trace after a multi-cut session |
+| `/undo` | POST | `{count?: number}` | `{ok}` — bangs Cmd+Z N times via osascript (clamped 1–200) by clicking Edit > Undo in Premiere's menu. Backup path when `ccUndo()` from host.jsx can't reach the undo stack |
+| `/testclaude` | GET | — | `{variants: [...]}` — diagnostic probe; spawns the `claude` CLI with 5 different `stdio`/cwd/env configurations and reports which ones return `{"ok":true}` within the timeout. Used during install troubleshooting when the bridge can't get claude to respond |
 
 > Removed in earlier cleanup: `/panel` (dev-mode index.html preview) and `/dev/reload-stream` (SSE file-watch reload). Both gone — see the comment at bridge.js line 1802.
 
