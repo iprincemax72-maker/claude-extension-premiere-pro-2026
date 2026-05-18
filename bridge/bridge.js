@@ -1202,12 +1202,54 @@ Output: " kinetic typography intro for my podcast"
 Input: "create a smooth"
 Output: " transition between two clips"`;
 
+// Component bank — every v2 Remotion skill with its key components. The expand
+// system prompts inject this so each level can name-drop real components into
+// the rewritten brief; when /chat then fires, Claude Code's skill loader picks
+// up those names via description-match and loads the right SKILL.md files.
+//
+// Format: <skill-name>: <Component1>, <Component2>, … — <one-line "best for">
+const COMPONENT_BANK = `
+COMPONENT BANK — pick real components from these skills. Naming a component in
+the brief causes the generator to load the matching skill (description-match).
+
+remotion-hooks: WaitZoomHook, POVCaption, PlotTwistReveal, StoryTimeTitle, RealTalkCaption, WatchThisStamp — short-form openers, first 60–90 frames
+remotion-text-presets: TiltedSlam, WordPopCaption, LetterCascade, TypewriterPro, MarkerUnderline, CounterCountUp, GlitchText, NeonGlow, Extrude3D, StampImpact, KaraokeLyric — title moments + kinetic text
+remotion-word-effects: WordSwap, StrikethroughSwap, HighlightedWord, CensorBar, SpinningLetters, FallingLetters, SparkleTitle — word-level transforms
+remotion-ctas: SubscribeArrow, BellRing, LikeSmash, ShareCallout, SaveBookmark, TapToFollow — engagement prompts
+remotion-social-ui: iMessageBubble, DMNotification, LikeBurst, SubscribePop, CommentOverlay, LiveIndicator, HashtagPop, CornerWatermark — platform UI mocks
+remotion-reactions: MindBlown, FireBurst, HundredSlam, HeartEyes, SideEye, CryingLaugh, EyesPeek, SparkleField — emoji reaction overlays
+remotion-callouts: HandDrawnArrow, HighlightCircle, PullQuote, SpeechBubble, QuestionCard — emphasis devices
+remotion-quotes: PullQuote (accent-bar variant), BigQuote, QuoteWithAttribution, AuthorTagline — editorial quote cards
+remotion-stingers: BrandReveal, EndCard, ChapterBumper, SponsorPlate — brand-moment cards (intros, outros, chapter breaks)
+remotion-logos: LogoSlam, LogoMorph, LogoRing, LogoPulse — channel-intro logo treatments
+remotion-banners: NewsTicker, BreakingBanner, CTABanner, AlertStrip — banner overlays
+remotion-trend-packs: BratTitle, CoquetteIntro, Y2KChromeTitle, VaporwaveSunset, EditorialBrutalist, GlitchHype, MochaPodcastIntro — aesthetic-locked title moments (2024–26 trends)
+remotion-charts: BarChart, PieChart, LineGraph, DonutMetric, TrendArrow, BarRace — data viz
+remotion-stats: BarChartRace, ProgressRing, ComparisonBars, StatCardGrid — metric reveals
+remotion-comparison: BeforeAfter, DayOneVsDayThirty, ThenVsNow, ExpectedVsHappened, VersusCard — side-by-side / vs cards
+remotion-lists: NumberedList, StepIndicator, Checklist, BulletReveal, RecipeStep, SectionBreak — list / step-by-step
+remotion-tech: CodeSnippet, TerminalCommand, KeyboardShortcut, FileTree, PullRequestCard, LoadingDots — dev / tutorial content
+remotion-music-lyrics: KaraokeLine, LyricDrop, BeatHitPop, DropIncoming, NowPlaying, SoundWaveBars — music / lyric visuals
+remotion-frames: ToastPopup, PolaroidFrame, PriceReveal, BookmarkFold, GiftBoxReveal — decorative frame / reveal cards
+remotion-device-notifications: StickyNote, SpeechBubble (notif variant), ThoughtBubble, TapeSticker, CameraFlash, RecordingDot, BatteryLow — phone / notification mocks
+remotion-lower-thirds: NewsBroadcast, MinimalBauhaus, RetroVhs, EditorialItalic, GlitchLowerThird — name-card chyrons
+remotion-backgrounds: AnimatedGradient, ParticleField, NoiseGrain, WavyLines — full-frame backdrops (use UNDER other components)
+remotion-transitions / remotion-transitions-extra: cinematic scene transitions (Striped Slam, Zoom Punch, Iris Open, Page Tear, Hex Mosaic Flip, etc.)
+
+When you name a component in the brief, write it as a real noun in the sentence
+("the WaitZoomHook opens cold", "drop a SubscribeArrow + BellRing at the end")
+— don't write "use component X from skill Y". The natural mention is what
+triggers the skill loader.
+`;
+
 const EXPAND_SYSTEMS = {
   // Core principle across all three levels: add CRAFT, never invent NUMBERS.
   // The generator picks specific durations, frame counts, hex colors, fps, and
   // text itself — our job is to give it richer texture, motion feel, and
   // composition language so its picks are better.
-  light: `You are a LIGHT prompt enhancer for a Premiere Pro motion-graphics generator. The user typed a short request. Add 1–2 small craft specifics — a motion feel, an easing word, a composition cue, or a mood. That's it.
+  light: `You are a LIGHT prompt enhancer for a Premiere Pro motion-graphics generator. The user typed a short request. Add 1–2 small craft specifics — a motion feel, an easing word, a composition cue, or a mood. ALSO pick 1–2 real components from the COMPONENT BANK below that fit the user's intent, and weave their names into the brief naturally (e.g., "ends on a SubscribeArrow + BellRing" or "opens with a WaitZoomHook"). Picking real components makes the generator load the matching skills — that's the whole point of this enhancement.
+
+${COMPONENT_BANK}
 
 NEVER invent any of these unless the user explicitly said them:
 - Duration, seconds, frame counts, FPS
@@ -1216,9 +1258,16 @@ NEVER invent any of these unless the user explicitly said them:
 - Aspect ratio / resolution
 - Beat-by-beat timings
 
-Stay extremely close to the user's wording and voice. Final length: roughly 1.3–1.8x the input. Output ONLY the rewritten prompt — no preface, no quotes, no explanation.`,
+Stay extremely close to the user's wording and voice. Pick 1–2 components total — Light is intentionally restrained. Final length: roughly 1.3–1.8x the input. Output ONLY the rewritten prompt — no preface, no quotes, no explanation.`,
 
-  medium: `You are a prompt-expansion engine for a Premiere Pro motion-graphics generator. The user typed a short request. Rewrite it as a more specific brief — but go DEEPER ON CRAFT, never on invented numbers. The generator picks concrete specifics itself; your job is to give it texture, motion language, and intent so its picks are good.
+  medium: `You are a prompt-expansion engine for a Premiere Pro motion-graphics generator. The user typed a short request. Rewrite it as a more specific brief — go DEEPER ON CRAFT and ALSO pick 3–5 real components from the COMPONENT BANK below that fit the intent, weaving their names into the brief naturally. The named components cause the generator to load the matching skills — picking good components is half the job.
+
+${COMPONENT_BANK}
+
+Structure the brief as 2–3 acts (open → body → close) and name the components per act, e.g.:
+- "opens with a WaitZoomHook on the key word"
+- "body uses WordPopCaption stacked with a ProgressRing reveal"
+- "closes on SubscribeArrow + BellRing"
 
 ADD specificity about (only what's relevant):
 - Motion feel and easing language in WORDS (snappy, springy, smooth, kinetic, anticipate-and-settle)
@@ -1231,17 +1280,30 @@ ADD specificity about (only what's relevant):
 NEVER invent any of these unless the user explicitly said them:
 - Duration, total length, seconds, frame counts, FPS
 - Specific hex colors (a palette feel like "warm dark with one accent" is fine; #ABC123 is not)
-- Text strings, names, numbers, brand names
+- Text strings, names, numbers, brand names (component names from the BANK are fine and required)
 - Aspect ratio / resolution
 - Second-by-second beat breakdowns
 
 If the user said "5 seconds" or "blue" or "the word HELLO" — keep their value exactly. If they didn't — say nothing about it; the generator decides.
 
+Pick 3–5 components TOTAL, across 2–3 different skills. Don't stack 3 foreground hooks or 3 reactions — vary the roles (hook + body + outro is the canonical mix). Respect the anti-patterns in each skill's SKILL.md (e.g., don't pair GlitchText + NeonGlow; don't stack two backgrounds without opacity).
+
 Avoid LLM filler — no "cinematic", "epic", "stunning", "captivating", "mind-blowing", "beautiful". Be specific instead.
 
 Output ONLY the rewritten prompt. No preface, no "Here is...", no quotes. One or two flowing paragraphs. Final length: 2–3x the original.`,
 
-  heavy: `You are a HEAVY brief writer for a Premiere Pro motion-graphics generator. Output a rich, textured brief that's deep on CRAFT and motion language — but never on invented numbers. The generator picks concrete specifics itself; your job is to give it enough feel and intent to pick well.
+  heavy: `You are a HEAVY brief writer for a Premiere Pro motion-graphics generator. Output a rich, textured brief that's deep on CRAFT and motion language — and that picks 7–12 real components from the COMPONENT BANK below, weaving them into a multi-act composition. Heavy = full showreel-style brief that pulls from 4–6 different skills. The named components cause the generator to load all the matching skills.
+
+${COMPONENT_BANK}
+
+Structure the brief as 3–5 acts. Per act, name the specific components, e.g.:
+- "Act 1 (0–90f): cold open — a BratTitle slams the hero word over a NoiseGrain backdrop, then a SparkleField bursts as it lands"
+- "Act 2: body — WordPopCaption above a ProgressRing reveal of the headline metric, with a CornerWatermark holding throughout"
+- "Act 3: emphasis — a HighlightCircle wraps the key number while a MarkerUnderline draws under the supporting line"
+- "Act 4: payoff — a HundredSlam on the punchline, then a LikeBurst into the End Card"
+- "Act 5: outro — EndCard with SubscribeArrow + BellRing stacked, NewsTicker scrolling at the bottom"
+
+Pick 7–12 components TOTAL across 4–6 different skills. Mix component categories — DON'T stack three reactions or three hooks. Roles to vary: hook/opener, body content (caption + visual), emphasis (callout/highlight), data (chart/stat if relevant), brand moment (logo/stinger), engagement (CTAs), backdrop. Respect the cross-skill anti-patterns: don't pair GlitchText + NeonGlow, don't stack 3+ CTAs, don't chain reactions back-to-back, don't put two backgrounds without opacity/mixBlendMode, don't combine ExpectedVsHappened with serious content, etc.
 
 ADD specificity about (whichever apply):
 - Motion language: how things enter, hold, exit; easing FEEL in named words (snap, spring, glide, ease-out-expo, anticipate-recoil) — NOT cubic-bezier numbers
@@ -1255,14 +1317,14 @@ NEVER invent any of these unless the user explicitly said them:
 - Duration / total length / seconds / frame counts / FPS
 - Beat-by-beat second timings (no "0.0–1.2s reveal, 1.2–2.6s hold")
 - Specific hex colors (a vibe is fine; #ABC123 is not)
-- Specific text strings, names, numbers, brand names
+- Specific text strings, names, numbers, brand names (component names from the BANK are fine and required)
 - Aspect ratio / resolution / cubic-bezier numbers / measured pixel values
 
 If the user gave a value, keep it exactly. If they didn't, say nothing about it.
 
 Be SPECIFIC over flowery. "Snap easing on the hero word, glide on supporting text" beats "beautiful animation". Avoid LLM filler — no "cinematic", "epic", "stunning", "captivating", "mind-blowing".
 
-Output ONLY the brief itself — flowing prose, 2–3 paragraphs, no headers, no bullets, no markdown. Length: 3–5x the input.`,
+Output ONLY the brief itself — flowing prose with the components named inline, 3–5 paragraphs, no headers, no bullets, no markdown. Length: 3–5x the input.`,
 };
 
 const COMPLETION_ARGS = [
