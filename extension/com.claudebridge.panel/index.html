@@ -2529,7 +2529,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.20</span>
+    <span class="version-tag" id="versionTag">10.21</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -4733,7 +4733,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.20';
+  const PANEL_VERSION = '10.21';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -6882,6 +6882,9 @@ async function sendMessage() {
   const reqId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
               : 'req-' + Date.now() + '-' + Math.random().toString(36).slice(2);
   const labelEl = placeholder.body.querySelector('.orbit-label');
+  // Capture the last visible status — surfaced in the Continue button below
+  // so a resumed task knows roughly where it was when killed.
+  let lastStatus = '';
   let progressES = null;
   try {
     progressES = new EventSource(BRIDGE + '/progress-stream');
@@ -6890,6 +6893,7 @@ async function sendMessage() {
         const payload = JSON.parse(ev.data);
         if (payload.reqId && payload.reqId !== reqId) return;
         const { text } = payload;
+        if (text) lastStatus = text;
         if (text && labelEl) labelEl.textContent = text;
         if (text && progressUI && progressUI.setStatus) progressUI.setStatus(text);
       } catch {}
@@ -6930,7 +6934,159 @@ async function sendMessage() {
   } catch (err) {
     progressUI.cleanup();
     if (err.name === 'AbortError') {
-      placeholder.body.innerHTML = '<p style="color:var(--text-dim);font-style:italic">Cancelled.</p>';
+      // Cancelled — offer a Continue button. Tells Claude to resume from
+      // where it was when killed, using the original prompt + last status
+      // as breadcrumbs. Partial work usually still lives on disk under
+      // ~/PremiereClaude/remotion-intro/src/ so resuming is cheap.
+      placeholder.body.innerHTML = '';
+      const cancelLine = document.createElement('p');
+      cancelLine.style.cssText = 'color:var(--text-dim);font-style:italic;margin:0 0 8px 0';
+      cancelLine.textContent = 'Cancelled.' + (lastStatus ? ' Was at: ' + lastStatus : '');
+      placeholder.body.appendChild(cancelLine);
+
+      const continueBtn = document.createElement('button');
+      continueBtn.type = 'button';
+      continueBtn.className = 'cc-btn-continue';
+      continueBtn.style.cssText =
+        'display:inline-flex;align-items:center;gap:6px;' +
+        'background:var(--accent-soft);color:var(--accent);' +
+        'border:1px solid var(--accent-line);border-radius:8px;' +
+        'padding:6px 12px;font-family:var(--font-ui);font-size:12px;' +
+        'font-weight:500;cursor:pointer;transition:background 0.12s var(--ease)';
+      continueBtn.innerHTML =
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>' +
+        '<span>Continue</span>';
+      continueBtn.addEventListener('mouseenter', () => continueBtn.style.background = 'var(--accent)');
+      continueBtn.addEventListener('mouseleave', () => continueBtn.style.background = 'var(--accent-soft)');
+      continueBtn.addEventListener('click', () => {
+        continueBtn.disabled = true;
+        continueBtn.style.opacity = '0.5';
+        continueBtn.style.cursor = 'wait';
+        sendContinuationChat(msg, lastStatus);
+      });
+      placeholder.body.appendChild(continueBtn);
+    } else {
+      placeholder.body.innerHTML = '<p>Error: ' + escapeHTML(err.message) + '</p><p style="color:var(--text-dim);font-size:11.5px">Is the bridge running?</p>';
+    }
+  } finally {
+    if (progressES) { try { progressES.close(); } catch {} progressES = null; }
+    activeChatAbort = null;
+    setBusy(false);
+    input.focus();
+  }
+}
+
+// Resume a chat that was previously cancelled mid-flight. Sends a meta-prompt
+// telling claude: original prompt + last visible status + "pick up where you
+// left off". Reuses the SAME bubble plumbing as a fresh send so the UX is
+// identical (progress bar, status updates, import preview cards).
+async function sendContinuationChat(originalMsg, lastStatus) {
+  if (activeChatAbort) return;
+  // The visible user-bubble — short label, not the full continuation prompt.
+  const youHTML =
+    '<div class="reply-ref">'
+    + '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;flex-shrink:0;color:var(--accent)"><polygon points="5 3 19 12 5 21 5 3"/></svg>'
+    + '<span class="reply-ref-label">Continuing</span>'
+    + '<span class="reply-ref-name">' + escapeHTML((originalMsg || '').slice(0, 60)) + (originalMsg.length > 60 ? '…' : '') + '</span>'
+    + '</div>'
+    + '<p style="color:var(--text-dim);font-size:11.5px;margin:6px 0 0 0;font-style:italic">resume from where you left off</p>';
+  makeMsg('you', youHTML);
+  setBusy(true);
+  const placeholder = makeMsg('claude', thinkingHTML());
+
+  // The continuation prompt — meta instructions for claude.
+  const outboundMsg =
+      '[CONTINUATION OF PREVIOUS REQUEST]\n'
+    + 'Your previous attempt was interrupted by the user before completing.\n'
+    + 'Original request: "' + originalMsg + '"\n'
+    + (lastStatus ? 'Last visible status when interrupted: "' + lastStatus + '"\n' : '')
+    + '\n'
+    + 'Resume from where you left off. Check ~/PremiereClaude/remotion-intro/src/ '
+    + 'for any partial .tsx file you may have created before being killed — if one '
+    + 'exists that matches what you were building, finish it instead of starting over. '
+    + 'Then re-register it in Root.tsx if needed, render, and emit the [[IMPORT:...]] marker.';
+
+  let context = null;
+  try { context = await getPremiereContext(); } catch {}
+
+  activeChatAbort = new AbortController();
+  const estimateSec = estimatePromptDuration(originalMsg, false);
+  const progressUI = makeProgressUI(placeholder.body, estimateSec);
+  const reqId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+              : 'req-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  const labelEl = placeholder.body.querySelector('.orbit-label');
+  let resumeStatus = '';
+  let progressES = null;
+  try {
+    progressES = new EventSource(BRIDGE + '/progress-stream');
+    progressES.addEventListener('progress', (ev) => {
+      try {
+        const payload = JSON.parse(ev.data);
+        if (payload.reqId && payload.reqId !== reqId) return;
+        const { text } = payload;
+        if (text) resumeStatus = text;
+        if (text && labelEl) labelEl.textContent = text;
+        if (text && progressUI && progressUI.setStatus) progressUI.setStatus(text);
+      } catch {}
+    });
+    progressES.addEventListener('done', (ev) => {
+      try { const p = JSON.parse(ev.data || '{}'); if (p.reqId && p.reqId !== reqId) return; } catch {}
+      try { progressES.close(); } catch {}
+      progressES = null;
+    });
+  } catch {}
+
+  try {
+    const r = await fetch(BRIDGE + '/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reqId, message: outboundMsg, context,
+        renderMode: userSettings.renderMode || 'default',
+      }),
+      signal: activeChatAbort.signal,
+    });
+    const data = await r.json();
+    progressUI.complete();
+    await new Promise(res => setTimeout(res, 350));
+    progressUI.cleanup();
+
+    if (data.error) throw new Error(data.error);
+    const replyText = data.reply || '(no response)';
+    placeholder.body.innerHTML = renderMarkdown(replyText);
+    streamReveal(placeholder.body);
+
+    if (data.imports && data.imports.length) {
+      for (const p of data.imports) {
+        addRenderPreview(placeholder.wrap, p, originalMsg, replyText);
+      }
+    }
+  } catch (err) {
+    progressUI.cleanup();
+    if (err.name === 'AbortError') {
+      // Allow chaining continuations — same Continue button pattern.
+      placeholder.body.innerHTML = '';
+      const cancelLine = document.createElement('p');
+      cancelLine.style.cssText = 'color:var(--text-dim);font-style:italic;margin:0 0 8px 0';
+      cancelLine.textContent = 'Cancelled.' + (resumeStatus ? ' Was at: ' + resumeStatus : '');
+      placeholder.body.appendChild(cancelLine);
+      const continueBtn = document.createElement('button');
+      continueBtn.type = 'button';
+      continueBtn.style.cssText =
+        'display:inline-flex;align-items:center;gap:6px;' +
+        'background:var(--accent-soft);color:var(--accent);' +
+        'border:1px solid var(--accent-line);border-radius:8px;' +
+        'padding:6px 12px;font-family:var(--font-ui);font-size:12px;' +
+        'font-weight:500;cursor:pointer';
+      continueBtn.innerHTML =
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>' +
+        '<span>Continue</span>';
+      continueBtn.addEventListener('click', () => {
+        continueBtn.disabled = true;
+        continueBtn.style.opacity = '0.5';
+        sendContinuationChat(originalMsg, resumeStatus);
+      });
+      placeholder.body.appendChild(continueBtn);
     } else {
       placeholder.body.innerHTML = '<p>Error: ' + escapeHTML(err.message) + '</p><p style="color:var(--text-dim);font-size:11.5px">Is the bridge running?</p>';
     }
