@@ -21,7 +21,7 @@ Six animated chart components for video data viz. Each accepts a plain data arra
 | **LineGraph** | Trend over time | SVG path draws left-to-right | `{x, y}[]` or `number[]` |
 | **DonutMetric** | Single % stat | Ring fills + center counter ticks | `{value, label?}` |
 | **TrendArrow** | Up/down callout | Arrow rises with % counter alongside | `{delta, label?}` |
-| **BarRace** | "X vs Y over time" | Bars reorder and grow each frame | `{label, value}[]` |
+| **BarRace** | "X vs Y over time" | Bars reorder and grow between snapshots | `frames: {label, value}[][]` (array of snapshots, one per step) + `framesPerStep` |
 
 ## When to Load
 
@@ -102,17 +102,39 @@ Six animated chart components for video data viz. Each accepts a plain data arra
 </AbsoluteFill>
 ```
 
-**Platform leaderboard race:**
+**Platform leaderboard race (multi-snapshot — the bars REORDER between snapshots):**
 ```tsx
 <Sequence durationInFrames={120}>
-  <BarRace data={[
-    { label: "TikTok",    value: 1100 },
-    { label: "YouTube",   value: 780 },
-    { label: "Instagram", value: 540 },
-    { label: "X",         value: 220 },
-  ]} />
+  <BarRace
+    frames={[
+      // Q1 snapshot
+      [
+        { label: "YouTube",   value: 800 },
+        { label: "TikTok",    value: 600 },
+        { label: "Instagram", value: 540 },
+        { label: "X",         value: 220 },
+      ],
+      // Q2 snapshot — TikTok overtakes
+      [
+        { label: "TikTok",    value: 920 },
+        { label: "YouTube",   value: 850 },
+        { label: "Instagram", value: 580 },
+        { label: "X",         value: 240 },
+      ],
+      // Q3 snapshot — TikTok pulls away
+      [
+        { label: "TikTok",    value: 1100 },
+        { label: "YouTube",   value: 780 },
+        { label: "Instagram", value: 540 },
+        { label: "X",         value: 220 },
+      ],
+    ]}
+    framesPerStep={40}
+  />
 </Sequence>
 ```
+
+If you only have a single snapshot (no reordering happens), use `BarChart` instead — BarRace's value-add is animating BETWEEN snapshots.
 
 ## Common Prop Overrides
 
