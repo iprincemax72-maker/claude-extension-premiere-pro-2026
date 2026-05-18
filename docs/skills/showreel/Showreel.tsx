@@ -5,7 +5,7 @@
 //   0–75    BrandReveal (stinger)
 //   75–155  WaitZoomHook (hook) with ParticleField (backgrounds) under it
 //   155–240 KaraokeLine (music-lyrics) with WavyLines (backgrounds) under it
-//   240–320 DonutMetric (stats) full-frame
+//   240–320 DonutMetric (charts) full-frame
 //   320–410 EndCard (stinger) with SubscribeArrow (ctas) stacked
 //
 // Renders to 1920x1080 landscape so the lower-thirds / charts behave.
