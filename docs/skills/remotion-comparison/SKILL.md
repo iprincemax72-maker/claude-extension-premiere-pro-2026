@@ -58,9 +58,13 @@ Five side-by-side comparison cards for transformation, versus, or "this vs that"
   <BeforeAfter
     before="Old logo"
     after="New logo"
-    beforeImage="https://yoursite.com/logo-v1.png"
-    afterImage="https://yoursite.com/logo-v2.png"
+    beforeLabel="BEFORE"
+    afterLabel="AFTER"
   />
+  {/* Note: BeforeAfter renders the `before` / `after` strings as the
+      labels in each half. It doesn't support per-side images. For
+      image comparison, fork the source or composite an Img above
+      each half inside an AbsoluteFill. */}
 </Sequence>
 ```
 
