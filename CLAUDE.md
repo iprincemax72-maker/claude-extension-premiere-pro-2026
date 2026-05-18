@@ -143,6 +143,9 @@ CLAUDE.md     # This file — agent-facing
 | `/complete` | POST | `{prefix}` | `{completion}` — inline autocomplete |
 | `/expand` | POST | `{prompt, level}` | `{expanded}` — light / medium / heavy |
 | `/autocut` | POST | `{clipPath, clipDuration, clipIn?, clipOut?, includeSilence?, findFillers?, findRepeats?, useTranscript?}` | `{cuts[], totalCut, transcribed, summary, method}` |
+| `/autocut-cancel` | POST | — | `{ok}` — aborts the currently-running autocut claude subprocess so the user can recover from a stuck pipeline without restarting the bridge |
+| `/autoedit` | POST | `{clipPath, clipDuration, clipIn?, clipOut?, density?, styleOverride?, premiereCaptions?, reqId?}` | `{ok, reqId, applied[], skipped[], summary, logFile}` — runs the multi-act autoedit pipeline (transcript → moment-picker → render graphics in parallel → return import payload) |
+| `/autoedit-cancel` | POST | — | `{ok}` — aborts the currently-running autoedit pipeline (kills all in-flight child renders) |
 | `/update` | POST | — | `{ok, updated[], bridgeChanged, premiereRestartNeeded}` — pulls from GitHub raw |
 | `/preview/<file>` | GET | — | Streams a file from `~/PremiereClaude/output/` with byte-range support |
 | `/progress-stream` | GET | — | SSE — pushes `{ text, pct }` per work-stage event |
