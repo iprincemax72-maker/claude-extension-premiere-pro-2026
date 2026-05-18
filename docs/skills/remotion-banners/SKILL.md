@@ -39,7 +39,7 @@ Four banner-style overlays — bottom news tickers, breaking-news cards, top war
 - **Don't** stack CTABanner + BreakingBanner — both want the bottom half of the frame and they'll fight visually. Sequence them: BreakingBanner during the news beat, CTABanner during the engagement beat.
 - **Don't** use AlertStrip's `level="error"` for non-critical content. The pulsing glow is meme-coded as "real problem" — false alarms train viewers to dismiss the visual.
 - **Don't** chain two NewsTickers in the same shot. The continuous scroll is hypnotic; doubling it overwhelms.
-- **Don't** override CTABanner's `bg`. The semi-transparent dark `rgba(15,15,15,0.92)` is critical to readability; making it transparent makes the text fight whatever's behind, while making it opaque blocks too much of the underlying frame.
+- **Don't** override CTABanner's `bg` to a solid opaque color — `bg` is the full-frame `AbsoluteFill` background and defaults to `transparent` so the dark inner card can float over your content. Making it opaque (e.g. `bg="#000"`) covers the whole frame with a solid block, defeating the overlay intent. The inner card's `rgba(15,15,15,0.92)` is hardcoded — you can't change it without forking the source.
 
 ## Composition Recipes
 
