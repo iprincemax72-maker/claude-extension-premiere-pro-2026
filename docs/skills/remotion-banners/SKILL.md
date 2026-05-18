@@ -131,8 +131,8 @@ Four banner-style overlays — bottom news tickers, breaking-news cards, top war
 - **Audio cue points:**
   - NewsTicker: continuous, no cue points; underscore with sustained news-room hum
   - BreakingBanner: slides in ~14f → "BREAKING NEWS" sting; flash at frame 4-6 → quick whoosh
-  - CTABanner: lands ~14f → soft "ding"; glow breathes at 0.1 rad/frame (about 6s period) → no SFX needed for the loop
-  - AlertStrip: lands ~14f → notification chime; dot pulses at 0.2 rad/frame (~3s period) → no SFX for loop
+  - CTABanner: lands ~14f → soft "ding"; glow breathes on a ~31-frame period (`|sin(f * 0.1)|` → π/0.1 ≈ 1s at 30fps) → no SFX needed for the loop
+  - AlertStrip: lands ~14f → notification chime; dot pulses on a ~16-frame period (`|sin(f * 0.2)|` → π/0.2 ≈ 0.5s at 30fps) → no SFX for loop
 
 ## Pairing with other skills
 
