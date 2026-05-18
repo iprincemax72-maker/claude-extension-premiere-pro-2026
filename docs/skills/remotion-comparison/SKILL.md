@@ -54,17 +54,20 @@ Five side-by-side comparison cards for transformation, versus, or "this vs that"
 
 **Product comparison (BeforeAfter with image URLs):**
 ```tsx
+import { staticFile } from "remotion";
+
 <Sequence durationInFrames={100}>
   <BeforeAfter
-    before="Old logo"
-    after="New logo"
+    before={staticFile("old-logo.png")}
+    after={staticFile("new-logo.png")}
     beforeLabel="BEFORE"
     afterLabel="AFTER"
   />
-  {/* Note: BeforeAfter renders the `before` / `after` strings as the
-      labels in each half. It doesn't support per-side images. For
-      image comparison, fork the source or composite an Img above
-      each half inside an AbsoluteFill. */}
+  {/* BeforeAfter auto-detects URL-vs-text on each side: if `before` or
+      `after` starts with `/`, `http`, or `file:` it renders as an <Img>
+      with cover-fit + the "faded" filter applied to the left half. Pass
+      plain text and the side becomes a colored gradient panel with the
+      text centered. Mixing one image side + one text side works. */}
 </Sequence>
 ```
 
