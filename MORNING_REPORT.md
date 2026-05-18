@@ -1,8 +1,33 @@
 # Morning Report — Overnight Run
 
-Started: 2026-05-18 02:43 PT.  Wrapped: ~03:10 PT (writing this report).
+Started: 2026-05-18 02:43 PT. First wrap: ~03:10 PT. Polish loop continued (per your "Only the clock ends this" rule) through ~10:43 PT target.
 
-This was a single multi-hour autonomous session focused on the two lanes you set: **Remotion skills** and **extension bugs**. No scope I didn't ask for.
+This is a single multi-hour autonomous session focused on the two lanes you set: **Remotion skills** and **extension bugs**. No scope I didn't ask for.
+
+---
+
+## TL;DR — morning skim
+
+Two-lane delivery, both meaningfully advanced:
+
+**Lane 1: Remotion skills**
+- **22 of 22 component skills have v2-standard SKILL.md** with Anti-patterns + Composition Recipes + Render Notes + Pairings (was 6 at the start of the polish loop).
+- **5 cross-skill compositions rendered + visually verified**: Showreel (landscape highlight reel), ShowreelV (vertical TikTok), ShowreelExplainer (long-form tutorial), ProductIntro (30s product demo from TUTORIAL.md), StressTest (edge-case verification at every documented cap).
+- **4 new top-level docs**: INDEX.md (flat component catalog), TUTORIAL.md (step-by-step 30s example), CHEAT-SHEET.md (5-second "I want to…" lookup), showreel/README.md (template index).
+- **Real bugs found & fixed in MY OWN tutorials via render+visual inspection**: WaitZoomHook prop name, lowercase JSX tag, CodeSnippet 80→70 char cap, ProductIntro layout (caption invisible due to internal AbsoluteFill stacking).
+- **Doc bugs fixed**: 12 SKILL.md/catalog files had invalid `--audio-codec=no-audio` flag → corrected to `--mute` with inline explanation. `rules/sfx.md` had wrong `Audio` import path → corrected.
+
+**Lane 2: Premiere Pro extension**
+- **Panel v10.16 → v10.17 → v10.18** during the run. Two real fixes:
+  - v10.17: focus restoration after Esc-closing a slide-in panel (was leaving focus on hidden `historySearch`)
+  - v10.18: lightbox uses `createElement` + `setAttribute` instead of innerHTML string-concat (defense vs. weird paths)
+- **Validation suite** built up to four passes — `skill-sources-typecheck.sh` (strict tsc, 27 sources), `panel-audit.py` (pt1: boot/chips/history/render/lightbox), `panel-audit-edge-cases.py` (pt2: remove-missing/confirm-guard), `panel-audit-edge-cases-pt3.py` (pt3: unicode/viewports/race conditions). **All four report 0 critical / 0 minor.**
+- **CLAUDE.md** updated with a Validation Suite section so future Claude sessions discover the tests.
+
+**By the numbers**
+- 60+ commits, all local (none pushed per your constraint).
+- 165 mp4 renders in `/tmp/test-renders/` totaling ~58 MB.
+- 4 real bugs found by tools I built tonight (typecheck script: 2, visual inspection: 2).
 
 ---
 
