@@ -350,6 +350,20 @@ python3 tests/panel-audit-edge-cases-pt3.py
 
 Each must report 0 critical / 0 minor before a release. The version assertion in pt1 loosely matches "10." so legitimate version bumps don't break the audit (you'd see it flag a missing/stale version, not a wrong number).
 
+### Skill docs — where to look first
+
+When generating motion graphics, **always start at the top of `docs/skills/`** and fall through:
+
+1. **`docs/skills/CHEAT-SHEET.md`** — single-screen "I want to…" lookup. 5 seconds.
+2. **`docs/skills/INDEX.md`** — flat catalog of every component grouped by use case. ~30 seconds.
+3. **`docs/skills/TUTORIAL.md`** — step-by-step "build a 30-second product intro" with full code + common-mistakes section.
+4. **`docs/skills/showreel/README.md`** — five render-verified cross-skill templates to copy.
+5. **`docs/skills/<skill-name>/SKILL.md`** — per-skill anti-patterns + composition recipes + prop overrides + audio cues + pairings. Read when you've picked the skill and need component-specific guidance.
+
+All 22 component skills (callouts, lower-thirds, stats, backgrounds, stingers, text-presets, music-lyrics, comparison, charts, tech, lists, frames, reactions, device-notifications, word-effects, ctas, hooks, social-ui, trend-packs, quotes, banners, logos) have the same v2 SKILL.md structure as of the May 2026 polish loop — Anti-patterns + Composition Recipes + Render Notes + Pairings.
+
+The 7 workflow/teaching skills (ads, best-practices, production, superpowers-setup, transitions, transitions-extra, video-skill) have different shapes; they're not components but pipelines/patterns.
+
 ---
 
 ## HARD-WON KNOWLEDGE (don't relearn these)
