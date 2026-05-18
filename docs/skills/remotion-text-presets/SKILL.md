@@ -158,7 +158,7 @@ Each preset has sensible defaults that produce a usable result with just one req
 - **Audio cue points:**
   - TiltedSlam: slam at frame ~10 → "THWACK" SFX on frame 8
   - WordPopCaption: each word at `8 + i * framesPerWord` → tick per word
-  - LetterCascade: letters land at `i * 2 + 14` → keyboard-tap SFX per letter
+  - LetterCascade: letters land at `i * framesPerLetter + ~12` (default `framesPerLetter=3` → letter 0 at frame 12, letter 5 at frame 27) → keyboard-tap SFX per letter
   - TypewriterPro: `charsPerSecond` (default 28 cps ≈ 1 char per ~1.07 frames at 30fps) → mechanical keystroke per char; the component also auto-pauses 6 frames at `.,?!:` so the SFX should match the visible cadence, not a metronome
   - CounterCountUp: ramp completes at `durationFrames` (default 45) → "ding" at completion
   - GlitchText: peak at frame 0, decay by 18 → static burst SFX
