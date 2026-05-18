@@ -1,8 +1,8 @@
 # Showreel templates — copy-paste cross-skill compositions
 
-Five render-verified compositions that mix multiple v2 skills in one timeline. Use these as starting points for new productions, or as anti-pattern reference (e.g. how to layer a background under a foreground without them fighting).
+Six render-verified compositions that mix multiple v2 skills in one timeline. Use these as starting points for new productions, or as anti-pattern reference (e.g. how to layer a background under a foreground without them fighting).
 
-All five type-check clean under `tests/skill-sources-typecheck.sh` and render to mp4 with `--mute --codec h264`.
+All six type-check clean under `tests/skill-sources-typecheck.sh` and render to mp4 with `--mute --codec h264`.
 
 ## What's here
 
