@@ -15,8 +15,8 @@ For full details (anti-patterns, recipes, audio cues, pairings) read the per-ski
 ## By Use Case (start here)
 
 ### Openers (first 60–90 frames of a video)
-- **WaitZoomHook** (`remotion-hooks`) — zoom-punch reveal of one key word, V, Y
-- **POVCaption** (`remotion-hooks`) — TikTok-skit caption with per-word entrance, V, Y
+- **WaitZoomHook** (`remotion-hooks`) — zoom-punch reveal of one key word, A, Y
+- **POVCaption** (`remotion-hooks`) — TikTok-skit caption with per-word entrance, A, Y
 - **PlotTwistReveal** (`remotion-hooks`) — kerning + scanline mid-clip reveal, A, N
 - **StoryTimeTitle** (`remotion-hooks`) — paper-card calm opener, A, Y
 - **RealTalkCaption** (`remotion-hooks`) — editorial pull-quote opener, A, Y
