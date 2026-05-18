@@ -103,7 +103,9 @@ Six components for music videos, lyric drops, podcast intros, or beat-driven con
 <AbsoluteFill>
   <YourTalkingHead />
   <div style={{ position: "absolute", bottom: 80, right: 80, width: 220, height: 80 }}>
-    <SoundWaveBars count={5} color="#22d3ee" size={1} speed={1.5} />
+    {/* size is the pixel-height of the bar container (default 220).
+        For an 80px-tall corner spot, drop size to ~80. */}
+    <SoundWaveBars count={5} color="#22d3ee" size={80} speed={1.5} />
   </div>
 </AbsoluteFill>
 ```
@@ -127,7 +129,8 @@ Six components for music videos, lyric drops, podcast intros, or beat-driven con
 <NowPlaying track="Untitled #4" artist="lo-fi nights" bpm={70} />
 
 // SoundWaveBars with brand color and slower wave
-<SoundWaveBars count={8} color="#ec4899" size={1.2} speed={0.8} />
+// (size is in pixels — default 220, use 300+ for larger displays)
+<SoundWaveBars count={8} color="#ec4899" size={280} speed={0.8} />
 ```
 
 ## Render Notes
