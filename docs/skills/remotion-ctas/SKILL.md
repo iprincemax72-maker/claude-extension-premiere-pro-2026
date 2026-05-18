@@ -153,7 +153,7 @@ Six **call-to-action** components for video creators — the animated prompts th
 
 - **SubscribeArrow + BellRing** (in this skill) — the classic YouTube end-card stack
 - **LikeSmash + WordPopCaption** (`remotion-text-presets`) — heart smash + "LIKE!" word pop
-- **ShareCallout + ToastPopup** (`remotion-device-notifications`) — share prompt + notification of someone sharing
+- **ShareCallout + ToastPopup** (`remotion-frames`) — share prompt + notification of someone sharing
 - **SaveBookmark + RecipeStep** (`remotion-lists`) — "save this recipe" mid-cooking-tutorial
 - **TapToFollow + SubscribePop** (`remotion-social-ui`) — anticipation prompt → fulfillment animation
 - **All CTAs + CornerWatermark** (`remotion-social-ui`) — branded end-card setup
