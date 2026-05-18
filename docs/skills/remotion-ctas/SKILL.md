@@ -116,6 +116,10 @@ Six **call-to-action** components for video creators — the animated prompts th
 // Brand-color subscribe arrow
 <SubscribeArrow color="#ff7a4d" />
 
+// SubscribeArrow pointing a different direction
+// (valid: "down-right" | "down-left" | "up-right" | "up-left" | "down" | "right")
+<SubscribeArrow point="down-left" />
+
 // BellRing in custom accent
 <BellRing accent="#7c3aed" />
 
