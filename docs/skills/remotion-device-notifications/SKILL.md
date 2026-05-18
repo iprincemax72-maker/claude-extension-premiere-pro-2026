@@ -145,7 +145,7 @@ Seven small device / sticker / notification overlays for video editing. Render-v
   - TapeSticker: lands ~12f → tape-rip SFX
   - CameraFlash: peak at `startFrame + 1` → camera-shutter SFX with flash sting
   - RecordingDot: no entrance SFX (loops) — pair with a sustained "recording" hum
-  - BatteryLow: tick pulse ~30-frame period → low-battery beep on each tick
+  - BatteryLow: tick pulse ~14-frame period (`|sin(f * 0.22)|` gives π/0.22 ≈ 14f) → low-battery beep on each tick
 
 ## Pairing with other skills
 
