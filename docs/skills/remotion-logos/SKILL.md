@@ -38,7 +38,7 @@ Four channel-logo / brand-intro stingers — drop in a single character/glyph or
 - **Don't** use LogoMorph for a permanent intro hold. The shape morphs from circle to rounded square and then stays — beyond ~120 frames you're holding on a static result. Use LogoPulse for held intros (its breathing loops cleanly).
 - **Don't** override LogoRing's `ringSize`. The component computes `size * 1.35` for a reason — at higher ratios the dashed ring renders off-screen on tighter compositions.
 - **Don't** stack two logos in the same composition. The "this is the brand" moment is singular. If you need to introduce two brands (e.g. host + sponsor), sequence: 90f LogoSlam for brand A, then 90f LogoSlam for brand B, with a beat between.
-- **Don't** use LogoPulse for less than 90 frames. The breathing loop period is ~30 frames (1s) and the halo cycle is 90 frames — anything shorter and the periodic halo doesn't fire at all, making it indistinguishable from a static logo.
+- **Don't** use LogoPulse for less than 90 frames. The breathing loop period is ~105 frames (`sin(f * 0.06)` → 2π/0.06) and the halo cycle is exactly 90 frames (`f % 90`) — anything shorter than 90f and the periodic halo doesn't fire at all, making LogoPulse indistinguishable from a static logo.
 
 ## Composition Recipes
 
