@@ -236,7 +236,7 @@ Without the Changes button, every prompt is a clean creative slate — different
 
 User selects a clip in the timeline → clicks **Auto-Cut**:
 
-**Stage 1: ffmpeg silencedetect** — Bridge runs `ffmpeg -i <clip> -af silencedetect=noise=-30dB:d=0.6`. Stderr `time=HH:MM:SS` is parsed in real time to drive the progress bar 2% → 14%.
+**Stage 1: ffmpeg silencedetect** — Bridge runs `ffmpeg -i <clip> -af silencedetect=noise=-35dB:d=0.7 -f null -`. Stderr `time=HH:MM:SS` is parsed in real time to drive the progress bar 2% → 14%. (Threshold history: `-30dB:0.6` was too aggressive — cut quiet speech as silence; `-45dB:1.5` was too soft. `-35dB:0.7` sits in the middle: ignores quiet speech but catches genuine dead air, trims real pauses without nuking natural half-second breaths.)
 
 **Stage 2: Claude transcribes + analyses** — Bridge spawns `claude -p` with a strict prompt that requires:
 1. **Transcribe** using `asr-transcribe-to-text` skill → `whisper-cli` → `faster-whisper` → ffmpeg-extract + STT, in that order. Only set `transcribed: false` if all four fail.
