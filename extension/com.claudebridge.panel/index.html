@@ -2529,7 +2529,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.25</span>
+    <span class="version-tag" id="versionTag">10.26</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -4751,7 +4751,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.25';
+  const PANEL_VERSION = '10.26';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -5887,40 +5887,12 @@ async function runAutoEdit(opts) {
     }
     progressUI.text('Reading clip…');
 
-    // 1b. Try Premiere's own caption track first — if there are captions on
-    // the sequence covering this clip's window, we can skip whisper. Falls
-    // back to whisper if no captions or the call fails.
-    let premiereCaptions = null;
-    let probeDump = null;
-    try {
-      const capsRaw = await evalES('ccGetSequenceCaptions()');
-      const caps = JSON.parse(capsRaw);
-      if (caps && caps.ok && caps.sentences && caps.sentences.length) {
-        premiereCaptions = caps.sentences;
-        progressUI.text(`Using Premiere captions (${caps.sentences.length} lines)…`);
-      } else {
-        // No captions found at the path I know. Run the diagnostic probe so
-        // we can see what subtitle/caption shape your Premiere actually uses.
-        try {
-          const probeRaw = await evalES('ccProbeTranscript()');
-          probeDump = probeRaw;
-          console.log('[autoedit] caption probe:', probeRaw);
-        } catch (pe) { console.log('[autoedit] probe failed:', pe); }
-      }
-    } catch (ce) { console.log('[autoedit] captions failed:', ce); }
-
-    // If captions returned empty AND we have probe output, show it in the
-    // progress card so the user can share it with me.
-    if (!premiereCaptions && probeDump) {
-      const note = document.createElement('div');
-      note.style.cssText = 'margin-top:10px;padding:8px 10px;background:rgba(217,119,87,0.08);border-left:3px solid var(--accent);border-radius:4px;font-size:11px;color:var(--muted);font-family:"SF Mono",monospace;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto;';
-      note.textContent = 'No Premiere captions found at the legacy API path. Falling back to whisper.\n\nProbe output (share with Claude to fix the reader):\n' + probeDump;
-      try {
-        const card = progressUI.text && progressUI.text._card;
-        const body = document.querySelector('.autoedit-progress')?.parentElement;
-        if (body) body.appendChild(note);
-      } catch {}
-    }
+    // Skip Premiere captions entirely — always use parakeet on the bridge.
+    // The Premiere caption path produced uneven results (legacy API
+    // varied by version, sometimes missed words, didn't pick up
+    // background speaker). Forcing parakeet gives one consistent
+    // transcript source.
+    const premiereCaptions = null;
 
     // 2. Hit the bridge
     const resp = await fetch(BRIDGE + '/autoedit', {
