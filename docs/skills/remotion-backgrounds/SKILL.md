@@ -116,7 +116,7 @@ Four animated backdrops — each fills the frame as an `AbsoluteFill` and is int
   - NoiseGrain at `intensity=0.5`: ~37ms/frame. At `intensity=1` expect ~100ms/frame.
   - WavyLines: ~28ms/frame.
 - For transparent overlay (e.g. NoiseGrain on top of real footage): set `bg="transparent"` and render with `--codec prores --prores-profile 4444 --mute`.
-- **Loop seam warning:** ParticleField uses `((y0 - frame * speed * 0.1) % 110)` which loops cleanly only when `frame * speed * 0.1` reaches a multiple of 110. For seamless loops, set `durationInFrames` to a multiple of `1100 / speed`. Otherwise the loop point shows a discontinuity.
+- **Loop seam warning:** ParticleField does **not** loop seamlessly by default. Each dot has a per-particle `speed` value (range 0.2–1.6, generated from the seeded RNG), so no single `durationInFrames` puts all dots back at their origin. The y math is `((y0 - frame * speed * 0.1) % 110)` — for a TRUE seamless loop, fork the source and (a) set all dots to a shared speed S, then (b) make `durationInFrames` a multiple of `1100 / S`. For non-seamless looping use cases (the typical "background, played underneath other content") the visual discontinuity at the loop point is invisible because the dots are small and you're not looking AT them.
 
 ## Pairing with other skills
 
