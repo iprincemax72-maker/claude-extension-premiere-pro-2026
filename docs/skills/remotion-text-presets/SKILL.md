@@ -23,7 +23,7 @@ description: Eleven production-tested text animation presets for Remotion — dr
 | **TypewriterPro** | Code reveals, story openers | Char-by-char slice + blinking cursor + punctuation pause |
 | **MarkerUnderline** | Emphasis, callouts | Text fade + highlighter line draws beneath |
 | **CounterCountUp** | Stats, money, %, big numbers | Eased numeric ramp + comma grouping + final-value punch |
-| **GlitchText** | Damaged-feed openers, error states | RGB-split + jitter, settles after ~18f |
+| **GlitchText** | Damaged-feed openers, error states | RGB-split + jitter, settle factor decays to 0 by frame 30; residual ~5px RGB split persists afterward (intentional, sells the "damaged feed" aesthetic) |
 | **NeonGlow** | Neon-sign aesthetic, "LIVE" badges | Layered text-shadow glow + soft pulse |
 | **Extrude3D** | Bold logo wordmarks | Z-stacked shadow copies for depth |
 | **StampImpact** | "APPROVED" / "REJECTED" / "SOLD OUT" | Slam-in with rotation overshoot + dust-puff vibe |
@@ -57,7 +57,7 @@ description: Eleven production-tested text animation presets for Remotion — dr
 
 - **Don't** use TiltedSlam for text >12 chars. The slam + tilt + wobble is calibrated for 1–2 word titles. Long phrases lose the impact and the tilt makes long text hard to read.
 - **Don't** use WordPopCaption with `framesPerWord < 6`. The eye can't track word-by-word reveals faster than ~5 frames per word (200ms). Below 6 it feels glitched.
-- **Don't** use GlitchText for more than ~30 frames. The glitch decays to zero by frame 18 and the static result is just plain text — extending the comp adds dead frames. Cut at ~25f.
+- **Don't** use GlitchText for more than ~30 frames. The settle factor (`Math.max(0, 1 - frame / 30)`) decays to 0 by frame 30, BUT a residual ~5px RGB split persists indefinitely — it's the "post-damage steady state" effect. Either: (a) cut at frame 30 for a clean dies-down feel, or (b) hold longer if you want the persistent-damaged-feed look (the residual is intentional, not a bug).
 - **Don't** layer GlitchText + NeonGlow simultaneously. Glitch's RGB split fights the neon glow halo, both effects cancel.
 - **Don't** use Extrude3D with a transparent bg over real footage. The Z-stacked shadow copies bleed into the underlying frame and the depth illusion collapses. Use it on solid bg only.
 - **Don't** use StampImpact for more than one stamp per scene. Two stamps competing visually feels like a meme template, not editing.
