@@ -107,6 +107,14 @@ Seven text-effect components that manipulate words/letters with frame-perfect mo
 // WordSwap slower (more reading time)
 <WordSwap words={["a", "b", "c"]} framesPerWord={28} />
 
+// WordSwap with prefix + suffix — the cycling word sits inside a fixed sentence:
+//   "Made for {prefix}{word}{suffix}"
+<WordSwap
+  words={["creators", "founders", "designers"]}
+  prefix="Made for "
+  suffix=" who ship daily."
+/>
+
 // HighlightedWord brand color (uses highlightColor + highlightIndex)
 <HighlightedWord sentence="..." highlightIndex={2} highlightColor="#ff7a4d" />
 
