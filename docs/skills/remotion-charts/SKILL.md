@@ -10,7 +10,6 @@ Six animated chart components for video data viz. Each accepts a plain data arra
 ## Quick Reference
 
 - [Source](./references/charts-source.tsx)
-- [Catalog](./references/charts-catalog.md)
 
 ## The Six Charts
 

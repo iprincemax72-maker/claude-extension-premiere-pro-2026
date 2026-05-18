@@ -8,7 +8,6 @@ description: Five before/after and versus comparison components for Remotion —
 Five side-by-side comparison cards for transformation, versus, or "this vs that" content. Render-verified to mp4.
 
 - [Source](./references/comparison-source.tsx)
-- [Catalog](./references/comparison-catalog.md)
 
 ## Components
 

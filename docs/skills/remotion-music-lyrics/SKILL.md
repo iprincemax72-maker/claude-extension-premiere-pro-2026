@@ -8,7 +8,6 @@ description: Six music and lyric-driven components for Remotion — KaraokeLine 
 Six components for music videos, lyric drops, podcast intros, or beat-driven content. **v2 with proper beat-driven motion** — see source header comments for what each upgrade adds over v1.
 
 - [Source](./references/music-lyrics-source.tsx) — full implementations
-- [Catalog](./references/music-lyrics-catalog.md) — usage tips
 
 ## The Six Components
 
