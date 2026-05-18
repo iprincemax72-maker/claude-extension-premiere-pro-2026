@@ -902,11 +902,21 @@ function _momentPayloadText(m) {
 
 // AUTO EDIT — custom-generate each moment's motion graphic. For every moment
 // we spawn an agentic Claude that WRITES a fresh Remotion composition (no
-// templates) and renders it to a transparent .mov overlay. 4 run in
-// parallel; a moment that fails gets ONE retry, then is skipped. Returns the
-// same shape renderMomentsParallel did so the /autoedit endpoint is unchanged.
+// templates) and renders it to a transparent .mov overlay. All moments run
+// in parallel (user's call on their M4 16GB), capped at 16 as a safety net
+// for Full-coverage runs where moment counts can balloon past 30 — that
+// would guarantee swap-thrash + possible OOM on 16GB RAM. A moment that
+// fails gets ONE retry, then is skipped. Returns the same shape
+// renderMomentsParallel did so the /autoedit endpoint is unchanged.
+//
+// Tradeoff we accepted (user picked 12-at-once over recommended 6):
+//   - 12 parallel Remotion renders peak around 8 GB RAM. On 16GB the OS
+//     swaps to SSD, slowing per-task time. The user explicitly chose this
+//     over the 6-parallel option that wouldn't swap. If you hit OOM kills,
+//     drop the cap back to 6-8 in this same constant.
 function generateMomentsParallel(moments, reqId, log, onProgress) {
-  const MAX_INFLIGHT = 4;
+  const PARALLEL_CAP = 16;
+  const MAX_INFLIGHT = Math.min(moments.length || 1, PARALLEL_CAP);
   const cacheDir = path.join(OUTPUT_DIR, 'cache');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
 
