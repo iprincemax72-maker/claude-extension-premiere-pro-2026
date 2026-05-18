@@ -15,7 +15,7 @@ Four animated data-reveal components, render-verified to mp4.
 | Name | Use for | Animation |
 |------|---------|-----------|
 | **BarChartRace** | Multi-row horizontal bars filling in stagger — leaderboards, rankings | Each bar springs in 6 frames after the one above; bar fill + value count are synced (one spring drives both) |
-| **ProgressRing** | Single percentage / metric with circular gauge — completion, score | Stroke-dashoffset counts up; big % counter eased with `1 - (1-p)^2.4` so it overshoots slightly |
+| **ProgressRing** | Single percentage / metric with circular gauge — completion, score | Stroke-dashoffset counts up; big % counter eased with `1 - (1-p)^2.4` — ease-out curve (fast start, slow finish), monotonic to target (does NOT overshoot) |
 | **ComparisonBars** | A vs B vertical bars side-by-side — before / after | A grows from frame 0, B grows from frame 6 (so the eye reads them in order); values count up with the bars |
 | **StatCardGrid** | 3 tile dashboard — multi-metric reveal | Cards pop-scale stagger (8f apart); numbers eased-ramp count up after the card lands |
 
@@ -26,14 +26,14 @@ Four animated data-reveal components, render-verified to mp4.
 ## Golden rules
 
 1. All counters use `fontVariantNumeric: "tabular-nums"` — digits don't jump width as they animate (this is critical; non-tabular numbers shudder visibly on counter animations)
-2. Counts use the eased ramp `1 - (1-p)^2.4` — overshoots slightly toward target then locks. Don't replace with linear interpolate or it'll feel mechanical
+2. Counts use the eased ramp `1 - (1-p)^2.4` — ease-out curve (fast start, decelerating to target, NEVER overshoots). Don't replace with linear interpolate or it'll feel mechanical. Don't replace with a spring either — the deterministic eased ramp is what makes counters land predictably
 3. Default colors are brand-neutral (emerald / pink / purple / red) — override via the `color` prop on each data row
 4. Data shape stays the same: `{label, value}` for the simple ones; `{label, value, color?}` for the chart components; `{value, suffix?, prefix?, label, color?}` for StatCardGrid
 
 ## Anti-patterns
 
 - **Don't** feed BarChartRace > 8 rows. Past 8, each row's height shrinks below the readable threshold for short-form video. Split into two charts and use a Sequence pair.
-- **Don't** use ProgressRing for values < 5%. The ring stub is barely visible and the eased ramp's overshoot becomes a percentage point or two of false reading. Use a single counter component instead (or take the value × 10 and label it differently).
+- **Don't** use ProgressRing for values < 5%. The ring stub is barely visible (just a few degrees of the circle filled) and reads as "approximately zero" from a distance. Use a single counter component or BarChart row instead, or take the value × 10 and label it differently if the original value matters.
 - **Don't** put extreme value ratios in ComparisonBars (e.g. 12,000 vs 184,000). The small bar will read as zero. If the comparison spans an order of magnitude, render on a log scale by pre-transforming values (`Math.log10(v + 1)`) and stamp the *real* numbers on top.
 - **Don't** use StatCardGrid for 4+ tiles. The layout is hardcoded to a flex row with `gap: 32` — at 4+ tiles each card narrows below where its 110px counter font fits comfortably. Use BarChartRace for 4+ rows of comparable metrics.
 - **Don't** chain stat components back-to-back without a beat between. Two consecutive data reveals overwhelm — give the viewer 30–60 frames of body content (or a still hold of the previous result) between metric moments.
