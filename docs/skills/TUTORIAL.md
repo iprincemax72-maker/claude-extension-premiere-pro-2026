@@ -169,5 +169,7 @@ Make sure every component you use has `bg="transparent"` set when going the ProR
 - [showreel/Showreel.tsx](./showreel/Showreel.tsx) — landscape highlight reel template
 - [showreel/ShowreelV.tsx](./showreel/ShowreelV.tsx) — vertical TikTok template
 - [showreel/ShowreelExplainer.tsx](./showreel/ShowreelExplainer.tsx) — long-form tutorial template
+- [showreel/ProductIntro.tsx](./showreel/ProductIntro.tsx) — finished version of the composition built in this tutorial
+- [showreel/ShowreelMeme.tsx](./showreel/ShowreelMeme.tsx) — meme/comedy showreel (proves reactions can chain when sequenced apart)
 - [showreel/StressTest.tsx](./showreel/StressTest.tsx) — edge-case verification at every documented cap
 - Each skill's `SKILL.md` for anti-patterns, recipes, prop overrides, audio cues, pairings.
