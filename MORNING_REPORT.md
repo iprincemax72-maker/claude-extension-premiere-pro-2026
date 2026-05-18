@@ -25,9 +25,13 @@ Two-lane delivery, both meaningfully advanced:
 - **CLAUDE.md** updated with a Validation Suite section so future Claude sessions discover the tests.
 
 **By the numbers**
-- 60+ commits, all local (none pushed per your constraint).
-- 165 mp4 renders in `/tmp/test-renders/` totaling ~58 MB.
-- 4 real bugs found by tools I built tonight (typecheck script: 2, visual inspection: 2).
+- 75+ commits, all local (none pushed per your constraint).
+- 165 mp4 renders in `/tmp/test-renders/` totaling ~65 MB.
+- **28 distinct bugs caught and fixed** — split across:
+  - 2 panel UX bugs (v10.17 focus restore, v10.18 lightbox createElement)
+  - 2 my-own-tutorial bugs (WaitZoomHook prop name, lowercase JSX tag)
+  - 3 invalid-flag/import doc bugs (audio-codec across 12 docs, sfx.md Audio import, animations.md missing imports)
+  - 20+ doc-vs-source-drift bugs in SKILL.md files (loop periods, ease curves, data shapes, prop names). Largest cluster was in `remotion-charts/SKILL.md` where BarRace took an array-of-snapshots not a single snapshot, PieChart took a separate `colors` array not per-slice colors, BarChart had no per-row color support, LineGraph took `{label, value}[]` not `{x, y}[]`, TrendArrow used `value`+`direction` not `delta`. Several loop-period claims were 2–6× off because I'd estimated rather than computed `2π/coefficient`. Several `|sin|` claims were 2× off because I'd forgotten the absolute value halves the period. All caught by re-reading source against the SKILL.md anti-pattern + audio-cue sections.
 
 ---
 
