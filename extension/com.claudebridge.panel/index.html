@@ -761,7 +761,7 @@
     font-style: italic;
     margin-top: 6px;
   }
-  /* ───── SUGGESTION CHIPS (redesigned v10.31) ─────
+  /* ───── SUGGESTION CHIPS (redesigned v10.32) ─────
      Soft button-cards in a 3-column grid. Each category has a
      left-aligned header with a tiny accent dash. Chips are squared
      (not pill) with generous padding and a clear hover lift. */
@@ -2579,7 +2579,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.31</span>
+    <span class="version-tag" id="versionTag">10.32</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -2787,6 +2787,43 @@
           <div class="settings-row-hint">Pull from GitHub on bridge launch</div>
         </div>
         <label class="settings-toggle"><input type="checkbox" id="settingAutoUpdate" checked><span></span></label>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Defaults for new renders</div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Default aspect ratio</div>
+          <div class="settings-row-hint">Prepended to every prompt so you don't have to type it. Override per-prompt anytime.</div>
+        </div>
+        <div class="settings-segmented" id="settingAspect">
+          <button data-val="auto" class="active">Auto</button>
+          <button data-val="9:16">9:16</button>
+          <button data-val="16:9">16:9</button>
+          <button data-val="1:1">1:1</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Default duration</div>
+          <div class="settings-row-hint">Only applied when your prompt doesn't specify one</div>
+        </div>
+        <div class="settings-segmented" id="settingDuration">
+          <button data-val="auto" class="active">Auto</button>
+          <button data-val="3">3s</button>
+          <button data-val="5">5s</button>
+          <button data-val="10">10s</button>
+          <button data-val="15">15s</button>
+          <button data-val="30">30s</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Confirm before timeline import</div>
+          <div class="settings-row-hint">Ask before any render auto-places onto your sequence — safety net for picky cuts</div>
+        </div>
+        <label class="settings-toggle"><input type="checkbox" id="settingConfirmImport"><span></span></label>
       </div>
     </div>
 
@@ -4783,7 +4820,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.31';
+  const PANEL_VERSION = '10.32';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -4950,6 +4987,9 @@ const SETTINGS_DEFAULTS = {
   expand: 'light',
   autoUpdate: true,
   renderMode: 'default',  // fast | default | slow — speed/quality dial for renders
+  aspect: 'auto',         // auto | 9:16 | 16:9 | 1:1 — prepended to every prompt
+  duration: 'auto',       // auto | 3 | 5 | 10 | 15 | 30 — prepended when prompt doesn't specify
+  confirmImport: false,   // when true, render cards ask before auto-placing on timeline
 };
 const ACCENT_PALETTES = {
   coral:   { accent:'#d97757', accent2:'#e89a6c', hover:'#e88566', soft:'rgba(217,119,87,0.14)', line:'rgba(217,119,87,0.45)', glow:'rgba(217,119,87,0.55)' },
@@ -5012,11 +5052,13 @@ function syncSettingsUI() {
   setSeg('settingTheme',     userSettings.theme);
   setSeg('settingPlacement', userSettings.placement);
   setSeg('settingExpand',    userSettings.expand);
+  setSeg('settingAspect',    userSettings.aspect);
+  setSeg('settingDuration',  userSettings.duration);
   // Swatches
   const sw = document.getElementById('settingAccent');
   if (sw) sw.querySelectorAll('.sw').forEach(b => b.classList.toggle('active', b.dataset.val === userSettings.accent));
   // Toggles
-  const toggles = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate' };
+  const toggles = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingConfirmImport: 'confirmImport' };
   for (const id in toggles) {
     const el = document.getElementById(id);
     if (el) el.checked = !!userSettings[toggles[id]];
@@ -5040,6 +5082,8 @@ function bindSettingsHandlers() {
   bindSeg('settingTheme',     'theme');
   bindSeg('settingPlacement', 'placement');
   bindSeg('settingExpand',    'expand');
+  bindSeg('settingAspect',    'aspect');
+  bindSeg('settingDuration',  'duration');
   // Swatches
   const sw = document.getElementById('settingAccent');
   if (sw) sw.addEventListener('click', (e) => {
@@ -5051,7 +5095,7 @@ function bindSettingsHandlers() {
     applySettings();
   });
   // Toggles
-  const toggleMap = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate' };
+  const toggleMap = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingConfirmImport: 'confirmImport' };
   for (const id in toggleMap) {
     const el = document.getElementById(id);
     if (!el) continue;
@@ -6493,6 +6537,21 @@ function addRenderPreview(msgWrap, absPath, prompt, reply) {
   const changesBtn = card.querySelector('[data-act="changes"]');
 
   importBtn.addEventListener('click', async () => {
+    // Settings → "Confirm before timeline import" — gate the auto-import.
+    // Default is off so this only nags users who explicitly opted in.
+    if (userSettings.confirmImport) {
+      const filename = (absPath || '').split('/').pop().split('\\').pop();
+      const modeLabel = activeMode === 'overwrite' ? 'OVERWRITE clips at the playhead'
+                       : activeMode === 'overlay'   ? 'OVERLAP on the next free track'
+                       : 'place at the playhead';
+      const ok = await ccConfirm({
+        title: 'Import to timeline?',
+        message: `"${filename}" will ${modeLabel}. Continue?`,
+        okLabel: 'Import',
+        cancelLabel: 'Not yet',
+      });
+      if (!ok) return;
+    }
     importBtn.disabled = true;
     importBtn.textContent = 'Importing…';
     const meta = card.querySelector('.render-preview-meta');
@@ -6953,6 +7012,21 @@ async function sendMessage() {
   if (activeReferences.length) {
     const refLines = activeReferences.map(r => '[REFERENCE: ' + r.path + ']').join('\n');
     outboundMsg = refLines + '\n' + outboundMsg;
+  }
+
+  // Inject default-aspect + default-duration from Settings as a [USER PREFS]
+  // hint. The user can override per-prompt by saying "make it 1080x1920" or
+  // "make it 3 seconds" — claude's instructions tell it explicit user values
+  // always win over preferences. Only added if not 'auto'.
+  const prefs = [];
+  if (userSettings.aspect && userSettings.aspect !== 'auto') {
+    prefs.push('aspect=' + userSettings.aspect);
+  }
+  if (userSettings.duration && userSettings.duration !== 'auto') {
+    prefs.push('duration=' + userSettings.duration + 's');
+  }
+  if (prefs.length) {
+    outboundMsg = '[USER PREFS: ' + prefs.join(', ') + ' — use these unless the prompt explicitly says otherwise]\n' + outboundMsg;
   }
 
   // Build the user-message bubble with inline thumbnails for any images.
