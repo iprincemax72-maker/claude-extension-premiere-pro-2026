@@ -153,7 +153,7 @@ These match `remotion-hooks` — use them in compositions for cross-skill timing
 
 ## Pairing with other skills
 
-- **iMessageBubble + ToastPopup** (`remotion-device-notifications`) — phone-screen vibe with both notification types
+- **iMessageBubble + ToastPopup** (`remotion-frames`) — phone-screen vibe with both notification types
 - **DMNotification + WordPopCaption** (`remotion-text-presets`) — DM lands + caption explains
 - **LikeBurst + EndCard** (`remotion-stingers`) — outro card with hearts flying out for celebration
 - **SubscribePop + SubscribeArrow** (`remotion-ctas`) — anticipation prompt (arrow) → fulfillment animation (pop)
