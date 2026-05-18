@@ -3344,17 +3344,24 @@ async function checkForUpdates(opts) {
       const remote = await _readUpdateSource(target);
       let local = null;
       try { local = fs.readFileSync(target.dest); } catch {}
-      // When force=true (manual ↻ click), ALWAYS rewrite — don't trust
-      // the byte-equal check. Saw a case where GitHub's CDN returned
-      // stale bytes that matched the local file even though the user
-      // saw a stale version in the panel. Forcing the write costs ~ms
-      // and guarantees the user gets the freshest copy.
-      if (force || !local || !local.equals(remote)) {
+      const bytesDiffer = !local || !local.equals(remote);
+      // When force=true (manual ↻ click), ALWAYS rewrite — this is the
+      // original defense against GitHub CDN stale-byte caching. With a
+      // local-source setup it's a no-op (bytes match), but it still
+      // doesn't hurt to be defensive against any partial-write disasters.
+      // CRITICAL: only flag bridgeChanged/premiereRestartNeeded if the
+      // bytes ACTUALLY differ. Otherwise a force-rewrite of byte-identical
+      // files spuriously tells the panel "restart your bridge" — which
+      // the user spammed 4-5 times on a manual update click because the
+      // toast kept coming back. Restart-required must be real, not forced.
+      if (force || bytesDiffer) {
         fs.mkdirSync(path.dirname(target.dest), { recursive: true });
         fs.writeFileSync(target.dest, remote);
-        result.updated.push(target.label);
-        if (target.needsBridgeRestart) result.bridgeChanged = true;
-        if (target.needsPremRestart) result.premiereRestartNeeded = true;
+        if (bytesDiffer) {
+          result.updated.push(target.label);
+          if (target.needsBridgeRestart) result.bridgeChanged = true;
+          if (target.needsPremRestart) result.premiereRestartNeeded = true;
+        }
       }
     } catch (e) {
       console.error('  update check failed for ' + target.label + ': ' + e.message);
