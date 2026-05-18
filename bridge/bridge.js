@@ -2068,6 +2068,10 @@ const server = http.createServer((req, res) => {
       const message = payload.message;
       const context = payload.context || null;
       const reqId   = payload.reqId || crypto.randomUUID();
+      // Tab type — 'animation' (Remotion render pipeline) vs 'chat' (free
+      // conversation, no rendering). Free-chat tabs use a different system
+      // prompt that lets claude help with anything, not just animations.
+      const tabMode = (payload.mode === 'chat') ? 'chat' : 'animation';
       // Render mode — fast / default / slow. Controls self-critique depth
       // and how much exploration Claude does. Backward-compat: old panels
       // send selfCritique:bool, and "mid" was the old name for "default".
@@ -2214,7 +2218,24 @@ const server = http.createServer((req, res) => {
       //   slow    — keep self-critique + ask for 2 retries, 3-frame checks,
       //             and deliberate library exploration
       let resolvedSystemPrompt;
-      if (renderMode === 'fast') {
+      if (tabMode === 'chat') {
+        // Free-chat tab — short, focused system prompt. Claude is a chat
+        // partner, not a render pipeline. Still gets Premiere context so it
+        // can reason about the project / selected clip when relevant.
+        resolvedSystemPrompt = [
+          'You are Claude, running inside an Adobe Premiere Pro extension panel as a FREE-CHAT assistant.',
+          '',
+          'This is a CHAT tab. The user does NOT want a rendered video right now. They want to ask you questions, get advice, work through editing logic, debug scripts, brainstorm — anything.',
+          '',
+          'Each user message MAY be prefixed with a [PREMIERE CONTEXT] block describing the active project, sequence, playhead, and any selected clips. Use that context to give grounded answers when it\'s relevant; ignore it when the question is general.',
+          '',
+          'Hard rules:',
+          '- DO NOT write Remotion compositions, DO NOT emit [[IMPORT:...]] markers, DO NOT render any files. Those belong in animation tabs.',
+          '- DO NOT spawn rendering tools or write .tsx files. Just answer.',
+          '- If the user asks for an actual rendered animation, tell them to switch to an animation tab (the + button next to the chat-bubble + button at the top).',
+          '- Answer in plain markdown. Concise, useful, no filler. The user is editing video — they don\'t want a 5-paragraph essay; they want the answer.',
+        ].join('\n');
+      } else if (renderMode === 'fast') {
         resolvedSystemPrompt = SYSTEM_PROMPT
           .replace(/__SELF_CRITIQUE_BEGIN__[\s\S]*?__SELF_CRITIQUE_END__\n?/g, '');
       } else {
@@ -2303,7 +2324,11 @@ const server = http.createServer((req, res) => {
           '',
         ].join('\n'),
       };
-      resolvedSystemPrompt = (MODE_HEADERS[renderMode] || '') + resolvedSystemPrompt;
+      // Render-mode headers only apply to animation tabs (the headers explain
+      // ambition/depth for compositions). Chat tabs skip them entirely.
+      if (tabMode !== 'chat') {
+        resolvedSystemPrompt = (MODE_HEADERS[renderMode] || '') + resolvedSystemPrompt;
+      }
       console.log('  [chat] render mode: ' + renderMode);
 
       const args = [

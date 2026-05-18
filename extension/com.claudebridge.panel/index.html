@@ -650,6 +650,65 @@
   }
   .new-tab-btn:hover { background: rgba(255,255,255,0.08); color: var(--fg); }
   .new-tab-btn svg { width: 14px; height: 14px; }
+  /* The chat-tab button sits next to + and is slightly accent-tinted so
+     the two buttons read as related-but-different actions. */
+  .new-chat-btn {
+    margin-left: 2px;
+    color: rgba(217, 119, 87, 0.55);
+    box-shadow: none;
+  }
+  .new-chat-btn:hover { color: var(--accent); background: var(--accent-soft); }
+  /* Small chat-bubble icon shown inside chat-type tab pills so the user
+     can tell at-a-glance which tabs are free-chat vs animation. */
+  .tab-pill .tab-type-icon {
+    display: inline-flex;
+    align-items: center;
+    color: var(--accent);
+    opacity: 0.85;
+    margin-right: 2px;
+  }
+  .tab-pill .tab-type-icon svg { width: 10px; height: 10px; }
+  /* When a free-chat tab is active, hide the render-only composer controls:
+     the Place/Overwrite/Overlap toolbar, the Fast/Default/Slow render-mode
+     group, the Auto-Edit button, and the EXTEND group. The user's just
+     chatting — those make no sense. The composer input + send button stay. */
+  body.chat-mode .mode-bar { display: none !important; }
+  body.chat-mode .expand-group { display: none !important; }
+  /* The reference attach is still useful (e.g. drop a screenshot for context),
+     so we leave .ref-bar in place. */
+
+  /* Free-chat empty state — simpler than the animation empty state, no
+     chips grid. Just a centered hero with a "you're in a different mode"
+     explanation. */
+  .empty.empty-chat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 40px 20px;
+    text-align: center;
+  }
+  .empty.empty-chat .empty-logo {
+    font-size: 48px;
+    width: auto;
+    height: auto;
+    background: none;
+    box-shadow: none;
+    margin-bottom: 12px;
+  }
+  .empty.empty-chat h1 {
+    font-size: 22px;
+    margin: 0 0 12px;
+    color: var(--text);
+  }
+  .empty.empty-chat .empty-sub {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.55;
+    max-width: 420px;
+    margin: 0;
+  }
 
   /* ───── EMPTY STATE ───── */
   .empty {
@@ -761,7 +820,7 @@
     font-style: italic;
     margin-top: 6px;
   }
-  /* ───── SUGGESTION CHIPS (redesigned v10.32) ─────
+  /* ───── SUGGESTION CHIPS (redesigned v10.33) ─────
      Soft button-cards in a 3-column grid. Each category has a
      left-aligned header with a tiny accent dash. Chips are squared
      (not pill) with generous padding and a clear hover lift. */
@@ -2579,7 +2638,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.32</span>
+    <span class="version-tag" id="versionTag">10.33</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -2860,6 +2919,9 @@
   <button class="new-tab-btn" id="newTabBtn" title="New animation tab — ⌘⇧T (Ctrl+Tab cycles)" type="button">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
   </button>
+  <button class="new-tab-btn new-chat-btn" id="newChatTabBtn" title="New free-chat tab — talk to Claude without the Remotion render pipeline. Useful for color advice, edit logic, debugging, anything." type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+  </button>
 </div>
 
 <div id="log">
@@ -2975,6 +3037,7 @@ function getActiveLogContent() {
   tabs.push({
     id: 't1',
     label: 'New animation',
+    type: 'animation',  // animation | chat — animation is the default Remotion-render flow; chat is free conversation
     contentEl: firstContent,
     inputDraft: '',
     activeChatAbort: null,
@@ -2989,21 +3052,39 @@ function makeTabId() { _tabCounter++; return 't' + _tabCounter; }
 function newTab(opts) {
   // Stash current globals into the leaving tab
   stashActiveTabState();
+  const type = (opts && opts.type === 'chat') ? 'chat' : 'animation';
 
   const id = makeTabId();
   const contentEl = document.createElement('div');
   contentEl.className = 'tab-content';
   contentEl.dataset.tabId = id;
-  // Each new tab starts with the empty-state UI so the user sees the chips.
-  contentEl.innerHTML = _emptyHTML;
+
+  if (type === 'chat') {
+    // Free-chat tabs get a different empty state — no suggestion chips, no
+    // "rendered into your bin" pitch. Just a clear "you're talking to Claude
+    // directly" hero so the user knows the mode is different.
+    contentEl.innerHTML = `
+      <div class="empty empty-chat">
+        <div class="empty-logo">💬</div>
+        <h1>Free chat with Claude</h1>
+        <p class="empty-sub">No Remotion pipeline, no renders — just ask anything. Color advice, edit logic, fix-this-script, naming, whatever. Still gets Premiere context so Claude knows your project + selected clip.</p>
+      </div>
+    `;
+  } else {
+    // Each new animation tab starts with the empty-state UI so the user sees the chips.
+    contentEl.innerHTML = _emptyHTML;
+  }
   log.appendChild(contentEl);
-  // The cloned empty state has an empty #chips container — actually populate
-  // it so the suggestion chips show up like in the first tab.
-  const newChips = contentEl.querySelector('#chips');
-  if (newChips && typeof renderChips === 'function') renderChips(newChips);
+  if (type === 'animation') {
+    // The cloned empty state has an empty #chips container — populate it
+    const newChips = contentEl.querySelector('#chips');
+    if (newChips && typeof renderChips === 'function') renderChips(newChips);
+  }
 
   tabs.push({
-    id, label: 'New animation',
+    id,
+    label: type === 'chat' ? 'Chat' : 'New animation',
+    type,
     contentEl,
     inputDraft: '',
     activeChatAbort: null,
@@ -3061,6 +3142,9 @@ function stashActiveTabState() {
 function applyActiveTabState() {
   const t = tabs[activeTabIdx];
   if (!t) return;
+  // Body class drives composer visibility — CSS hides render-only controls
+  // (Place / Fast-Default-Slow / Auto-Edit / EXTEND) when in chat mode.
+  document.body.classList.toggle('chat-mode', t.type === 'chat');
   // Toggle visibility of tab contents
   for (const tab of tabs) tab.contentEl.classList.toggle('active', tab === t);
   // Restore this tab's scroll position. Defer one tick so the layout from
@@ -3104,8 +3188,13 @@ function renderTabStrip() {
     // Tooltip teaches the keyboard shortcut for switching to this tab + close.
     const switchShort = idx < 9 ? `  (⌘${idx + 1})` : '';
     pill.title = `${t.label}${switchShort}\n⌘⇧W close · ⌘⇧T new · Ctrl+Tab cycle`;
+    // Type icon — chat-bubble for chat tabs (other tabs unlabeled = animation default)
+    const typeIcon = (t.type === 'chat')
+      ? '<span class="tab-type-icon" title="Free chat — no Remotion pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>'
+      : '';
     pill.innerHTML =
       (tabHasActivity(t) ? '<span class="tab-dot"></span>' : '')
+      + typeIcon
       + '<span class="tab-label">' + escapeHTML(t.label) + '</span>'
       + '<button class="tab-close" type="button" aria-label="Close tab" title="Close · ⌘⇧W">'
       + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
@@ -3135,6 +3224,7 @@ function renderTabStrip() {
 // for "Add Default Transition" so we use Cmd+Shift+T / Cmd+Shift+W instead.
 // Ctrl+Tab cycles tabs (Chrome's secondary shortcut, no Premiere conflict).
 document.getElementById('newTabBtn').addEventListener('click', () => newTab());
+document.getElementById('newChatTabBtn').addEventListener('click', () => newTab({ type: 'chat' }));
 document.addEventListener('keydown', (e) => {
   // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs (works in CEP, no Premiere clash)
   if (e.ctrlKey && e.key === 'Tab') {
@@ -4820,7 +4910,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.32';
+  const PANEL_VERSION = '10.33';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -7015,18 +7105,21 @@ async function sendMessage() {
   }
 
   // Inject default-aspect + default-duration from Settings as a [USER PREFS]
-  // hint. The user can override per-prompt by saying "make it 1080x1920" or
-  // "make it 3 seconds" — claude's instructions tell it explicit user values
-  // always win over preferences. Only added if not 'auto'.
-  const prefs = [];
-  if (userSettings.aspect && userSettings.aspect !== 'auto') {
-    prefs.push('aspect=' + userSettings.aspect);
-  }
-  if (userSettings.duration && userSettings.duration !== 'auto') {
-    prefs.push('duration=' + userSettings.duration + 's');
-  }
-  if (prefs.length) {
-    outboundMsg = '[USER PREFS: ' + prefs.join(', ') + ' — use these unless the prompt explicitly says otherwise]\n' + outboundMsg;
+  // hint — only for ANIMATION tabs. Chat tabs are general conversation, so
+  // aspect/duration would be confusing noise.
+  const _activeTab = tabs[activeTabIdx];
+  const _isChatTab = _activeTab && _activeTab.type === 'chat';
+  if (!_isChatTab) {
+    const prefs = [];
+    if (userSettings.aspect && userSettings.aspect !== 'auto') {
+      prefs.push('aspect=' + userSettings.aspect);
+    }
+    if (userSettings.duration && userSettings.duration !== 'auto') {
+      prefs.push('duration=' + userSettings.duration + 's');
+    }
+    if (prefs.length) {
+      outboundMsg = '[USER PREFS: ' + prefs.join(', ') + ' — use these unless the prompt explicitly says otherwise]\n' + outboundMsg;
+    }
   }
 
   // Build the user-message bubble with inline thumbnails for any images.
@@ -7106,6 +7199,11 @@ async function sendMessage() {
     });
   } catch {}
 
+  // Detect tab type — free-chat tabs talk to claude without the Remotion
+  // pipeline. Bridge uses a plain-chat system prompt and we skip render-
+  // card construction even if [[IMPORT:...]] sneaks through.
+  const activeTabType = (tabs[activeTabIdx] && tabs[activeTabIdx].type) || 'animation';
+
   try {
     const r = await fetch(BRIDGE + '/chat', {
       method: 'POST',
@@ -7113,6 +7211,7 @@ async function sendMessage() {
       body: JSON.stringify({
         reqId, message: outboundMsg, context,
         renderMode: userSettings.renderMode || 'default',
+        mode: activeTabType,
       }),
       signal: activeChatAbort.signal,
     });
@@ -7127,7 +7226,7 @@ async function sendMessage() {
     placeholder.body.innerHTML = renderMarkdown(replyText);
     streamReveal(placeholder.body);
 
-    if (data.imports && data.imports.length) {
+    if (activeTabType !== 'chat' && data.imports && data.imports.length) {
       for (const p of data.imports) {
         addRenderPreview(placeholder.wrap, p, msg, replyText);
         // CRITICAL: log to history immediately, BEFORE the user clicks Import.
