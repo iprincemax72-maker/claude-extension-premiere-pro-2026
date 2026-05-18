@@ -1895,20 +1895,27 @@ const server = http.createServer((req, res) => {
   // panel can decide whether to nudge.
   if (req.method === 'GET' && req.url === '/check-update') {
     (async () => {
-      const out = { ok: true, localVersion: null, remoteVersion: null, updateAvailable: false };
+      const out = { ok: true, localVersion: null, remoteVersion: null, updateAvailable: false, source: LOCAL_SOURCE_DIR ? 'local' : 'github' };
       try {
-        const localPath = path.join(PANEL_DIR, 'index.html');
-        const local = fs.readFileSync(localPath, 'utf8');
-        const mL = local.match(/PANEL_VERSION\s*=\s*['"]([^'"]+)['"]/);
-        if (mL) out.localVersion = mL[1];
-        if (typeof fetch === 'function') {
+        const installedPath = path.join(PANEL_DIR, 'index.html');
+        const installed = fs.readFileSync(installedPath, 'utf8');
+        const mInstalled = installed.match(/PANEL_VERSION\s*=\s*['"]([^'"]+)['"]/);
+        if (mInstalled) out.localVersion = mInstalled[1];
+
+        // Source-of-truth: local repo if present, else GitHub raw.
+        let srcText = null;
+        if (LOCAL_SOURCE_DIR) {
+          try {
+            srcText = fs.readFileSync(path.join(LOCAL_SOURCE_DIR, 'extension', 'com.claudebridge.panel', 'index.html'), 'utf8');
+          } catch (e) { out.error = 'local source read failed: ' + e.message; }
+        } else if (typeof fetch === 'function') {
           const r = await fetch(GITHUB_RAW + '/extension/com.claudebridge.panel/index.html?nc=' + Date.now(),
                                { headers: { 'Cache-Control': 'no-cache' } });
-          if (r.ok) {
-            const txt = await r.text();
-            const mR = txt.match(/PANEL_VERSION\s*=\s*['"]([^'"]+)['"]/);
-            if (mR) out.remoteVersion = mR[1];
-          }
+          if (r.ok) srcText = await r.text();
+        }
+        if (srcText) {
+          const mRemote = srcText.match(/PANEL_VERSION\s*=\s*['"]([^'"]+)['"]/);
+          if (mRemote) out.remoteVersion = mRemote[1];
         }
         if (out.localVersion && out.remoteVersion && out.localVersion !== out.remoteVersion) {
           out.updateAvailable = true;
@@ -3244,15 +3251,62 @@ const server = http.createServer((req, res) => {
 });
 
 // Auto-update — on launch, the bridge pulls the latest panel + bridge files
-// from GitHub raw. Diff against on-disk; rewrite only if changed. Skip with
-// CLAUDE_BRIDGE_NO_UPDATE=1 in the environment.
+// from a SOURCE and diffs against on-disk; rewrite only if changed.
+//
+// Source resolution order:
+//   1. CLAUDE_BRIDGE_LOCAL_SOURCE env var (an absolute repo path)
+//   2. Auto-detect: ~/All Claude Work/claude-extension-premiere-pro-2026/
+//      (the canonical dev path) — used IF the dir exists and has the
+//      expected structure on disk
+//   3. GitHub raw (fallback for installer users who don't have the repo)
+//
+// Skip the whole thing with CLAUDE_BRIDGE_NO_UPDATE=1 in the env.
 const GITHUB_RAW = 'https://raw.githubusercontent.com/iprincemax72-maker/claude-extension-premiere-pro-2026/main';
+
+function _resolveLocalSourceDir() {
+  const candidates = [];
+  if (process.env.CLAUDE_BRIDGE_LOCAL_SOURCE) candidates.push(process.env.CLAUDE_BRIDGE_LOCAL_SOURCE);
+  if (process.env.HOME) {
+    candidates.push(path.join(process.env.HOME, 'All Claude Work', 'claude-extension-premiere-pro-2026'));
+    candidates.push(path.join(process.env.HOME, 'claude-extension-premiere-pro-2026'));
+  }
+  for (const dir of candidates) {
+    try {
+      // Validate it looks like the right repo — must have bridge/bridge.js
+      // and extension/com.claudebridge.panel/index.html
+      if (fs.existsSync(path.join(dir, 'bridge', 'bridge.js')) &&
+          fs.existsSync(path.join(dir, 'extension', 'com.claudebridge.panel', 'index.html'))) {
+        return dir;
+      }
+    } catch {}
+  }
+  return null;
+}
+const LOCAL_SOURCE_DIR = _resolveLocalSourceDir();
+
+// Each target now has a `relPath` (relative path WITHIN the source repo) and
+// a `dest` (where to write on disk). The reader picks local file or GitHub
+// URL based on whether LOCAL_SOURCE_DIR is set.
 const UPDATE_TARGETS = [
-  { url: GITHUB_RAW + '/extension/com.claudebridge.panel/index.html',     dest: path.join(PANEL_DIR, 'index.html'),     label: 'panel UI' },
-  { url: GITHUB_RAW + '/extension/com.claudebridge.panel/jsx/host.jsx',   dest: path.join(PANEL_DIR, 'jsx', 'host.jsx'), label: 'ExtendScript', needsPremRestart: true },
-  { url: GITHUB_RAW + '/extension/com.claudebridge.panel/CSXS/manifest.xml', dest: path.join(PANEL_DIR, 'CSXS', 'manifest.xml'), label: 'manifest' },
-  { url: GITHUB_RAW + '/bridge/bridge.js',                                 dest: __filename, label: 'bridge', needsBridgeRestart: true },
+  { relPath: 'extension/com.claudebridge.panel/index.html',     dest: path.join(PANEL_DIR, 'index.html'),     label: 'panel UI' },
+  { relPath: 'extension/com.claudebridge.panel/jsx/host.jsx',   dest: path.join(PANEL_DIR, 'jsx', 'host.jsx'), label: 'ExtendScript', needsPremRestart: true },
+  { relPath: 'extension/com.claudebridge.panel/CSXS/manifest.xml', dest: path.join(PANEL_DIR, 'CSXS', 'manifest.xml'), label: 'manifest' },
+  { relPath: 'bridge/bridge.js',                                 dest: __filename, label: 'bridge', needsBridgeRestart: true },
 ];
+
+// Read a single target's source bytes — local first, GitHub fallback.
+async function _readUpdateSource(target) {
+  if (LOCAL_SOURCE_DIR) {
+    const localSrc = path.join(LOCAL_SOURCE_DIR, target.relPath);
+    try { return fs.readFileSync(localSrc); }
+    catch (e) { throw new Error('local source read failed: ' + e.message); }
+  }
+  if (typeof fetch !== 'function') throw new Error('Node fetch unavailable');
+  const r = await fetch(GITHUB_RAW + '/' + target.relPath + '?t=' + Date.now(),
+                        { headers: { 'Cache-Control': 'no-cache' } });
+  if (!r.ok) throw new Error('GitHub returned ' + r.status);
+  return Buffer.from(await r.arrayBuffer());
+}
 
 // Persistent auto-update flag — written by the panel's settings toggle so
 // the preference survives bridge restarts. File present = auto-update OFF.
@@ -3264,7 +3318,7 @@ function isAutoUpdateDisabled() {
 
 async function checkForUpdates(opts) {
   const force = !!(opts && opts.force);
-  const result = { ok: true, updated: [], bridgeChanged: false, premiereRestartNeeded: false, skipped: false };
+  const result = { ok: true, updated: [], bridgeChanged: false, premiereRestartNeeded: false, skipped: false, source: LOCAL_SOURCE_DIR ? 'local' : 'github' };
   // The .no-auto-update sentinel is the user's explicit "leave my files
   // alone" signal — it MUST win even when force=true (manual ↻). The user
   // was losing local dev edits whenever the panel called /update with
@@ -3274,18 +3328,20 @@ async function checkForUpdates(opts) {
     result.skipped = true;
     return result;
   }
-  if (typeof fetch !== 'function') {
-    console.log('Auto-update skipped — Node fetch unavailable (upgrade to Node 18+).\n');
+  if (!LOCAL_SOURCE_DIR && typeof fetch !== 'function') {
+    console.log('Auto-update skipped — no local source and Node fetch unavailable (upgrade to Node 18+).\n');
     result.skipped = true;
-    result.error = 'fetch unavailable';
+    result.error = 'no source';
     return result;
   }
-  console.log('Checking for updates…');
+  if (LOCAL_SOURCE_DIR) {
+    console.log('Checking for updates from local repo: ' + LOCAL_SOURCE_DIR);
+  } else {
+    console.log('Checking for updates from GitHub raw (no local repo detected — set CLAUDE_BRIDGE_LOCAL_SOURCE to override)');
+  }
   for (const target of UPDATE_TARGETS) {
     try {
-      const r = await fetch(target.url + '?t=' + Date.now(), { headers: { 'Cache-Control': 'no-cache' } });
-      if (!r.ok) continue;
-      const remote = Buffer.from(await r.arrayBuffer());
+      const remote = await _readUpdateSource(target);
       let local = null;
       try { local = fs.readFileSync(target.dest); } catch {}
       // When force=true (manual ↻ click), ALWAYS rewrite — don't trust
@@ -3308,7 +3364,7 @@ async function checkForUpdates(opts) {
     console.log('Up to date.\n');
     return result;
   }
-  console.log('Updated ' + result.updated.length + ' file' + (result.updated.length === 1 ? '' : 's') + ':');
+  console.log('Updated ' + result.updated.length + ' file' + (result.updated.length === 1 ? '' : 's') + ' from ' + result.source + ':');
   result.updated.forEach(label => console.log('  • ' + label));
   if (result.bridgeChanged) {
     console.log('\n!! Bridge itself was updated. Close this terminal and re-launch the bridge to load the new version.');
