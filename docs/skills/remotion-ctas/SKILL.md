@@ -16,12 +16,12 @@ Six **call-to-action** components for video creators — the animated prompts th
 
 | Name | Mimics | Key Mechanic | Loop period |
 |------|--------|--------------|-------------|
-| **SubscribeArrow** | YT subscribe arrow pointing at button | Hand-drawn arrow draws + bouncing loop | ~24 frames |
+| **SubscribeArrow** | YT subscribe arrow pointing at button | Hand-drawn arrow draws + bouncing loop | ~31 frames (bounce loop period from `sin((f-22)*0.2)`) |
 | **BellRing** | Notification bell click + ring | Tilt-shake + sound ripples + filled state | 60 frames (ripple period; second ripple offset by 30f gives a denser feeling) |
 | **LikeSmash** | TikTok/IG double-tap heart smash | Heart slams white → fills red → particles | ~50 frames |
-| **ShareCallout** | "Share this" paper-plane prompt | Paper-plane glide + arrow + label | ~80 frames |
-| **SaveBookmark** | "Save for later" corner bookmark | Bookmark unfolds in corner | ~70 frames |
-| **TapToFollow** | "Tap to follow" finger animation | Hovering finger taps + ripple + "✓ Following" tooltip | ~90 frames |
+| **ShareCallout** | "Share this" paper-plane prompt | Paper-plane glide + Lissajous figure-8 hover | ~105 frames (figure-8 full cycle from `sin((f-18)*0.06)`) |
+| **SaveBookmark** | "Save for later" corner bookmark | Bookmark unfolds in corner + multi-sine breath | dominant ~105 frames (multi-sine tremor; non-clean loop) |
+| **TapToFollow** | "Tap to follow" finger animation | Hovering finger taps + ripple + "✓ Following" tooltip | 50 frames (`f % 50` tap cycle) |
 
 ## When to Load
 
