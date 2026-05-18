@@ -142,7 +142,7 @@ CLAUDE.md     # This file — agent-facing
 | `/chat` | POST | `{message, context}` | `{reply, imports[]}` — spawns `claude -p`, streams tool events to SSE |
 | `/complete` | POST | `{prefix}` | `{completion}` — inline autocomplete |
 | `/expand` | POST | `{prompt, level}` | `{expanded}` — light / medium / heavy |
-| `/autocut` | POST | `{clipPath, clipDuration}` | `{cuts[], totalCut, transcribed, summary, method}` |
+| `/autocut` | POST | `{clipPath, clipDuration, clipIn?, clipOut?, includeSilence?, findFillers?, findRepeats?, useTranscript?}` | `{cuts[], totalCut, transcribed, summary, method}` |
 | `/update` | POST | — | `{ok, updated[], bridgeChanged, premiereRestartNeeded}` — pulls from GitHub raw |
 | `/preview/<file>` | GET | — | Streams a file from `~/PremiereClaude/output/` with byte-range support |
 | `/progress-stream` | GET | — | SSE — pushes `{ text, pct }` per work-stage event |
