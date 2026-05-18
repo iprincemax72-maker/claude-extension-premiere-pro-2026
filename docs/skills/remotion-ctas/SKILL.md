@@ -17,7 +17,7 @@ Six **call-to-action** components for video creators — the animated prompts th
 | Name | Mimics | Key Mechanic | Loop period |
 |------|--------|--------------|-------------|
 | **SubscribeArrow** | YT subscribe arrow pointing at button | Hand-drawn arrow draws + bouncing loop | ~24 frames |
-| **BellRing** | Notification bell click + ring | Tilt-shake + sound ripples + filled state | ~36 frames |
+| **BellRing** | Notification bell click + ring | Tilt-shake + sound ripples + filled state | 60 frames (ripple period; second ripple offset by 30f gives a denser feeling) |
 | **LikeSmash** | TikTok/IG double-tap heart smash | Heart slams white → fills red → particles | ~50 frames |
 | **ShareCallout** | "Share this" paper-plane prompt | Paper-plane glide + arrow + label | ~80 frames |
 | **SaveBookmark** | "Save for later" corner bookmark | Bookmark unfolds in corner | ~70 frames |
