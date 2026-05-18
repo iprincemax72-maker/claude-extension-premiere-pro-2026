@@ -1,23 +1,20 @@
 // ShowreelExplainer — long-form tutorial composition mixing tutorial-coded
-// skills (tech, lists, stats, callouts, frames).
+// skills (stingers, backgrounds, tech, stats, lists, callouts).
 //
-// 16:9 landscape, ~16 seconds. Stress tests:
-//   - tech components (CodeSnippet + TerminalCommand back-to-back, then B-roll)
-//   - chart reveal with pull-quote takeaway
-//   - list reveal + section break in 16:9
-//   - callouts pointing at on-screen elements
+// 1920x1080 landscape, 19.3 seconds (580 frames @ 30fps).
 //
 // Demonstrates the "don't chain 3+ tech components without B-roll" rule
 // by SHOWING what B-roll between them looks like (in this case a stat
-// reveal serves as the B-roll equivalent).
+// reveal serves as the B-roll equivalent between CodeSnippet and
+// TerminalCommand).
 
 import React from "react";
 import { AbsoluteFill, Sequence } from "remotion";
 import { ChapterBumper } from "./stingers";
-import { CodeSnippet, TerminalCommand, LoadingDots } from "./tech";
-import { StepIndicator, SectionBreak } from "./lists";
+import { CodeSnippet, TerminalCommand } from "./tech";
+import { SectionBreak } from "./lists";
 import { ProgressRing } from "./stats";
-import { PullQuote, HandDrawnArrow } from "./callouts";
+import { PullQuote } from "./callouts";
 import { WavyLines } from "./backgrounds";
 
 export const ShowreelExplainer: React.FC = () => {
