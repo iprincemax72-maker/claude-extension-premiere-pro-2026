@@ -128,7 +128,7 @@ Six **call-to-action** components for video creators — the animated prompts th
 <LikeSmash size={280} />
 
 // ShareCallout in left corner
-<ShareCallout corner="bottom-left" />
+<ShareCallout target="bottom-left" />
 
 // SaveBookmark with brand color
 <SaveBookmark color="#10b981" />
