@@ -131,3 +131,12 @@ aftermathGlow(framesSincePunch, decay=30): number
 ```
 
 Reuse these in compositions you build alongside hooks — keeps timing coherent across the whole short.
+
+## Pairing with other skills
+
+- **WaitZoomHook + ParticleField** (`remotion-backgrounds`) — punchy reveal over tech-cyan backdrop
+- **POVCaption + iMessageBubble** (`remotion-social-ui`) — TikTok skit setup
+- **PlotTwistReveal + CameraFlash** (`remotion-device-notifications`) — flash transitions into the twist
+- **StoryTimeTitle + WavyLines** (`remotion-backgrounds`) — calm-waves backdrop under a personal-story opener
+- **RealTalkCaption + DonutMetric** (`remotion-charts`) — voiceover-styled caption paired with a single big stat
+- **WatchThisStamp + HighlightCircle** (`remotion-callouts`) — circle the subject, stamp the side

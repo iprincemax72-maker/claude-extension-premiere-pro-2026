@@ -150,3 +150,14 @@ tremor(frame, amplitude=1, speed=0.18): number  // multi-sine micro-tremor
 ```
 
 These match `remotion-hooks` — use them in compositions for cross-skill timing coherence.
+
+## Pairing with other skills
+
+- **iMessageBubble + ToastPopup** (`remotion-device-notifications`) — phone-screen vibe with both notification types
+- **DMNotification + WordPopCaption** (`remotion-text-presets`) — DM lands + caption explains
+- **LikeBurst + EndCard** (`remotion-stingers`) — outro card with hearts flying out for celebration
+- **SubscribePop + SubscribeArrow** (`remotion-ctas`) — anticipation prompt (arrow) → fulfillment animation (pop)
+- **CommentOverlay + iMessageBubble** — comment lands on screen, then iMessage thread of the response
+- **LiveIndicator + NewsTicker** (`remotion-banners`) — full live-broadcast set
+- **HashtagPop + LikeBurst** — hashtag pops with hearts on the beat
+- **CornerWatermark + (any other component)** — universal branding overlay; safe to layer on top of anything because it lives in a corner
