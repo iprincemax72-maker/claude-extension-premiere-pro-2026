@@ -18,9 +18,9 @@ Six animated chart components for video data viz. Each accepts a plain data arra
 |------|----------|----------|------------|
 | **BarChart** | Comparing 3–6 categories | Bars grow from bottom, labels above | `{label, value}[]` |
 | **PieChart** | Share-of-total | Wedges sweep-fill clockwise | `{label, value, color?}[]` |
-| **LineGraph** | Trend over time | SVG path draws left-to-right | `{x, y}[]` or `number[]` |
+| **LineGraph** | Trend over time | SVG path draws left-to-right | `{label, value}[]` (label is the x-axis tick, value is the y) |
 | **DonutMetric** | Single % stat | Ring fills + center counter ticks | `{value, label?}` |
-| **TrendArrow** | Up/down callout | Arrow rises with % counter alongside | `{delta, label?}` |
+| **TrendArrow** | Up/down callout | Arrow rises with % counter alongside | `{ value: number, label?: string, direction?: "up" \| "down" }` |
 | **BarRace** | "X vs Y over time" | Bars reorder and grow between snapshots | `frames: {label, value}[][]` (array of snapshots, one per step) + `framesPerStep` |
 
 ## When to Load
@@ -45,7 +45,7 @@ Six animated chart components for video data viz. Each accepts a plain data arra
 - **Don't** feed BarChart > 6 categories. Past 6 the X-axis labels become unreadable and bars get pencil-thin. Switch to BarRace (handles 4–8 rows comfortably) or BarChartRace from `remotion-stats` (8 row cap).
 - **Don't** put more than 5 wedges in PieChart. Past 5 wedges, the slice-labels overlap. For 6+ categories use BarChart.
 - **Don't** use LineGraph with < 4 data points. With only 2–3 points the path-draw looks more like a connect-the-dots than a trend. Use TrendArrow for "we went up by X%" callouts on tiny data.
-- **Don't** use DonutMetric for negative numbers. The ring fill assumes 0–100. For "we lost 12%" use TrendArrow with `delta: -12`.
+- **Don't** use DonutMetric for negative numbers. The ring fill assumes 0–100. For "we lost 12%" use TrendArrow with `value={12} direction="down"`.
 - **Don't** use TrendArrow alone as a hero — it's a callout. Stack it on top of body content (the talking-head, the screen recording, the BarChart) so the trend is contextualized.
 - **Don't** use BarRace with stable rankings (rows that don't change order). The whole point is the reordering. Stable data → use BarChart.
 - **Don't** put data labels with line breaks. The current code measures text width assuming single-line — multi-line labels overflow the column.
@@ -80,7 +80,14 @@ Six animated chart components for video data viz. Each accepts a plain data arra
 <Sequence durationInFrames={90}>
   <LineGraph
     title="Monthly visits"
-    data={[12, 14, 18, 22, 21, 28, 35, 38, 42, 48, 53, 62]}
+    data={[
+      { label: "Jan", value: 12 }, { label: "Feb", value: 14 },
+      { label: "Mar", value: 18 }, { label: "Apr", value: 22 },
+      { label: "May", value: 21 }, { label: "Jun", value: 28 },
+      { label: "Jul", value: 35 }, { label: "Aug", value: 38 },
+      { label: "Sep", value: 42 }, { label: "Oct", value: 48 },
+      { label: "Nov", value: 53 }, { label: "Dec", value: 62 },
+    ]}
   />
 </Sequence>
 ```
@@ -97,7 +104,7 @@ Six animated chart components for video data viz. Each accepts a plain data arra
 <AbsoluteFill>
   <YourFootage />
   <AbsoluteFill style={{ zIndex: 1 }}>
-    <TrendArrow delta={42} label="MoM" />
+    <TrendArrow value={42} label="MoM" direction="up" />
   </AbsoluteFill>
 </AbsoluteFill>
 ```
@@ -145,14 +152,14 @@ If you only have a single snapshot (no reordering happens), use `BarChart` inste
   { label: "Q2", value: 158, color: "#10b981" },
 ]} />
 
-// LineGraph with custom axis labels
-<LineGraph title="Sessions" data={[...]} yAxisLabel="visits" />
+// LineGraph with custom title (no separate y-axis-label prop)
+<LineGraph title="Sessions" data={[...]} />
 
 // DonutMetric without label (just the number)
 <DonutMetric value={92} />
 
-// TrendArrow downtrend
-<TrendArrow delta={-12} label="this week" />
+// TrendArrow downtrend — use positive value + direction="down"
+<TrendArrow value={12} label="this week" direction="down" />
 ```
 
 ## Render Notes
