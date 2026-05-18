@@ -41,6 +41,7 @@ FILES=(
   src/skills-test/Showreel.tsx
   src/skills-test/ShowreelV.tsx
   src/skills-test/ShowreelExplainer.tsx
+  src/skills-test/ShowreelMeme.tsx
   src/skills-test/ProductIntro.tsx
   src/skills-test/StressTest.tsx
 )
