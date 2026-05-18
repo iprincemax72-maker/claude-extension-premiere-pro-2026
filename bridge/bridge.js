@@ -2424,10 +2424,6 @@ const server = http.createServer((req, res) => {
             if (/no stdin data received in \d+s/i.test(s)) return;
             stderr += s;
           });
-          // Track BOTH byte-level activity AND status-text changes so a
-          // hung tool_use that just dribbles heartbeats can still be killed.
-          let lastStatus = '';
-          let lastStatusChangedAt = Date.now();
           proc.stdout.on('data', chunk => {
             lastActivity = Date.now();
             lineBuf += chunk.toString();
@@ -2439,13 +2435,7 @@ const server = http.createServer((req, res) => {
               let evt;
               try { evt = JSON.parse(line); } catch { continue; }
               const status = streamEventToStatus(evt);
-              if (status) {
-                broadcastProgress(status, null, reqId);
-                if (status !== lastStatus) {
-                  lastStatus = status;
-                  lastStatusChangedAt = Date.now();
-                }
-              }
+              if (status) broadcastProgress(status, null, reqId);
               if (evt.type === 'result' && typeof evt.result === 'string') finalReply = evt.result;
               if (evt.type === 'assistant' && evt.message && Array.isArray(evt.message.content)) {
                 for (const blk of evt.message.content) {
@@ -2455,38 +2445,22 @@ const server = http.createServer((req, res) => {
             }
           });
 
-          // Idle watchdog — tightened from 3min → 90s. ALSO kills if the
-          // SAME status text has been broadcasting for 90s (catches hung
-          // tool_use that keeps dribbling identical heartbeats).
-          const IDLE_TIMEOUT_MS = 90 * 1000;
-          const STATUS_STUCK_MS = 90 * 1000;
-          const idleCheck = setInterval(() => {
-            if (resolved) { clearInterval(idleCheck); return; }
-            const idle = Date.now() - lastActivity;
-            const stuck = Date.now() - lastStatusChangedAt;
-            if (idle > IDLE_TIMEOUT_MS) {
-              console.log('  [chat] idle ' + Math.round(idle/1000) + 's' + (retry ? ' (retry)' : '') + ' — killing claude');
-              idleKilled = true;
-              try { proc.kill('SIGKILL'); } catch {}
-            } else if (stuck > STATUS_STUCK_MS && lastStatus) {
-              console.log('  [chat] status stuck on "' + lastStatus + '" for ' + Math.round(stuck/1000) + 's — killing claude');
-              idleKilled = true;
-              try { proc.kill('SIGKILL'); } catch {}
-            }
-          }, 10000);
-
-          // Hard timeout
-          const HARD_TIMEOUT_MS = 10 * 60 * 1000;
+          // No idle watchdog — complex prompts (HIGH extend with 7-12
+          // components, multi-act compositions, long renders) legitimately
+          // think and tool-use for many minutes between visible output.
+          // The 90s "idle-killed" watchdog was punishing those. Only a
+          // generous hard timeout remains as the absolute safety net so a
+          // genuinely runaway process can't pin a slot forever.
+          const HARD_TIMEOUT_MS = 30 * 60 * 1000;
           const hardKiller = setTimeout(() => {
             if (resolved) return;
-            console.log('  [chat] hard timeout — killing claude');
+            console.log('  [chat] hard timeout (30 min) — killing claude');
             try { proc.kill('SIGKILL'); } catch {}
           }, HARD_TIMEOUT_MS);
 
           const done = (obj) => {
             if (resolved) return;
             resolved = true;
-            clearInterval(idleCheck);
             clearTimeout(hardKiller);
             try { req.off('aborted', onAbort); } catch {}
             resolve(obj);
@@ -2506,9 +2480,7 @@ const server = http.createServer((req, res) => {
                 err = ('partial: ' + lineBuf.slice(-400)).trim();
               }
               if (!err) {
-                err = 'Claude exited with code ' + code + (idleKilled
-                  ? ' (idle-killed — try a simpler request or use Fast mode)'
-                  : '. Possible causes: quota / network / auth. Try again.');
+                err = 'Claude exited with code ' + code + '. Possible causes: quota / network / auth. Try again.';
               }
               return done({
                 ok: false,
