@@ -132,8 +132,9 @@ description: Eleven production-tested text animation presets for Remotion — dr
 // WordPopCaption faster (9 frames/word — snappier read)
 <WordPopCaption words={["this", "is", "fast"]} framesPerWord={9} />
 
-// TypewriterPro for code (mono font + slower pace)
-<TypewriterPro text="const x = 42;" framesPerChar={4} />
+// TypewriterPro for code (slower pace — note: prop is charsPerSecond, NOT framesPerChar)
+// Default is 28 cps; drop to ~14 for a slower, more deliberate reveal.
+<TypewriterPro text="const x = 42;" charsPerSecond={14} />
 
 // CounterCountUp with K-suffix and slower ramp
 <CounterCountUp target={184} suffix="K" durationFrames={60} />
@@ -158,7 +159,7 @@ Each preset has sensible defaults that produce a usable result with just one req
   - TiltedSlam: slam at frame ~10 → "THWACK" SFX on frame 8
   - WordPopCaption: each word at `8 + i * framesPerWord` → tick per word
   - LetterCascade: letters land at `i * 2 + 14` → keyboard-tap SFX per letter
-  - TypewriterPro: `framesPerChar` (default 3) → mechanical keystroke per char
+  - TypewriterPro: `charsPerSecond` (default 28 cps ≈ 1 char per ~1.07 frames at 30fps) → mechanical keystroke per char; the component also auto-pauses 6 frames at `.,?!:` so the SFX should match the visible cadence, not a metronome
   - CounterCountUp: ramp completes at `durationFrames` (default 45) → "ding" at completion
   - GlitchText: peak at frame 0, decay by 18 → static burst SFX
   - NeonGlow: lights up at frame 0, pulses indefinitely → "neon hum" sustained
