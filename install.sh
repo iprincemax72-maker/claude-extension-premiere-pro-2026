@@ -152,13 +152,22 @@ else
     fi
 fi
 
-# ---------- 9. Desktop launcher ----------
-step "Placing launcher on Desktop"
+# ---------- 9. Desktop launcher (fallback — auto-start LaunchAgent below makes this optional) ----------
+step "Placing launcher on Desktop (fallback)"
 DESKTOP="$HOME/Desktop"
 LAUNCHER="$DESKTOP/Claude Bridge.command"
 cp "bridge/start.command" "$LAUNCHER"
 chmod +x "$LAUNCHER"
 ok "$LAUNCHER"
+
+# ---------- 9b. LaunchAgent so the bridge auto-starts at login ----------
+step "Installing LaunchAgent (bridge auto-starts at every login)"
+if bash "bridge/install-launchagent.sh" 2>&1 | tail -3 | grep -q "OK"; then
+    ok "Bridge is live and will auto-start on login"
+else
+    warn "LaunchAgent install hit issues — you can still launch with the Desktop shortcut"
+    warn "Or rerun later: bash bridge/install-launchagent.sh"
+fi
 
 # ---------- 10. Premiere Pro detection ----------
 step "Detecting Adobe Premiere Pro"
@@ -178,9 +187,10 @@ printf "\033[32m----------------------------------------\033[0m\n"
 echo ""
 echo " Next steps:"
 echo "  1. If Claude isn't logged in yet, open a new Terminal and run:  claude /login"
-echo "  2. Double-click \"Claude Bridge.command\" on your Desktop."
-echo "  3. Open Premiere Pro -> Window -> Extensions -> Claude."
-echo "  4. Status pill turns green; you're ready."
+echo "  2. Open Premiere Pro -> Window -> Extensions -> Claude."
+echo "  3. Status pill turns green; you're ready. The bridge is already running"
+echo "     in the background (LaunchAgent we just installed). It restarts on"
+echo "     crash and starts again at every login automatically."
 echo ""
-echo " To stop the bridge: close its terminal window."
+echo " To stop auto-start at login:  bash bridge/install-launchagent.sh --uninstall"
 echo ""

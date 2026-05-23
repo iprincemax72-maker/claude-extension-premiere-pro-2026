@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  macOS LaunchAgent template — copies into ~/Library/LaunchAgents/com.claudebridge.plist
+  via install-launchagent.sh. The installer substitutes __HOME__ and __NODE__ with
+  the actual paths on the user's machine.
+
+  Effect once loaded:
+    - Bridge runs at user login automatically. No need to open Premiere first.
+    - Survives panel close, Premiere close, terminal close.
+    - Auto-restarts if the bridge crashes (KeepAlive on Crashed, 10s throttle).
+    - Logs to ~/PremiereClaude/bridge.log.
+
+  Unload with:  launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.claudebridge.plist
+  Or:           bash bridge/install-launchagent.sh --uninstall
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.claudebridge</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__NODE__</string>
+        <string>__HOME__/PremiereClaude/bridge.js</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__HOME__/PremiereClaude</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>HOME</key>
+        <string>__HOME__</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>__HOME__/PremiereClaude/bridge.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__HOME__/PremiereClaude/bridge.log</string>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>ProcessType</key>
+    <string>Interactive</string>
+</dict>
+</plist>
