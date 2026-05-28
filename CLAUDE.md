@@ -23,6 +23,64 @@ Premiere CEP Panel  ─HTTP─►  Local Node bridge  ─spawns─►  claude CL
 
 ---
 
+## DEBUGGING — read the log first
+
+**There is ONE unified log that captures every module.** Before guessing at any
+bug, read it. It's the single source of truth for what actually happened across
+the panel, bridge, autocut, autoedit, and ExtendScript — time-ordered.
+
+File: `~/PremiereClaude/logs/unified.jsonl` (one JSON object per line)
+
+Each line: `{ t, session, module, level, msg, data?, reqId? }`
+- **module**: `panel` | `bridge` | `autocut` | `autoedit` | `host` | `render`
+- **level**: `debug` | `info` | `warn` | `error`
+- **reqId**: ties a panel action → bridge handling → render together
+
+### How to read it (fastest first)
+
+```bash
+# Pretty live tail (needs jq; falls back to raw without it)
+bash bridge/tail-logs.sh
+
+# Errors + warnings only, live
+bash bridge/tail-logs.sh --errors
+
+# Dump the last 200 lines and exit (good for a snapshot)
+bash bridge/tail-logs.sh --dump 200
+
+# One module only
+bash bridge/tail-logs.sh --dump --module panel
+
+# Or hit the bridge endpoint (returns parsed JSON):
+curl -s "http://127.0.0.1:3737/logs/recent?n=300&level=error" | jq .
+curl -s "http://127.0.0.1:3737/logs/recent?n=100&module=autoedit" | jq .
+
+# Or just read the raw file:
+tail -100 ~/PremiereClaude/logs/unified.jsonl
+```
+
+### What's captured automatically
+- **Panel**: every uncaught error (`window.onerror` + `unhandledrejection`,
+  with file/line/stack), boot marker (`panel loaded` + version), chat send
+  failures, autocut/autoedit failures, cancellations.
+- **Bridge**: startup, every chat request + done/error (with reqId), update
+  checks.
+- **ExtendScript (host)**: `evalES` captures EvalScript errors AND any
+  `{ok:false}` / `{error}` JSON that host.jsx returns — so a broken Premiere
+  call surfaces here instead of silently returning null.
+- **autocut / autoedit**: their per-request file logs ALSO mirror into the
+  unified log, so render events sit inline with the panel action that triggered them.
+
+### How to log a new event
+- **Panel JS**: `cclog('info'|'warn'|'error', 'message', optionalDataObj)`
+- **Bridge JS**: `clog('module', 'level', 'msg', dataObj, reqId)`
+- Anything POSTing `{module, level, msg, data}` to `/log` lands in the same file.
+
+Log rotates at 5 MB → `unified.jsonl.1`. `bridge.log` (raw terminal stdout)
+still exists as a secondary; the unified JSONL is the one to read.
+
+---
+
 ## INSTALL — one-prompt agent playbook
 
 Prereqs the user must have:
@@ -130,7 +188,8 @@ CLAUDE.md     # This file — agent-facing
 - `~/PremiereClaude/bridge.js` — the running bridge
 - `~/PremiereClaude/remotion-intro/` — pre-scaffolded Remotion project; Claude writes new components into `src/` and registers them in `Root.tsx`
 - `~/PremiereClaude/output/` — rendered files, pasted images, ffmpeg keyframes
-- `~/PremiereClaude/bridge.log` — bridge stdout/stderr
+- `~/PremiereClaude/bridge.log` — bridge stdout/stderr (raw terminal output)
+- `~/PremiereClaude/logs/unified.jsonl` — **THE UNIFIED LOG. Read this first when debugging anything.** One JSONL line per event from every module (panel, bridge, autocut, autoedit, host/ExtendScript), time-ordered. See "DEBUGGING — read the log first" below.
 - `~/Library/Application Support/Adobe/CEP/extensions/com.claudebridge.panel/` (macOS) — installed panel
 - `%APPDATA%\Adobe\CEP\extensions\com.claudebridge.panel\` (Windows) — installed panel
 
@@ -139,6 +198,8 @@ CLAUDE.md     # This file — agent-facing
 | Endpoint | Method | Body | Returns |
 |---|---|---|---|
 | `/ping` | GET | — | `{ok, session, outputDir}` |
+| `/log` | POST | `{module, level, msg, data?, reqId?}` | `{ok}` — appends one line to the unified log (`~/PremiereClaude/logs/unified.jsonl`). Fire-and-forget; the panel uses this for `cclog()`. |
+| `/logs/recent` | GET | `?n=300&module=panel&level=error` | `{ok, count, logFile, lines[]}` — parsed recent unified-log lines, optionally filtered by module + min level. Use this to read the log without shell access. |
 | `/chat` | POST | `{message, context}` | `{reply, imports[]}` — spawns `claude -p`, streams tool events to SSE |
 | `/complete` | POST | `{prefix}` | `{completion}` — inline autocomplete |
 | `/expand` | POST | `{prompt, level}` | `{expanded}` — light / medium / heavy |

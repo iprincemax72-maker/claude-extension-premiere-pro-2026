@@ -19,6 +19,73 @@ const PANEL_DIR = (process.platform === 'win32')
   : path.join(os.homedir(), 'Library', 'Application Support', 'Adobe', 'CEP', 'extensions', 'com.claudebridge.panel');
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
+// ─────────────────────────────────────────────────────────────────────────
+// UNIFIED LOG COLLECTOR
+// One JSONL file that every module feeds into — panel, bridge, ExtendScript
+// (host.jsx via the panel), and render subprocesses. Each line is a single
+// JSON object: { t, session, module, level, msg, data?, reqId? }.
+//
+// Why: previously panel console.logs vanished into CEP's void, bridge logs
+// went to bridge.log, host.jsx debug went nowhere, and renders wrote to
+// per-request files. Debugging meant guessing. Now: read ONE file and see
+// the whole story across modules, time-ordered.
+//
+// Modules log here via:
+//   - bridge:        clog(module, level, msg, data, reqId)   [this file]
+//   - panel:         POST /log  { module:'panel', level, msg, data }
+//   - host.jsx:      panel forwards its debug/error to POST /log
+//   - renders:       bridge routes their key events through clog()
+//
+// Read it via:  GET /logs/recent?n=300&module=panel&level=error
+//           or:  tail -f ~/PremiereClaude/logs/unified.jsonl | jq .
+//           or:  bash bridge/tail-logs.sh
+// ─────────────────────────────────────────────────────────────────────────
+const LOG_DIR = path.join(WORK_DIR, 'logs');
+const UNIFIED_LOG = path.join(LOG_DIR, 'unified.jsonl');
+const LOG_MAX_BYTES = 5 * 1024 * 1024;   // rotate at 5 MB → unified.jsonl.1
+try { fs.mkdirSync(LOG_DIR, { recursive: true }); } catch {}
+
+function _rotateLogIfNeeded() {
+  try {
+    const st = fs.statSync(UNIFIED_LOG);
+    if (st.size > LOG_MAX_BYTES) {
+      // Single-generation rotation — keep .1 as the previous chunk, overwrite.
+      try { fs.renameSync(UNIFIED_LOG, UNIFIED_LOG + '.1'); } catch {}
+    }
+  } catch {}  // file doesn't exist yet → nothing to rotate
+}
+
+// Core writer. Synchronous append so log ordering is exact and a crash
+// can't lose the line that explains the crash. Best-effort: never throws.
+function clog(module, level, msg, data, reqId) {
+  const rec = {
+    t: new Date().toISOString(),
+    session: SESSION_ID.slice(0, 8),
+    module: module || 'bridge',
+    level: level || 'info',     // debug | info | warn | error
+    msg: String(msg == null ? '' : msg),
+  };
+  if (reqId) rec.reqId = String(reqId).slice(0, 12);
+  if (data !== undefined) {
+    try {
+      // Cap serialized data so one giant payload can't bloat the log.
+      let s = JSON.stringify(data);
+      if (s && s.length > 4000) s = s.slice(0, 4000) + '…[truncated]';
+      rec.data = s === undefined ? String(data) : JSON.parse(s);
+    } catch {
+      rec.data = String(data).slice(0, 4000);
+    }
+  }
+  try {
+    _rotateLogIfNeeded();
+    fs.appendFileSync(UNIFIED_LOG, JSON.stringify(rec) + '\n');
+  } catch {}
+  // Mirror warn/error to the terminal so a human watching bridge.log still
+  // sees the important stuff without tailing the JSONL.
+  if (level === 'error') { try { console.error('  [' + rec.module + '] ' + rec.msg); } catch {} }
+  else if (level === 'warn') { try { console.warn('  [' + rec.module + '] ' + rec.msg); } catch {} }
+}
+
 // Dev-mode live-reload removed — was causing the bridge to degrade after
 // SSE clients accumulated (claude spawns hung after a few minutes of panel
 // uptime). Production panels reload manually via Window → Extensions →
@@ -1815,6 +1882,59 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── Unified log collector: ingest a log line from any module ──────────
+  // The panel POSTs { module, level, msg, data, reqId } here. host.jsx
+  // errors come through here too (panel forwards them). Fire-and-forget
+  // from the caller's perspective — always 200, never blocks the UI.
+  if (req.method === 'POST' && req.url === '/log') {
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 64 * 1024) req.destroy(); });
+    req.on('end', () => {
+      try {
+        const p = JSON.parse(body || '{}');
+        clog(p.module || 'panel', p.level || 'info', p.msg || '', p.data, p.reqId);
+      } catch {}
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end('{"ok":true}');
+    });
+    return;
+  }
+
+  // ── Read recent unified log lines — for debugging / Claude to fetch ───
+  // GET /logs/recent?n=300&module=panel&level=error
+  //   n      max lines to return (default 300, cap 2000)
+  //   module filter to one module (panel | bridge | host | render)
+  //   level  filter to one level+ (error | warn | info | debug)
+  if (req.method === 'GET' && req.url.startsWith('/logs/recent')) {
+    try {
+      const u = new URL(req.url, 'http://localhost');
+      const n = Math.min(2000, Math.max(1, parseInt(u.searchParams.get('n') || '300', 10) || 300));
+      const fModule = u.searchParams.get('module');
+      const fLevel = u.searchParams.get('level');
+      const LEVEL_RANK = { debug: 0, info: 1, warn: 2, error: 3 };
+      const minRank = fLevel ? (LEVEL_RANK[fLevel] ?? 0) : 0;
+
+      let raw = '';
+      try { raw = fs.readFileSync(UNIFIED_LOG, 'utf8'); } catch {}
+      let lines = raw.split('\n').filter(Boolean);
+      // Parse + filter
+      let recs = [];
+      for (const ln of lines) {
+        let r; try { r = JSON.parse(ln); } catch { continue; }
+        if (fModule && r.module !== fModule) continue;
+        if (fLevel && (LEVEL_RANK[r.level] ?? 1) < minRank) continue;
+        recs.push(r);
+      }
+      recs = recs.slice(-n);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, count: recs.length, logFile: UNIFIED_LOG, lines: recs }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: String(e && e.message || e) }));
+    }
+    return;
+  }
+
   // Panel auto-reload — returns the mtime of the panel's index.html. The
   // panel polls this every 5s; if mtime changes, the panel reloads itself.
   // Single-shot fetch, no persistent connection — safe replacement for the
@@ -2330,6 +2450,7 @@ const server = http.createServer((req, res) => {
         resolvedSystemPrompt = (MODE_HEADERS[renderMode] || '') + resolvedSystemPrompt;
       }
       console.log('  [chat] render mode: ' + renderMode);
+      clog('bridge', 'info', 'chat request', { renderMode, tabMode, msgLen: (message || '').length, hasContext: !!context }, reqId);
 
       const args = [
         '-p',
@@ -2470,8 +2591,8 @@ const server = http.createServer((req, res) => {
         r = await runClaudeOnce(true);
       }
 
-      if (r.aborted) { chatDone = true; broadcastProgressDone(reqId); return; }
-      if (!r.ok) return sendErr(r.error || 'claude failed');
+      if (r.aborted) { chatDone = true; broadcastProgressDone(reqId); clog('bridge', 'info', 'chat aborted by user', null, reqId); return; }
+      if (!r.ok) { clog('bridge', 'error', 'chat failed', { error: r.error || 'claude failed', idleKilled: !!r.idleKilled }, reqId); return sendErr(r.error || 'claude failed'); }
 
       const reply = (r.reply || '').trim() || '(no response)';
       const rawImports = [];
@@ -2480,6 +2601,7 @@ const server = http.createServer((req, res) => {
       while ((m = re.exec(reply)) !== null) rawImports.push(m[1].trim());
       console.log('< ' + String(reply).slice(0, 80));
       if (rawImports.length) console.log('  imports: ' + rawImports.join(', '));
+      clog('bridge', 'info', 'chat done', { replyLen: reply.length, imports: rawImports.length }, reqId);
 
       try {
         const safePaths = await Promise.all(rawImports.map(p => ensurePremiereImportable(p)));
@@ -2889,7 +3011,12 @@ const server = http.createServer((req, res) => {
       if (!fs.existsSync(clipPath)) { res.writeHead(404); res.end('{"error":"file not found"}'); return; }
 
       const logPath = path.join(OUTPUT_DIR, `autocut-${reqId}.log`);
-      const log = (s) => { try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${s}\n`); } catch {} };
+      // Per-request file log AND the unified collector (so cross-module
+      // debugging sees autocut events inline with panel + chat events).
+      const log = (s) => {
+        try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${s}\n`); } catch {}
+        clog('autocut', /error|fail/i.test(String(s)) ? 'error' : 'info', String(s), null, reqId);
+      };
       log(`AUTOCUT start clip=${clipPath} clipDuration=${clipDuration} clipIn=${clipIn} clipOut=${clipOut} silence=${wantSilence} fillers=${wantFillers} repeats=${wantRepeats}`);
 
       try {
@@ -3047,7 +3174,11 @@ const server = http.createServer((req, res) => {
 
       _activeAutoedit = { children: new Set(), aborted: false };
       const logPath = path.join(OUTPUT_DIR, `autoedit-${reqId}.log`);
-      const log = (s) => { try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${s}\n`); } catch {} };
+      // Per-request file log AND the unified collector.
+      const log = (s) => {
+        try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${s}\n`); } catch {}
+        clog('autoedit', /error|fail|timeout/i.test(String(s)) ? 'error' : 'info', String(s), null, reqId);
+      };
 
       try {
         const inP  = (typeof clipIn  === 'number') ? clipIn  : 0;
@@ -3354,7 +3485,8 @@ function _tryListen() {
     console.log('Output dir: ' + OUTPUT_DIR);
     console.log('Open Premiere Pro → Window → Extensions → Claude');
     console.log('(keep this terminal open)\n');
-    checkForUpdates().catch(e => console.error('Update check error:', e.message));
+    clog('bridge', 'info', 'bridge started', { port: PORT, workDir: WORK_DIR, node: process.version });
+    checkForUpdates().catch(e => { clog('bridge', 'error', 'update check threw', { error: e.message }); console.error('Update check error:', e.message); });
   });
 }
 server.on('error', (err) => {
