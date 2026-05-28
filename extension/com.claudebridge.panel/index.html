@@ -820,12 +820,52 @@
     font-style: italic;
     margin-top: 6px;
   }
-  /* ───── SUGGESTION CHIPS (redesigned v10.35 — compact wrapping pills) ─────
+  /* ───── SUGGESTION CHIPS (redesigned v10.36 — compact wrapping pills) ─────
      The old full-width-card layout made each category 8+ tall rows, so the
      whole panel needed a lot of scrolling. Now each category is a cluster of
      small content-width pills that WRAP — collapsing ~8 rows into ~2-3.
      Categories flow in a 2-column masonry-ish grid; each category's pills
      wrap inside it. Far less vertical height = far less scrolling. */
+  /* Category filter bar — the answer to "too much scrolling". 27 categories
+     × ~7 chips = 178 chips is too much to dump. Instead: a compact bar of
+     category pills here, and only the SELECTED category's chips show below.
+     Browse every category without scrolling; click one to see its chips. */
+  .chips-nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+    width: 100%;
+    max-width: 760px;
+    margin: 2px auto 16px;
+    padding: 0 10px;
+    box-sizing: border-box;
+  }
+  .chips-nav.hidden { display: none !important; }
+  .chips-nav-pill {
+    display: inline-flex;
+    align-items: center;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text-faint);
+    padding: 4px 11px;
+    border-radius: 100px;
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, transform 0.12s var(--ease-out);
+    user-select: none;
+  }
+  .chips-nav-pill:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+  .chips-nav-pill.active {
+    background: var(--accent-soft);
+    border-color: rgba(217,119,87,0.45);
+    color: #fff;
+  }
+  .chips-nav-pill:active { transform: scale(0.96); }
+
   .chips {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -837,6 +877,13 @@
     box-sizing: border-box;
     align-content: start;
   }
+  /* In category-filter mode (default, not searching), only the active
+     section shows — and since it's a single section, let it use the full
+     width with centered pills instead of one narrow grid column. */
+  .chips.cat-filtered { display: block; max-width: 760px; margin-left: auto; margin-right: auto; }
+  .chips.cat-filtered .chips-section { align-items: center; }
+  .chips.cat-filtered .chips-section-title { justify-content: center; }
+  .chips.cat-filtered .chips-section-row { justify-content: center; }
   @media (min-width: 1000px) { .chips { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 560px) { .chips { grid-template-columns: 1fr; } }
   .chips-section {
@@ -2619,7 +2666,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.35</span>
+    <span class="version-tag" id="versionTag">10.36</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -3559,6 +3606,11 @@ const SUGGESTIONS = [
 
 /* Render chips on the empty state. All categories render at boot — with
    the 3-column grid the full set fits without a Show-more toggle. */
+// Currently-selected category for the filter bar (empty-state browsing).
+// null until renderChips picks the first one. Per-container in practice but
+// a single global is fine since only one empty-state is visible at a time.
+let _activeChipCat = null;
+
 function renderChips(container) {
   if (!container) return;
   container.innerHTML = '';
@@ -3575,6 +3627,33 @@ function renderChips(container) {
     }
     groupByCat[key].items.push({ label, prompt, idx: flatIdx++ });
   });
+
+  // Default active category = first one, unless a previous pick is still valid.
+  if (!_activeChipCat || !groupByCat[_activeChipCat]) {
+    _activeChipCat = groups.length ? groups[0].cat : null;
+  }
+
+  // ── Category filter bar ──────────────────────────────────────────────
+  // Sits in the empty-state body, ABOVE the chips grid (#chips). We insert
+  // it as a sibling before the container so it isn't wiped by the
+  // container.innerHTML reset above.
+  const emptyBody = container.parentElement;
+  if (emptyBody) {
+    const oldNav = emptyBody.querySelector('.chips-nav');
+    if (oldNav) oldNav.remove();
+    const nav = document.createElement('div');
+    nav.className = 'chips-nav';
+    groups.forEach((grp) => {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'chips-nav-pill' + (grp.cat === _activeChipCat ? ' active' : '');
+      pill.dataset.cat = grp.cat;
+      pill.textContent = grp.cat;
+      pill.addEventListener('click', () => selectChipCategory(grp.cat));
+      nav.appendChild(pill);
+    });
+    emptyBody.insertBefore(nav, container);
+  }
 
   // Equalize section heights — shorter categories get thin filler
   // lines below their last chip so every column aligns at the bottom.
@@ -3618,6 +3697,35 @@ function renderChips(container) {
       row.appendChild(line);
     }
   });
+
+  // Apply the initial single-category view (only the active section shows).
+  _applyCatFilterTo(container);
+}
+
+// Show only the active category's section. Skips entirely while a search is
+// active (search shows matches across all categories instead).
+function _applyCatFilterTo(container) {
+  if (!container) return;
+  const searching = container.classList.contains('searching');
+  if (searching) return;
+  container.classList.add('cat-filtered');
+  container.querySelectorAll('.chips-section').forEach(sec => {
+    const t = sec.querySelector('.chips-section-title');
+    const cat = t ? t.textContent : '';
+    sec.classList.toggle('hidden', cat !== _activeChipCat);
+  });
+}
+
+// Click handler for a category pill — switch the visible category.
+function selectChipCategory(cat) {
+  _activeChipCat = cat;
+  // Update the active pill highlight + the visible section, scoped to the
+  // currently-active tab's empty state.
+  document.querySelectorAll('.tab-content.active .chips-nav-pill, .chips-nav-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.cat === cat);
+  });
+  const cont = (document.querySelector('.tab-content.active #chips')) || document.getElementById('chips');
+  _applyCatFilterTo(cont);
 }
 renderChips(chipsContainer);
 
@@ -3626,25 +3734,38 @@ renderChips(chipsContainer);
    re-mounts the empty state from its HTML snapshot. */
 function filterChips(query) {
   const q = (query || '').trim().toLowerCase();
-  const chipsEl = document.getElementById('chips');
-  const noMatch = document.getElementById('emptyNoMatch');
+  // Scope to the active tab's chips so a background tab's chips aren't touched.
+  const chipsEl = (document.querySelector('.tab-content.active #chips')) || document.getElementById('chips');
+  const noMatch = (document.querySelector('.tab-content.active #emptyNoMatch')) || document.getElementById('emptyNoMatch');
   if (!chipsEl) return;
   const searching = q.length > 0;
-  // While searching, drop the 3-column grid + category headers and show
-  // matching chips as a flat single-column flow. CSS toggle handles the
-  // visual; JS only sets the class + per-chip hidden state.
-  chipsEl.classList.toggle('searching', searching);
+  const navEl = chipsEl.parentElement ? chipsEl.parentElement.querySelector('.chips-nav') : null;
+
+  if (!searching) {
+    // Back to category-browse mode: restore the nav + show only the active
+    // category. Clear any search-state classes/hidden flags first.
+    chipsEl.classList.remove('searching');
+    if (navEl) navEl.classList.remove('hidden');
+    chipsEl.querySelectorAll('.chip').forEach(c => c.classList.remove('hidden'));
+    _applyCatFilterTo(chipsEl);
+    if (noMatch) noMatch.style.display = 'none';
+    return;
+  }
+
+  // Searching: hide the category nav + the single-category constraint, show
+  // matching chips from EVERY category as a flat centered flow.
+  if (navEl) navEl.classList.add('hidden');
+  chipsEl.classList.remove('cat-filtered');
+  chipsEl.classList.add('searching');
   let shown = 0;
   chipsEl.querySelectorAll('.chip').forEach(c => {
-    const hit = !q || (c.dataset.haystack || '').indexOf(q) >= 0;
+    const hit = (c.dataset.haystack || '').indexOf(q) >= 0;
     c.classList.toggle('hidden', !hit);
     if (hit) shown++;
   });
-  // Hide whole sections that have zero visible chips during a search,
-  // so we don't render orphan whitespace blocks.
   chipsEl.querySelectorAll('.chips-section').forEach(sec => {
     const anyVisible = !!sec.querySelector('.chip:not(.hidden)');
-    sec.classList.toggle('hidden', searching && !anyVisible);
+    sec.classList.toggle('hidden', !anyVisible);
   });
   if (noMatch) noMatch.style.display = shown === 0 ? '' : 'none';
 }
@@ -4970,7 +5091,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.35';
+  const PANEL_VERSION = '10.36';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
