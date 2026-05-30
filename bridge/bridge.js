@@ -1850,6 +1850,64 @@ and stop. Don't reach for glitch and grain because they're in the library.
 
 Style: terse. The user is editing in Premiere, not reading docs. One or two sentences plus the import marker is the goal. Skip preamble like "Sure, I'll help…".`;
 
+// ─────────────────────────────────────────────────────────────────────────
+// REMOTION BEST-PRACTICES INJECTION
+// The remotion-best-practices skill must apply to EVERY render — reliably,
+// not "maybe, if the spawned claude decides to read the rule files." The old
+// system prompt only POINTED at the files ("load these"), which claude read
+// inconsistently → one render had the craft rules, the next didn't, and
+// quality wobbled. So we read the core rule files at startup and inject them
+// straight into the render system prompt.
+//
+// Reading from the skill files (not hardcoding) keeps this in sync: edit the
+// skill, restart the bridge, the new rules apply. If the skill is missing,
+// the blocks are empty strings and the prompt still works (graceful).
+//
+//   CORE  = animations.md — hard correctness rules (useCurrentFrame, no CSS
+//           transitions). Injected in ALL render modes, including fast.
+//   CRAFT = motion-design.md + timing.md — the spring catalog, multi-act
+//           choreography, easing reference. Injected in default + slow only;
+//           fast mode is deliberately minimal so it gets CORE only.
+// ─────────────────────────────────────────────────────────────────────────
+const BP_RULES_DIR = path.join(os.homedir(), '.claude', 'skills', 'remotion-best-practices', 'rules');
+function _readBPRule(file) {
+  try {
+    let s = fs.readFileSync(path.join(BP_RULES_DIR, file), 'utf8');
+    // Strip YAML frontmatter — the rule body is what matters in-context.
+    s = s.replace(/^---[\s\S]*?---\s*/, '').trim();
+    return s;
+  } catch { return ''; }
+}
+const BP_CORE  = _readBPRule('animations.md');
+const BP_CRAFT = [_readBPRule('motion-design.md'), _readBPRule('timing.md')].filter(Boolean).join('\n\n---\n\n');
+clog('bridge', 'info', 'best-practices loaded', {
+  core: BP_CORE.length, craft: BP_CRAFT.length, dir: BP_RULES_DIR,
+});
+
+// Build the inject block for a given render mode. Empty string if no rules
+// were found (skill not installed) — caller-safe.
+function buildBestPracticesBlock(renderMode) {
+  const parts = [];
+  if (BP_CORE) parts.push(BP_CORE);
+  if (renderMode !== 'fast' && BP_CRAFT) parts.push(BP_CRAFT);
+  if (!parts.length) return '';
+  return [
+    '═══════════════════════════════════════════════════════════════════════════',
+    'REMOTION BEST PRACTICES — these ALWAYS apply to the composition you write.',
+    'Inlined from the remotion-best-practices skill so they are guaranteed in',
+    'context. Follow them; they are what separate a polished render from a',
+    'janky AI-looking one. (For task-specific techniques — captions, fonts,',
+    'charts, voiceover, transitions — also read the matching rule file under',
+    BP_RULES_DIR + '/ and the remotion-transitions skill.)',
+    '═══════════════════════════════════════════════════════════════════════════',
+    '',
+    parts.join('\n\n'),
+    '',
+    '═══════════════════════════════════════════════════════════════════════════',
+    '',
+  ].join('\n');
+}
+
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
@@ -2355,13 +2413,22 @@ const server = http.createServer((req, res) => {
           '- If the user asks for an actual rendered animation, tell them to switch to an animation tab (the + button next to the chat-bubble + button at the top).',
           '- Answer in plain markdown. Concise, useful, no filler. The user is editing video — they don\'t want a 5-paragraph essay; they want the answer.',
         ].join('\n');
-      } else if (renderMode === 'fast') {
-        resolvedSystemPrompt = SYSTEM_PROMPT
-          .replace(/__SELF_CRITIQUE_BEGIN__[\s\S]*?__SELF_CRITIQUE_END__\n?/g, '');
-      } else {
+      } else if (renderMode === 'slow') {
+        // SLOW is the only mode that keeps the self-critique (render a middle
+        // still, read it, check centering/clipping/contrast, one retry).
+        // Strip just the markers, keep the block.
         resolvedSystemPrompt = SYSTEM_PROMPT
           .replace(/__SELF_CRITIQUE_BEGIN__\n?/g, '')
           .replace(/__SELF_CRITIQUE_END__\n?/g, '');
+      } else {
+        // FAST and DEFAULT skip the self-critique entirely. The user asked to
+        // drop the middle-frame "is everything centered" check from default —
+        // it added ~20-30s + a retry per render. Best-practices rules (now
+        // injected every time) cover the common layout mistakes up front, so
+        // the check is no longer worth the wait on the default path. Use the
+        // SLOW mode when you want the full verify-and-retry pass.
+        resolvedSystemPrompt = SYSTEM_PROMPT
+          .replace(/__SELF_CRITIQUE_BEGIN__[\s\S]*?__SELF_CRITIQUE_END__\n?/g, '');
       }
 
       // The modes differ in CREATIVE AMBITION, not just QA rigor. The whole
@@ -2395,7 +2462,10 @@ const server = http.createServer((req, res) => {
           'style library (easings, palettes, typography, motion helpers) as',
           'building blocks, but the composition itself is yours — a real,',
           'purpose-built animation, not a template with the text swapped.',
-          'Keep the self-critique pass (one fix-and-re-render is fine).',
+          'Render once and ship — NO self-critique / still-frame check on',
+          'Default (it added ~20-30s). Get the layout right the first time by',
+          'following the best-practices rules above. Use Slow mode when you',
+          'want the full verify-and-retry pass.',
           '═══════════════════════════════════════════════════════════════════════════',
           '',
         ].join('\n'),
@@ -2446,8 +2516,11 @@ const server = http.createServer((req, res) => {
       };
       // Render-mode headers only apply to animation tabs (the headers explain
       // ambition/depth for compositions). Chat tabs skip them entirely.
+      // Best-practices rules go FIRST (most authoritative), then the mode
+      // header, then the base system prompt.
       if (tabMode !== 'chat') {
         resolvedSystemPrompt = (MODE_HEADERS[renderMode] || '') + resolvedSystemPrompt;
+        resolvedSystemPrompt = buildBestPracticesBlock(renderMode) + resolvedSystemPrompt;
       }
       console.log('  [chat] render mode: ' + renderMode);
       clog('bridge', 'info', 'chat request', { renderMode, tabMode, msgLen: (message || '').length, hasContext: !!context }, reqId);
