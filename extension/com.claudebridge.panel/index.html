@@ -841,7 +841,7 @@
     font-style: italic;
     margin-top: 6px;
   }
-  /* ───── SUGGESTION CHIPS (redesigned v10.38 — compact wrapping pills) ─────
+  /* ───── SUGGESTION CHIPS (redesigned v10.39 — compact wrapping pills) ─────
      The old full-width-card layout made each category 8+ tall rows, so the
      whole panel needed a lot of scrolling. Now each category is a cluster of
      small content-width pills that WRAP — collapsing ~8 rows into ~2-3.
@@ -2181,6 +2181,83 @@
     line-height: 1;
   }
   .iter-bar .iter-cancel:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+  /* ───── QUEUE STRIP ─────
+     Compact horizontal list of pending prompts above the composer. Each is
+     a chip with an × to remove. A ▶ "run next" button appears at the left
+     when the queue is paused (idle with items — e.g. after the user cancels
+     the in-flight one). */
+  .queue-strip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 6px 9px;
+    border-bottom: 1px solid var(--border-soft);
+    background: rgba(255,255,255,0.018);
+  }
+  .queue-strip .queue-label {
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-right: 2px;
+    flex-shrink: 0;
+  }
+  .queue-strip .queue-run {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--accent-soft);
+    border: 1px solid rgba(217,119,87,0.4);
+    color: var(--accent);
+    border-radius: 100px;
+    padding: 2px 9px 2px 7px;
+    font-size: 10.5px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s var(--ease-out), color 0.12s var(--ease-out);
+  }
+  .queue-strip .queue-run:hover { background: var(--accent); color: #fff; }
+  .queue-strip .queue-run svg { width: 9px; height: 9px; }
+  .queue-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 220px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 7px;
+    padding: 3px 4px 3px 9px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  /* The first item gets a subtle accent tint + a tiny dot when running. */
+  .queue-item.running {
+    border-color: rgba(217,119,87,0.4);
+    background: var(--accent-soft);
+    color: var(--text);
+  }
+  .queue-item .queue-item-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 180px;
+  }
+  .queue-item .queue-item-x {
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 1px 4px;
+    border-radius: 5px;
+    flex-shrink: 0;
+  }
+  .queue-item .queue-item-x:hover { color: var(--text); background: rgba(255,255,255,0.08); }
   .ref-add {
     display: inline-flex;
     align-items: center;
@@ -2700,7 +2777,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.38</span>
+    <span class="version-tag" id="versionTag">10.39</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -3026,6 +3103,9 @@
     </div>
     <div class="ref-bar" id="refBar"></div>
     <div class="iter-bar" id="iterBar" style="display:none;"></div>
+    <!-- Queue strip — shows the active tab's pending prompts. Rendered by
+         renderQueueStrip(); hidden when the queue is empty. -->
+    <div class="queue-strip" id="queueStrip" style="display:none;"></div>
     <div class="input-stack">
       <div class="ghost" id="ghost" aria-hidden="true"><span class="ghost-typed"></span><span class="ghost-suggest"></span></div>
       <textarea id="input" placeholder="Ask Claude…" rows="1" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
@@ -3164,6 +3244,7 @@ function getActiveLogContent() {
     activeAutocut: null,
     activeAutoedit: null,
     expanding: false,
+    queue: [],          // pending prompts: [{ id, msg, refs, iterCtx }]
   });
 })();
 
@@ -3211,6 +3292,7 @@ function newTab(opts) {
     activeAutocut: null,
     activeAutoedit: null,
     expanding: false,
+    queue: [],          // pending prompts: [{ id, msg, refs, iterCtx }]
   });
   activeTabIdx = tabs.length - 1;
   applyActiveTabState();
@@ -3234,6 +3316,7 @@ function closeTab(idx) {
   if (t.activeChatAbort) { try { t.activeChatAbort.abort(); } catch {} }
   if (t.activeAutocut)   { try { t.activeAutocut.abort.abort(); fetch(BRIDGE + '/autocut-cancel',  { method:'POST' }).catch(()=>{}); } catch {} }
   if (t.activeAutoedit)  { try { t.activeAutoedit.abort.abort(); fetch(BRIDGE + '/autoedit-cancel', { method:'POST' }).catch(()=>{}); } catch {} }
+  t.queue = [];  // drop any queued prompts on this tab
   try { t.contentEl.remove(); } catch {}
   tabs.splice(idx, 1);
   if (tabs.length === 0) {
@@ -3284,6 +3367,10 @@ function applyActiveTabState() {
   try { setBusy && setBusy(!!activeChatAbort); } catch {}
   try { updateEscHint && updateEscHint(); } catch {}
   try { syncExpandEnabled && syncExpandEnabled(); updateExpandRecommendation && updateExpandRecommendation(); } catch {}
+  // Show this tab's queue; if it has items, is idle, and wasn't paused by a
+  // user cancel, resume draining it (the "switched away mid-run" case).
+  try { renderQueueStrip && renderQueueStrip(); } catch {}
+  try { if (typeof _maybeDrainQueue === 'function' && !activeChatAbort && !t.queuePaused) _maybeDrainQueue(t); } catch {}
 }
 
 function setTabLabel(idx, label) {
@@ -5160,7 +5247,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.38';
+  const PANEL_VERSION = '10.39';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -7342,10 +7429,135 @@ function setIterationContext(ctx) {
   bar.querySelector('.iter-cancel').addEventListener('click', () => setIterationContext(null));
 }
 
-async function sendMessage() {
-  if (activeChatAbort) return; // already in flight
+/* ═══════════════════════════════════════════════════════════════════════
+   SEND QUEUE  (per-tab, auto-run)
+   When you hit send while a request is already in flight, the new prompt is
+   snapshotted onto the active tab's queue instead of being dropped. When the
+   in-flight request finishes naturally, the next queued item auto-sends.
+   Works for normal prompts, suggestion-chip prompts (they fill the input),
+   and "Changes" iterations (iterationContext is captured in the snapshot).
+   ═══════════════════════════════════════════════════════════════════════ */
+function _queueId() {
+  return 'q-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// Snapshot the current composer (text + references + iteration context) onto
+// the active tab's queue, then clear the composer for the next prompt.
+function enqueueCurrentSend() {
+  const tab = tabs[activeTabIdx];
+  if (!tab) return;
   const msg = input.value.trim();
   if (!msg) return;
+  if (!tab.queue) tab.queue = [];
+  tab.queue.push({
+    id: _queueId(),
+    msg,
+    refs: activeReferences.slice(),
+    iterCtx: iterationContext
+      ? { originalPrompt: iterationContext.originalPrompt, originalPath: iterationContext.originalPath }
+      : null,
+  });
+  // Clear the composer so the user can type the next one.
+  input.value = '';
+  try { localStorage.removeItem(DRAFT_KEY); } catch {}
+  autosize(); clearGhost();
+  if (iterationContext) setIterationContext(null);
+  if (activeReferences.length) clearReferences();
+  renderQueueStrip();
+  cclog('info', 'prompt queued', { depth: tab.queue.length });
+}
+
+// Render the active tab's queue into the strip above the composer.
+function renderQueueStrip() {
+  const strip = document.getElementById('queueStrip');
+  if (!strip) return;
+  const tab = tabs[activeTabIdx];
+  const q = (tab && tab.queue) || [];
+  if (!q.length) { strip.style.display = 'none'; strip.innerHTML = ''; return; }
+  strip.style.display = '';
+  // When idle with items queued (paused — e.g. after a user cancel), show a
+  // ▶ Run button so the user can kick the queue back into motion.
+  const idle = !activeChatAbort;
+  const runBtn = idle
+    ? '<button type="button" class="queue-run" id="queueRunBtn" title="Run the next queued prompt now">'
+      + '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>Run</button>'
+    : '';
+  const items = q.map((it, i) =>
+    '<span class="queue-item' + (i === 0 && !idle ? ' running' : '') + '" data-id="' + it.id + '">'
+    + '<span class="queue-item-text">' + escapeHTML(it.msg.slice(0, 60)) + (it.msg.length > 60 ? '…' : '') + '</span>'
+    + '<button type="button" class="queue-item-x" data-id="' + it.id + '" title="Remove from queue" aria-label="Remove">×</button>'
+    + '</span>'
+  ).join('');
+  strip.innerHTML = '<span class="queue-label">Queue · ' + q.length + '</span>' + runBtn + items;
+}
+
+// Restore a queued intent into the composer globals, then send it through the
+// normal sendMessage path (which reads + clears those globals).
+function _runQueuedIntent(intent) {
+  if (!intent) return;
+  input.value = intent.msg || '';
+  activeReferences = (intent.refs && intent.refs.slice()) || [];
+  try { renderRefBar(); } catch {}
+  setIterationContext(intent.iterCtx || null);
+  autosize();
+  sendMessage();
+}
+
+// After a send finishes, advance the queue if appropriate. Only drains when:
+//   - the finished send belonged to the still-active tab, AND
+//   - nothing new is already in flight, AND
+//   - the finish was NOT a user cancel (cancel pauses the queue on purpose).
+function _maybeDrainQueue(tab, opts) {
+  const userCancelled = !!(opts && opts.userCancelled);
+  if (!tab || !tab.queue || !tab.queue.length) { if (tab) tab.queuePaused = false; renderQueueStrip(); return; }
+  if (tabs[activeTabIdx] !== tab) { renderQueueStrip(); return; }  // switched away → resume on return
+  if (activeChatAbort) { renderQueueStrip(); return; }              // something already running
+  if (userCancelled) { tab.queuePaused = true; renderQueueStrip(); return; }  // paused by user; ▶ Run resumes it
+  // Natural finish → advance.
+  tab.queuePaused = false;
+  const next = tab.queue.shift();
+  renderQueueStrip();
+  _runQueuedIntent(next);
+}
+
+// ▶ Run / × remove — delegated on the strip.
+(function wireQueueStrip() {
+  const strip = document.getElementById('queueStrip');
+  if (!strip) return;
+  strip.addEventListener('click', (e) => {
+    const runBtn = e.target.closest && e.target.closest('#queueRunBtn');
+    if (runBtn) {
+      // Manually start the next queued item (resume a paused queue).
+      const tab = tabs[activeTabIdx];
+      if (tab && tab.queue && tab.queue.length && !activeChatAbort) {
+        tab.queuePaused = false;
+        const next = tab.queue.shift();
+        renderQueueStrip();
+        _runQueuedIntent(next);
+      }
+      return;
+    }
+    const x = e.target.closest && e.target.closest('.queue-item-x');
+    if (x) {
+      const id = x.getAttribute('data-id');
+      const tab = tabs[activeTabIdx];
+      if (tab && tab.queue) {
+        tab.queue = tab.queue.filter(it => it.id !== id);
+        renderQueueStrip();
+        cclog('info', 'queue item removed', { depth: tab.queue.length });
+      }
+    }
+  });
+})();
+
+async function sendMessage() {
+  const msg = input.value.trim();
+  if (!msg) return;
+  // Busy → queue this prompt instead of dropping it (per-tab, auto-run).
+  if (activeChatAbort) { enqueueCurrentSend(); return; }
+  // Bind this send to its tab so the queue drains in the right place even if
+  // the user switches tabs while it runs.
+  const _sendTab = tabs[activeTabIdx];
   clearEmpty();
   input.value = '';
   try { localStorage.removeItem(DRAFT_KEY); } catch {}
@@ -7467,6 +7679,9 @@ async function sendMessage() {
   // pipeline. Bridge uses a plain-chat system prompt and we skip render-
   // card construction even if [[IMPORT:...]] sneaks through.
   const activeTabType = (tabs[activeTabIdx] && tabs[activeTabIdx].type) || 'animation';
+  // Whether this request ended via a user cancel (Esc/stop). A user cancel
+  // PAUSES the queue (doesn't auto-advance); a natural finish drains it.
+  let _userCancelled = false;
 
   try {
     const r = await fetch(BRIDGE + '/chat', {
@@ -7509,6 +7724,7 @@ async function sendMessage() {
   } catch (err) {
     progressUI.cleanup();
     if (err.name === 'AbortError') {
+      _userCancelled = true;
       // Cancelled — offer a Continue button. Tells Claude to resume from
       // where it was when killed, using the original prompt + last status
       // as breadcrumbs. Partial work usually still lives on disk under
@@ -7550,6 +7766,8 @@ async function sendMessage() {
     activeChatAbort = null;
     setBusy(false);
     input.focus();
+    // Advance the per-tab queue (no-op if empty / user-cancelled / tab switched).
+    try { _maybeDrainQueue(_sendTab, { userCancelled: _userCancelled }); } catch {}
   }
 }
 
@@ -7559,6 +7777,8 @@ async function sendMessage() {
 // identical (progress bar, status updates, import preview cards).
 async function sendContinuationChat(originalMsg, lastStatus) {
   if (activeChatAbort) return;
+  const _sendTab = tabs[activeTabIdx];
+  let _userCancelled = false;
   // The visible user-bubble — short label, not the full continuation prompt.
   const youHTML =
     '<div class="reply-ref">'
@@ -7645,6 +7865,7 @@ async function sendContinuationChat(originalMsg, lastStatus) {
   } catch (err) {
     progressUI.cleanup();
     if (err.name === 'AbortError') {
+      _userCancelled = true;
       // Allow chaining continuations — same Continue button pattern.
       placeholder.body.innerHTML = '';
       const cancelLine = document.createElement('p');
@@ -7678,6 +7899,7 @@ async function sendContinuationChat(originalMsg, lastStatus) {
     activeChatAbort = null;
     setBusy(false);
     input.focus();
+    try { _maybeDrainQueue(_sendTab, { userCancelled: _userCancelled }); } catch {}
   }
 }
 
