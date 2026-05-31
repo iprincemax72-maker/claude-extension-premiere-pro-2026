@@ -99,6 +99,11 @@ let _activeAutocut = null;
 // can kill it. Holds { children: Set<ChildProcess>, aborted: bool }.
 let _activeAutoedit = null;
 
+// Count of in-flight heavy requests (chat render / autoedit / autocut). The
+// periodic auto-update uses this to avoid restarting the bridge mid-render.
+let _heavyInflight = 0;
+function _bridgeBusy() { return _heavyInflight > 0 || !!_activeAutoedit || !!_activeAutocut; }
+
 
 // Resolve an absolute path to ffmpeg — falls back to bare 'ffmpeg' if no
 // absolute path is found. Needed because the bridge may be auto-spawned by
@@ -2169,6 +2174,13 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
+  // Track in-flight heavy requests so the periodic auto-update never restarts
+  // the bridge mid-render. res 'close' fires on normal finish OR client abort.
+  if (req.method === 'POST' && (req.url === '/chat' || req.url === '/autoedit' || req.url === '/autoedit/run' || req.url === '/autoedit/analyze' || req.url === '/autocut')) {
+    _heavyInflight++;
+    res.on('close', () => { _heavyInflight = Math.max(0, _heavyInflight - 1); });
+  }
+
   // (dev /panel and /dev/reload-stream removed)
 
   // Real-time progress channel — panel subscribes when sending /chat so the
@@ -3996,6 +4008,12 @@ function _selfRespawn(opts) {
 //   • Otherwise (manual `node bridge.js` in a terminal): spawn a replacement.
 // A 25s sentinel prevents a relaunch storm if the on-disk write keeps failing.
 function _autoRestartForBridgeUpdate(result) {
+  // Never restart mid-render — defer; the next periodic check will retry.
+  if (_bridgeBusy()) {
+    console.log('Bridge update ready, but a render is in flight — will restart when idle.');
+    clog('bridge', 'info', 'bridge restart deferred (busy)', { updated: result && result.updated });
+    return;
+  }
   try {
     const sent = path.join(WORK_DIR, '.last-update-restart');
     let recent = false;
@@ -4058,16 +4076,39 @@ function _tryListen() {
     console.log('Open Premiere Pro → Window → Extensions → Claude');
     console.log('(keep this terminal open)\n');
     clog('bridge', 'info', 'bridge started', { port: PORT, workDir: WORK_DIR, node: process.version });
+    const _applyUpdateResult = (result, label) => {
+      if (!result) return;
+      if (result.updated && result.updated.length) {
+        clog('bridge', 'info', label + ': applied update', { updated: result.updated });
+        console.log(label + ': updated ' + result.updated.join(', '));
+      }
+      // Panel/host/manifest changes are picked up automatically — the panel's
+      // /version mtime poll reloads it (when safe). Only a bridge.js change
+      // needs a process restart.
+      if (result.bridgeChanged) _autoRestartForBridgeUpdate(result);
+    };
     checkForUpdates()
-      .then((result) => {
-        // If the bridge's OWN code changed on disk, the running process is
-        // still the OLD code — restart so the update actually takes effect
-        // (instead of just printing "restart the bridge").
-        if (result && result.bridgeChanged) _autoRestartForBridgeUpdate(result);
-      })
+      .then((r) => _applyUpdateResult(r, 'launch update'))
       .catch(e => { clog('bridge', 'error', 'update check threw', { error: e.message }); console.error('Update check error:', e.message); });
+
+    // PERIODIC auto-update — re-check every 3 min so a long-running bridge
+    // actually picks up new code without a manual restart. This is the piece
+    // that was missing: checkForUpdates() previously ran ONLY at launch, so an
+    // already-running bridge never saw pushed changes. No-op when nothing
+    // changed (checkForUpdates only writes on byte diff) and skipped while a
+    // render is in flight (bridge restart is deferred to the next tick).
+    if (!_updatePoll) {
+      _updatePoll = setInterval(() => {
+        if (isAutoUpdateDisabled()) return;
+        checkForUpdates()
+          .then((r) => _applyUpdateResult(r, 'periodic update'))
+          .catch(e => clog('bridge', 'error', 'periodic update threw', { error: e.message }));
+      }, 3 * 60 * 1000);
+      if (_updatePoll.unref) _updatePoll.unref();
+    }
   });
 }
+let _updatePoll = null;
 server.on('error', (err) => {
   if (err && err.code === 'EADDRINUSE' && _listenAttempts < 10) {
     _listenAttempts++;

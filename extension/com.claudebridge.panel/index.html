@@ -1464,14 +1464,26 @@
     flex-wrap: nowrap;
     padding: 3px 8px 5px;
   }
-  .tb-left  { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
-  .tb-right { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; justify-content: flex-end; }
-  .tb-right .hint-text { flex: 1 1 0; }
+  .tb-left  { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
+  .tb-left .hint-text { flex: 1 1 0; }
+  .tb-right { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; }
   body.chat-mode #renderModeGroup,
   body.chat-mode #autoeditBtn { display: none !important; }
-  /* Auto-Edit now lives in the header icon bar — busy tint */
-  .icon-btn.busy { color: var(--accent); }
-  .icon-btn:disabled { opacity: 0.5; cursor: wait; }
+  /* Auto-Edit — small labeled pill in the header (distinct from the bare icons) */
+  .ae-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 26px; padding: 0 10px; margin-right: 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border); border-radius: 7px;
+    color: var(--text-dim);
+    font-family: var(--font-ui); font-size: 11.5px; font-weight: 500;
+    cursor: pointer; white-space: nowrap;
+    transition: color .15s var(--ease), border-color .15s var(--ease), background .15s var(--ease);
+  }
+  .ae-pill svg { width: 13px; height: 13px; flex-shrink: 0; }
+  .ae-pill:hover { color: var(--text); border-color: var(--accent-line); background: rgba(217,119,87,0.07); }
+  .ae-pill:disabled { opacity: 0.55; cursor: wait; }
+  .ae-pill.busy { color: var(--accent); border-color: var(--accent-line); background: rgba(217,119,87,0.07); }
   .hint-text {
     font-size: 10.5px;
     color: var(--text-faint);
@@ -2908,7 +2920,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.44</span>
+    <span class="version-tag" id="versionTag">10.46</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -2921,8 +2933,9 @@
     </button>
   </div>
   <div style="display:flex;align-items:center">
-    <button class="icon-btn" id="autoeditBtn" type="button" title="Auto-Edit — read the speech and drop motion graphics on V2/V3" aria-label="Auto-Edit" style="margin-right:4px">
+    <button class="ae-pill" id="autoeditBtn" type="button" title="Auto-Edit — read the speech and drop motion graphics on V2/V3">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h16"/><circle cx="19" cy="12" r="2.5" fill="currentColor"/></svg>
+      Auto-Edit
     </button>
     <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3265,15 +3278,15 @@
     </div>
     <div class="input-toolbar">
       <div class="tb-left">
-        <div class="rmode-group" id="renderModeGroup" title="How hard Claude works on the animation — Fast: quick template-based, ~1 min. Default: a real custom-built animation, no templates (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
-          <button class="rmode-pill" data-rmode="fast" type="button" title="Fast — quick template-based animation, ~1 min">Fast</button>
-          <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
-          <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Claude takes its time, ~3-5 min">Slow</button>
-        </div>
+        <span class="hint-text" id="hint"><kbd class="k-tab" title="Press Tab to accept the grey ghost-text suggestion Claude shows ahead of your cursor">Tab</kbd> accept · <kbd title="Enter sends the message">Enter</kbd> send · <kbd>⌘V</kbd> paste · <kbd>⌘C</kbd> copy</span>
+        <span class="esc-hint" id="escHint" title="Cancel the current request"><kbd>esc</kbd> cancel</span>
       </div>
       <div class="tb-right">
-      <span class="hint-text" id="hint"><kbd class="k-tab" title="Press Tab to accept the grey ghost-text suggestion Claude shows ahead of your cursor">Tab</kbd> accept · <kbd title="Enter sends the message">Enter</kbd> send · <kbd>⌘V</kbd> paste · <kbd>⌘C</kbd> copy</span>
-      <span class="esc-hint" id="escHint" title="Cancel the current request"><kbd>esc</kbd> cancel</span>
+      <div class="rmode-group" id="renderModeGroup" title="How hard Claude works on the animation — Fast: quick template-based, ~1 min. Default: a real custom-built animation, no templates (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
+        <button class="rmode-pill" data-rmode="fast" type="button" title="Fast — quick template-based animation, ~1 min">Fast</button>
+        <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
+        <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Claude takes its time, ~3-5 min">Slow</button>
+      </div>
       <div class="expand-group" id="expandGroup">
         <button class="expand-btn" data-level="light" type="button" aria-label="Light expand" title="Light — adds a couple missing specifics (duration, primary color)" disabled>
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l1.5 4.5L18 10l-4.5 1.5L12 16l-1.5-4.5L6 10l4.5-1.5L12 4z"/></svg>
@@ -5475,7 +5488,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.44';
+  const PANEL_VERSION = '10.46';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -8660,6 +8673,21 @@ document.addEventListener('keydown', (e) => {
   if (historyPanel.classList.contains('show')) {
     e.preventDefault();
     closeHistory();
+    return;
+  }
+  // Auto-Edit wizard modal — close on Escape (aeCancelWizard also aborts any
+  // in-flight analyze). Must come before the generic cancel so an open modal
+  // at the options/questions step (no active work) still dismisses.
+  const _aem = document.getElementById('autoeditModal');
+  if (_aem && _aem.classList.contains('show')) {
+    e.preventDefault();
+    try { aeCancelWizard(); } catch { _aem.classList.remove('show'); }
+    return;
+  }
+  const _acm = document.getElementById('autocutModal');
+  if (_acm && _acm.classList.contains('show')) {
+    e.preventDefault();
+    _acm.classList.remove('show');
     return;
   }
   if (activeChatAbort || expanding || activeAutocut || activeAutoedit) {
