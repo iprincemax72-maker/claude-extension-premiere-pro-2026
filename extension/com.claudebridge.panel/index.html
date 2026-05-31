@@ -2989,7 +2989,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.64</span>
+    <span class="version-tag" id="versionTag">10.65</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -5573,7 +5573,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.64';
+  const PANEL_VERSION = '10.65';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -7013,6 +7013,7 @@ function startInlineProgress(reqId) {
           <span class="interrupt-hint">ESC to interrupt</span>
           <button class="ae-loglink" style="margin-left:auto;background:none;border:1px solid rgba(217,119,87,0.35);color:var(--accent);padding:2px 10px;border-radius:10px;font-size:11px;cursor:pointer;font-family:inherit;">Show log</button>
         </div>
+        <div class="progress-bar" style="margin-top:9px;"><div class="progress-bar-fill"></div></div>
         <pre class="ae-logpane" style="display:none;margin-top:10px;background:rgba(0,0,0,0.25);color:#d8d4c8;font-family:'SF Mono','JetBrains Mono',monospace;font-size:11px;line-height:1.4;padding:10px 12px;border-radius:6px;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-word;border:1px solid rgba(217,119,87,0.2);"></pre>
       </div>
     </div>`;
@@ -7022,6 +7023,9 @@ function startInlineProgress(reqId) {
   const elapsedEl = card.querySelector('.ae-elapsed');
   const logLink   = card.querySelector('.ae-loglink');
   const logPane   = card.querySelector('.ae-logpane');
+  const barEl     = card.querySelector('.progress-bar');
+  const barFill   = card.querySelector('.progress-bar-fill');
+  const setBar = (pct) => { if (barFill && typeof pct === 'number') barFill.style.width = Math.max(0, Math.min(100, pct)) + '%'; };
 
   const startedAt = Date.now();
   let finished = false;
@@ -7081,6 +7085,7 @@ function startInlineProgress(reqId) {
         const data = JSON.parse(ev.data || '{}');
         if (data.reqId && data.reqId !== reqId) return;
         if (data.text) textEl.textContent = data.text;
+        if (typeof data.pct === 'number') setBar(data.pct);
       } catch {}
     });
     es.addEventListener('done', (ev) => {
@@ -7101,8 +7106,11 @@ function startInlineProgress(reqId) {
 
   return {
     text(s) { textEl.textContent = s; },
+    setPct(p) { setBar(p); },
     done(s) {
       textEl.textContent = s;
+      setBar(100);
+      if (barEl) barEl.classList.add('complete');
       card.querySelector('.ae-spinner').style.display = 'none';
       cleanup();
     },
