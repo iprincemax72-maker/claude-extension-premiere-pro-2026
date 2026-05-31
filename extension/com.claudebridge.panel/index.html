@@ -2855,6 +2855,24 @@
     to   { opacity: 1; transform: translate3d(0, 0, 0); }
   }
   .history-item:hover { border-color: var(--accent-line); transform: translate3d(0, -1px, 0); }
+  /* Conversations you've already reopened get an accent left-bar + an "opened"
+     badge, so you can tell which ones you've already clicked. */
+  .history-item.visited { box-shadow: inset 3px 0 0 var(--accent); }
+  .hist-opened {
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 100px;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-line);
+    color: var(--accent);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
   .history-thumb {
     width: 56px; height: 56px;
     border-radius: 6px;
@@ -2971,7 +2989,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.63</span>
+    <span class="version-tag" id="versionTag">10.64</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -4876,6 +4894,17 @@ const historyList = document.getElementById('historyList');
 let history = [];
 try { history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { history = []; }
 
+// Track which history conversations you've already reopened, so the panel can
+// mark them ("opened") — otherwise it's hard to tell which one you clicked last.
+const HISTORY_VISITED_KEY = 'claudeBridge.history.visited';
+let _historyVisited = new Set();
+try { _historyVisited = new Set(JSON.parse(localStorage.getItem(HISTORY_VISITED_KEY) || '[]')); } catch {}
+function markHistoryVisited(id) {
+  if (!id || _historyVisited.has(id)) return;
+  _historyVisited.add(id);
+  try { localStorage.setItem(HISTORY_VISITED_KEY, JSON.stringify([..._historyVisited])); } catch {}
+}
+
 function saveHistory() {
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch {}
   renderHistoryBadge();
@@ -4950,11 +4979,14 @@ function renderHistory() {
         + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'
         + '</button>'
       : '';
-    html += '<div class="history-item" data-row-id="' + e.id + '" title="Click to reopen this conversation in a new tab">'
+    const visited = _historyVisited.has(e.id);
+    const openedBadge = visited ? '<span class="hist-opened" title="You\'ve already opened this one">opened</span>' : '';
+    html += '<div class="history-item' + (visited ? ' visited' : '') + '" data-row-id="' + e.id + '" title="Click to reopen this conversation in a new tab">'
       + thumbHTML
       + '<div class="history-body">'
       +   '<div class="history-prompt-row">'
       +     '<div class="history-prompt">' + promptText + '</div>'
+      +     openedBadge
       +     copyBtn
       +   '</div>'
       +   '<div class="history-meta">' + meta + '</div>'
@@ -5073,7 +5105,7 @@ function renderHistory() {
       if (!t || t.closest('button') || t.closest('.history-thumb') || t.closest('.history-copy')) return;
       const id = row.getAttribute('data-row-id');
       const entry = history.find(x => x.id === id);
-      if (entry) reopenConversation(entry);
+      if (entry) { markHistoryVisited(id); row.classList.add('visited'); reopenConversation(entry); }
     });
   });
 
@@ -5541,7 +5573,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.63';
+  const PANEL_VERSION = '10.64';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
