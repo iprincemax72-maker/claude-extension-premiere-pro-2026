@@ -1469,6 +1469,18 @@
   .tb-left .hint-text { flex: 0 1 auto; min-width: 0; }
   .input-toolbar > #renderModeGroup { flex: 0 0 auto; }
   .tb-right { display: flex; align-items: center; gap: 7px; flex: 1 1 auto; min-width: 0; justify-content: flex-end; }
+  /* Compact bottom bar — everything a touch smaller (the send button is left
+     at full size). Prefixed selectors win on specificity over the base rules. */
+  .input-toolbar .hint-text { font-size: 9.5px; }
+  .input-toolbar .hint-text kbd { font-size: 9px; padding: 1px 4px; }
+  .tb-left .esc-hint { font-size: 9.5px; }
+  .tb-left .esc-hint kbd { font-size: 9px; padding: 1px 4px; }
+  .input-toolbar .rmode-group { padding: 1px; }
+  .input-toolbar .rmode-pill { font-size: 9.5px; padding: 2px 7px; }
+  .input-toolbar .expand-group { padding: 1px; }
+  .input-toolbar .expand-btn { height: 18px; padding: 0 5px; font-size: 9px; }
+  .input-toolbar .expand-btn svg { width: 9px; height: 9px; }
+  .input-toolbar .expand-group::before { font-size: 8.5px; padding: 0 4px 0 3px; }
   body.chat-mode #renderModeGroup,
   body.chat-mode #autoeditBtn { display: none !important; }
   /* Auto-Edit — small labeled pill in the header (distinct from the bare icons) */
@@ -2924,7 +2936,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.48</span>
+    <span class="version-tag" id="versionTag">10.49</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -5492,7 +5504,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.48';
+  const PANEL_VERSION = '10.49';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
