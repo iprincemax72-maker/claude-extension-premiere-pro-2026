@@ -3905,7 +3905,12 @@ async function checkForUpdates(opts) {
       // toast kept coming back. Restart-required must be real, not forced.
       if (force || bytesDiffer) {
         fs.mkdirSync(path.dirname(target.dest), { recursive: true });
-        fs.writeFileSync(target.dest, remote);
+        // Atomic write: temp file + rename. A rename within the same dir is
+        // atomic, so a kill mid-write can never leave a truncated/corrupt
+        // install file (critical now that startup force-kills other bridges).
+        const tmp = target.dest + '.tmp-' + process.pid;
+        fs.writeFileSync(tmp, remote);
+        fs.renameSync(tmp, target.dest);
         if (bytesDiffer) {
           result.updated.push(target.label);
           if (target.needsBridgeRestart) result.bridgeChanged = true;
@@ -3982,12 +3987,70 @@ function _selfRespawn(opts) {
   }
 }
 
+// Restart the bridge to load a freshly-written bridge.js. Behaviour depends on
+// how the bridge is supervised:
+//   • Under launchd (CLAUDE_BRIDGE_LAUNCHD=1): exit NON-ZERO. The LaunchAgent's
+//     KeepAlive{Crashed:true} relaunches ONE fresh instance with the new code.
+//     (exit 0 would NOT relaunch because SuccessfulExit:false.) This avoids the
+//     spawn-a-child-then-exit race that fights launchd for the port.
+//   • Otherwise (manual `node bridge.js` in a terminal): spawn a replacement.
+// A 25s sentinel prevents a relaunch storm if the on-disk write keeps failing.
+function _autoRestartForBridgeUpdate(result) {
+  try {
+    const sent = path.join(WORK_DIR, '.last-update-restart');
+    let recent = false;
+    try { recent = (Date.now() - fs.statSync(sent).mtimeMs) < 25000; } catch {}
+    if (recent) {
+      console.log('Bridge update detected, but a restart already happened <25s ago — skipping to avoid a loop.');
+      clog('bridge', 'warn', 'auto-restart suppressed (recent restart)', { updated: result && result.updated });
+      return;
+    }
+    try { fs.writeFileSync(sent, new Date().toISOString() + '\n'); } catch {}
+  } catch {}
+  clog('bridge', 'info', 'restarting to apply bridge update', { updated: result && result.updated, launchd: process.env.CLAUDE_BRIDGE_LAUNCHD === '1' });
+  if (process.env.CLAUDE_BRIDGE_LAUNCHD === '1') {
+    console.log('\nBridge code was updated — exiting so launchd relaunches the new version…\n');
+    setTimeout(() => { try { server.close(); } catch {} process.exit(1); }, 200);
+  } else {
+    console.log('\nBridge code was updated — respawning to load it…\n');
+    _selfRespawn({ forUpdate: true });
+  }
+}
+
 // Retry listen() up to ~10x if the port is still held by the previous
 // instance — used during /restart self-replacement so the new bridge can
 // bind cleanly even if the old one hasn't fully released the socket yet.
+// THERE CAN BE ONLY ONE. Orphaned bridges (PPID 1) that launchd lost track of
+// were squatting the port and serving stale code, blocking every update — and
+// `kickstart` only kills the job's tracked pid, not the orphan. So on startup
+// (and on any EADDRINUSE) we forcibly SIGKILL every OTHER bridge.js process,
+// then bind. The newest instance always wins; zombies/orphans/double-spawns can
+// never persist. Matches the install path so it never touches a dev `node
+// bridge/bridge.js` running from the repo.
+function _killOtherBridges() {
+  let killed = 0;
+  try {
+    const out = require('child_process').execSync(
+      "pgrep -f 'PremiereClaude/bridge.js' 2>/dev/null || true",
+      { encoding: 'utf8' },
+    );
+    const pids = out.split('\n').map(s => s.trim()).filter(Boolean).map(Number)
+      .filter(p => p && p !== process.pid);
+    for (const pid of pids) {
+      try { process.kill(pid, 'SIGKILL'); killed++; } catch {}
+    }
+  } catch {}
+  if (killed) {
+    console.log('Evicted ' + killed + ' other bridge process' + (killed === 1 ? '' : 'es') + ' (single-instance enforce).');
+    clog('bridge', 'warn', 'evicted other bridge instances on startup', { killed });
+  }
+  return killed;
+}
+
 let _listenAttempts = 0;
 function _tryListen() {
   server.listen(PORT, '127.0.0.1', () => {
+    _listenAttempts = 0;
     console.log('Claude Bridge v2 running at http://localhost:' + PORT);
     console.log('Session ID: ' + SESSION_ID);
     console.log('Work dir:   ' + WORK_DIR);
@@ -3998,14 +4061,9 @@ function _tryListen() {
     checkForUpdates()
       .then((result) => {
         // If the bridge's OWN code changed on disk, the running process is
-        // still the OLD code — auto-restart so the update actually takes
-        // effect (instead of just printing "restart the bridge"). The
-        // one-shot env guard ensures the replacement can't loop.
-        if (result && result.bridgeChanged && process.env.CLAUDE_BRIDGE_JUST_RESTARTED_FOR_UPDATE !== '1') {
-          console.log('\nBridge code was updated — auto-restarting to load it…\n');
-          clog('bridge', 'info', 'auto-restarting to apply bridge update', { updated: result.updated });
-          _selfRespawn({ forUpdate: true });
-        }
+        // still the OLD code — restart so the update actually takes effect
+        // (instead of just printing "restart the bridge").
+        if (result && result.bridgeChanged) _autoRestartForBridgeUpdate(result);
       })
       .catch(e => { clog('bridge', 'error', 'update check threw', { error: e.message }); console.error('Update check error:', e.message); });
   });
@@ -4013,12 +4071,18 @@ function _tryListen() {
 server.on('error', (err) => {
   if (err && err.code === 'EADDRINUSE' && _listenAttempts < 10) {
     _listenAttempts++;
-    console.log('Port ' + PORT + ' busy (try ' + _listenAttempts + '/10), retrying in 300ms…');
-    setTimeout(_tryListen, 300);
+    // A squatter holds the port — evict it (it's an orphan we lost track of),
+    // then retry. This is what makes the newest bridge always win.
+    _killOtherBridges();
+    console.log('Port ' + PORT + ' busy (try ' + _listenAttempts + '/10) — evicted squatters, retrying in 400ms…');
+    setTimeout(_tryListen, 400);
   } else {
     console.error('Bridge listen failed:', err);
     process.exit(1);
   }
 });
-_tryListen();
+// Kill any pre-existing bridge before the first bind so we start from a clean
+// single-instance state.
+_killOtherBridges();
+setTimeout(_tryListen, 250);
 

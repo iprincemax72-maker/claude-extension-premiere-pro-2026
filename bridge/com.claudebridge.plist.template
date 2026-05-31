@@ -33,6 +33,8 @@
         <string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
         <key>HOME</key>
         <string>__HOME__</string>
+        <key>CLAUDE_BRIDGE_LAUNCHD</key>
+        <string>1</string>
     </dict>
 
     <key>RunAtLoad</key>
