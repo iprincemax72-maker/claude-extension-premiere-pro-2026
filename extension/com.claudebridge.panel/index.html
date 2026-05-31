@@ -984,9 +984,9 @@
   .chip {
     display: inline-flex;
     align-items: center;
-    background: rgba(255,255,255,0.035);
-    border: 1px solid rgba(255,255,255,0.07);
-    color: var(--text-dim);
+    background: rgba(255,255,255,0.055);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--text);
     padding: 5px 11px;
     border-radius: 8px;
     font-size: 11px;
@@ -2418,6 +2418,11 @@
   }
 
   .ref-bar { flex-wrap: wrap; }
+  /* Reference row: Reference button(s) on the left, Auto-Edit pill on the right */
+  .ref-row { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-soft); padding-right: 9px; }
+  .ref-row .ref-bar { flex: 1 1 auto; border-bottom: none; min-width: 0; }
+  .ref-row .ae-pill { flex: 0 0 auto; margin-right: 0; }
+  body.chat-mode .ref-row .ae-pill { display: none !important; }
   .ref-chip {
     display: inline-flex;
     align-items: center;
@@ -2934,7 +2939,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.51</span>
+    <span class="version-tag" id="versionTag">10.52</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -3276,7 +3281,13 @@
 
 <div class="composer">
   <div class="input-wrap">
-    <div class="ref-bar" id="refBar"></div>
+    <div class="ref-row">
+      <div class="ref-bar" id="refBar"></div>
+      <button class="ae-pill" id="autoeditBtn" type="button" title="Auto-Edit — read the speech and drop motion graphics on V2/V3">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h16"/><circle cx="19" cy="12" r="2.5" fill="currentColor"/></svg>
+        Auto-Edit
+      </button>
+    </div>
     <div class="iter-bar" id="iterBar" style="display:none;"></div>
     <!-- Queue strip — shows the active tab's pending prompts. Rendered by
          renderQueueStrip(); hidden when the queue is empty. -->
@@ -3292,10 +3303,6 @@
         <span class="esc-hint" id="escHint" title="Cancel the current request"><kbd>esc</kbd> cancel</span>
       </div>
       <div class="tb-right">
-      <button class="ae-pill" id="autoeditBtn" type="button" title="Auto-Edit — read the speech and drop motion graphics on V2/V3">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h16"/><circle cx="19" cy="12" r="2.5" fill="currentColor"/></svg>
-        Auto-Edit
-      </button>
       <div class="rmode-group" id="renderModeGroup" title="How hard Claude works on the animation — Fast: quick template-based, ~1 min. Default: a real custom-built animation, no templates (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
         <button class="rmode-pill" data-rmode="fast" type="button" title="Fast — quick template-based animation, ~1 min">Fast</button>
         <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
@@ -5502,7 +5509,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.51';
+  const PANEL_VERSION = '10.52';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
