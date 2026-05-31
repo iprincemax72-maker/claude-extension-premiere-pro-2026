@@ -953,6 +953,12 @@ async function detectInterviewQuestions(sentences, density, log) {
       { value: 'editorial', label: 'Bold editorial' },
       { value: 'luxury',    label: 'Luxury & moody' },
     ] },
+    { id: 'ratio', q: 'Aspect ratio of the video?', type: 'single', options: [
+      { value: '1920x1080', label: 'Landscape 16:9 (1920×1080)' },
+      { value: '1080x1920', label: 'Vertical 9:16 (1080×1920)' },
+      { value: '1080x1080', label: 'Square 1:1 (1080×1080)' },
+      { value: '1080x1350', label: 'Portrait 4:5 (1080×1350)' },
+    ] },
   ];
   try {
     const sample = sentences.slice(0, 220).map((s, i) => `[${i}] ${s.text}`).join('\n').slice(0, 8000);
@@ -1215,6 +1221,8 @@ function _momentPayloadText(m) {
 //     drop the cap back to 6-8 in this same constant.
 function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
   const PARALLEL_CAP = 16;
+  const vidW = (genOpts && genOpts.width)  || 1920;
+  const vidH = (genOpts && genOpts.height) || 1080;
   const MAX_INFLIGHT = Math.min(moments.length || 1, PARALLEL_CAP);
   const cacheDir = path.join(OUTPUT_DIR, 'cache');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
@@ -1280,7 +1288,8 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
       '- DO use the style library at ' + WORK_DIR + '/remotion-intro/src/lib/',
       '  for easings, palettes, typography and motion helpers — read the files',
       '  you need first to get exact export names.',
-      '- 1920x1080, 30fps, EXACTLY ' + task.durationFrames + ' frames.',
+      '- ' + vidW + 'x' + vidH + ', 30fps, EXACTLY ' + task.durationFrames + ' frames.'
+        + (vidW < vidH ? ' This is a VERTICAL frame — compose for a tall 9:16-ish canvas (stack elements, keep text within the centre safe area).' : (vidW === vidH ? ' This is a SQUARE frame.' : '')),
       '- TRANSPARENT background — this is CRITICAL. The composition root must',
       '  have NO opaque background (no solid-color AbsoluteFill behind it).',
       '  Render with EXACTLY this codec config so the alpha channel survives:',
@@ -3719,7 +3728,13 @@ const server = http.createServer((req, res) => {
         const styleMode = (answers.styleConsistency === 'vary') ? 'vary' : 'same';
         const tone = answers.tone || 'minimal';
         const styleSpec = buildStyleSpec(tone);
-        log(`AUTO EDIT run reqId=${reqId} density=${density} styleMode=${styleMode} tone=${tone} answers=${JSON.stringify(answers)}`);
+        // Aspect ratio → overlay resolution. Default landscape 1920x1080.
+        const rm = String(answers.ratio || '1920x1080').match(/(\d{3,4})\s*x\s*(\d{3,4})/);
+        let vidW = rm ? parseInt(rm[1], 10) : 1920;
+        let vidH = rm ? parseInt(rm[2], 10) : 1080;
+        if (!(vidW >= 240 && vidW <= 4096)) vidW = 1920;
+        if (!(vidH >= 240 && vidH <= 4096)) vidH = 1080;
+        log(`AUTO EDIT run reqId=${reqId} density=${density} styleMode=${styleMode} tone=${tone} res=${vidW}x${vidH} answers=${JSON.stringify(answers)}`);
 
         // ── Plan (answer-steered) ─────────────────────────────────────────
         broadcastProgress('Planning the edit', 30, reqId);
@@ -3759,7 +3774,7 @@ const server = http.createServer((req, res) => {
         broadcastProgress('Generating motion graphics', 42, reqId);
         const renderResults = await generateMomentsParallel(plan, reqId, log, (done, total) => {
           broadcastProgress(`Generating motion graphics (${done}/${total})`, 42 + Math.floor((done / total) * 48), reqId);
-        }, { styleMode, styleSpec });
+        }, { styleMode, styleSpec, width: vidW, height: vidH });
 
         const applied = renderResults.filter(r => r && r.ok).map(r => ({ ...r, timelineSec: r.atSec }));
         const skipped = renderResults.filter(r => r && !r.ok);

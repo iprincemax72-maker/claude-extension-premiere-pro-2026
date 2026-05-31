@@ -2080,6 +2080,31 @@
   .ae-optbtn.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
   .ae-err { font-size: 11.5px; color: var(--accent); margin: 8px 0 2px; min-height: 1px; }
 
+  /* Minimized Auto-Edit chip — lets you work in Premiere while it transcribes */
+  .ae-mini {
+    position: fixed; right: 14px; bottom: 14px; z-index: 10000;
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 8px 8px 12px;
+    background: rgba(28,26,24,0.97);
+    border: 1px solid rgba(217,119,87,0.45); border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    font-size: 11.5px; color: var(--text);
+  }
+  .ae-mini .ae-spinner { width: 14px; height: 14px; }
+  .ae-mini-label b { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .ae-mini-restore {
+    font: inherit; font-size: 11px; color: #fff;
+    background: var(--accent); border: none; border-radius: 8px;
+    padding: 4px 11px; cursor: pointer;
+  }
+  .ae-mini-restore:hover { filter: brightness(1.08); }
+  .ae-mini-cancel {
+    font: inherit; background: none; border: none;
+    color: var(--text-dim); cursor: pointer; font-size: 14px;
+    line-height: 1; padding: 2px 5px;
+  }
+  .ae-mini-cancel:hover { color: var(--accent); }
+
   .autocut-card {
     margin-top: 10px;
     padding: 10px 12px;
@@ -2901,6 +2926,7 @@
       <div class="ae-wizard-spinner"><div class="ae-spinner"></div><span id="aeAnalyzeElapsed">0s</span></div>
       <div class="autocut-modal-actions">
         <button type="button" class="autocut-modal-cancel" data-ae-cancel>Cancel</button>
+        <button id="aeMinBtn" type="button" class="autocut-modal-go">Minimize — keep working</button>
       </div>
     </div>
 
@@ -2916,6 +2942,14 @@
     </div>
 
   </div>
+</div>
+
+<!-- Minimized Auto-Edit chip (shown while analyzing, so you can keep working) -->
+<div class="ae-mini" id="aeMiniChip" style="display:none">
+  <div class="ae-spinner"></div>
+  <span class="ae-mini-label">Reading your video… <b id="aeMiniElapsed">0s</b></span>
+  <button class="ae-mini-restore" id="aeMiniRestore" type="button">Open</button>
+  <button class="ae-mini-cancel" id="aeMiniCancel" type="button" title="Cancel Auto-Edit">&times;</button>
 </div>
 
 <!-- History Panel (overlay) -->
@@ -6409,9 +6443,22 @@ function aeShowStep(step) {
     el.style.display = (el.getAttribute('data-step') === step) ? 'block' : 'none';
   });
 }
+let aeMinimized = false;
 function closeAutoeditModal() {
   autoeditModal.classList.remove('show');
+  aeMinimized = false;
+  const chip = document.getElementById('aeMiniChip'); if (chip) chip.style.display = 'none';
   if (aeWizard && aeWizard.ticker) { clearInterval(aeWizard.ticker); aeWizard.ticker = null; }
+}
+function aeMinimize() {
+  aeMinimized = true;
+  autoeditModal.classList.remove('show');
+  const chip = document.getElementById('aeMiniChip'); if (chip) chip.style.display = 'flex';
+}
+function aeRestore() {
+  aeMinimized = false;
+  const chip = document.getElementById('aeMiniChip'); if (chip) chip.style.display = 'none';
+  autoeditModal.classList.add('show');
 }
 async function openAutoeditModal() {
   try {
@@ -6471,6 +6518,11 @@ function aeCancelWizard() {
 // STEP 1 → analyze
 const aeStartBtn = document.getElementById('aeStartBtn');
 if (aeStartBtn) aeStartBtn.addEventListener('click', analyzeAutoEdit);
+{
+  const mb = document.getElementById('aeMinBtn'); if (mb) mb.addEventListener('click', aeMinimize);
+  const mr = document.getElementById('aeMiniRestore'); if (mr) mr.addEventListener('click', aeRestore);
+  const mc = document.getElementById('aeMiniCancel'); if (mc) mc.addEventListener('click', aeCancelWizard);
+}
 async function analyzeAutoEdit() {
   const density = (document.querySelector('input[name="aeDensity"]:checked') || {}).value || 'moderate';
   aeWizard.density = density;
@@ -6495,9 +6547,14 @@ async function analyzeAutoEdit() {
 
   aeShowStep('analyzing');
   const elapsedEl = document.getElementById('aeAnalyzeElapsed');
+  const miniElapsedEl = document.getElementById('aeMiniElapsed');
   const startedAt = Date.now();
   if (aeWizard.ticker) clearInterval(aeWizard.ticker);
-  aeWizard.ticker = setInterval(() => { if (elapsedEl) elapsedEl.textContent = Math.floor((Date.now() - startedAt) / 1000) + 's'; }, 500);
+  aeWizard.ticker = setInterval(() => {
+    const t = Math.floor((Date.now() - startedAt) / 1000) + 's';
+    if (elapsedEl) elapsedEl.textContent = t;
+    if (miniElapsedEl) miniElapsedEl.textContent = t;
+  }, 500);
 
   try {
     const resp = await fetch(BRIDGE + '/autoedit/analyze', {
@@ -6510,6 +6567,7 @@ async function analyzeAutoEdit() {
       let m = 'Bridge returned ' + resp.status;
       try { const e = await resp.json(); if (e.error) m = e.error; } catch {}
       aeShowStep('options'); if (errEl) errEl.textContent = m;
+      if (aeMinimized) aeRestore();
       activeAutoedit = null; updateEscHint && updateEscHint();
       return;
     }
@@ -6519,10 +6577,12 @@ async function analyzeAutoEdit() {
     activeAutoedit = null; updateEscHint && updateEscHint();
     renderAeQuestions();
     aeShowStep('questions');
+    if (aeMinimized) aeRestore();   // pop back up — it's time to answer
   } catch (e) {
     if (aeWizard.ticker) { clearInterval(aeWizard.ticker); aeWizard.ticker = null; }
     if (e && e.name === 'AbortError') return; // cancelled by user
     aeShowStep('options'); if (errEl) errEl.textContent = 'Analyze failed: ' + (e.message || e);
+    if (aeMinimized) aeRestore();
     activeAutoedit = null; updateEscHint && updateEscHint();
   }
 }
