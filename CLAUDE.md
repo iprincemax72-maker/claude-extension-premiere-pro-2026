@@ -263,11 +263,17 @@ The Desktop launcher (`Claude Bridge.command` / `Claude Bridge.bat`) is now a **
 
 ### Auto-update
 
-On every bridge launch (unless `CLAUDE_BRIDGE_NO_UPDATE=1` is set), the bridge fetches the latest `index.html`, `host.jsx`, `manifest.xml`, and `bridge.js` from GitHub raw. Diffs against on-disk; overwrites only if changed.
+Source-of-truth resolution: the bridge prefers a **local repo** if it finds one (`~/All Claude Work/claude-extension-premiere-pro-2026`, or `CLAUDE_BRIDGE_LOCAL_SOURCE`), else **GitHub raw**. It syncs the latest `index.html`, `host.jsx`, `manifest.xml`, and `bridge.js`; diffs against on-disk and writes (atomically — temp file + rename) only when bytes differ.
 
-**Critical caveat for development:** when developing locally, set `CLAUDE_BRIDGE_NO_UPDATE=1` in the env before spawning, otherwise auto-update will overwrite your local edits with the older GitHub version.
+**`checkForUpdates()` runs on launch AND on a 3-minute interval** (`_updatePoll`). This periodic check is what makes a long-running bridge pick up pushed changes without a manual restart — it was the missing piece that made auto-update appear broken. Panel/host/manifest changes apply silently (the panel's `/version` mtime poll reloads it when safe); a `bridge.js` change triggers a self-restart **only when idle** (`_bridgeBusy()` = no in-flight chat/autoedit/autocut, tracked via `_heavyInflight`), deferred to the next tick otherwise.
 
-A small ↻ button in the panel header triggers `/update` manually. Toast feedback: *"Updated: panel UI, ExtendScript"* / *"Already up to date"* / *"Update failed: ..."*.
+**Self-restart mechanics** (`_autoRestartForBridgeUpdate`): under launchd (`CLAUDE_BRIDGE_LAUNCHD=1` in the plist) it `process.exit(1)` so `KeepAlive{Crashed:true}` relaunches ONE clean instance (exit 0 wouldn't, since `SuccessfulExit:false`). Non-launchd runs spawn a replacement (`_selfRespawn`). A 25s sentinel (`.last-update-restart`) prevents any relaunch storm.
+
+**THERE CAN BE ONLY ONE** (`_killOtherBridges`): on startup and on every `EADDRINUSE`, the bridge SIGKILLs any other `PremiereClaude/bridge.js` process before binding. This permanently fixed the orphaned-bridge-squatting-the-port class of bugs (`kickstart` only kills the job's tracked pid, not orphans). If you ever see EADDRINUSE loops, an orphan was the cause — this now self-heals.
+
+**Critical caveat for development:** set `CLAUDE_BRIDGE_NO_UPDATE=1` before spawning a dev bridge, otherwise auto-update will overwrite your in-progress edits with whatever is committed.
+
+A small ↻ button in the panel header triggers `/update` manually (force). Toast feedback: *"Updated: panel UI, ExtendScript"* / *"Already up to date"* / *"Update failed: ..."*.
 
 ### Chat + render flow
 
