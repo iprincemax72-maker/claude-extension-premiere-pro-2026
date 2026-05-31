@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "5.1";
+var HOST_JSX_VERSION = "5.2";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -401,6 +401,196 @@ function ccGetSelectedClip() {
             inPoint: clipInPt,
             outPoint: clipOutPt,
             duration: clipDur,
+        });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e) });
+    }
+}
+
+// ── AUTO-EDIT v2 selection ────────────────────────────────────────────────
+// Resolve a projectItem's underlying media-file path using the same 4-method
+// cascade ccGetSelectedClip uses. Returns "" when there is no single file
+// (e.g. a nested sequence — handled separately by _ccFindNestedSequence).
+function _ccResolveMediaPath(pi) {
+    if (!pi) return "";
+    var path = _ccSafe(function () { return pi.getMediaPath && pi.getMediaPath(); }) || "";
+    if (path) return path;
+    path = _ccSafe(function () { return pi.getColumnMetadata && pi.getColumnMetadata("Column.Intrinsic.MediaPath"); }) || "";
+    if (path) return path;
+    path = _ccSafe(function () {
+        if (!pi.getXMPMetadata) return "";
+        var xmp = pi.getXMPMetadata();
+        if (!xmp) return "";
+        var patterns = [/<xmpDM:filePath>([^<]+)<\/xmpDM:filePath>/i, /<filePath[^>]*>([^<]+)<\/filePath>/i];
+        for (var i = 0; i < patterns.length; i++) {
+            var m = xmp.match(patterns[i]);
+            if (m && m[1] && (m[1].indexOf("/") >= 0 || m[1].indexOf("\\") >= 0)) return m[1].replace(/^file:\/\//, "");
+        }
+        return "";
+    }) || "";
+    if (path) return path;
+    path = _ccSafe(function () {
+        if (typeof app.enableQE === "function") app.enableQE();
+        if (typeof qe === "undefined" || !qe || !qe.project) return "";
+        var targetId = _ccSafe(function () { return pi.nodeId; });
+        if (!targetId) return "";
+        function walk(parent, depth) {
+            if (!parent || depth > 8) return "";
+            var n = _ccSafe(function () { return parent.numItems; });
+            if (typeof n !== "number") return "";
+            for (var i = 0; i < n; i++) {
+                var ch = _ccSafe(function () { return parent.getItemAt(i); });
+                if (!ch) continue;
+                var chId = _ccSafe(function () { return ch.nodeId; });
+                if (chId === targetId) {
+                    var fp = _ccSafe(function () { return ch.filePath; });
+                    if (fp) return fp;
+                }
+                var sub = walk(ch, depth + 1);
+                if (sub) return sub;
+            }
+            return "";
+        }
+        return walk(qe.project, 0) || "";
+    }) || "";
+    return path;
+}
+
+// A clip whose projectItem has no media file but IS a sequence = a nested
+// sequence. Find the matching Sequence object so we can walk its real media.
+function _ccFindNestedSequence(pi) {
+    if (!pi) return null;
+    var piId = _ccSafe(function () { return pi.nodeId; });
+    var piName = _ccSafe(function () { return pi.name; });
+    var seqs = _ccSafe(function () { return app.project.sequences; });
+    if (!seqs) return null;
+    var n = _ccSafe(function () { return seqs.numSequences; });
+    if (typeof n !== "number") n = _ccSafe(function () { return seqs.length; });
+    if (typeof n !== "number") return null;
+    var byName = null;
+    for (var i = 0; i < n; i++) {
+        var s = _ccSafe(function () { return seqs[i]; });
+        if (!s) continue;
+        var sPi = _ccSafe(function () { return s.projectItem; });
+        var sId = sPi && _ccSafe(function () { return sPi.nodeId; });
+        if (sId && piId && sId === piId) return s;
+        var sName = _ccSafe(function () { return s.name; });
+        if (sName && piName && sName === piName) byName = s;
+    }
+    return byName; // name match is the fallback when nodeIds don't line up
+}
+
+// Walk a nested sequence's tracks and return audio segments that fall inside
+// the [outerIn, outerOut] portion the outer clip actually uses, each mapped to
+// where it lands on the OUTER timeline. Prefers audio tracks (clean speech);
+// falls back to video tracks (embedded audio) when there are no audio clips.
+function _ccNestedAudioSegments(nseq, outerTimelineStart, outerIn, outerOut) {
+    var segs = [];
+    function collect(tracks) {
+        if (!tracks) return;
+        var nt = _ccSafe(function () { return tracks.numTracks; });
+        if (typeof nt !== "number") return;
+        for (var t = 0; t < nt; t++) {
+            var trk = _ccSafe(function () { return tracks[t]; });
+            var clips = trk && _ccSafe(function () { return trk.clips; });
+            if (!clips) continue;
+            var nc = _ccSafe(function () { return clips.numItems; });
+            for (var c = 0; c < nc; c++) {
+                var cl = _ccSafe(function () { return clips[c]; });
+                if (!cl) continue;
+                var cpi = _ccSafe(function () { return cl.projectItem; });
+                var p = _ccResolveMediaPath(cpi);
+                if (!p) continue;
+                var nStart = _ccSafe(function () { return cl.start && cl.start.seconds; });
+                var nEnd   = _ccSafe(function () { return cl.end && cl.end.seconds; });
+                var srcIn  = _ccSafe(function () { return cl.inPoint && cl.inPoint.seconds; });
+                if (typeof nStart !== "number" || typeof nEnd !== "number") continue;
+                var lo = Math.max(nStart, outerIn);
+                var hi = Math.min(nEnd, outerOut);
+                if (hi - lo < 0.05) continue;            // outside the used portion
+                var srcLo = (typeof srcIn === "number" ? srcIn : 0) + (lo - nStart);
+                var srcHi = srcLo + (hi - lo);
+                var tl = outerTimelineStart + (lo - outerIn);
+                segs.push({ path: p, inSec: srcLo, outSec: srcHi, timelineStart: tl });
+            }
+        }
+    }
+    collect(_ccSafe(function () { return nseq.audioTracks; }));
+    if (!segs.length) collect(_ccSafe(function () { return nseq.videoTracks; }));
+    return segs;
+}
+
+// Return EVERY selected clip (across all tracks), resolved down to a flat list
+// of audio segments in timeline order — supports multi-clip selection (a whole
+// cut-up video) AND nested sequences. Linked A/V duplicates are de-duped.
+function ccGetSelectedClips() {
+    try {
+        if (typeof app === "undefined" || !app || !app.project) return JSON.stringify({ ok: false, error: "no project" });
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) return JSON.stringify({ ok: false, error: "no active sequence" });
+
+        var sel = [];
+        function scan(tracks, kind) {
+            if (!tracks) return;
+            var nt = _ccSafe(function () { return tracks.numTracks; });
+            if (typeof nt !== "number") return;
+            for (var t = 0; t < nt; t++) {
+                var trk = _ccSafe(function () { return tracks[t]; });
+                var clips = trk && _ccSafe(function () { return trk.clips; });
+                if (!clips) continue;
+                var nc = _ccSafe(function () { return clips.numItems; });
+                for (var i = 0; i < nc; i++) {
+                    var c = _ccSafe(function () { return clips[i]; });
+                    if (c && c.isSelected && c.isSelected()) sel.push({ clip: c, kind: kind, trackIdx: t });
+                }
+            }
+        }
+        scan(_ccSafe(function () { return seq.videoTracks; }), "video");
+        scan(_ccSafe(function () { return seq.audioTracks; }), "audio");
+        if (!sel.length) return JSON.stringify({ ok: false, error: "no clip selected" });
+
+        var clips = [], allSegs = [], spanLo = Infinity, spanHi = -Infinity;
+        for (var k = 0; k < sel.length; k++) {
+            var found = sel[k].clip;
+            var pi = _ccSafe(function () { return found.projectItem; });
+            var name = _ccSafe(function () { return found.name; }) || "";
+            var tlStart = _ccSafe(function () { return found.start && found.start.seconds; });
+            var tlEnd   = _ccSafe(function () { return found.end && found.end.seconds; });
+            var inPt    = _ccSafe(function () { return found.inPoint && found.inPoint.seconds; });
+            var outPt   = _ccSafe(function () { return found.outPoint && found.outPoint.seconds; });
+            if (typeof tlStart !== "number") continue;
+            var dur = (typeof tlEnd === "number") ? (tlEnd - tlStart) : null;
+            var inV = (typeof inPt === "number") ? inPt : 0;
+            var outV = (typeof outPt === "number") ? outPt : (inV + (dur || 0));
+
+            var path = _ccResolveMediaPath(pi);
+            var nested = false, segs = [];
+            if (path) {
+                segs = [{ path: path, inSec: inV, outSec: outV, timelineStart: tlStart }];
+            } else {
+                var nseq = _ccFindNestedSequence(pi);
+                if (nseq) { nested = true; segs = _ccNestedAudioSegments(nseq, tlStart, inV, outV); }
+            }
+            if (!segs.length) continue;
+            for (var s = 0; s < segs.length; s++) allSegs.push(segs[s]);
+            if (tlStart < spanLo) spanLo = tlStart;
+            if (typeof tlEnd === "number" && tlEnd > spanHi) spanHi = tlEnd;
+            clips.push({ name: name, nested: nested, kind: sel[k].kind, timelineStart: tlStart, timelineEnd: tlEnd, inPoint: inV, outPoint: outV, segmentCount: segs.length });
+        }
+        if (!allSegs.length) return JSON.stringify({ ok: false, error: "Couldn't resolve media for the selected clip(s). If it's a nested sequence, make sure it contains audio." });
+
+        // De-dupe linked A/V (video clip + its linked audio share file/time).
+        allSegs.sort(function (a, b) { return a.timelineStart - b.timelineStart; });
+        var seen = {}, deduped = [];
+        for (var d = 0; d < allSegs.length; d++) {
+            var g = allSegs[d];
+            var key = g.path + "|" + Math.round(g.timelineStart * 10) + "|" + Math.round(g.inSec * 10);
+            if (seen[key]) continue;
+            seen[key] = 1; deduped.push(g);
+        }
+        return JSON.stringify({
+            ok: true, count: clips.length, clips: clips, segments: deduped,
+            span: { start: spanLo, end: spanHi }, durationSec: (spanHi - spanLo),
         });
     } catch (e) {
         return JSON.stringify({ ok: false, error: String(e) });
@@ -872,8 +1062,13 @@ function ccAutoEditApply(payloadJson) {
             var item = _ccFindItemByPath(app.project.rootItem, it.file, 0);
             if (!item) { skipped.push({ index: i, file: it.file, reason: "item not found after import" }); continue; }
 
-            // 2. Compute target timeline time (snap to frame).
-            var rawSec = timelineStart + (it.atSec - inPt);
+            // 2. Compute target timeline time (snap to frame). Auto-Edit v2
+            //    sends timelineSec already in timeline time (multi-clip /
+            //    nested); legacy single-clip sends source-media atSec which we
+            //    offset by where the selected clip sits.
+            var rawSec = (typeof it.timelineSec === "number")
+                ? it.timelineSec
+                : (timelineStart + (it.atSec - inPt));
             var snappedSec = Math.floor(rawSec * fps) / fps;
             if (snappedSec < 0) snappedSec = 0;
 

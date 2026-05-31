@@ -632,7 +632,7 @@ function ensurePremiereImportable(absPath) {
 // Send sentence-level transcript to Claude and ask for a JSON list of
 // "moments" — points in the video that deserve a motion graphic. Returns
 // an array of Moment objects (see schema above the /autoedit endpoint).
-function detectMoments(sentences, density, styleOverride, reqId, log) {
+function detectMoments(sentences, density, styleOverride, reqId, log, extraGuidance) {
   return new Promise((resolve) => {
     const targetCount = density === 'sparse' ? Math.max(3, Math.floor(sentences.length / 18))
                       : density === 'dense'  ? Math.max(8, Math.floor(sentences.length / 6))
@@ -697,7 +697,7 @@ function detectMoments(sentences, density, styleOverride, reqId, log) {
       '     Exactly like this (one object per line):',
       '     {"id":"m1","type":"callout","startIndex":2,"endIndex":3,"label":"Key point","payload":{"text":"THE BIG IDEA"},"confidence":0.8}',
       '     {"id":"m2","type":"fact","startIndex":5,"endIndex":6,"label":"Supporting fact","payload":{"text":"a short fact"},"confidence":0.7}',
-    ].join('\n');
+    ].join('\n') + (extraGuidance ? '\n\n' + extraGuidance : '');
 
     const user = 'TRANSCRIPT (one line per spoken segment, [N] is the line index):\n' + transcriptForClaude;
     const fullPrompt = system + '\n\n' + user;
@@ -859,6 +859,238 @@ function detectMoments(sentences, density, styleOverride, reqId, log) {
   });
 }
 
+// ════════════════════════════════════════════════════════════════════════
+//  AUTO-EDIT v2 — interview → plan → fit-check, plus multi-segment audio.
+// ════════════════════════════════════════════════════════════════════════
+
+// In-memory transcript cache so /autoedit/analyze (transcribe + ask) and
+// /autoedit/run (plan + generate) don't transcribe twice. Pruned by age/size.
+const _autoeditCache = new Map();   // reqId -> { sentences, span, density, style, createdAt }
+function _aeCacheSet(reqId, val) {
+  val.createdAt = Date.now();
+  _autoeditCache.set(reqId, val);
+  // prune: drop >30min old, then cap to 20 newest
+  const now = Date.now();
+  for (const [k, v] of _autoeditCache) if (now - (v.createdAt || 0) > 30 * 60 * 1000) _autoeditCache.delete(k);
+  if (_autoeditCache.size > 20) {
+    const oldest = [..._autoeditCache.entries()].sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0));
+    for (let i = 0; i < oldest.length - 20; i++) _autoeditCache.delete(oldest[i][0]);
+  }
+}
+
+// One-shot Haiku text call (no tools, no session) — used for the interview
+// questions and the plan fit-check. Returns raw stdout (best-effort; '' on
+// failure so callers degrade gracefully). Registered as an _activeAutoedit
+// child so ESC cancels it.
+function runClaudeText(promptStr, timeoutMs, log, label) {
+  return new Promise((resolve) => {
+    const claudePath = process.env.CLAUDE_CLI || 'claude';
+    const extendedPath = [process.env.PATH || '', '/Users/anshdhakad/.local/bin', '/opt/homebrew/bin', '/usr/local/bin'].filter(Boolean).join(':');
+    const proc = spawn(claudePath, [
+      '-p', promptStr,
+      '--output-format', 'text',
+      '--model', 'claude-haiku-4-5-20251001',
+      '--permission-mode', 'bypassPermissions',
+      '--no-session-persistence',
+    ], { env: { ...process.env, PATH: extendedPath }, cwd: os.tmpdir(), stdio: ['ignore', 'pipe', 'pipe'] });
+    if (_activeAutoedit) _activeAutoedit.children.add(proc);
+    let out = '', err = '', done = false;
+    const killer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, timeoutMs);
+    proc.stdout.on('data', d => out += d);
+    proc.stderr.on('data', d => err += d.toString().slice(-1000));
+    const end = (code) => {
+      if (done) return; done = true;
+      clearTimeout(killer);
+      if (_activeAutoedit) _activeAutoedit.children.delete(proc);
+      log && log(`${label}: exit ${code} ${out.length}B` + (err ? ' stderr=' + err.slice(-200) : ''));
+      resolve(out);
+    };
+    proc.on('exit', end); proc.on('close', end);
+    proc.on('error', (e) => { if (done) return; done = true; clearTimeout(killer); log && log(`${label} spawn err ${e.message}`); resolve(''); });
+  });
+}
+
+// Concrete, named visual styles. When the user picks "same style for the whole
+// video" we lock ONE of these and feed it into every graphic prompt so all the
+// overlays look like a single designed set (fixes "they all look the same /
+// random"). When they pick "vary", each graphic gets its own look instead.
+const STYLE_PRESETS = {
+  minimal:   { palette: 'near-white text #F5F3EC over a subtle dark scrim, single warm accent #D97757', font: 'clean grotesk sans (Inter / Helvetica Neue), tight tracking', motion: 'gentle fades + small upward slides on soft springs', inout: 'fade + slide-up in, fade out' },
+  energetic: { palette: 'high-contrast white + electric accent #FF4D2E, bold and punchy', font: 'heavy condensed sans, ALL-CAPS emphasis words', motion: 'fast spring pops, scale overshoot, quick staggered reveals', inout: 'scale/slam in, snap out' },
+  editorial: { palette: 'paper #ECE7DD with ink #1A1916 and one red rule #C8312B', font: 'serif display headline + grotesk caption, magazine feel', motion: 'masked clip-wipes, baseline slides, measured timing', inout: 'mask/clip reveal in, wipe out' },
+  luxury:    { palette: 'mocha #2A211C with champagne #C9A86A, low-key and refined', font: 'elegant serif with generous letter-spacing', motion: 'slow eases, soft blur-in, nothing abrupt', inout: 'blur + fade in, slow fade out' },
+};
+function buildStyleSpec(tone) {
+  const p = STYLE_PRESETS[tone] || STYLE_PRESETS.minimal;
+  return ['  - palette: ' + p.palette, '  - typography: ' + p.font, '  - motion feel: ' + p.motion, '  - entry/exit: ' + p.inout].join('\n');
+}
+
+// Turn the user's interview answers into a short guidance block appended to the
+// moment-detection prompt. Style/tone are handled separately, so skip them.
+function buildMomentGuidance(answers) {
+  if (!answers || typeof answers !== 'object') return '';
+  const bits = [];
+  for (const k in answers) {
+    if (k === 'styleConsistency' || k === 'tone') continue;
+    const v = answers[k];
+    if (v && typeof v === 'string') bits.push(v);
+  }
+  return bits.length ? ('USER PREFERENCES — honor these when choosing moments:\n  - ' + bits.join('\n  - ')) : '';
+}
+
+// Read the transcript and ask the user a couple of SMART, content-based
+// multiple-choice questions, on top of two fixed ones (style consistency +
+// tone). Returns an array of { id, q, type, options:[{value,label}] }.
+async function detectInterviewQuestions(sentences, density, log) {
+  const fixed = [
+    { id: 'styleConsistency', q: 'Same visual style across the whole video, or mix it up per moment?', type: 'single', options: [
+      { value: 'same', label: 'Same style throughout — one consistent look' },
+      { value: 'vary', label: 'Vary it per moment — different looks' },
+    ] },
+    { id: 'tone', q: 'Overall visual tone?', type: 'single', options: [
+      { value: 'minimal',   label: 'Clean & minimal' },
+      { value: 'energetic', label: 'Energetic & punchy' },
+      { value: 'editorial', label: 'Bold editorial' },
+      { value: 'luxury',    label: 'Luxury & moody' },
+    ] },
+  ];
+  try {
+    const sample = sentences.slice(0, 220).map((s, i) => `[${i}] ${s.text}`).join('\n').slice(0, 8000);
+    const system = [
+      'You are a motion-graphics editor about to add on-screen graphics to a talking-head video.',
+      'Read the transcript and ask UP TO 2 short multiple-choice questions whose answers would change HOW you edit — based on the ACTUAL content you see (the real topics, names, numbers, lists).',
+      'Examples: if there is an enumerated list, ask whether to animate it as a checklist or skip it; if there are statistics, ask how prominent the numbers should be; if names/people are introduced, ask whether to add lower-third name tags.',
+      'Do NOT ask about visual style, tone, colour, font, or density — those are decided separately. Content-driven questions ONLY.',
+      'Output JSONL — ONE compact JSON object per line. No array, no prose, no markdown fences:',
+      '{"id":"c1","q":"There\'s a 3-step list around the middle — show it as…","options":[{"value":"checklist","label":"Animated checklist"},{"value":"caption","label":"Just captions"},{"value":"skip","label":"Skip it"}]}',
+      'Each question: 2-3 options, each with a short value and a human label. Max 2 questions. If the content is unremarkable, output NOTHING.',
+    ].join('\n');
+    const raw = await runClaudeText(system + '\n\nTRANSCRIPT:\n' + sample, 90000, log, 'interview');
+    const content = [];
+    for (const line of String(raw).split('\n')) {
+      let t = line.trim();
+      if (!t || t[0] !== '{') continue;
+      t = t.replace(/,\s*$/, '');
+      try {
+        const o = JSON.parse(t);
+        if (o && o.q && Array.isArray(o.options) && o.options.length >= 2) {
+          o.id = 'c' + (content.length + 1);
+          o.type = 'single';
+          o.options = o.options.slice(0, 4).map(op => ({ value: String(op.value || op.label || ''), label: String(op.label || op.value || '') }));
+          content.push({ id: o.id, q: String(o.q), type: 'single', options: o.options });
+        }
+      } catch {}
+      if (content.length >= 2) break;
+    }
+    log && log(`interview: ${content.length} content questions generated`);
+    return fixed.concat(content);
+  } catch (e) {
+    log && log('interview failed, using fixed questions only: ' + e.message);
+    return fixed;
+  }
+}
+
+// Double-check the plan FITS the video before the expensive generate step.
+// (1) deterministic clamp — every moment must lie inside the span, have a
+// positive duration, and not run past the end. (2) a light Claude review that
+// drops clearly bad/duplicate picks and writes a one-line fit summary.
+async function verifyPlan(moments, sentences, spanStart, spanEnd, log) {
+  let m = (moments || [])
+    .filter(x => x && typeof x.startSec === 'number' && typeof x.endSec === 'number')
+    .map(x => {
+      const st = Math.max(spanStart, x.startSec);
+      let en = Math.min(spanEnd, x.endSec);
+      if (en <= st) en = Math.min(spanEnd, st + 1.5);
+      return { ...x, startSec: st, endSec: en };
+    })
+    .filter(x => x.endSec > x.startSec && x.startSec >= spanStart - 0.01 && x.startSec < spanEnd);
+
+  let report = `Fit check: ${m.length} graphics, all inside the ${Math.round(spanEnd - spanStart)}s span.`;
+  try {
+    const list = m.map((x, i) => `${i}. [${x.startSec.toFixed(1)}-${x.endSec.toFixed(1)}s] ${x.type}: ${String(x.label || _momentPayloadText(x)).slice(0, 70)}`).join('\n');
+    const sys = [
+      `You are reviewing a motion-graphics edit plan for a ${Math.round(spanEnd - spanStart)}s video, BEFORE it is rendered.`,
+      'For each graphic, decide if it FITS: timing is reasonable, it is not redundant with its immediate neighbours, and the label makes sense for that type.',
+      'Return ONE JSON object only, nothing else: {"drop":[<indices to remove>],"note":"<one short sentence on the overall fit>"}.',
+      'Be conservative — only drop clearly bad or duplicate graphics. An empty drop list is the normal, expected answer.',
+    ].join('\n');
+    const raw = await runClaudeText(sys + '\n\nPLAN:\n' + list, 90000, log, 'verify');
+    const mt = String(raw).match(/\{[\s\S]*\}/);
+    if (mt) {
+      const v = JSON.parse(mt[0]);
+      if (Array.isArray(v.drop) && v.drop.length) {
+        const ds = new Set(v.drop.map(Number));
+        const kept = m.filter((_, i) => !ds.has(i));
+        if (kept.length) m = kept;   // never let verify nuke the whole plan
+      }
+      if (v.note) report = `Fit check: ${String(v.note).slice(0, 160)} (${m.length} graphics)`;
+    }
+  } catch (e) { log && log('verify review skipped: ' + e.message); }
+  return { moments: m, report };
+}
+
+// Extract + concatenate the audio of N timeline segments into ONE 16kHz mono
+// WAV for transcription, and return a map so transcript times (relative to the
+// concatenated wav) can be converted back to absolute TIMELINE seconds. This
+// is what makes multi-clip selection and nested sequences work: each clip /
+// nested sub-clip is one segment; their audio is stitched in timeline order.
+async function extractConcatAudio(segments, reqId, log) {
+  const tmpBase = path.join(OUTPUT_DIR, `_ae_${reqId.slice(0, 8)}`);
+  const partPaths = [];
+  const timeMap = [];
+  let cum = 0;
+  for (let i = 0; i < segments.length; i++) {
+    const s = segments[i];
+    const dur = Math.max(0, (Number(s.outSec) || 0) - (Number(s.inSec) || 0));
+    if (dur < 0.05) continue;
+    const out = `${tmpBase}_part${i}.wav`;
+    await new Promise((res, rej) => {
+      const args = ['-y', '-ss', String(s.inSec), '-to', String(s.outSec), '-i', s.path, '-ac', '1', '-ar', '16000', out];
+      const ff = spawn(FFMPEG_BIN, args);
+      let er = '';
+      ff.stderr.on('data', d => er += d.toString().slice(-1500));
+      const k = setTimeout(() => { try { ff.kill('SIGKILL'); } catch {} rej(new Error('segment extract timeout')); }, 120000);
+      ff.on('error', e => { clearTimeout(k); rej(e); });
+      ff.on('close', c => { clearTimeout(k); (c === 0 && fs.existsSync(out)) ? res() : rej(new Error('segment ffmpeg exit ' + c + ': ' + er.slice(-200))); });
+    });
+    partPaths.push(out);
+    timeMap.push({ concatStart: cum, dur, timelineStart: Number(s.timelineStart) || 0 });
+    cum += dur;
+  }
+  if (!partPaths.length) throw new Error('no audio segments extracted');
+
+  let wavPath;
+  if (partPaths.length === 1) {
+    wavPath = partPaths[0];
+  } else {
+    wavPath = `${tmpBase}_concat.wav`;
+    const listFile = `${tmpBase}_list.txt`;
+    fs.writeFileSync(listFile, partPaths.map(p => `file '${p.replace(/'/g, "'\\''")}'`).join('\n'));
+    await new Promise((res, rej) => {
+      const ff = spawn(FFMPEG_BIN, ['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', wavPath]);
+      let er = '';
+      ff.stderr.on('data', d => er += d.toString().slice(-1500));
+      const k = setTimeout(() => { try { ff.kill('SIGKILL'); } catch {} rej(new Error('concat timeout')); }, 120000);
+      ff.on('error', e => { clearTimeout(k); rej(e); });
+      ff.on('close', c => { clearTimeout(k); (c === 0 && fs.existsSync(wavPath)) ? res() : rej(new Error('concat exit ' + c + ': ' + er.slice(-200))); });
+    });
+    for (const p of partPaths) { try { fs.unlinkSync(p); } catch {} }
+    try { fs.unlinkSync(listFile); } catch {}
+  }
+  log && log(`concat audio: ${segments.length} segs → ${cum.toFixed(1)}s wav`);
+  return { wavPath, totalDur: cum, timeMap };
+}
+// Map a time in the concatenated wav back to an absolute timeline second.
+function concatToTimeline(timeMap, t) {
+  for (let i = 0; i < timeMap.length; i++) {
+    const seg = timeMap[i];
+    if (t < seg.concatStart + seg.dur + 0.001 || i === timeMap.length - 1) {
+      return seg.timelineStart + Math.max(0, t - seg.concatStart);
+    }
+  }
+  return t;
+}
+
 // Anti-collision + density cap. Sorts moments by start time, drops anything
 // that lands within `minGapSec` of the previous kept moment, then caps the
 // total to `maxPerMin × clipMinutes`.
@@ -981,7 +1213,7 @@ function _momentPayloadText(m) {
 //     swaps to SSD, slowing per-task time. The user explicitly chose this
 //     over the 6-parallel option that wouldn't swap. If you hit OOM kills,
 //     drop the cap back to 6-8 in this same constant.
-function generateMomentsParallel(moments, reqId, log, onProgress) {
+function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
   const PARALLEL_CAP = 16;
   const MAX_INFLIGHT = Math.min(moments.length || 1, PARALLEL_CAP);
   const cacheDir = path.join(OUTPUT_DIR, 'cache');
@@ -1001,6 +1233,16 @@ function generateMomentsParallel(moments, reqId, log, onProgress) {
 
   function buildPrompt(task) {
     const m = task.moment;
+    const opts = genOpts || null;
+    let styleBlock = '';
+    if (opts && opts.styleMode === 'same' && opts.styleSpec) {
+      styleBlock = 'LOCKED STYLE — every graphic in THIS video shares ONE consistent look. '
+        + 'Use exactly this palette, type and motion (nothing else) so all overlays read as a single designed set:\n' + opts.styleSpec;
+    } else if (opts) {
+      styleBlock = 'DISTINCT STYLE — give THIS graphic its own look (aesthetic hint: '
+        + momentTypeToTrendPack(m.type, task.idx) + '). Across the video the graphics should feel VARIED — '
+        + 'do not default to the same generic caption palette/type/motion every time.';
+    }
     return [
       'Create a motion-graphic OVERLAY for a video. It will be placed on a',
       'track ABOVE the speaker\'s footage, so it MUST have a fully transparent',
@@ -1010,6 +1252,8 @@ function generateMomentsParallel(moments, reqId, log, onProgress) {
       '  type: ' + (m.type || 'fact'),
       '  show this: ' + _momentPayloadText(m),
       '  on screen for: ' + task.durationSec.toFixed(1) + 's (' + task.durationFrames + ' frames @ 30fps)',
+      '',
+      styleBlock,
       '',
       'BUILD IT:',
       '- Write a FRESH Remotion composition from scratch. Do NOT copy or import',
@@ -3385,6 +3629,154 @@ const server = http.createServer((req, res) => {
       } finally {
         _activeAutoedit = null;
       }
+    });
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  AUTO EDIT v2 — two-phase: /analyze (transcribe + ask questions) then
+  //  /run (answer-steered plan → fit-check → generate). Supports multi-clip
+  //  selection and nested sequences (segments come pre-resolved from host.jsx).
+  // ═══════════════════════════════════════════════════════════════════════
+  if (req.method === 'POST' && req.url === '/autoedit/analyze') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      let payload;
+      try { payload = JSON.parse(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+      const reqId = payload.reqId || crypto.randomUUID();
+      const segments = Array.isArray(payload.segments) ? payload.segments : null;
+      const density = payload.density || 'moderate';
+      const style = payload.style || 'auto';
+      if (!segments || !segments.length) { res.writeHead(400); res.end(JSON.stringify({ error: 'missing segments', reqId })); return; }
+      for (const s of segments) {
+        if (!s || !s.path || !fs.existsSync(s.path)) { res.writeHead(404); res.end(JSON.stringify({ error: 'media file not found: ' + ((s && s.path) || '?'), reqId })); return; }
+      }
+      _activeAutoedit = { children: new Set(), aborted: false };
+      const logPath = path.join(OUTPUT_DIR, `autoedit-${reqId}.log`);
+      const log = (s) => { try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${s}\n`); } catch {} clog('autoedit', /error|fail|timeout/i.test(String(s)) ? 'error' : 'info', String(s), null, reqId); };
+      try {
+        const spanStart = (payload.span && typeof payload.span.start === 'number') ? payload.span.start : Math.min(...segments.map(s => Number(s.timelineStart) || 0));
+        let spanEnd = (payload.span && typeof payload.span.end === 'number') ? payload.span.end : null;
+        log(`AUTO EDIT analyze reqId=${reqId} segs=${segments.length} density=${density}`);
+
+        broadcastProgress('Extracting audio', 6, reqId);
+        if (_activeAutoedit.aborted) throw new Error('cancelled');
+        const { wavPath, totalDur, timeMap } = await extractConcatAudio(segments, reqId, log);
+        if (spanEnd == null) spanEnd = spanStart + totalDur;
+        if (totalDur < 5) { broadcastProgressDone(reqId); res.writeHead(400); res.end(JSON.stringify({ error: 'Selection is too short (need at least ~5s of audio)', reqId })); _activeAutoedit = null; return; }
+
+        broadcastProgress('Transcribing', 16, reqId);
+        if (_activeAutoedit.aborted) throw new Error('cancelled');
+        const transcriptRaw = await runTranscribe(wavPath, totalDur);
+        log(`parakeet: ${(transcriptRaw || []).length} segments`);
+        if (!transcriptRaw || transcriptRaw.length < 3) { broadcastProgressDone(reqId); res.writeHead(400); res.end(JSON.stringify({ error: "Couldn't hear much speech in the selection", reqId })); _activeAutoedit = null; return; }
+
+        const sentences = transcriptRaw.map((seg, i) => ({
+          i,
+          startSec: concatToTimeline(timeMap, typeof seg.start === 'number' ? seg.start : 0),
+          endSec:   concatToTimeline(timeMap, typeof seg.end   === 'number' ? seg.end   : 0),
+          text:     (seg.text || '').trim(),
+        })).filter(s => s.text.length > 0);
+        if (sentences.length < 3) { broadcastProgressDone(reqId); res.writeHead(400); res.end(JSON.stringify({ error: 'Not enough speech in the selection', reqId })); _activeAutoedit = null; return; }
+
+        broadcastProgress('Reading the speech', 24, reqId);
+        if (_activeAutoedit.aborted) throw new Error('cancelled');
+        const questions = await detectInterviewQuestions(sentences, density, log);
+        _aeCacheSet(reqId, { sentences, span: { start: spanStart, end: spanEnd }, density, style });
+        log(`analyze done: ${sentences.length} sentences, ${questions.length} questions`);
+
+        broadcastProgressDone(reqId);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, reqId, questions, sentenceCount: sentences.length, durationSec: (spanEnd - spanStart) }));
+      } catch (e) {
+        log(`analyze ERROR ${e.message}`);
+        broadcastProgressDone(reqId);
+        try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e), reqId, logFile: logPath })); } catch {}
+      } finally { _activeAutoedit = null; }
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && req.url === '/autoedit/run') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      let payload;
+      try { payload = JSON.parse(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+      const reqId = payload.reqId;
+      const answers = (payload.answers && typeof payload.answers === 'object') ? payload.answers : {};
+      const cached = reqId && _autoeditCache.get(reqId);
+      if (!cached) { res.writeHead(400); res.end(JSON.stringify({ error: 'Auto-Edit session expired — run analyze again', reqId })); return; }
+      _activeAutoedit = { children: new Set(), aborted: false };
+      const logPath = path.join(OUTPUT_DIR, `autoedit-${reqId}.log`);
+      const log = (s) => { try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${s}\n`); } catch {} clog('autoedit', /error|fail|timeout/i.test(String(s)) ? 'error' : 'info', String(s), null, reqId); };
+      try {
+        const { sentences, span } = cached;
+        const density = payload.density || cached.density || 'moderate';
+        const style = payload.style || cached.style || 'auto';
+        const spanStart = span.start, spanEnd = span.end, totalDur = spanEnd - spanStart;
+        const styleMode = (answers.styleConsistency === 'vary') ? 'vary' : 'same';
+        const tone = answers.tone || 'minimal';
+        const styleSpec = buildStyleSpec(tone);
+        log(`AUTO EDIT run reqId=${reqId} density=${density} styleMode=${styleMode} tone=${tone} answers=${JSON.stringify(answers)}`);
+
+        // ── Plan (answer-steered) ─────────────────────────────────────────
+        broadcastProgress('Planning the edit', 30, reqId);
+        if (_activeAutoedit.aborted) throw new Error('cancelled');
+        const guidance = buildMomentGuidance(answers);
+        const moments = await detectMoments(sentences, density, style, reqId, log, guidance);
+        log(`moments raw: ${moments.length}`);
+
+        let filtered;
+        if (density === 'full') {
+          const sorted = [...moments].sort((a, b) => a.startSec - b.startSec);
+          const deduped = []; let lastEnd = -Infinity;
+          for (const m of sorted) { if (m.startSec < lastEnd - 0.3) continue; deduped.push(m); lastEnd = m.endSec; }
+          filtered = fillGaps(deduped, sentences, spanStart, spanEnd, 2.0);
+        } else {
+          const minGapSec = density === 'sparse' ? 8 : density === 'dense' ? 2 : 4;
+          const maxPerMin = density === 'sparse' ? 3 : density === 'dense' ? 10 : 6;
+          filtered = spaceMoments(moments, minGapSec, maxPerMin, totalDur);
+        }
+        log(`after spacing: ${filtered.length}`);
+
+        // ── Fit-check (the "double check it fits the video" step) ─────────
+        broadcastProgress('Double-checking the plan fits', 38, reqId);
+        if (_activeAutoedit.aborted) throw new Error('cancelled');
+        const verified = await verifyPlan(filtered, sentences, spanStart, spanEnd, log);
+        log(`verify: ${verified.report}`);
+        const plan = verified.moments;
+        if (!plan.length) {
+          broadcastProgressDone(reqId);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, reqId, applied: [], skipped: [], summary: 'No suitable moments found.', planReport: verified.report }));
+          _activeAutoedit = null;
+          return;
+        }
+
+        // ── Generate (style-locked or varied per the answers) ─────────────
+        broadcastProgress('Generating motion graphics', 42, reqId);
+        const renderResults = await generateMomentsParallel(plan, reqId, log, (done, total) => {
+          broadcastProgress(`Generating motion graphics (${done}/${total})`, 42 + Math.floor((done / total) * 48), reqId);
+        }, { styleMode, styleSpec });
+
+        const applied = renderResults.filter(r => r && r.ok).map(r => ({ ...r, timelineSec: r.atSec }));
+        const skipped = renderResults.filter(r => r && !r.ok);
+        log(`render done ok=${applied.length} skipped=${skipped.length}`);
+
+        broadcastProgressDone(reqId);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true, reqId, applied, skipped, planReport: verified.report,
+          summary: `${applied.length}/${plan.length} graphics ready` + (skipped.length ? ` (${skipped.length} skipped)` : ''),
+          logFile: logPath,
+        }));
+      } catch (e) {
+        log(`run ERROR ${e.message}`);
+        broadcastProgressDone(reqId);
+        try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e), reqId, logFile: logPath })); } catch {}
+      } finally { _activeAutoedit = null; }
     });
     return;
   }
