@@ -2170,18 +2170,21 @@
   .ae-selinfo.warn { border-color: rgba(217,119,87,0.4); color: var(--accent); }
   .ae-wizard-spinner { display: flex; align-items: center; gap: 11px; padding: 20px 4px 8px; color: var(--text-dim); font-size: 12px; }
   .ae-wizard-spinner .ae-spinner { width: 16px; height: 16px; }
-  .ae-questions { display: flex; flex-direction: column; gap: 15px; margin: 6px 0; max-height: 320px; overflow-y: auto; padding-right: 4px; }
+  .ae-questions { display: flex; flex-direction: column; gap: 13px; margin: 4px 0 2px; max-height: 58vh; overflow-y: auto; padding-right: 4px; }
+  .ae-questions::-webkit-scrollbar { width: 7px; }
+  .ae-questions::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 7px; }
   .ae-q-title { font-size: 12.5px; font-weight: 600; color: var(--text); margin-bottom: 8px; line-height: 1.35; }
   .ae-q-opts { display: flex; flex-wrap: wrap; gap: 7px; }
   .ae-optbtn {
     font: inherit; font-size: 11.5px; color: var(--text-dim);
     background: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.1); border-radius: 999px;
-    padding: 6px 13px; cursor: pointer;
-    transition: background .12s, border-color .12s, color .12s;
+    padding: 5px 12px; cursor: pointer;
+    transition: background .14s var(--ease-out), border-color .14s var(--ease-out), color .14s var(--ease-out), transform .12s var(--ease-out), box-shadow .14s var(--ease-out);
   }
   .ae-optbtn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-  .ae-optbtn.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .ae-optbtn:active { transform: scale(0.96); }
+  .ae-optbtn.selected { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(217,119,87,0.3); }
   .ae-err { font-size: 11.5px; color: var(--accent); margin: 8px 0 2px; min-height: 1px; }
 
   /* Minimized Auto-Edit chip — lets you work in Premiere while it transcribes */
@@ -2957,7 +2960,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.55</span>
+    <span class="version-tag" id="versionTag">10.56</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -5527,7 +5530,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.55';
+  const PANEL_VERSION = '10.56';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
