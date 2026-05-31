@@ -1438,7 +1438,23 @@
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
-  #input::placeholder { color: var(--text-faint); }
+  /* Native placeholder is hidden — a JS-controlled overlay (#inputPh) renders
+     the placeholder instead, so it reliably shows whenever the field is empty
+     (CEP's old Chrome sometimes drops the native one). */
+  #input::placeholder { color: transparent; }
+  .input-ph {
+    position: absolute;
+    top: 0; left: 0;
+    padding: 11px 12px 6px;      /* match #input / .ghost */
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text-faint);
+    pointer-events: none;
+    user-select: none;
+    z-index: 1;
+    transition: opacity 0.1s var(--ease-out);
+  }
 
   .input-toolbar {
     display: flex;
@@ -1934,7 +1950,7 @@
       linear-gradient(180deg, rgba(34,29,32,0.98) 0%, rgba(19,17,19,0.99) 100%);
     border: 1px solid rgba(217,119,87,0.22);
     border-radius: var(--radius-lg);
-    padding: 16px 16px 13px;
+    padding: 11px 13px 10px;
     box-shadow:
       0 30px 80px rgba(0,0,0,0.6),
       0 0 44px rgba(217,119,87,0.09),
@@ -1945,7 +1961,7 @@
   /* Futuristic top accent line */
   .autocut-modal-card::before {
     content: '';
-    position: absolute; top: 0; left: 16px; right: 16px; height: 1px;
+    position: absolute; top: 0; left: 13px; right: 13px; height: 1px;
     background: linear-gradient(90deg, transparent, var(--accent) 35%, var(--accent-2, var(--accent)) 65%, transparent);
     opacity: 0.7;
   }
@@ -1954,25 +1970,26 @@
   .autocut-modal.show .autocut-modal-card { transform: translate3d(0, 0, 0) scale(1); }
 
   .autocut-modal-title {
-    font-size: 14px;
+    font-size: 12.5px;
     font-weight: 600;
     color: var(--text);
-    margin-bottom: 4px;
+    margin-bottom: 2px;
   }
   .autocut-modal-subtitle {
-    font-size: 11.5px;
+    font-size: 10px;
+    line-height: 1.3;
     color: var(--text-dim);
-    margin-bottom: 14px;
+    margin-bottom: 9px;
   }
   .autocut-opt {
     display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 8px 11px;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 9px;
     background: rgba(255,255,255,0.025);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    margin-bottom: 5px;
+    margin-bottom: 3px;
     cursor: pointer;
     transition: background 0.12s var(--ease-out), border-color 0.12s var(--ease-out), box-shadow 0.12s var(--ease-out);
   }
@@ -1982,15 +1999,31 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 1px var(--accent) inset, 0 4px 16px rgba(217,119,87,0.14);
   }
-  .autocut-opt input[type="checkbox"] {
+  .autocut-opt input[type="checkbox"],
+  .autocut-opt input[type="radio"] {
     appearance: none;
     -webkit-appearance: none;
-    width: 16px; height: 16px;
+    width: 13px; height: 13px;
     border: 1.5px solid var(--border-strong, rgba(255,255,255,0.2));
     border-radius: 4px;
     background: transparent;
     cursor: pointer;
-    margin-top: 1px;
+    margin: 0;
+    flex-shrink: 0;
+    position: relative;
+    transition: background 0.12s var(--ease-out), border-color 0.12s var(--ease-out);
+  }
+  .autocut-opt input[type="radio"] { border-radius: 50%; }
+  .autocut-opt input[type="radio"]:checked { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 2px rgba(19,17,19,0.99) inset; }
+  .autocut-opt input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 13px; height: 13px;
+    border: 1.5px solid var(--border-strong, rgba(255,255,255,0.2));
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    margin-top: 0;
     flex-shrink: 0;
     position: relative;
     transition: background 0.12s var(--ease-out), border-color 0.12s var(--ease-out);
@@ -2002,24 +2035,24 @@
   .autocut-opt input[type="checkbox"]:checked::after {
     content: '';
     position: absolute;
-    left: 4px; top: 1px;
-    width: 4px; height: 8px;
+    left: 3.5px; top: 0.5px;
+    width: 3px; height: 7px;
     border: solid #fff;
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
   }
   .autocut-opt-text { flex: 1; min-width: 0; }
-  .autocut-opt-name { font-size: 12.5px; font-weight: 500; color: var(--text); }
-  .autocut-opt-desc { font-size: 10.5px; color: var(--text-dim); margin-top: 2px; line-height: 1.4; }
+  .autocut-opt-name { font-size: 11.5px; font-weight: 500; color: var(--text); }
+  .autocut-opt-desc { font-size: 9.5px; color: var(--text-dim); margin-top: 1px; line-height: 1.25; }
 
   .autocut-modal-actions {
     display: flex;
     gap: 8px;
-    margin-top: 14px;
+    margin-top: 10px;
   }
   .autocut-modal-cancel {
     flex: 1;
-    padding: 9px;
+    padding: 7px;
     background: transparent;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
@@ -2068,7 +2101,7 @@
 
   .autocut-modal-go {
     flex: 2;
-    padding: 9px;
+    padding: 7px;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
     border: none;
     border-radius: var(--radius-md);
@@ -2084,10 +2117,10 @@
   /* Auto-Edit wizard (options → analyzing → questions) */
   .ae-step { display: block; }
   .ae-selinfo {
-    font-size: 11.5px; color: var(--text-dim);
-    margin: 2px 0 14px; padding: 8px 11px;
+    font-size: 10.5px; color: var(--text-dim);
+    margin: 0 0 8px; padding: 6px 9px;
     background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.07); border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.07); border-radius: 7px;
   }
   .ae-selinfo b { color: var(--text); font-weight: 600; }
   .ae-selinfo.warn { border-color: rgba(217,119,87,0.4); color: var(--accent); }
@@ -2875,7 +2908,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.43</span>
+    <span class="version-tag" id="versionTag">10.44</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -2927,38 +2960,34 @@
     <!-- STEP 1 — options -->
     <div class="ae-step" data-step="options">
       <div class="autocut-modal-title">Auto-Edit</div>
-      <div class="autocut-modal-subtitle">I'll read the speech, ask you a couple of quick questions, plan the graphics, double-check the plan fits, then generate and drop them on V2 / V3.</div>
+      <div class="autocut-modal-subtitle">Read speech → ask a couple of questions → plan → fit-check → generate on V2/V3.</div>
       <div class="ae-selinfo" id="aeSelInfo">Reading selection…</div>
 
       <label class="autocut-opt" data-opt="density-sparse">
         <input type="radio" name="aeDensity" id="aeDensitySparse" value="sparse">
         <div class="autocut-opt-text">
-          <div class="autocut-opt-name">Sparse</div>
-          <div class="autocut-opt-desc">~3 graphics per minute. Lets the clip breathe.</div>
+          <div class="autocut-opt-name">Sparse <span class="autocut-opt-desc" style="margin:0">· ~3/min, lets it breathe</span></div>
         </div>
       </label>
 
       <label class="autocut-opt" data-opt="density-moderate">
         <input type="radio" name="aeDensity" id="aeDensityModerate" value="moderate" checked>
         <div class="autocut-opt-text">
-          <div class="autocut-opt-name">Moderate</div>
-          <div class="autocut-opt-desc">~6 per minute. Default. Tasteful coverage.</div>
+          <div class="autocut-opt-name">Moderate <span class="autocut-opt-desc" style="margin:0">· ~6/min, tasteful (default)</span></div>
         </div>
       </label>
 
       <label class="autocut-opt" data-opt="density-dense">
         <input type="radio" name="aeDensity" id="aeDensityDense" value="dense">
         <div class="autocut-opt-text">
-          <div class="autocut-opt-name">Dense</div>
-          <div class="autocut-opt-desc">~10 per minute. For high-energy social cuts.</div>
+          <div class="autocut-opt-name">Dense <span class="autocut-opt-desc" style="margin:0">· ~10/min, high-energy</span></div>
         </div>
       </label>
 
       <label class="autocut-opt" data-opt="density-full">
         <input type="radio" name="aeDensity" id="aeDensityFull" value="full">
         <div class="autocut-opt-text">
-          <div class="autocut-opt-name">Full coverage</div>
-          <div class="autocut-opt-desc">No gaps. A motion graphic on screen the entire video — the key beats get their special cards, every gap in between gets filled.</div>
+          <div class="autocut-opt-name">Full coverage <span class="autocut-opt-desc" style="margin:0">· no gaps, graphic on the whole time</span></div>
         </div>
       </label>
 
@@ -3231,6 +3260,7 @@
     <div class="queue-strip" id="queueStrip" style="display:none;"></div>
     <div class="input-stack">
       <div class="ghost" id="ghost" aria-hidden="true"><span class="ghost-typed"></span><span class="ghost-suggest"></span></div>
+      <div class="input-ph" id="inputPh" aria-hidden="true">Ask Claude…</div>
       <textarea id="input" placeholder="Ask Claude…" rows="1" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
     </div>
     <div class="input-toolbar">
@@ -5445,7 +5475,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.43';
+  const PANEL_VERSION = '10.44';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -8313,13 +8343,22 @@ async function sendContinuationChat(originalMsg, lastStatus) {
 }
 
 /* ───── Input UX ───── */
+// JS-controlled placeholder: visible only when the textarea is empty. Driven
+// from autosize() (which runs after EVERY value change — typing, erasing,
+// send-clear, tab-switch, paste, expand) so it can never get stuck hidden.
+const inputPh = document.getElementById('inputPh');
+function updateInputPh() {
+  if (inputPh) inputPh.style.opacity = (input.value.length === 0) ? '1' : '0';
+}
 function autosize() {
   input.style.height = 'auto';
   input.style.height = Math.min(input.scrollHeight, 180) + 'px';
+  updateInputPh();
   // Programmatic input.value changes (send-clear, chip-click, expand-result)
   // don't fire 'input', so refresh the suggested EXTEND level here too.
   try { syncExpandEnabled && syncExpandEnabled(); updateExpandRecommendation && updateExpandRecommendation(); } catch {}
 }
+updateInputPh();
 
 /* ───── Live AI ghost-text autocomplete ───── */
 let activeSuggestion = '';
