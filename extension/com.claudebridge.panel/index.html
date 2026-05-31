@@ -1444,8 +1444,17 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
     padding: 3px 8px 5px;
   }
+  .tb-left, .tb-right { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .tb-right { flex: 1 1 auto; justify-content: flex-end; }
+  body.chat-mode #renderModeGroup,
+  body.chat-mode #autoeditBtn { display: none !important; }
+  /* Auto-Edit now lives in the header icon bar — busy tint */
+  .icon-btn.busy { color: var(--accent); }
+  .icon-btn:disabled { opacity: 0.5; cursor: wait; }
   .hint-text {
     font-size: 10.5px;
     color: var(--text-faint);
@@ -1564,37 +1573,37 @@
   .expand-group {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: 2px;
     padding: 2px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--border);
-    border-radius: 9px;
-    margin-right: 5px;
+    border-radius: 8px;
+    margin-right: 4px;
   }
   .expand-btn {
     background: transparent;
     color: var(--text-faint);
     border: none;
-    height: 24px;
-    padding: 0 8px;
+    height: 20px;
+    padding: 0 6px;
     border-radius: 6px;
     cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center;
-    gap: 4px;
+    gap: 3px;
     font-family: var(--font-ui);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 500;
     letter-spacing: 0.02em;
     transition: background 0.12s var(--ease-out), color 0.12s var(--ease-out);
     position: relative;
   }
-  .expand-btn svg { width: 11px; height: 11px; transition: transform 0.15s var(--ease-out); }
+  .expand-btn svg { width: 10px; height: 10px; transition: transform 0.15s var(--ease-out); }
   .expand-group::before {
     content: 'Extend';
     color: var(--text-dim);
-    font-size: 10.5px;
+    font-size: 9.5px;
     font-weight: 500;
-    padding: 0 6px 0 4px;
+    padding: 0 5px 0 4px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
@@ -1729,7 +1738,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 6px 9px 3px;
+    padding: 4px 10px;
     border-bottom: 1px solid var(--border-soft);
   }
   .mode-bar-label {
@@ -1780,7 +1789,7 @@
   .rmode-group {
     display: inline-flex;
     align-items: center;
-    margin-left: 8px;
+    margin-left: 0;
     padding: 2px;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid var(--border);
@@ -1792,9 +1801,9 @@
     background: transparent;
     color: var(--text-faint);
     font-family: var(--font-ui);
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 600;
-    padding: 3px 9px;
+    padding: 3px 8px;
     border-radius: 6px;
     cursor: pointer;
     transition: background 0.12s var(--ease-out), color 0.12s var(--ease-out);
@@ -1916,15 +1925,31 @@
     pointer-events: auto;
   }
   .autocut-modal-card {
-    width: min(360px, calc(100vw - 32px));
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
+    position: relative;
+    width: min(380px, calc(100vw - 28px));
+    max-height: calc(100vh - 26px);
+    overflow-y: auto;
+    background:
+      linear-gradient(180deg, rgba(34,29,32,0.98) 0%, rgba(19,17,19,0.99) 100%);
+    border: 1px solid rgba(217,119,87,0.22);
     border-radius: var(--radius-lg);
-    padding: 18px 18px 14px;
-    box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04) inset;
+    padding: 16px 16px 13px;
+    box-shadow:
+      0 30px 80px rgba(0,0,0,0.6),
+      0 0 44px rgba(217,119,87,0.09),
+      0 0 0 1px rgba(255,255,255,0.04) inset;
     transform: translate3d(0, 8px, 0) scale(0.97);
     transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   }
+  /* Futuristic top accent line */
+  .autocut-modal-card::before {
+    content: '';
+    position: absolute; top: 0; left: 16px; right: 16px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent) 35%, var(--accent-2, var(--accent)) 65%, transparent);
+    opacity: 0.7;
+  }
+  .autocut-modal-card::-webkit-scrollbar { width: 8px; }
+  .autocut-modal-card::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; }
   .autocut-modal.show .autocut-modal-card { transform: translate3d(0, 0, 0) scale(1); }
 
   .autocut-modal-title {
@@ -1942,18 +1967,19 @@
     display: flex;
     align-items: flex-start;
     gap: 10px;
-    padding: 10px 12px;
+    padding: 8px 11px;
     background: rgba(255,255,255,0.025);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    margin-bottom: 6px;
+    margin-bottom: 5px;
     cursor: pointer;
-    transition: background 0.12s var(--ease-out), border-color 0.12s var(--ease-out);
+    transition: background 0.12s var(--ease-out), border-color 0.12s var(--ease-out), box-shadow 0.12s var(--ease-out);
   }
   .autocut-opt:hover { background: rgba(255,255,255,0.05); }
   .autocut-opt:has(input:checked) {
-    background: rgba(217, 119, 87, 0.08);
-    border-color: var(--accent-line);
+    background: rgba(217, 119, 87, 0.1);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent) inset, 0 4px 16px rgba(217,119,87,0.14);
   }
   .autocut-opt input[type="checkbox"] {
     appearance: none;
@@ -2579,6 +2605,26 @@
   .logs-body .log-err { color: #e07474; }
   .logs-body .log-ok  { color: #6fbf8a; }
   .logs-body .log-dim { color: #6e6a5e; }
+  .logs-body .log-warn { color: #e0b15c; }
+  /* Module tag colours for the unified view */
+  .logs-body .lg-mod { font-weight: 600; }
+  .logs-body .lg-mod-bridge   { color: #7aa2d6; }
+  .logs-body .lg-mod-panel    { color: #b48ce0; }
+  .logs-body .lg-mod-autoedit { color: #d9a05c; }
+  .logs-body .lg-mod-autocut  { color: #d98c6f; }
+  .logs-body .lg-mod-host     { color: #6fbf8a; }
+  .logs-body .lg-mod-render   { color: #c98ab0; }
+  .logs-body .lg-time { color: #57544a; }
+  .logs-body .lg-req  { color: #57544a; }
+  .logs-body .lg-data { color: #8c8678; }
+  .logs-filter {
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 5px;
+    font-size: 11px; padding: 3px 7px; width: 96px; font-family: inherit;
+    transition: width .15s var(--ease-out), border-color .12s;
+  }
+  .logs-filter:focus { outline: none; border-color: var(--accent-line); width: 150px; }
+  #logsErrToggle.active { color: var(--accent); border-color: var(--accent-line); background: rgba(217,119,87,0.1); }
   .logs-foot {
     padding: 6px 12px;
     background: var(--bg-elevated);
@@ -2828,7 +2874,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.40</span>
+    <span class="version-tag" id="versionTag">10.42</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -2841,6 +2887,9 @@
     </button>
   </div>
   <div style="display:flex;align-items:center">
+    <button class="icon-btn" id="autoeditBtn" type="button" title="Auto-Edit — read the speech and drop motion graphics on V2/V3" aria-label="Auto-Edit" style="margin-right:4px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h16"/><circle cx="19" cy="12" r="2.5" fill="currentColor"/></svg>
+    </button>
     <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
@@ -2978,8 +3027,13 @@
     <span>Live logs</span>
     <div class="logs-header-actions">
       <select id="logsSource" class="logs-source" title="Log to tail">
+        <option value="unified">All modules (detailed)</option>
         <option value="bridge">Bridge stdout</option>
       </select>
+      <input id="logsFilter" class="logs-filter" type="text" placeholder="filter…" autocomplete="off" spellcheck="false" title="Filter lines (module, level, text)">
+      <button class="icon-btn" id="logsErrToggle" type="button" title="Show errors + warnings only" style="margin:0 2px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </button>
       <button class="icon-btn" id="logsPauseBtn" type="button" title="Pause / resume tail" style="margin:0 2px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" id="logsPauseIcon">
           <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
@@ -3169,26 +3223,6 @@
 
 <div class="composer">
   <div class="input-wrap">
-    <div class="mode-bar" id="modeBar">
-      <span class="mode-bar-label">Place</span>
-      <button class="mode-pill" data-mode="overwrite" type="button" title="Overwrite at playhead — replaces what's there on V1">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12h8"/></svg>
-        Overwrite
-      </button>
-      <button class="mode-pill active" data-mode="overlay" type="button" title="Overlap — drops the rendered clip on the next empty track (V2, V3...) so it overlaps your existing footage in time">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="13" height="11" rx="1.5"/><rect x="7" y="4" width="13" height="11" rx="1.5"/></svg>
-        Overlap
-      </button>
-      <div class="rmode-group" id="renderModeGroup" title="How hard Claude works on the animation — Fast: quick template-based, ~1 min. Default: a real custom-built animation, no templates (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
-        <button class="rmode-pill" data-rmode="fast" type="button" title="Fast — quick template-based animation, ~1 min">Fast</button>
-        <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
-        <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Claude takes its time, ~3-5 min">Slow</button>
-      </div>
-      <button class="autocut-btn" id="autoeditBtn" type="button" title="Auto-Edit: read the speech of the selected clip and drop motion graphics on V2/V3 at the right beats">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h16"/><circle cx="19" cy="12" r="2.5" fill="currentColor"/></svg>
-        Auto-Edit
-      </button>
-    </div>
     <div class="ref-bar" id="refBar"></div>
     <div class="iter-bar" id="iterBar" style="display:none;"></div>
     <!-- Queue strip — shows the active tab's pending prompts. Rendered by
@@ -3199,6 +3233,14 @@
       <textarea id="input" placeholder="Ask Claude…" rows="1" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
     </div>
     <div class="input-toolbar">
+      <div class="tb-left">
+        <div class="rmode-group" id="renderModeGroup" title="How hard Claude works on the animation — Fast: quick template-based, ~1 min. Default: a real custom-built animation, no templates (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
+          <button class="rmode-pill" data-rmode="fast" type="button" title="Fast — quick template-based animation, ~1 min">Fast</button>
+          <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
+          <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Claude takes its time, ~3-5 min">Slow</button>
+        </div>
+      </div>
+      <div class="tb-right">
       <span class="hint-text" id="hint"><kbd class="k-tab" title="Press Tab to accept the grey ghost-text suggestion Claude shows ahead of your cursor">Tab</kbd> accept · <kbd title="Enter sends the message">Enter</kbd> send · <kbd>⌘V</kbd> paste · <kbd>⌘C</kbd> copy</span>
       <span class="esc-hint" id="escHint" title="Cancel the current request"><kbd>esc</kbd> cancel</span>
       <div class="expand-group" id="expandGroup">
@@ -3230,6 +3272,7 @@
           <rect x="6" y="6" width="12" height="12" rx="2"/>
         </svg>
       </button>
+      </div><!-- /tb-right -->
     </div>
   </div>
 </div>
@@ -5190,6 +5233,8 @@ renderHistoryBadge();
   const pauseBtn = document.getElementById('logsPauseBtn');
   const clearBtn = document.getElementById('logsClearBtn');
   const pauseIcon = document.getElementById('logsPauseIcon');
+  const filterEl = document.getElementById('logsFilter');
+  const errToggle = document.getElementById('logsErrToggle');
 
   if (!panel || !btn) return;
 
@@ -5204,6 +5249,9 @@ renderHistoryBadge();
       if (!home || !_fs || !_path) return null;
       const outDir = _path.join(home, 'PremiereClaude', 'output');
       const sel = source.value;
+      if (sel === 'unified') {
+        return _path.join(home, 'PremiereClaude', 'logs', 'unified.jsonl');
+      }
       if (sel === 'bridge') {
         return _path.join(home, 'PremiereClaude', 'bridge.log');
       }
@@ -5231,13 +5279,13 @@ renderHistoryBadge();
         hasAutoedit = files.some(n => n.startsWith('autoedit-') && n.endsWith('.log'));
         hasAutocut  = files.some(n => n.startsWith('autocut-')  && n.endsWith('.log'));
       }
-      const want = ['bridge'];
+      const want = ['unified', 'bridge'];
       if (hasAutoedit) want.push('autoedit');
       if (hasAutocut) want.push('autocut');
       const current = source.value;
       const existing = Array.from(source.options).map(o => o.value);
       if (JSON.stringify(want) === JSON.stringify(existing)) return;
-      const labels = { bridge: 'Bridge stdout', autoedit: 'Auto-Edit (latest)', autocut: 'Auto-Cut (latest)' };
+      const labels = { unified: 'All modules (detailed)', bridge: 'Bridge stdout', autoedit: 'Auto-Edit (latest)', autocut: 'Auto-Cut (latest)' };
       source.innerHTML = want.map(v => `<option value="${v}">${labels[v]}</option>`).join('');
       if (want.indexOf(current) >= 0) source.value = current;
     } catch {}
@@ -5249,6 +5297,55 @@ renderHistoryBadge();
     if (l.indexOf(' ok ') >= 0 || l.indexOf('done') >= 0) return 'log-ok';
     if (line.startsWith('[20') || line.startsWith('  ')) return 'log-dim';
     return '';
+  }
+
+  // Detailed renderer for the unified JSONL collector. Each line:
+  //   HH:MM:SS [LEVEL module] #reqId  message   {data}
+  // colour-coded by module + level, with text/level filtering.
+  function renderUnified(rawText, filterStr, errorsOnly) {
+    const frag = document.createDocumentFragment();
+    const lines = rawText.split('\n');
+    const startIdx = Math.max(0, lines.length - 600);
+    for (let i = startIdx; i < lines.length; i++) {
+      const raw = lines[i].trim();
+      if (!raw) continue;
+      let o = null;
+      try { o = JSON.parse(raw); } catch {}
+      if (!o) {
+        if (errorsOnly) continue;
+        if (filterStr && raw.toLowerCase().indexOf(filterStr) < 0) continue;
+        const s = document.createElement('span'); s.className = 'log-dim'; s.textContent = raw + '\n'; frag.appendChild(s);
+        continue;
+      }
+      const lvl = String(o.level || 'info').toLowerCase();
+      if (errorsOnly && lvl !== 'error' && lvl !== 'warn') continue;
+      const t = String(o.t || '').slice(11, 19) || '--:--:--';
+      const mod = String(o.module || '?');
+      const req = o.reqId ? ('#' + String(o.reqId).slice(0, 6)) : '';
+      const msg = String(o.msg == null ? '' : o.msg);
+      let dataStr = '';
+      if (o.data != null) { try { dataStr = (typeof o.data === 'object') ? JSON.stringify(o.data) : String(o.data); } catch {} }
+      if (filterStr) {
+        const flat = (t + ' ' + lvl + ' ' + mod + ' ' + req + ' ' + msg + ' ' + dataStr).toLowerCase();
+        if (flat.indexOf(filterStr) < 0) continue;
+      }
+      const line = document.createElement('span');
+      line.className = 'log-line ' + (lvl === 'error' ? 'log-err' : lvl === 'warn' ? 'log-warn' : '');
+      const tEl = document.createElement('span'); tEl.className = 'lg-time'; tEl.textContent = t + ' ';
+      const mEl = document.createElement('span'); mEl.className = 'lg-mod lg-mod-' + mod; mEl.textContent = '[' + lvl.toUpperCase() + ' ' + mod + ']';
+      line.appendChild(tEl); line.appendChild(mEl);
+      if (req) { const rEl = document.createElement('span'); rEl.className = 'lg-req'; rEl.textContent = ' ' + req; line.appendChild(rEl); }
+      const msgEl = document.createElement('span'); msgEl.textContent = ' ' + msg; line.appendChild(msgEl);
+      if (dataStr) { const dEl = document.createElement('span'); dEl.className = 'lg-data'; dEl.textContent = '  ' + dataStr; line.appendChild(dEl); }
+      line.appendChild(document.createTextNode('\n'));
+      frag.appendChild(line);
+    }
+    if (!frag.childNodes.length) {
+      const s = document.createElement('span'); s.className = 'log-dim';
+      s.textContent = (filterStr || errorsOnly) ? '(no matching log lines)\n' : '(no log entries yet)\n';
+      frag.appendChild(s);
+    }
+    return frag;
   }
 
   function tail() {
@@ -5266,8 +5363,10 @@ renderHistoryBadge();
       pathEl.textContent = file;
       if (st.size === lastBytes) return; // no change
       lastBytes = st.size;
-      // Read last 64KB only — enough for ~600 lines without bogging the panel
-      const startByte = Math.max(0, st.size - 64 * 1024);
+      const isUnified = (source.value === 'unified');
+      // Read a tail window — bigger for the detailed unified log.
+      const cap = (isUnified ? 256 : 64) * 1024;
+      const startByte = Math.max(0, st.size - cap);
       const fd = _fs.openSync(file, 'r');
       const len = st.size - startByte;
       const buf = Buffer.alloc(len);
@@ -5278,16 +5377,24 @@ renderHistoryBadge();
         const nl = text.indexOf('\n');
         if (nl >= 0) text = text.slice(nl + 1);  // drop partial first line
       }
-      const lines = text.split('\n').slice(-400);
-      // Render with simple per-line class for colour. Use a DocumentFragment.
-      const frag = document.createDocumentFragment();
-      lines.forEach(l => {
-        const span = document.createElement('span');
-        const cls = colorise(l);
-        if (cls) span.className = cls;
-        span.textContent = l + '\n';
-        frag.appendChild(span);
-      });
+      const filterStr = (filterEl && filterEl.value || '').trim().toLowerCase();
+      const errorsOnly = !!(errToggle && errToggle.classList.contains('active'));
+      let frag;
+      if (isUnified) {
+        frag = renderUnified(text, filterStr, errorsOnly);
+      } else {
+        frag = document.createDocumentFragment();
+        text.split('\n').slice(-500).forEach(l => {
+          if (!l) return;
+          const cls = colorise(l);
+          if (errorsOnly && cls !== 'log-err') return;
+          if (filterStr && l.toLowerCase().indexOf(filterStr) < 0) return;
+          const span = document.createElement('span');
+          if (cls) span.className = cls;
+          span.textContent = l + '\n';
+          frag.appendChild(span);
+        });
+      }
       const wasAtBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 20;
       body.innerHTML = '';
       body.appendChild(frag);
@@ -5312,6 +5419,8 @@ renderHistoryBadge();
   });
   close.addEventListener('click', () => { panel.classList.remove('show'); stop(); });
   source.addEventListener('change', () => { lastBytes = 0; tail(); });
+  if (filterEl) filterEl.addEventListener('input', () => { lastBytes = 0; tail(); });
+  if (errToggle) errToggle.addEventListener('click', () => { errToggle.classList.toggle('active'); lastBytes = 0; tail(); });
   clearBtn.addEventListener('click', () => { body.innerHTML = ''; lastBytes = 0; });
   pauseBtn.addEventListener('click', () => {
     paused = !paused;
@@ -5335,7 +5444,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.40';
+  const PANEL_VERSION = '10.42';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -5596,6 +5705,9 @@ function bindSettingsHandlers() {
   }
   bindSeg('settingTheme',     'theme');
   bindSeg('settingPlacement', 'placement');
+  // Placement lives only in Settings now (removed from the composer bar) — keep
+  // the live activeMode/MODE_STORAGE in sync when it's changed here.
+  { const sp = document.getElementById('settingPlacement'); if (sp) sp.addEventListener('click', (e) => { const b = e.target.closest('button[data-val]'); if (b && typeof setMode === 'function') setMode(b.dataset.val); }); }
   bindSeg('settingExpand',    'expand');
   bindSeg('settingAspect',    'aspect');
   bindSeg('settingDuration',  'duration');
@@ -6217,11 +6329,8 @@ function setMode(m) {
   try { localStorage.setItem(MODE_STORAGE, m); } catch {}
   document.querySelectorAll('.mode-pill').forEach(p => p.classList.toggle('active', p.dataset.mode === m));
 }
-document.getElementById('modeBar').addEventListener('click', (e) => {
-  const btn = e.target.closest('.mode-pill');
-  if (!btn) return;
-  setMode(btn.dataset.mode);
-});
+// Placement pills were removed from the composer — placement now lives only in
+// Settings (Default placement), which calls setMode() directly. No bar listener.
 
 // Render mode (Fast / Mid / Slow) — how hard Claude works on each animation.
 // Stored in userSettings.renderMode and sent with every /chat request.

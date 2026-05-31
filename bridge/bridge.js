@@ -3954,6 +3954,34 @@ async function handleUpdateRequest(req, res) {
   });
 }
 
+// Self-respawn the bridge process so on-disk code edits take effect. Spawns a
+// detached replacement (inherits stdio so terminal logs continue), then exits
+// after the response/flush window. Reused by /restart and by the launch-time
+// auto-update when bridge.js itself changed.
+function _selfRespawn(opts) {
+  try {
+    const childEnv = Object.assign({}, process.env);
+    if (opts && opts.forUpdate) {
+      // One-shot guard: the replacement must NOT auto-restart again even if it
+      // (somehow) still sees a bridge diff — prevents any restart loop.
+      childEnv.CLAUDE_BRIDGE_JUST_RESTARTED_FOR_UPDATE = '1';
+      delete childEnv.CLAUDE_BRIDGE_NO_UPDATE; // let it keep syncing other files
+    } else {
+      // Plain /restart = reload node, do NOT re-sync files from source.
+      childEnv.CLAUDE_BRIDGE_NO_UPDATE = '1';
+    }
+    const child = spawn(process.execPath, [__filename, ...process.argv.slice(2)], {
+      cwd: process.cwd(), env: childEnv, detached: true, stdio: 'inherit',
+    });
+    child.unref();
+    setTimeout(() => { try { server.close(); } catch {} process.exit(0); }, 300);
+    return true;
+  } catch (e) {
+    console.error('self-respawn failed:', e.message);
+    return false;
+  }
+}
+
 // Retry listen() up to ~10x if the port is still held by the previous
 // instance — used during /restart self-replacement so the new bridge can
 // bind cleanly even if the old one hasn't fully released the socket yet.
@@ -3967,7 +3995,19 @@ function _tryListen() {
     console.log('Open Premiere Pro → Window → Extensions → Claude');
     console.log('(keep this terminal open)\n');
     clog('bridge', 'info', 'bridge started', { port: PORT, workDir: WORK_DIR, node: process.version });
-    checkForUpdates().catch(e => { clog('bridge', 'error', 'update check threw', { error: e.message }); console.error('Update check error:', e.message); });
+    checkForUpdates()
+      .then((result) => {
+        // If the bridge's OWN code changed on disk, the running process is
+        // still the OLD code — auto-restart so the update actually takes
+        // effect (instead of just printing "restart the bridge"). The
+        // one-shot env guard ensures the replacement can't loop.
+        if (result && result.bridgeChanged && process.env.CLAUDE_BRIDGE_JUST_RESTARTED_FOR_UPDATE !== '1') {
+          console.log('\nBridge code was updated — auto-restarting to load it…\n');
+          clog('bridge', 'info', 'auto-restarting to apply bridge update', { updated: result.updated });
+          _selfRespawn({ forUpdate: true });
+        }
+      })
+      .catch(e => { clog('bridge', 'error', 'update check threw', { error: e.message }); console.error('Update check error:', e.message); });
   });
 }
 server.on('error', (err) => {
