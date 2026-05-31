@@ -1469,6 +1469,15 @@
   .tb-left .hint-text { flex: 0 1 auto; min-width: 0; }
   .tb-right { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; }
   .tb-right .ae-pill { margin-right: 0; }
+  /* Tactile press feedback — buttery micro-interactions on the main controls */
+  .icon-btn { transition: background .12s var(--ease-out), color .12s var(--ease-out), border-color .12s var(--ease-out), transform .12s var(--ease-out); }
+  .icon-btn:active:not(:disabled) { transform: scale(0.9); }
+  .tab-pill { transition: background .15s var(--ease-out), color .15s var(--ease-out), transform .12s var(--ease-out); }
+  .tab-pill:active { transform: scale(0.97); }
+  .ae-pill:active:not(:disabled) { transform: scale(0.96); }
+  .settings-btn:active { transform: scale(0.975); }
+  .ref-add:active { transform: scale(0.95); }
+  .rmode-pill:active { transform: scale(0.93); }
   /* Compact bottom bar — everything a touch smaller (the send button is left
      at full size). Prefixed selectors win on specificity over the base rules. */
   .input-toolbar .hint-text { font-size: 10px; }
@@ -2960,7 +2969,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.56</span>
+    <span class="version-tag" id="versionTag">10.57</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -5530,7 +5539,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.56';
+  const PANEL_VERSION = '10.57';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
