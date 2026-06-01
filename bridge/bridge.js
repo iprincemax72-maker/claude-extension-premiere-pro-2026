@@ -1009,31 +1009,50 @@ async function detectInterviewQuestions(sentences, density, log) {
 // build prompt instead of a transcript). Two fixed questions (aspect ratio +
 // tone) plus up to 3 content-driven ones. Returns [{id,q,type,options:[{value,label}]}].
 async function detectPlanQuestions(message, log) {
-  const fixed = [
-    { id: 'ratio', q: 'Aspect ratio?', type: 'single', options: [
-      { value: '1920x1080', label: 'Landscape 16:9' },
-      { value: '1080x1920', label: 'Vertical 9:16' },
-      { value: '1080x1080', label: 'Square 1:1' },
-      { value: '1080x1350', label: 'Portrait 4:5' },
-    ] },
-    { id: 'tone', q: 'Visual tone?', type: 'single', options: [
-      { value: 'minimal',   label: 'Clean & minimal' },
-      { value: 'energetic', label: 'Energetic & punchy' },
-      { value: 'editorial', label: 'Bold editorial' },
-      { value: 'luxury',    label: 'Luxury & moody' },
-    ] },
-  ];
+  const msg = String(message || '');
+  // Fixed questions are CONDITIONAL — only ask what the prompt hasn't already
+  // pinned down, so a fully-specified prompt doesn't get padded with noise.
+  const hasRatio = /\b(16:9|9:16|1:1|4:5|4:3|\d{3,4}\s*[x×]\s*\d{3,4}|portrait|landscape|vertical|horizontal|square|widescreen|reel|tiktok|shorts?)\b/i.test(msg);
+  const hasTone  = /\b(minimal|clean|luxur|elegant|energetic|punchy|bold|editorial|playful|corporate|retro|vintage|neon|cyber|moody|dark|aesthetic|cinematic|premium|sleek|modern|brutalist|grunge|vibe|style)\b/i.test(msg);
+  const fixed = [];
+  if (!hasRatio) fixed.push({ id: 'ratio', q: 'Aspect ratio?', type: 'single', options: [
+    { value: '1920x1080', label: 'Landscape 16:9' },
+    { value: '1080x1920', label: 'Vertical 9:16' },
+    { value: '1080x1080', label: 'Square 1:1' },
+    { value: '1080x1350', label: 'Portrait 4:5' },
+  ] });
+  if (!hasTone) fixed.push({ id: 'tone', q: 'Visual tone?', type: 'single', options: [
+    { value: 'minimal',   label: 'Clean & minimal' },
+    { value: 'energetic', label: 'Energetic & punchy' },
+    { value: 'editorial', label: 'Bold editorial' },
+    { value: 'luxury',    label: 'Luxury & moody' },
+  ] });
   try {
+    // The model decides HOW MANY content questions to ask, scaled to how
+    // complex / ambiguous the request is — that's what the user asked for.
     const system = [
       'You are a senior motion-graphics designer about to build ONE Remotion animation for the user.',
-      'Read their request and ask UP TO 3 short multiple-choice questions whose answers would genuinely change HOW you design and animate it — based on the SPECIFIC request (the actual text, shapes, mood, content they mentioned).',
-      'Make them SMART and specific to THIS request — e.g. what element should be the focal point, what animates in first, how the accent/border/glow is treated, what the background does, how it exits, which word gets emphasized, icon or no icon, etc.',
-      'Do NOT ask about aspect ratio or overall visual tone — those are asked separately. Do NOT ask trivial yes/no filler.',
+      'Read their request and ask the clarifying multiple-choice questions whose answers would genuinely change HOW you design and animate it — based on the SPECIFIC request (the actual text, shapes, mood, content they mentioned).',
+      '',
+      'SCALE THE NUMBER OF QUESTIONS TO THE REQUEST — this is the most important rule:',
+      '  • A short, simple, fully-specified request → ask 0-1 questions (or none).',
+      '  • A normal request with a few open decisions → 2-3 questions.',
+      '  • A big, vague, ambitious, or multi-part request → 4-6 questions.',
+      'Use real judgment. Do NOT pad a simple prompt with filler questions, and do',
+      'NOT under-ask on a complex one. Hard prompt = more questions; easy prompt = fewer.',
+      '',
+      'Make every question SMART and specific to THIS request — e.g. what element is',
+      'the focal point, what animates in first, accent/border/glow treatment, what the',
+      'background does, how it exits, which word gets emphasized, icon or no icon,',
+      'pacing, color direction, layout. Never ask trivial yes/no filler.',
+      'Do NOT ask about aspect ratio or overall visual tone — those are handled separately.',
+      '',
       'Output JSONL — ONE compact JSON object per line. No array, no prose, no markdown fences:',
       '{"id":"c1","q":"The headline — how should each word arrive?","options":[{"value":"word","label":"One word at a time"},{"value":"all","label":"All together"},{"value":"char","label":"Letter by letter"}]}',
-      'Each question: 2-4 options, each with a short value and a human label. Max 3 questions. If the request is already fully specified, you may output NOTHING.',
+      'Each question: 2-4 options, each with a short value and a human label. Hard cap 6 questions.',
+      'If the request is already fully specified, output NOTHING.',
     ].join('\n');
-    const raw = await runClaudeText(system + '\n\nUSER REQUEST:\n' + String(message).slice(0, 4000), 60000, log, 'planq');
+    const raw = await runClaudeText(system + '\n\nUSER REQUEST:\n' + msg.slice(0, 4000), 60000, log, 'planq');
     const content = [];
     for (const line of String(raw).split('\n')) {
       let t = line.trim();
@@ -1048,9 +1067,9 @@ async function detectPlanQuestions(message, log) {
           content.push({ id: o.id, q: String(o.q), type: 'single', options: o.options });
         }
       } catch {}
-      if (content.length >= 3) break;
+      if (content.length >= 6) break;
     }
-    log && log(`planq: ${content.length} smart questions generated`);
+    log && log(`planq: ${content.length} smart questions (${fixed.length} fixed) for ${msg.length}-char prompt`);
     return fixed.concat(content);
   } catch (e) {
     log && log('planq failed, using fixed only: ' + e.message);
