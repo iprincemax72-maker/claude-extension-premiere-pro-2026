@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "5.2";
+var HOST_JSX_VERSION = "5.3";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -1049,7 +1049,10 @@ function ccAutoEditApply(payloadJson) {
 
         for (var i = 0; i < items.length; i++) {
             var it = items[i];
-            if (!it || !it.file || typeof it.atSec !== "number") {
+            // v2 items place by absolute timelineSec; legacy ones by atSec.
+            // Accept either so a timelineSec-only item isn't dropped here before
+            // the placement math below gets to use it.
+            if (!it || !it.file || (typeof it.atSec !== "number" && typeof it.timelineSec !== "number")) {
                 skipped.push({ index: i, reason: "invalid item" });
                 continue;
             }

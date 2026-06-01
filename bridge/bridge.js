@@ -936,7 +936,10 @@ function buildMomentGuidance(answers) {
   if (!answers || typeof answers !== 'object') return '';
   const bits = [];
   for (const k in answers) {
-    if (k === 'styleConsistency' || k === 'tone') continue;
+    // styleConsistency/tone drive the visual style, ratio drives the render
+    // resolution — none of those should steer WHICH moments get picked. Only
+    // the content-driven questions (ids like c1, c2) belong in moment guidance.
+    if (k === 'styleConsistency' || k === 'tone' || k === 'ratio') continue;
     const v = answers[k];
     if (v && typeof v === 'string') bits.push(v);
   }
@@ -1030,7 +1033,9 @@ async function verifyPlan(moments, sentences, spanStart, spanEnd, log) {
     if (mt) {
       const v = JSON.parse(mt[0]);
       if (Array.isArray(v.drop) && v.drop.length) {
-        const ds = new Set(v.drop.map(Number));
+        // Only honour in-range integer indices — a hallucinated/1-based/float
+        // index from the LLM must not silently drop the wrong graphic.
+        const ds = new Set(v.drop.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n < m.length));
         const kept = m.filter((_, i) => !ds.has(i));
         if (kept.length) m = kept;   // never let verify nuke the whole plan
       }
@@ -1091,12 +1096,21 @@ async function extractConcatAudio(segments, reqId, log) {
   log && log(`concat audio: ${segments.length} segs → ${cum.toFixed(1)}s wav`);
   return { wavPath, totalDur: cum, timeMap };
 }
-// Map a time in the concatenated wav back to an absolute timeline second.
+// Which concat segment a wav-time falls in (index into timeMap).
+function concatSegIndex(timeMap, t) {
+  for (let i = 0; i < timeMap.length; i++) {
+    if (t < timeMap[i].concatStart + timeMap[i].dur + 0.001) return i;
+  }
+  return timeMap.length - 1;
+}
+// Map a time in the concatenated wav back to an absolute timeline second. The
+// offset is clamped to the segment's own duration so a time never maps past the
+// clip it belongs to (clips can be non-contiguous on the timeline).
 function concatToTimeline(timeMap, t) {
   for (let i = 0; i < timeMap.length; i++) {
     const seg = timeMap[i];
     if (t < seg.concatStart + seg.dur + 0.001 || i === timeMap.length - 1) {
-      return seg.timelineStart + Math.max(0, t - seg.concatStart);
+      return seg.timelineStart + Math.max(0, Math.min(t - seg.concatStart, seg.dur));
     }
   }
   return t;
@@ -3693,12 +3707,23 @@ const server = http.createServer((req, res) => {
         log(`parakeet: ${(transcriptRaw || []).length} segments`);
         if (!transcriptRaw || transcriptRaw.length < 3) { broadcastProgressDone(reqId); res.writeHead(400); res.end(JSON.stringify({ error: "Couldn't hear much speech in the selection", reqId })); _activeAutoedit = null; return; }
 
-        const sentences = transcriptRaw.map((seg, i) => ({
-          i,
-          startSec: concatToTimeline(timeMap, typeof seg.start === 'number' ? seg.start : 0),
-          endSec:   concatToTimeline(timeMap, typeof seg.end   === 'number' ? seg.end   : 0),
-          text:     (seg.text || '').trim(),
-        })).filter(s => s.text.length > 0);
+        const sentences = transcriptRaw.map((seg, i) => {
+          const cs = (typeof seg.start === 'number') ? seg.start : 0;
+          let ce = (typeof seg.end === 'number') ? seg.end : cs;
+          // Keep the sentence inside the clip its start belongs to. Without
+          // this, a sentence that straddles a multi-clip concat boundary would
+          // map its end into the NEXT clip — producing a graphic that spans the
+          // timeline gap between two non-adjacent selected clips.
+          const si = concatSegIndex(timeMap, cs);
+          const segEnd = timeMap[si].concatStart + timeMap[si].dur;
+          if (ce > segEnd) ce = segEnd;
+          return {
+            i,
+            startSec: concatToTimeline(timeMap, cs),
+            endSec:   concatToTimeline(timeMap, ce),
+            text:     (seg.text || '').trim(),
+          };
+        }).filter(s => s.text.length > 0);
         if (sentences.length < 3) { broadcastProgressDone(reqId); res.writeHead(400); res.end(JSON.stringify({ error: 'Not enough speech in the selection', reqId })); _activeAutoedit = null; return; }
 
         broadcastProgress('Reading the speech', 24, reqId);
@@ -4014,6 +4039,19 @@ function _autoRestartForBridgeUpdate(result) {
     clog('bridge', 'info', 'bridge restart deferred (busy)', { updated: result && result.updated });
     return;
   }
+  // Also defer if an Auto-Edit /analyze just cached a transcript that's likely
+  // still awaiting its /run (the interview window). Restarting now would wipe
+  // the in-memory _autoeditCache and strand the user at "session expired".
+  try {
+    const now = Date.now();
+    for (const v of _autoeditCache.values()) {
+      if (now - (v.createdAt || 0) < 3 * 60 * 1000) {
+        console.log('Bridge update ready, but an Auto-Edit interview is pending — deferring restart.');
+        clog('bridge', 'info', 'bridge restart deferred (autoedit interview pending)', null);
+        return;
+      }
+    }
+  } catch {}
   try {
     const sent = path.join(WORK_DIR, '.last-update-restart');
     let recent = false;
