@@ -444,9 +444,41 @@ html[data-theme="dark"] .theme-toggle .moon { display: block; } html[data-theme=
 /* 4 — hero mockup tilt is set via JS transform; keep it smooth */
 .hero-mock { transition: transform 0.25s var(--ease); transform-style: preserve-3d; will-change: transform; }
 
+/* 5 — BORDER GLOW: a coral light travels around the card's border + soft halo */
+@property --glow-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.glow { position: relative; animation: glowHalo 5s ease-in-out infinite; }
+.glow::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.6px;
+  background: conic-gradient(from var(--glow-angle),
+    transparent 0deg, transparent 230deg,
+    var(--coral) 290deg, #f3b78f 312deg, var(--coral) 334deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none;
+  animation: glowSpin 5s linear infinite;
+}
+@keyframes glowSpin { to { --glow-angle: 360deg; } }
+@keyframes glowHalo {
+  0%, 100% { box-shadow: 0 0 22px -12px var(--coral), 0 22px 48px -30px rgba(0,0,0,0.55); }
+  50%      { box-shadow: 0 0 46px -8px var(--coral),  0 22px 48px -30px rgba(0,0,0,0.55); }
+}
+/* Fallback for browsers without @property: static coral arc, no rotation */
+@supports not (background: conic-gradient(from var(--glow-angle), red, blue)) {
+  .glow::before { background: conic-gradient(transparent 0deg 230deg, var(--coral) 300deg, transparent 360deg); animation: none; }
+}
+
+/* 6 — ambient hero glow slowly drifts so the page is never fully static */
+.hero::after { animation: heroDrift 16s ease-in-out infinite alternate; }
+@keyframes heroDrift {
+  from { transform: translate(0, 0) scale(1); opacity: 1; }
+  to   { transform: translate(-36px, 26px) scale(1.12); opacity: 0.72; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-h1 .w { opacity: 1; filter: none; transform: none; animation: none; }
-  .feat::before, .btn-primary::after { display: none; }
+  .feat::before, .btn-primary::after, .hero::after, .glow::before { display: none; animation: none; }
+  .glow { animation: none; }
 }
 
 /* ── Responsive ── */
@@ -617,19 +649,19 @@ html[data-theme="dark"] .theme-toggle .moon { display: block; } html[data-theme=
         <div class="num">01</div>
         <h3>Describe it</h3>
         <p>Type what you want.</p>
-        <div class="pic"><span class="kbd">make a 3-step checklist ⏎</span></div>
+        <div class="pic glow"><span class="kbd">make a 3-step checklist ⏎</span></div>
       </div>
       <div class="step reveal d1">
         <div class="num">02</div>
         <h3>Claude builds it</h3>
         <p>It writes the code and renders it.</p>
-        <div class="pic"><div class="miniwin"><div class="row"></div><div class="row c"></div><div class="row s"></div><div class="row"></div></div></div>
+        <div class="pic glow"><div class="miniwin"><div class="row"></div><div class="row c"></div><div class="row s"></div><div class="row"></div></div></div>
       </div>
       <div class="step reveal d2">
         <div class="num">03</div>
         <h3>It's on your timeline</h3>
         <p>One click. Ready to play.</p>
-        <div class="pic"><div class="tl"><div class="track"><span class="clip a"></span></div><div class="track"><span class="clip b"></span></div></div></div>
+        <div class="pic glow"><div class="tl"><div class="track"><span class="clip a"></span></div><div class="track"><span class="clip b"></span></div></div></div>
       </div>
     </div>
   </div>
@@ -694,7 +726,7 @@ html[data-theme="dark"] .theme-toggle .moon { display: block; } html[data-theme=
     <h2>Sixty seconds, start to finish.</h2>
   </div>
   <div class="wrap reveal d1">
-    <div class="video-frame">
+    <div class="video-frame glow">
       <!-- TODO: replace this placeholder with your embedded demo (YouTube/Vimeo iframe or a <video> tag) -->
       <button class="play" id="playDemo" aria-label="Play demo">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
