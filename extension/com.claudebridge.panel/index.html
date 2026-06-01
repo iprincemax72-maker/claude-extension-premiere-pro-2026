@@ -2292,6 +2292,20 @@
   }
   .plan-note::placeholder { color: var(--text-faint); }
   .plan-note:focus { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .plan-note-refs { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+  .plan-note-refs:empty { display: none; }
+  .plan-note-ref {
+    display: flex; align-items: center; gap: 6px; max-width: 100%;
+    padding: 4px 7px 4px 4px; border-radius: 8px;
+    background: rgba(255,255,255,0.05); border: 1px solid var(--accent-line);
+  }
+  .plan-note-ref img { width: 26px; height: 26px; object-fit: cover; border-radius: 5px; flex-shrink: 0; }
+  .plan-note-ref span { font-size: 10.5px; color: var(--text-dim); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plan-note-ref-x {
+    border: none; background: transparent; color: var(--text-faint);
+    font-size: 15px; line-height: 1; cursor: pointer; padding: 0 2px;
+  }
+  .plan-note-ref-x:hover { color: var(--accent); }
   .plan-card-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
   .plan-build-btn {
     font: inherit; font-size: 12px; font-weight: 700; color: #fff;
@@ -3104,7 +3118,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.74</span>
+    <span class="version-tag" id="versionTag">10.75</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -5720,7 +5734,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.74';
+  const PANEL_VERSION = '10.75';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -6680,8 +6694,10 @@ document.addEventListener('keydown', async (e) => {
   const k = (e.key || '').toLowerCase();
 
   if (k === 'v') {
-    // Only when the textarea is focused.
-    if (document.activeElement !== input) return;
+    // Works when the main composer OR a Plan-card note box is focused.
+    const ae = document.activeElement;
+    const isNote = !!(ae && ae.classList && ae.classList.contains('plan-note'));
+    if (ae !== input && !isNote) return;
 
     // PRIMARY PATH: let the browser's native paste fire — it's instant
     // because clipboardData is synchronous, no subprocess needed. Wait ~70ms
@@ -6697,14 +6713,20 @@ document.addEventListener('keydown', async (e) => {
         if (resolved) return;
         if (t && typeof t === 'string' && t.length) {
           resolved = true;
-          insertTextAtCursor(t);
+          if (isNote && typeof ae.setRangeText === 'function') {
+            const s = ae.selectionStart || ae.value.length;
+            ae.setRangeText(t, s, ae.selectionEnd || s, 'end');
+          } else { insertTextAtCursor(t); }
         }
       }).catch(() => {});
       const imgP = readClipboardImage().then(img => {
         if (resolved) return;
         if (img && img.blob) {
           resolved = true;
-          return attachBlobAsReference(img.blob, img.ext).then(() => input.focus());
+          return attachBlobAsReference(img.blob, img.ext).then(() => {
+            if (isNote) { if (_planNoteRefsUpdater) _planNoteRefsUpdater(); ae.focus(); }
+            else { input.focus(); }
+          });
         }
       }).catch(() => {});
       Promise.race([textP, imgP]);
@@ -8478,6 +8500,9 @@ function _maybeDrainQueue(tab, opts) {
 // Calls /plan/questions for smart multiple-choice questions, renders them as a
 // selectable card in the chat, and on "Build it" re-enters sendMessage with the
 // chosen answers baked in (skipPlan so it actually renders this time).
+// Set by the live question card so the global Cmd+V fallback can refresh its
+// pasted-image thumbnails; null when no card is awaiting input.
+let _planNoteRefsUpdater = null;
 async function runPlanInterview(msg) {
   const placeholder = makeMsg('claude',
     '<div class="plan-card"><div class="plan-loading"><span class="ae-spinner" style="width:15px;height:15px"></span> Thinking of a few quick questions…</div></div>');
@@ -8533,7 +8558,8 @@ function renderPlanCard(card, originalMsg, questions) {
     + '<div class="plan-note-label">'
     + '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
     + '<span>Or just tell me yourself — explain more, add context, anything I should know</span></div>'
-    + '<textarea class="plan-note" rows="2" placeholder="e.g. the rectangle should feel like a glassy iOS card, the text is a video title, keep it calm not flashy…"></textarea>'
+    + '<textarea class="plan-note" rows="2" placeholder="e.g. the rectangle should feel like a glassy iOS card, the text is a video title, keep it calm not flashy…   (you can paste a reference image here too)"></textarea>'
+    + '<div class="plan-note-refs"></div>'
     + '</div>';
   html += '<div class="plan-card-actions">'
     + '<button type="button" class="plan-build-btn">Build it</button>'
@@ -8563,17 +8589,56 @@ function renderPlanCard(card, originalMsg, questions) {
     const noteEl = card.querySelector('.plan-note');
     const note = (noteEl && noteEl.value || '').trim();
     if (note) ansText += (ansText ? '\n\n' : '') + '[EXTRA CONTEXT FROM ME — read this carefully, it overrides assumptions]\n' + note;
+    _planNoteRefsUpdater = null;   // card is closing — stop the Cmd+V fallback touching it
     card.querySelectorAll('button, textarea').forEach(x => x.disabled = true);
     card.classList.add('plan-card-locked');
     sendMessage(originalMsg, { skipPlan: true, skipYou: true, planAnswers: ansText });
   };
   card.querySelector('.plan-build-btn').addEventListener('click', () => build(true));
   card.querySelector('.plan-skip-btn').addEventListener('click', () => build(false));
-  // ⌘/Ctrl+Enter in the note box → Build it (Enter alone stays a newline).
+
+  // Show thumbnails of any pasted reference images right inside the card.
+  const noteRefsEl = card.querySelector('.plan-note-refs');
+  function updateNoteRefs() {
+    if (!noteRefsEl) return;
+    const imgs = activeReferences.filter(r => r.kind === 'image');
+    noteRefsEl.innerHTML = imgs.map((r, i) =>
+      '<div class="plan-note-ref" data-i="' + i + '">'
+      + (r.dataUrl ? '<img src="' + r.dataUrl + '" alt="">' : '')
+      + '<span>' + escapeHTML(r.name) + '</span>'
+      + '<button type="button" class="plan-note-ref-x" data-path="' + escapeHTML(r.path) + '" aria-label="Remove">&times;</button>'
+      + '</div>').join('');
+    noteRefsEl.querySelectorAll('.plan-note-ref-x').forEach(b => b.addEventListener('click', () => {
+      const p = b.getAttribute('data-path');
+      const idx = activeReferences.findIndex(r => r.path === p);
+      if (idx >= 0) removeReferenceAt(idx);
+      updateNoteRefs();
+    }));
+  }
+  _planNoteRefsUpdater = updateNoteRefs;
+
   const noteEl = card.querySelector('.plan-note');
-  if (noteEl) noteEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); build(true); }
-  });
+  if (noteEl) {
+    // ⌘/Ctrl+Enter → Build it (Enter alone stays a newline).
+    noteEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); build(true); }
+    });
+    // Paste a reference image directly into the box (native path).
+    noteEl.addEventListener('paste', async (e) => {
+      _nativePasteFiredAt = Date.now();
+      try {
+        const items = (e.clipboardData && e.clipboardData.items) || [];
+        for (const it of items) {
+          if (it.kind === 'file' && /^image\//i.test(it.type)) {
+            e.preventDefault();
+            const blob = it.getAsFile();
+            if (blob) { const ext = (it.type.split('/')[1] || 'png').toLowerCase(); await attachBlobAsReference(blob, ext); updateNoteRefs(); noteEl.focus(); }
+            return;
+          }
+        }
+      } catch {}
+    });
+  }
 }
 
 async function sendMessage(presetMsg, sendOpts) {
