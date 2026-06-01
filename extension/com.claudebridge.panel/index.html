@@ -3040,6 +3040,39 @@
     gap: 6px;
   }
   .history-prompt-row .history-prompt { flex: 1; min-width: 0; }
+  /* "+N changes" pill + the list of changes given in one conversation */
+  .hist-count {
+    flex-shrink: 0;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.02em;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-line);
+    border-radius: 999px;
+    padding: 1px 7px;
+    white-space: nowrap;
+  }
+  .history-changes {
+    margin: 6px 0 2px;
+    display: flex; flex-direction: column; gap: 4px;
+    border-left: 2px solid var(--accent-line);
+    padding-left: 8px;
+  }
+  .history-change {
+    display: flex; align-items: flex-start; gap: 6px;
+    font-size: 11px; color: var(--text-dim); line-height: 1.3;
+  }
+  .history-change-i {
+    flex-shrink: 0;
+    width: 14px; height: 14px; margin-top: 1px;
+    border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: 9px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .history-change-txt {
+    overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
   .history-copy {
     flex-shrink: 0;
     width: 22px; height: 22px;
@@ -3118,7 +3151,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.76</span>
+    <span class="version-tag" id="versionTag">10.77</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -5071,28 +5104,35 @@ function saveHistory() {
   renderHistoryBadge();
 }
 
-function addHistoryEntry({prompt, path, mode, reply}) {
+function addHistoryEntry({prompt, path, mode, reply, iterationOf}) {
   if (!path) return;
   const kind = IMAGE_EXTS.has(extOf(path)) ? 'image' : 'video';
-  // De-dup by path. Renders are now logged twice — once immediately when
-  // the render lands (so it's never lost to a panel reload) and again when
-  // the user clicks Import (so we capture the placement mode). If a
-  // matching path already exists, UPDATE it in place — promote the existing
-  // entry to the top, fill in mode/reply if the new call has them but the
-  // old one didn't.
+  // De-dup by path. Renders are logged twice — once immediately when the
+  // render lands (never lost to a reload) and again on Import (captures the
+  // placement mode). If a matching path exists, UPDATE it in place.
   const existingIdx = history.findIndex(h => h && h.path === path);
   if (existingIdx >= 0) {
     const existing = history[existingIdx];
     if (mode && !existing.mode) existing.mode = mode;
     if (reply && !existing.reply) existing.reply = reply;
     if (prompt && !existing.prompt) existing.prompt = prompt;
+    if (!existing.thread) existing.thread = existing.id;
     existing.t = Date.now();
-    // Move to top of history (most-recent-touched ordering).
     history.splice(existingIdx, 1);
     history.unshift(existing);
   } else {
+    // Group iterations (the Changes button) into ONE conversation: an
+    // iteration inherits the thread of the render it was based on, so all the
+    // changes for an animation show as a single history card instead of N
+    // separate ones. `iterationOf` is the path of the render being changed.
+    const id = Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    let thread = id;
+    if (iterationOf) {
+      const root = history.find(h => h && h.path === iterationOf);
+      if (root) thread = root.thread || root.id;
+    }
     const entry = {
-      id: Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      id, thread,
       prompt: prompt || '',
       reply: reply || '',
       path, kind, mode: mode || '', t: Date.now(),
@@ -5121,8 +5161,26 @@ function renderHistory() {
     historyList.innerHTML = '<div class="history-empty">No renders yet.<br>Send a message to generate your first animation.</div>';
     return;
   }
+  // Group history into threads (a root render + its Changes iterations) so all
+  // the changes for one animation appear as ONE conversation card.
+  const _threads = [];
+  const _byThread = new Map();
+  for (const e of history) {
+    if (!e) continue;
+    const key = e.thread || e.id;
+    let g = _byThread.get(key);
+    if (!g) { g = { key, items: [] }; _byThread.set(key, g); _threads.push(g); }
+    g.items.push(e);
+  }
+  // history is newest-first → items[0] is the latest render, last is the root.
   let html = '';
-  history.forEach((e, i) => {
+  _threads.forEach((g) => {
+    const items = g.items;
+    const latest = items[0];
+    const root = items[items.length - 1];
+    const e = latest;                       // thumbnail + actions act on the latest render
+    const chrono = items.slice().reverse(); // oldest → newest
+    const changeItems = chrono.slice(1);    // everything after the original = the changes given
     let thumbHTML;
     if (e.kind === 'image') {
       const src = pathToSrc(e.path, 'image');
@@ -5132,24 +5190,38 @@ function renderHistory() {
       thumbHTML = '<div class="history-thumb" data-id="' + e.id + '">' + ICON_FILM + '</div>';
     }
     const fileExists = !_fs || (function(){ try { return _fs.existsSync(e.path); } catch { return true; } })();
-    const promptText = e.prompt ? escapeHTML(e.prompt) : '<span style="opacity:0.5">(no prompt saved)</span>';
+    const promptText = root.prompt ? escapeHTML(root.prompt) : '<span style="opacity:0.5">(no prompt saved)</span>';
     const fname = e.path.split('/').pop();
     const meta = relTime(e.t) + ' · ' + escapeHTML(fname) + (fileExists ? '' : ' · <span style="color:var(--err)">missing</span>');
-    const copyBtn = e.prompt
-      ? '<button class="history-copy" data-act="copy" data-id="' + e.id + '" title="Copy prompt">'
+    const copyBtn = root.prompt
+      ? '<button class="history-copy" data-act="copy" data-id="' + e.id + '" title="Copy original prompt">'
         + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'
         + '</button>'
       : '';
-    const visited = _historyVisited.has(e.id);
+    const visited = _historyVisited.has(g.key);
     const openedBadge = visited ? '<span class="hist-opened" title="You\'ve already opened this one">opened</span>' : '';
-    html += '<div class="history-item' + (visited ? ' visited' : '') + '" data-row-id="' + e.id + '" title="Click to reopen this conversation in a new tab">'
+    const countPill = changeItems.length
+      ? '<span class="hist-count" title="' + changeItems.length + ' change' + (changeItems.length > 1 ? 's' : '') + ' in this conversation">+' + changeItems.length + ' change' + (changeItems.length > 1 ? 's' : '') + '</span>'
+      : '';
+    // The list of changes the user gave, in order, so they can see what they asked for.
+    const changesHTML = changeItems.length
+      ? '<div class="history-changes">'
+        + changeItems.map((c, i) =>
+            '<div class="history-change"><span class="history-change-i">' + (i + 1) + '</span>'
+            + '<span class="history-change-txt">' + (c.prompt ? escapeHTML(c.prompt) : '<span style="opacity:.5">(tweak)</span>') + '</span></div>'
+          ).join('')
+        + '</div>'
+      : '';
+    html += '<div class="history-item' + (visited ? ' visited' : '') + '" data-row-id="' + g.key + '" title="Click to reopen this whole conversation (original + all changes) in a new tab">'
       + thumbHTML
       + '<div class="history-body">'
       +   '<div class="history-prompt-row">'
       +     '<div class="history-prompt">' + promptText + '</div>'
+      +     countPill
       +     openedBadge
       +     copyBtn
       +   '</div>'
+      +   changesHTML
       +   '<div class="history-meta">' + meta + '</div>'
       +   '<div class="history-actions">'
       +     (fileExists ? '<button data-act="preview" data-id="' + e.id + '">Preview</button>' : '')
@@ -5251,22 +5323,23 @@ function renderHistory() {
           renderHistory();
         }
       } else if (btn.dataset.act === 'delete') {
-        history.splice(idx, 1);
+        // Delete the WHOLE conversation thread, not just the latest render.
+        const th = e.thread || e.id;
+        history = history.filter(x => (x.thread || x.id) !== th);
         saveHistory();
         renderHistory();
       }
     });
   });
-  // Row click → reopen conversation in a new tab. We listen on the row
-  // but stop the handler from firing when the click came from a button,
-  // the thumbnail, or the copy chip — those have their own handlers.
+  // Row click → reopen the whole conversation (original + all changes) in a
+  // new tab. Stop firing when the click came from a button, thumbnail, or copy.
   historyList.querySelectorAll('.history-item').forEach(row => {
     row.addEventListener('click', (ev) => {
       const t = ev.target;
       if (!t || t.closest('button') || t.closest('.history-thumb') || t.closest('.history-copy')) return;
-      const id = row.getAttribute('data-row-id');
-      const entry = history.find(x => x.id === id);
-      if (entry) { markHistoryVisited(id); row.classList.add('visited'); reopenConversation(entry); }
+      const key = row.getAttribute('data-row-id');           // thread key
+      const items = history.filter(x => (x.thread || x.id) === key).sort((a, b) => (a.t || 0) - (b.t || 0));
+      if (items.length) { markHistoryVisited(key); row.classList.add('visited'); reopenConversation(items); }
     });
   });
 
@@ -5333,38 +5406,36 @@ function renderHistory() {
 // stored Claude reply (if any) as message bubbles, plus the render
 // preview card so Re-import / Preview / Changes are available without
 // leaving the chat.
-function reopenConversation(entry) {
-  if (!entry) return;
-  try {
-    if (typeof newTab === 'function') newTab();
-    // Use the freshly-active tab's content container so the bubbles land
-    // in the right place (makeMsg appends to getActiveLogContent()).
-    if (typeof clearEmpty === 'function') clearEmpty();
+function reopenConversation(entryOrItems) {
+  // Accepts a single entry OR an array of thread items (original + changes,
+  // chronological) so the whole conversation rebuilds in one tab.
+  const items = Array.isArray(entryOrItems) ? entryOrItems.filter(Boolean) : (entryOrItems ? [entryOrItems] : []);
+  if (!items.length) return;
+  const renderEntry = (entry) => {
     if (entry.prompt) {
       makeMsg('you', '<p>' + escapeHTML(entry.prompt) + '</p>');
     }
     if (entry.reply) {
-      // reply was originally rendered through renderMarkdown — re-use
-      // that path so formatting (lists, code, [[IMPORT:]] strip) match.
       const html = (typeof renderMarkdown === 'function')
         ? renderMarkdown(entry.reply)
         : ('<p>' + escapeHTML(entry.reply) + '</p>');
       const m = makeMsg('claude', html);
-      // Re-attach the render preview card so Re-import / Changes still
-      // work — but only if the file is still on disk.
       const fileOk = !_fs || (function(){ try { return _fs.existsSync(entry.path); } catch { return true; } })();
       if (fileOk && typeof addRenderPreview === 'function') {
         addRenderPreview(m.wrap, entry.path, entry.prompt || '', entry.reply || '');
       }
     } else if (entry.path) {
-      // No reply saved (legacy entry) — at least attach the preview card
-      // so the user can re-import or iterate.
       const m = makeMsg('claude', '<p style="color:var(--text-dim);font-style:italic">Reopened from history. (Original reply not saved — only newer renders preserve the full conversation.)</p>');
       const fileOk = !_fs || (function(){ try { return _fs.existsSync(entry.path); } catch { return true; } })();
       if (fileOk && typeof addRenderPreview === 'function') {
         addRenderPreview(m.wrap, entry.path, entry.prompt || '', '');
       }
     }
+  };
+  try {
+    if (typeof newTab === 'function') newTab();
+    if (typeof clearEmpty === 'function') clearEmpty();
+    for (const entry of items) renderEntry(entry);
   } catch (e) {
     console.error('reopenConversation failed:', e);
   }
@@ -5734,7 +5805,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.76';
+  const PANEL_VERSION = '10.77';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -8664,6 +8735,9 @@ async function sendMessage(presetMsg, sendOpts) {
   // user's bubble shows just their tweak.
   let outboundMsg = msg;
   let outboundPlanMode = false;   // tells the bridge to interview+plan, not build
+  // Capture the path being iterated on BEFORE the context is cleared, so the
+  // resulting render groups into the same history conversation thread.
+  const _iterationOf = (iterationContext && iterationContext.originalPath) ? iterationContext.originalPath : null;
   if (iterationContext) {
     outboundMsg =
         'Make a new version of a previous render.\n'
@@ -8835,7 +8909,7 @@ async function sendMessage(presetMsg, sendOpts) {
         // "not yet imported"; if/when the user clicks Import the entry is
         // updated to reflect placement. Either way the render is findable.
         try {
-          addHistoryEntry({ prompt: msg || '', path: p, mode: '', reply: replyText || '' });
+          addHistoryEntry({ prompt: msg || '', path: p, mode: '', reply: replyText || '', iterationOf: _iterationOf });
         } catch {}
       }
     }
