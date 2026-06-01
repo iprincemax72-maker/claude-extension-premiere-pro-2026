@@ -382,8 +382,8 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 .mock-bar .lights { display: flex; gap: 6px; }
 .mock-bar .lights i { width: 11px; height: 11px; border-radius: 50%; }
 .mock-bar .lights i:nth-child(1){ background:#e1664f; } .mock-bar .lights i:nth-child(2){ background:#e0b04a; } .mock-bar .lights i:nth-child(3){ background:#6cbf7a; }
-.mock-bar .title { font-family: var(--mono); font-size: 0.7rem; color: var(--text-3); margin-left: 4px; }
-.mock-bar .ver { margin-left: auto; font-family: var(--mono); font-size: 0.62rem; color: var(--text-3); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; }
+.mock-bar .title { font-family: var(--mono); font-size: 0.7rem; color: var(--text-3); margin-left: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mock-bar .ver { margin-left: auto; flex: 0 0 auto; font-family: var(--mono); font-size: 0.62rem; color: var(--text-3); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; white-space: nowrap; }
 .mock-body { padding: 22px 20px; display: flex; flex-direction: column; gap: 18px; }
 .mrow { display: flex; gap: 12px; align-items: flex-start; }
 .mav { width: 26px; height: 26px; border-radius: 7px; flex: 0 0 auto; display: grid; place-items: center; font-size: 0.72rem; font-weight: 700; }
