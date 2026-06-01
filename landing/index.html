@@ -239,7 +239,12 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 @keyframes playPulse { 0% { box-shadow: 0 0 0 0 rgba(226,136,95,0.5); } 70%, 100% { box-shadow: 0 0 0 26px rgba(226,136,95,0); } }
 .video-frame .play:hover { transform: scale(1.06); box-shadow: 0 0 0 16px rgba(255,255,255,0.06); }
 .video-frame .play svg { width: 28px; height: 28px; margin-left: 3px; }
-.video-frame .cap { position: absolute; bottom: 16px; left: 18px; font-family: var(--mono); font-size: 0.7rem; color: var(--text-3); }
+.video-frame .cap { position: absolute; top: 15px; left: 16px; z-index: 2; font-family: var(--mono); font-size: 0.66rem; color: var(--text-2); background: rgba(0,0,0,0.35); border: 1px solid var(--line); border-radius: 7px; padding: 5px 9px; backdrop-filter: blur(4px); }
+.vplayer { position: absolute; left: 16px; right: 16px; bottom: 15px; z-index: 2; display: flex; align-items: center; gap: 12px; }
+.vplayer .vscrub { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.16); position: relative; }
+.vplayer .vscrub i { position: absolute; left: 0; top: 0; bottom: 0; width: 22%; background: linear-gradient(90deg, var(--coral), var(--coral-2)); border-radius: 2px; }
+.vplayer .vscrub::after { content: ""; position: absolute; left: 22%; top: 50%; width: 11px; height: 11px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(0,0,0,0.6); }
+.vplayer .vtime { font-family: var(--mono); font-size: 0.64rem; color: var(--text-2); flex: 0 0 auto; }
 
 /* ── Compare ── */
 .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
@@ -573,6 +578,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
     <div class="video-frame reveal d1">
       <button class="play magnetic" id="playDemo" aria-label="Play demo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
       <span class="cap">demo.mp4 — drop your screen recording here</span>
+      <div class="vplayer"><span class="vscrub"><i></i></span><span class="vtime">0:13 / 1:00</span></div>
     </div>
   </div>
 </section>
