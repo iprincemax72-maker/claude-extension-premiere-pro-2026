@@ -746,6 +746,10 @@ document.getElementById('playDemo').addEventListener('click', () => alert('Drop 
 /* count-up */
 (function () {
   const nums = document.querySelectorAll('.cnt'); if (!nums.length) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    nums.forEach(el => el.textContent = (el.getAttribute('data-prefix') || '') + (el.getAttribute('data-to') || ''));
+    return;
+  }
   const run = el => { const to = parseInt(el.getAttribute('data-to'),10)||0, pre = el.getAttribute('data-prefix')||'', t0 = performance.now();
     (function tick(t){ const p = Math.min(1,(t-t0)/1100), e = 1-Math.pow(1-p,3); el.textContent = pre+Math.round(to*e); if (p<1) requestAnimationFrame(tick); })(t0); };
   if ('IntersectionObserver' in window) { const io = new IntersectionObserver((es,o)=>es.forEach(e=>{ if(e.isIntersecting){run(e.target);o.unobserve(e.target);} }),{threshold:0.6}); nums.forEach(n=>io.observe(n)); } else nums.forEach(run);
