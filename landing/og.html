@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<!-- Source for og.png — open at 1200x630 and screenshot to og.png. Not linked from the site. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #09090b; --text: #FAFAFA; --text-2: #9a9aa1; --text-3: #61626a;
+    --coral: #E2885F; --coral-2: #F0A87E; --coral-press: #cc6f44;
+    --line: rgba(255,255,255,0.08); --line-2: rgba(255,255,255,0.14);
+    --sans: "Schibsted Grotesk", sans-serif; --mono: "JetBrains Mono", monospace;
+  }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  .og {
+    width: 1200px; height: 630px; position: relative; background: var(--bg);
+    font-family: var(--sans); color: var(--text); overflow: hidden;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 72px 76px;
+  }
+  /* grid backdrop */
+  .grid { position: absolute; inset: 0; z-index: 0;
+    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 60px 60px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 30% 0%, #000 20%, transparent 72%);
+            mask-image: radial-gradient(ellipse 80% 70% at 30% 0%, #000 20%, transparent 72%);
+    opacity: 0.6; }
+  /* coral atmosphere */
+  .bloom { position: absolute; border-radius: 50%; filter: blur(14px); z-index: 0; }
+  .bloom.a { top: -180px; left: -120px; width: 620px; height: 480px; background: radial-gradient(circle, rgba(226,136,95,0.30), transparent 62%); }
+  .bloom.b { bottom: -220px; right: -120px; width: 560px; height: 520px; background: radial-gradient(circle, rgba(226,136,95,0.16), transparent 64%); }
+  .og > * { position: relative; z-index: 1; }
+
+  .top { display: flex; align-items: center; gap: 14px; }
+  .glyph { width: 50px; height: 50px; border-radius: 13px; background: var(--coral); color: #15110d;
+    display: grid; place-items: center; font-family: Georgia, serif; font-style: italic; font-weight: 700; font-size: 30px;
+    box-shadow: 0 0 26px -4px var(--coral); }
+  .brand { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+  .brand small { display: block; font-family: var(--mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); font-weight: 500; margin-top: 2px; }
+
+  .mid { margin-top: auto; }
+  .eyebrow { font-family: var(--mono); font-size: 16px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--coral); font-weight: 500; margin-bottom: 22px; }
+  h1 { font-size: 92px; line-height: 0.98; letter-spacing: -0.04em; font-weight: 700; max-width: 16ch; }
+  h1 .c { background: linear-gradient(180deg, var(--coral-2), var(--coral-press)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .sub { margin-top: 26px; font-size: 27px; color: var(--text-2); letter-spacing: -0.01em; }
+
+  .bottom { display: flex; align-items: center; gap: 16px; margin-top: 40px; }
+  .chip { font-family: var(--mono); font-size: 15px; color: var(--text-2); border: 1px solid var(--line-2); border-radius: 99px; padding: 9px 16px; background: rgba(255,255,255,0.02); }
+  .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--line-2); }
+</style>
+</head>
+<body>
+  <div class="og">
+    <div class="grid"></div>
+    <div class="bloom a"></div>
+    <div class="bloom b"></div>
+
+    <div class="top">
+      <div class="glyph">C</div>
+      <div class="brand">Claude<small>for Adobe Premiere Pro</small></div>
+    </div>
+
+    <div class="mid">
+      <div class="eyebrow">Premiere Pro extension</div>
+      <h1>Motion graphics,<br>by <span class="c">just asking.</span></h1>
+      <div class="sub">Describe it. Claude builds it. It's on your timeline.</div>
+      <div class="bottom">
+        <span class="chip">Runs on your Claude plan</span><span class="dot"></span>
+        <span class="chip">No API key</span><span class="dot"></span>
+        <span class="chip">macOS &amp; Windows</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
