@@ -20,6 +20,23 @@ const PANEL_DIR = (process.platform === 'win32')
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
 // ─────────────────────────────────────────────────────────────────────────
+// CRASH GUARDS — a single bad request must NOT take down the whole bridge.
+// Without these, an uncaught error or unhandled promise rejection in ANY
+// handler (e.g. when several renders run at once and one throws) crashes the
+// entire node process, killing EVERY other in-flight request with a "Failed
+// to fetch". For a local single-process bridge, staying up and logging beats
+// crashing everyone's work — so we log and keep serving.
+// ─────────────────────────────────────────────────────────────────────────
+process.on('uncaughtException', (err) => {
+  try { console.error('[uncaughtException] kept bridge alive:\n' + (err && err.stack || err)); } catch {}
+  try { if (typeof clog === 'function') clog('bridge', 'error', 'uncaughtException (kept alive)', { err: String(err && err.message || err), stack: String(err && err.stack || '').slice(0, 1400) }); } catch {}
+});
+process.on('unhandledRejection', (reason) => {
+  try { console.error('[unhandledRejection] kept bridge alive:\n' + (reason && reason.stack || reason)); } catch {}
+  try { if (typeof clog === 'function') clog('bridge', 'error', 'unhandledRejection (kept alive)', { reason: String(reason && reason.message || reason), stack: String(reason && reason.stack || '').slice(0, 1400) }); } catch {}
+});
+
+// ─────────────────────────────────────────────────────────────────────────
 // UNIFIED LOG COLLECTOR
 // One JSONL file that every module feeds into — panel, bridge, ExtendScript
 // (host.jsx via the panel), and render subprocesses. Each line is a single
