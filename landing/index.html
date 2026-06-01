@@ -3,9 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<!-- Mark JS as available BEFORE paint so reveal-animations can hide content
-     only when JS can also reveal it. No JS → everything stays visible. -->
-<script>document.documentElement.classList.add('js');</script>
+<!-- Mark JS available + set the theme BEFORE paint (no flash). Defaults to dark. -->
+<script>
+(function () {
+  var d = document.documentElement;
+  d.classList.add('js');
+  var t = null; try { t = localStorage.getItem('theme'); } catch (e) {}
+  d.setAttribute('data-theme', t || 'dark');
+})();
+</script>
 <title>Claude for Premiere Pro — motion graphics by just asking</title>
 <meta name="description" content="Claude lives inside Adobe Premiere Pro. Describe a title, lower third, or full animation — it writes the code, renders it, and drops it on your timeline. No keyframes, no After Effects." />
 <meta name="theme-color" content="#F6F2EA" />
@@ -58,6 +64,25 @@
   --mono:  "JetBrains Mono", ui-monospace, Menlo, monospace;
 
   --ease:  cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Dark theme (default) — warm espresso, not cold grey ── */
+html[data-theme="dark"] {
+  --paper:      #14110B;
+  --paper-2:    #1B170F;
+  --paper-3:    #231E14;
+  --ink:        #F2EBDD;
+  --ink-soft:   #B4A992;
+  --ink-faint:  #7C7261;
+  --line:       #2C2618;
+  --line-2:     #3A3122;
+  --coral:      #E18A63;
+  --coral-deep: #EFA177;
+  --coral-soft: rgba(225,138,99,0.14);
+  --espresso:   #0E0C07;
+  --espresso-2: #171309;
+  --cream:      #F2EBDD;
+  --cream-soft: #B4A992;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -368,6 +393,62 @@ html.js .reveal.in { opacity: 1; transform: none; }
 @keyframes up { to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .hero .load-up { opacity: 1; transform: none; animation: none; } }
 
+/* ── Dark-theme touch-ups + theme-proofing ── */
+html[data-theme="dark"] body::before { mix-blend-mode: overlay; opacity: 0.06; }
+.compare .new { background: var(--espresso); border-color: var(--coral); }  /* stays a dark, coral-edged card in both themes */
+.btn-dark { color: var(--paper); }                                          /* text = opposite of bg in both themes */
+html[data-theme="dark"] .mock { box-shadow: 0 2px 4px rgba(0,0,0,0.3), 0 40px 90px -36px rgba(0,0,0,0.7); }
+
+/* ── Theme toggle button ── */
+.theme-toggle {
+  width: 38px; height: 38px; border-radius: 50%; flex: 0 0 auto;
+  display: grid; place-items: center; cursor: pointer;
+  background: transparent; border: 1px solid var(--line-2); color: var(--ink);
+  transition: border-color 0.18s var(--ease), color 0.18s var(--ease), transform 0.18s var(--ease);
+}
+.theme-toggle:hover { border-color: var(--coral); color: var(--coral); transform: rotate(18deg); }
+.theme-toggle svg { width: 18px; height: 18px; }
+.theme-toggle .moon { display: none; } .theme-toggle .sun { display: block; }
+html[data-theme="dark"] .theme-toggle .moon { display: block; } html[data-theme="dark"] .theme-toggle .sun { display: none; }
+
+/* ─────────── Creative effects ─────────── */
+
+/* 1 — headline words un-blur in, staggered (set via inline animation-delay) */
+.hero-h1 .w {
+  display: inline-block;
+  opacity: 0; filter: blur(12px); transform: translateY(18px);
+  animation: wordIn 0.85s var(--ease) forwards;
+}
+@keyframes wordIn { to { opacity: 1; filter: blur(0); transform: none; } }
+
+/* 2 — spotlight that follows the cursor across feature cards */
+.feat { position: relative; }
+.feat > * { position: relative; z-index: 1; }
+.feat::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%), var(--coral-soft), transparent 62%);
+  opacity: 0; transition: opacity 0.4s var(--ease);
+}
+.feat:hover::before { opacity: 1; }
+
+/* 3 — shine sweep across primary buttons on hover */
+.btn-primary { position: relative; overflow: hidden; }
+.btn-primary::after {
+  content: ""; position: absolute; top: 0; left: -65%; width: 45%; height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,0.35), transparent);
+  transform: skewX(-18deg); pointer-events: none;
+  transition: left 0.6s var(--ease);
+}
+.btn-primary:hover::after { left: 135%; }
+
+/* 4 — hero mockup tilt is set via JS transform; keep it smooth */
+.hero-mock { transition: transform 0.25s var(--ease); transform-style: preserve-3d; will-change: transform; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-h1 .w { opacity: 1; filter: none; transform: none; animation: none; }
+  .feat::before, .btn-primary::after { display: none; }
+}
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .nav-links, .nav-cta .btn-ghost { display: none; }
@@ -417,6 +498,10 @@ html.js .reveal.in { opacity: 1; transform: none; }
       <a href="#faq">FAQ</a>
     </nav>
     <div class="nav-cta">
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light/dark">
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
       <a href="#demo" class="btn btn-ghost">Watch demo</a>
       <a href="#pricing" class="btn btn-primary" data-buy>Get it</a>
       <button class="nav-toggle" id="navToggle" aria-label="Open menu">
@@ -450,7 +535,13 @@ html.js .reveal.in { opacity: 1; transform: none; }
   <div class="wrap hero-grid">
     <div class="hero-copy">
       <p class="eyebrow load-up l1">Premiere Pro extension</p>
-      <h1 class="load-up l2">Motion graphics,<br>by <span class="serif-italic accent">just asking.</span></h1>
+      <h1 class="hero-h1">
+        <span class="w" style="animation-delay:.12s">Motion</span>
+        <span class="w" style="animation-delay:.20s">graphics,</span><br>
+        <span class="w" style="animation-delay:.32s">by</span>
+        <span class="w accent serif-italic" style="animation-delay:.42s">just</span>
+        <span class="w accent serif-italic" style="animation-delay:.52s">asking.</span>
+      </h1>
       <p class="lede load-up l3">Describe it. Claude builds it. It's on your timeline.</p>
       <div class="hero-cta load-up l4">
         <a href="#pricing" class="btn btn-primary btn-lg" data-buy>Get it — <span data-price-inline>$39</span></a>
@@ -507,9 +598,9 @@ html.js .reveal.in { opacity: 1; transform: none; }
 <!-- ═══════════════ STATS ═══════════════ -->
 <section class="stats">
   <div class="stats-in">
-    <div class="stat reveal"><div class="n">~90<span class="u">s</span></div><div class="l">Avg. render</div></div>
+    <div class="stat reveal"><div class="n"><span class="cnt" data-to="90" data-prefix="~">~90</span><span class="u">s</span></div><div class="l">Avg. render</div></div>
     <div class="stat reveal d1"><div class="n">1–10</div><div class="l">Versions / prompt</div></div>
-    <div class="stat reveal d2"><div class="n">3</div><div class="l">Tools in one panel</div></div>
+    <div class="stat reveal d2"><div class="n"><span class="cnt" data-to="3">3</span></div><div class="l">Tools in one panel</div></div>
     <div class="stat reveal d3"><div class="n">0</div><div class="l">API keys needed</div></div>
   </div>
 </section>
@@ -874,6 +965,67 @@ document.getElementById('playDemo').addEventListener('click', () => {
   window.addEventListener('load', () => setTimeout(() => {
     document.querySelectorAll('.reveal:not(.in)').forEach(el => el.classList.add('in'));
   }, 2500));
+})();
+
+/* Theme toggle — flips data-theme + persists. (Default set in <head>.) */
+(function () {
+  const btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', next === 'dark' ? '#14110B' : '#F6F2EA');
+    try { localStorage.setItem('theme', next); } catch (e) {}
+  });
+})();
+
+/* Count-up stats when they scroll into view */
+(function () {
+  const nums = document.querySelectorAll('.cnt');
+  if (!nums.length) return;
+  const run = (el) => {
+    const to = parseInt(el.getAttribute('data-to'), 10) || 0;
+    const pre = el.getAttribute('data-prefix') || '';
+    const dur = 1100, t0 = performance.now();
+    (function tick(t) {
+      const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      el.textContent = pre + Math.round(to * e);
+      if (p < 1) requestAnimationFrame(tick);
+    })(t0);
+  };
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((es, obs) => es.forEach(e => { if (e.isIntersecting) { run(e.target); obs.unobserve(e.target); } }), { threshold: 0.6 });
+    nums.forEach(n => io.observe(n));
+  } else { nums.forEach(run); }
+})();
+
+/* Spotlight — coral glow follows the cursor across feature cards */
+(function () {
+  document.querySelectorAll('.feat').forEach(card => {
+    card.addEventListener('pointermove', (e) => {
+      const r = card.getBoundingClientRect();
+      card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+      card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    });
+  });
+})();
+
+/* 3D tilt — the hero mockup leans toward the cursor */
+(function () {
+  const mock = document.querySelector('.hero-mock');
+  const hero = document.querySelector('.hero');
+  if (!mock || !hero || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let raf = 0;
+  hero.addEventListener('pointermove', (e) => {
+    const r = mock.getBoundingClientRect();
+    const dx = (e.clientX - (r.left + r.width / 2)) / r.width;
+    const dy = (e.clientY - (r.top + r.height / 2)) / r.height;
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      mock.style.transform = 'perspective(1100px) rotateY(' + (dx * 6) + 'deg) rotateX(' + (-dy * 6) + 'deg)';
+    });
+  });
+  hero.addEventListener('pointerleave', () => { mock.style.transform = ''; });
 })();
 </script>
 </body>
