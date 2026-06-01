@@ -3151,7 +3151,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.77</span>
+    <span class="version-tag" id="versionTag">10.78</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -3733,6 +3733,10 @@ function newTab(opts) {
     activeAutoedit: null,
     expanding: false,
     queue: [],          // pending prompts: [{ id, msg, refs, iterCtx }]
+    // Per-tab controls — each tab keeps its own render mode + Ask-Questions
+    // state. New tabs inherit the last-used values as their starting point.
+    renderMode: userSettings.renderMode || 'default',
+    planMode: !!userSettings.planMode,
   });
   activeTabIdx = tabs.length - 1;
   applyActiveTabState();
@@ -3807,6 +3811,9 @@ function applyActiveTabState() {
   try { setBusy && setBusy(!!activeChatAbort); } catch {}
   try { updateEscHint && updateEscHint(); } catch {}
   try { syncExpandEnabled && syncExpandEnabled(); updateExpandRecommendation && updateExpandRecommendation(); } catch {}
+  // Per-tab controls — reflect THIS tab's render mode + Ask-Questions state.
+  try { syncRenderModeUI && syncRenderModeUI(); } catch {}
+  try { syncPlanBtn && syncPlanBtn(); } catch {}
   // Show this tab's queue; if it has items, is idle, and wasn't paused by a
   // user cancel, resume draining it (the "switched away mid-run" case).
   try { renderQueueStrip && renderQueueStrip(); } catch {}
@@ -5805,7 +5812,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.77';
+  const PANEL_VERSION = '10.78';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -6361,21 +6368,30 @@ syncSettingsUI();
 // When on, sendMessage() prepends a [PLAN MODE] directive to the prompt so
 // Claude asks clarifying questions + presents a short plan and waits for the
 // go-ahead instead of rendering immediately. State persists in userSettings.
+// Ask-Questions toggle is PER-TAB. The active tab's planMode drives the button;
+// userSettings.planMode is just the default new tabs inherit.
 const planBtn = document.getElementById('planBtn');
+function _activePlanMode() {
+  const t = (typeof tabs !== 'undefined') ? tabs[activeTabIdx] : null;
+  return t ? !!t.planMode : !!userSettings.planMode;
+}
 function syncPlanBtn() {
   if (!planBtn) return;
-  const on = !!userSettings.planMode;
+  const on = _activePlanMode();
   planBtn.classList.toggle('active', on);
   planBtn.setAttribute('aria-checked', on ? 'true' : 'false');
 }
 if (planBtn) {
   planBtn.addEventListener('click', () => {
-    userSettings.planMode = !userSettings.planMode;
+    const t = (typeof tabs !== 'undefined') ? tabs[activeTabIdx] : null;
+    const next = t ? !t.planMode : !userSettings.planMode;
+    if (t) t.planMode = next;
+    userSettings.planMode = next;   // remembered as the default for the next new tab
     saveSettings();
     syncPlanBtn();
-    try { toast(userSettings.planMode
-      ? 'Ask Questions ON — Claude asks a few smart questions before building.'
-      : 'Ask Questions OFF — Claude builds right away.'); } catch {}
+    try { toast(next
+      ? 'Ask Questions ON for this tab — Claude asks a few smart questions before building.'
+      : 'Ask Questions OFF for this tab — Claude builds right away.'); } catch {}
   });
   syncPlanBtn();
 }
@@ -6933,13 +6949,24 @@ function setMode(m) {
 // Placement pills were removed from the composer — placement now lives only in
 // Settings (Default placement), which calls setMode() directly. No bar listener.
 
-// Render mode (Fast / Mid / Slow) — how hard Claude works on each animation.
-// Stored in userSettings.renderMode and sent with every /chat request.
+// Render mode (Fast / Default / Slow) — how hard Claude works on each animation.
+// PER-TAB: each tab keeps its own mode. userSettings.renderMode is just the
+// default new tabs start from. Sent with every /chat request from that tab.
 function setRenderMode(m) {
   if (m === 'mid') m = 'default';  // old name migration
   if (!['fast', 'default', 'slow'].includes(m)) m = 'default';
-  userSettings.renderMode = m;
+  const t = tabs[activeTabIdx];
+  if (t) t.renderMode = m;
+  userSettings.renderMode = m;   // remembered as the default for the next new tab
   try { saveSettings(); } catch {}
+  document.querySelectorAll('.rmode-pill').forEach(p =>
+    p.classList.toggle('active', p.dataset.rmode === m));
+}
+// Reflect the ACTIVE tab's render mode in the pills without mutating anything
+// (used on tab switch).
+function syncRenderModeUI() {
+  const t = tabs[activeTabIdx];
+  const m = (t && t.renderMode) || userSettings.renderMode || 'default';
   document.querySelectorAll('.rmode-pill').forEach(p =>
     p.classList.toggle('active', p.dataset.rmode === m));
 }
@@ -8814,7 +8841,8 @@ async function sendMessage(presetMsg, sendOpts) {
   // EXCEPTION: skip the interview when iterating (the Changes button) — the
   // user is tweaking an existing render, not starting fresh, so just apply it.
   const _tabTypeNow = (tabs[activeTabIdx] && tabs[activeTabIdx].type) || 'animation';
-  if (userSettings.planMode && _tabTypeNow !== 'chat' && !sendOpts.skipPlan && !iterationContext) {
+  const _planOn = (tabs[activeTabIdx] && typeof tabs[activeTabIdx].planMode === 'boolean') ? tabs[activeTabIdx].planMode : !!userSettings.planMode;
+  if (_planOn && _tabTypeNow !== 'chat' && !sendOpts.skipPlan && !iterationContext) {
     if (activeReferences.length) clearReferences();
     await runPlanInterview(msg);
     return;
@@ -8880,7 +8908,7 @@ async function sendMessage(presetMsg, sendOpts) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         reqId, message: outboundMsg, context,
-        renderMode: userSettings.renderMode || 'default',
+        renderMode: (_sendTab && _sendTab.renderMode) || userSettings.renderMode || 'default',
         mode: activeTabType,
         planMode: outboundPlanMode,
       }),
@@ -9031,7 +9059,7 @@ async function sendContinuationChat(originalMsg, lastStatus) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         reqId, message: outboundMsg, context,
-        renderMode: userSettings.renderMode || 'default',
+        renderMode: (_sendTab && _sendTab.renderMode) || userSettings.renderMode || 'default',
       }),
       signal: activeChatAbort.signal,
     });
