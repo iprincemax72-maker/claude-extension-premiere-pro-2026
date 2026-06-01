@@ -2729,71 +2729,49 @@ const server = http.createServer((req, res) => {
       }
 
       // ──────────────────────────────────────────────────────────────────
-      // VARIATION DIRECTIVE — solves the "same prompt 3 times produces
-      // the same Helvetica + same easing + same palette" problem. Each
-      // request gets a random combination of (palette, font family,
-      // motion style, layout) so claude doesn't converge to its defaults.
+      // STYLE — match how plain `claude` in the terminal behaves: RESPECT what
+      // the user asked for. The old "variation directive" force-injected a
+      // RANDOM palette + font + motion + layout as "non-negotiable anchors" on
+      // EVERY render — so "clean white title" came out as forced neon-glitch.
+      // That single block is what wrecked small/mid prompts. Now: if the user
+      // described any look at all, leave it untouched. Only when the prompt
+      // gives NO aesthetic direction do we add a GENTLE nudge to make a
+      // deliberate, fresh choice (with a seed so repeats aren't identical) —
+      // never a forced, clashing style.
       // ──────────────────────────────────────────────────────────────────
-      const _pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-      const VARIATION_PALETTE = _pick([
-        'neon-cyber (electric blue, hot pink, neon green on near-black)',
-        'retro-warm (sunset orange, cream, deep burgundy)',
-        'brutalist-mono (pure black + pure white + ONE accent color of your choice)',
-        'soft-pastel (mint, coral, lavender on off-white)',
-        'club-strobe (saturated magenta + electric cyan on charcoal)',
-        'editorial (paper-cream + ink-black + a single muted accent)',
-        'forest-deep (deep teal, moss green, warm gold)',
-        'bauhaus (primary red, primary blue, primary yellow on black)',
-        'cyberpunk (acid yellow, hot magenta, electric blue on black)',
-        'minimalist-sand (sand beige, soft black, single warm accent)',
-        'y2k-chrome (chrome silver + holographic pinks/blues + black)',
-        'monochrome-warm (varied warm greys with one pop color)',
-      ]);
-      const VARIATION_FONT = _pick([
-        'Helvetica Neue (clean, modern, neutral)',
-        'Inter or system-ui (geometric, readable)',
-        'Playfair Display (high-contrast serif, editorial)',
-        'JetBrains Mono or Menlo (monospace, technical)',
-        'Bebas Neue or condensed sans (tall, athletic, punchy)',
-        'Cormorant Garamond (elegant serif, classic)',
-        'Space Mono (mono with a tech / web3 vibe)',
-        'Georgia (warm serif, magazine feel)',
-        'a heavy 900-weight grotesque (Inter Black, Helvetica Black) — bold display',
-        'a thin/light weight (Helvetica Light, Inter Thin) — quiet sophistication',
-      ]);
-      const VARIATION_MOTION = _pick([
-        'snap cuts and hard frame-jumps (no smooth interpolation)',
-        'smooth spring physics (damping ~12, stiffness ~140 — feels alive)',
-        'aggressive overshoot springs (damping 8, stiffness 220 — bouncy)',
-        'cubic ease-in-out (cinematic, contemplative)',
-        'micro-bounce on every element (1.05 → 1.0 punch)',
-        'staggered cascade where pieces enter at different times (50ms apart)',
-        'glitch jitter for the first 8-12 frames before settling',
-        'slow drift / float / breathe (subtle continuous motion)',
-        'whip-fast in (under 6 frames) then long hold',
-      ]);
-      const VARIATION_LAYOUT = _pick([
-        'center-aligned, vertically symmetric (classic balance)',
-        'asymmetric — push the focal element off-center to the rule-of-thirds intersection',
-        'top-anchored with the focal element near the top third',
-        'bottom-anchored (good for talking-head overlays)',
-        'edge-aligned, hugging one side of the frame',
-        'diagonal composition — orient elements along an implied diagonal line',
-        'extreme negative space — small element on a mostly-empty frame',
-      ]);
+      const _hasStyleCue = /\b(#[0-9a-fA-F]{3,8}|colou?rs?|palette|gradient|theme|styled?|aesthetic|vibe|looks?|mood|minimal|clean|simple|elegant|luxur|premium|sleek|bold|punchy|energetic|calm|soft|playful|serious|corporate|professional|modern|retro|vintage|y2k|neon|cyber|glitch|brutalist|editorial|magazine|pastel|dark|light|bright|moody|grain|gritty|font|serif|sans|mono|typeface|bebas|inter|helvetica|playfair|garamond|white|black|blue|red|green|gold|silver|pink|purple|orange|teal|cyan|magenta|yellow|beige|cream|navy|warm|cool|monochrome)\b/i.test(message);
+      // Brand/platform-implied prompts already dictate their colors (a YouTube
+      // subscribe is RED, iMessage is blue/green, Spotify is green, etc.). For
+      // these, do NOT nudge toward "a fresh look" — that's what made the
+      // subscribe button come out yellow instead of YouTube red. Let Claude
+      // apply real brand logic.
+      const _hasBrandCue = /\b(subscribe|unsubscribe|youtube|yt|instagram|insta|reels?|tiktok|twitter|tweet|facebook|spotify|netflix|whatsapp|imessage|messages?|snapchat|linkedin|twitch|discord|google|apple|spotify|like button|notification|bell|follow|story|stories|logo of|brand)\b/i.test(message);
       const _seed = Math.random().toString(36).slice(2, 8);
+      // PLAN-FIRST — the terminal gets great results partly because Claude
+      // thinks the piece through before coding. Nudge the same here, plus
+      // (only for style-less, non-brand prompts) ask for a committed, fresh look.
+      const styleNote = (_hasStyleCue || _hasBrandCue) ? '' : (
+        'The user did not specify a look. Make a DELIBERATE creative choice that\n' +
+        'genuinely fits the content and mood — a palette, type, motion feel and\n' +
+        'layout chosen on purpose. Avoid your default look and avoid producing the\n' +
+        'same design you\'d give any other prompt (variation seed ' + _seed + '). This is a\n' +
+        'nudge to commit to a fresh direction — it does NOT override anything the\n' +
+        'request already implies.\n\n');
+      // Always remind: when the content implies a real brand/platform, use its
+      // real conventions and colors — never randomize away from them.
+      const brandNote = _hasBrandCue ? (
+        '[BRAND LOGIC] This involves a known brand/platform. Use its REAL colors\n' +
+        'and conventions — e.g. a YouTube subscribe button is RED (#FF0000-ish) on\n' +
+        'a clean light/white card, not a random color. Match what the brand\n' +
+        'actually looks like; do not invent an off-brand palette.\n\n') : '';
       fullMessage =
-        '[VARIATION DIRECTIVE — seed ' + _seed + ', expires this render only]\n' +
-        'Make this run visually DISTINCT. Even if the user has run a similar prompt\n' +
-        'before, use the following constraints to push the design away from your\n' +
-        'defaults. These are non-negotiable creative anchors:\n\n' +
-        '  · PALETTE — ' + VARIATION_PALETTE + '\n' +
-        '  · TYPOGRAPHY — ' + VARIATION_FONT + '\n' +
-        '  · MOTION — ' + VARIATION_MOTION + '\n' +
-        '  · LAYOUT — ' + VARIATION_LAYOUT + '\n\n' +
-        'Pick a fresh composition name (do NOT reuse one that already exists in\n' +
-        'Root.tsx). Write a fresh component from scratch — do not import an old\n' +
-        'one and just tweak props.\n\n' +
+        '[APPROACH] First, think the piece through before writing any code: the ONE\n' +
+        'core idea, the 2-4 key beats, the motion feel, and the look. A clear plan\n' +
+        'up front is what separates a great animation from a generic one. Build a\n' +
+        'fresh component (unique name, don\'t reuse an old one), follow the\n' +
+        'remotion-best-practices skill, then verify the result before finishing.\n\n' +
+        brandNote +
+        styleNote +
         '────────────────────────────────────────────────\n\n' +
         fullMessage;
 
