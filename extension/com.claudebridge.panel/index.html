@@ -3044,7 +3044,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.69</span>
+    <span class="version-tag" id="versionTag">10.70</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -5659,7 +5659,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.69';
+  const PANEL_VERSION = '10.70';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -8431,6 +8431,7 @@ async function sendMessage() {
   // Iteration context (from the Changes button) is prepended invisibly so the
   // user's bubble shows just their tweak.
   let outboundMsg = msg;
+  let outboundPlanMode = false;   // tells the bridge to interview+plan, not build
   if (iterationContext) {
     outboundMsg =
         'Make a new version of a previous render.\n'
@@ -8467,17 +8468,28 @@ async function sendMessage() {
   // actually builds. Chat tabs are exempt — they're already conversational.
   if (userSettings.planMode && !_isChatTab && _activeTab) {
     if (_activeTab._planAwaitingAnswer) {
-      // This send is the user's answer to the plan — build it now.
+      // This send is the user's answer to the plan — BUILD it now. The bridge
+      // is stateless (--no-session-persistence), so replay the original
+      // request + the plan Claude gave, then the answers, so it has full
+      // context to build from.
       _activeTab._planAwaitingAnswer = false;
-    } else {
-      _activeTab._planAwaitingAnswer = true;
+      const orig = _activeTab._planOriginalMsg || '';
+      const planReply = _activeTab._planReply || '';
       outboundMsg =
-        '[PLAN MODE — do NOT build or render yet]\n' +
-        'Before generating anything, do two things and then STOP and wait for my reply:\n' +
-        '1. Ask me any clarifying questions you need to nail this (aspect ratio, duration, style/mood, colors, exact text/content, how many graphics, where they go).\n' +
-        '2. Give a short numbered plan of what you will build.\n' +
-        'Keep it concise. Do NOT write code or render in this turn — my next message will answer your questions and approve the plan, and THEN you build.\n\n' +
-        'My request: ' + outboundMsg;
+        '[PLAN MODE FOLLOW-UP — you already asked me clarifying questions and gave a plan. Here are my answers. Now BUILD it for real, following the plan + my answers.]\n' +
+        (orig ? 'Original request: ' + orig + '\n' : '') +
+        (planReply ? 'Your questions & plan were:\n' + planReply + '\n' : '') +
+        'My answers: ' + outboundMsg;
+      _activeTab._planOriginalMsg = '';
+      _activeTab._planReply = '';
+    } else {
+      // First command of the turn: tell the bridge to interview + plan, not
+      // render. The flag is the real enforcement (bridge swaps the system
+      // prompt); this invisible note is a belt-and-suspenders hint.
+      _activeTab._planAwaitingAnswer = true;
+      _activeTab._planOriginalMsg = msg;
+      outboundPlanMode = true;
+      outboundMsg = '[PLAN MODE: ask clarifying questions + give a short plan, then stop. Do NOT build/render this turn.]\n' + outboundMsg;
     }
   }
 
@@ -8574,6 +8586,7 @@ async function sendMessage() {
         reqId, message: outboundMsg, context,
         renderMode: userSettings.renderMode || 'default',
         mode: activeTabType,
+        planMode: outboundPlanMode,
       }),
       signal: activeChatAbort.signal,
     });
@@ -8587,6 +8600,10 @@ async function sendMessage() {
     const replyText = data.reply || '(no response)';
     placeholder.body.innerHTML = renderMarkdown(replyText);
     streamReveal(placeholder.body);
+
+    // If this was a Plan-mode interview turn, remember Claude's questions/plan
+    // so the next (answer) turn can replay it to the stateless bridge.
+    if (outboundPlanMode && _activeTab) { _activeTab._planReply = replyText; }
 
     if (activeTabType !== 'chat' && data.imports && data.imports.length) {
       for (const p of data.imports) {

@@ -2841,7 +2841,42 @@ const server = http.createServer((req, res) => {
         resolvedSystemPrompt = (MODE_HEADERS[renderMode] || '') + resolvedSystemPrompt;
         resolvedSystemPrompt = buildBestPracticesBlock(renderMode) + resolvedSystemPrompt;
       }
-      console.log('  [chat] render mode: ' + renderMode);
+
+      // PLAN MODE — the user flipped the header "Plan" toggle. This is a hard
+      // override that goes at the VERY FRONT of the system prompt so it beats
+      // the build-everything instructions below it. For this turn the agent
+      // must interview + plan and STOP — no code, no files, no render.
+      if (payload.planMode && tabMode !== 'chat') {
+        const PLAN_MODE_BLOCK = [
+          '═══════════════════════════════════════════════════════════════════════════',
+          'PLAN MODE IS ACTIVE — THIS SECTION OVERRIDES EVERYTHING BELOW IT.',
+          '═══════════════════════════════════════════════════════════════════════════',
+          'The user turned ON Plan mode for THIS turn. You MUST NOT build anything now:',
+          '  • Do NOT write or edit any .tsx/.ts/.js files.',
+          '  • Do NOT run Remotion, npx, or any render command.',
+          '  • Do NOT emit an [[IMPORT:...]] marker or produce a rendered file.',
+          'Every instruction below about creating and rendering a composition is',
+          'SUSPENDED for this one turn.',
+          '',
+          'Instead, do EXACTLY this and then end your turn:',
+          '  1. Ask the user the clarifying questions you genuinely need to nail the',
+          '     request — aspect ratio, duration, style/mood, exact colors, exact',
+          '     text/content, how many graphics, and where they go. Only ask what is',
+          '     actually unclear; do not interrogate.',
+          '  2. Give a SHORT numbered plan of what you will build once they answer.',
+          'Then STOP and wait for their reply. Keep it concise and in plain markdown.',
+          '',
+          'Do NOT render even if the request already sounds complete and detailed.',
+          'The user will answer in their next message, and ONLY THEN do you build.',
+          '═══════════════════════════════════════════════════════════════════════════',
+          '',
+          '',
+        ].join('\n');
+        resolvedSystemPrompt = PLAN_MODE_BLOCK + resolvedSystemPrompt;
+        clog('bridge', 'info', 'plan mode active — interview+plan, no render', { reqId }, reqId);
+      }
+
+      console.log('  [chat] render mode: ' + renderMode + (payload.planMode ? ' [PLAN MODE]' : ''));
       clog('bridge', 'info', 'chat request', { renderMode, tabMode, msgLen: (message || '').length, hasContext: !!context }, reqId);
 
       const args = [
