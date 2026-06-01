@@ -154,40 +154,80 @@ body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-eve
 .section-head .lede { margin-top: 1rem; }
 .section-head.center .lede { margin-inline: auto; }
 
-/* ── Steps ── */
-.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-.step { background: var(--s1s); border: 1px solid var(--line); border-radius: 16px; padding: 26px; box-shadow: 0 1px 0 var(--hi) inset; }
-.step .num { font-family: var(--mono); font-size: 0.74rem; color: var(--coral); letter-spacing: 0.08em; }
-.step h3 { margin: 16px 0 8px; }
-.step p { color: var(--text-2); font-size: 0.95rem; }
-.step .pic { margin-top: 20px; aspect-ratio: 16/9; border-radius: 11px; border: 1px solid var(--line); background: var(--bg-soft); display: grid; place-items: center; overflow: hidden; }
-.kbd { font-family: var(--mono); font-size: 0.78rem; background: var(--s2); border: 1px solid var(--line-2); border-radius: 8px; padding: 9px 13px; color: var(--text); box-shadow: 0 2px 0 rgba(0,0,0,0.5), 0 1px 0 var(--hi) inset, 0 4px 10px -4px rgba(0,0,0,0.6); }
-.miniwin { width: 76%; }
-.miniwin .row { height: 9px; border-radius: 4px; background: var(--s3); margin-bottom: 7px; }
-.miniwin .row.s { width: 58%; } .miniwin .row.c { width: 86%; background: rgba(226,136,95,0.5); }
-.tl { width: 80%; }
-.tl .track { height: 15px; border-radius: 4px; background: var(--s2); border: 1px solid var(--line); position: relative; margin-bottom: 6px; }
-.tl .clip { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; }
-.tl .track .clip.a { left: 8%; width: 50%; background: var(--s3); }
-.tl .track:nth-child(2) .clip.b { left: 30%; width: 26%; background: var(--coral); }
+/* ── How it works — a timeline-thread flow (on-theme for an editor) ── */
+.flow { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.flow-rail { position: absolute; top: 15px; left: 16.6%; right: 16.6%; height: 2px; background: linear-gradient(90deg, transparent, var(--coral) 14%, var(--coral) 86%, transparent); opacity: 0.35; pointer-events: none; }
+.flow-rail::after { content: ""; position: absolute; top: -2.5px; left: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--coral); box-shadow: 0 0 12px 2px var(--coral); animation: rail 4.8s var(--ease) infinite; }
+@keyframes rail { 0% { left: 0; opacity: 0; } 10%, 90% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
+.fstep { position: relative; text-align: center; }
+.fnode { width: 30px; height: 30px; margin: 0 auto; border-radius: 9px; background: var(--bg); border: 1px solid var(--coral); color: var(--coral); display: grid; place-items: center; font-family: var(--mono); font-size: 0.72rem; font-weight: 500; position: relative; z-index: 2; box-shadow: 0 0 0 6px var(--bg), 0 0 22px -4px var(--coral); }
+.fstep h3 { margin: 20px 0 0; }
+.fstep > p { color: var(--text-2); font-size: 0.95rem; margin: 8px 0 0; }
+.fviz { margin-top: 22px; aspect-ratio: 16/10; border-radius: 13px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--s1s), var(--bg-soft)); display: grid; place-items: center; overflow: hidden; box-shadow: 0 1px 0 var(--hi) inset, 0 24px 50px -34px rgba(0,0,0,0.8); }
+/* viz 1 — prompt bar */
+.viz-prompt { width: 80%; font-family: var(--mono); font-size: 0.78rem; color: var(--text); background: var(--bg); border: 1px solid var(--line-2); border-radius: 9px; padding: 11px 13px; display: flex; align-items: center; gap: 8px; box-shadow: 0 8px 20px -12px rgba(0,0,0,0.8); }
+.viz-prompt .vp-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--coral); flex: 0 0 auto; box-shadow: 0 0 8px var(--coral); }
+.viz-prompt .vp-caret { width: 2px; height: 1em; background: var(--coral); margin-left: 1px; animation: caret 1.1s steps(1) infinite; }
+/* viz 2 — render progress */
+.viz-render { width: 76%; }
+.viz-render .vr-line { height: 7px; border-radius: 4px; background: var(--s3); margin-bottom: 7px; }
+.viz-render .vr-line.s { width: 58%; }
+.viz-render .vr-bar { height: 7px; border-radius: 4px; background: var(--s2); margin-top: 13px; overflow: hidden; }
+.viz-render .vr-bar i { display: block; height: 100%; width: 8%; background: linear-gradient(90deg, var(--coral), var(--coral-2)); border-radius: 4px; animation: fill 2.8s var(--ease) infinite; }
+@keyframes fill { 0% { width: 8%; } 65%, 100% { width: 94%; } }
+.viz-render .vr-label { font-family: var(--mono); font-size: 0.62rem; color: var(--coral); margin-top: 10px; }
+/* viz 3 — timeline */
+.viz-tl { width: 82%; position: relative; }
+.viz-tl .vt-track { height: 16px; border-radius: 4px; background: var(--s2); border: 1px solid var(--line); position: relative; margin-bottom: 7px; }
+.viz-tl .clip { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; }
+.viz-tl .clip.a { left: 6%; width: 54%; background: var(--s3); }
+.viz-tl .clip.b { left: 34%; width: 30%; background: linear-gradient(90deg, var(--coral), var(--coral-press)); box-shadow: 0 0 14px -3px var(--coral); animation: drop 3.2s var(--ease) infinite; }
+@keyframes drop { 0% { transform: translateY(-9px); opacity: 0; } 18%, 100% { transform: none; opacity: 1; } }
+.viz-tl .vt-play { position: absolute; top: -5px; bottom: -5px; left: 48%; width: 2px; background: var(--coral); box-shadow: 0 0 10px var(--coral); }
+.viz-tl .vt-play::before { content: ""; position: absolute; top: -1px; left: -3px; width: 8px; height: 6px; border-radius: 2px; background: var(--coral); }
 
-/* ── Features (bento) ── */
-.feat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-.feat { background: var(--s1s); border: 1px solid var(--line); border-radius: 16px; padding: 24px; box-shadow: 0 1px 0 var(--hi) inset; position: relative; transition: transform 0.25s var(--ease), border-color 0.25s var(--ease); overflow: hidden; }
-.feat > * { position: relative; z-index: 1; }
-.feat::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: radial-gradient(200px circle at var(--mx,50%) var(--my,50%), rgba(226,136,95,0.10), transparent 60%); opacity: 0; transition: opacity 0.35s var(--ease); }
-.feat:hover { transform: translateY(-3px); border-color: var(--line-2); }
-.feat:hover::before { opacity: 1; }
-.feat.span2 { grid-column: span 2; }
-.feat .ic { width: 38px; height: 38px; border-radius: 10px; background: var(--s3); color: var(--coral); display: grid; place-items: center; margin-bottom: 16px; border: 1px solid var(--line); }
-.feat .ic svg { width: 20px; height: 20px; }
-.feat h3 { margin-bottom: 7px; }
-.feat p { color: var(--text-2); font-size: 0.92rem; }
+/* ── Features — three tools, each with a real mini-visual ── */
+.tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.tool { background: var(--s1s); border: 1px solid var(--line); border-radius: 18px; padding: 24px; box-shadow: 0 1px 0 var(--hi) inset; position: relative; overflow: hidden; transition: transform 0.25s var(--ease), border-color 0.25s var(--ease); }
+.tool > * { position: relative; z-index: 1; }
+.tool::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: radial-gradient(260px circle at var(--mx,50%) var(--my,50%), rgba(226,136,95,0.12), transparent 60%); opacity: 0; transition: opacity 0.35s var(--ease); }
+.tool:hover { transform: translateY(-3px); border-color: var(--line-2); }
+.tool:hover::before { opacity: 1; }
+.tool .tlabel { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.14em; color: var(--coral); }
+.tool h3 { margin: 11px 0 7px; display: flex; align-items: center; gap: 9px; font-size: 1.12rem; }
+.tool h3 svg { width: 19px; height: 19px; color: var(--coral); flex: 0 0 auto; }
+.tool p { color: var(--text-2); font-size: 0.9rem; }
+.tviz { margin-top: 20px; aspect-ratio: 16/9; border-radius: 12px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--bg-soft), var(--bg)); overflow: hidden; position: relative; display: grid; place-items: center; box-shadow: 0 1px 0 var(--hi) inset; }
+/* tool 01 — generate: a lower-third rendering in */
+.gen-frame { position: absolute; inset: 0; }
+.gen-frame::after { content: "1080×1920"; position: absolute; top: 8px; right: 10px; font-family: var(--mono); font-size: 0.52rem; color: var(--text-3); }
+.gen-frame .lt { position: absolute; left: 13%; bottom: 24%; display: flex; flex-direction: column; gap: 5px; animation: ltin 3.6s var(--ease) infinite; }
+@keyframes ltin { 0% { transform: translateX(-16px); opacity: 0; } 16%, 100% { transform: none; opacity: 1; } }
+.gen-frame .lt-bar { width: 26px; height: 4px; border-radius: 2px; background: var(--coral); box-shadow: 0 0 10px var(--coral); }
+.gen-frame .lt-t1 { width: 84px; height: 9px; border-radius: 3px; background: var(--text); opacity: 0.92; }
+.gen-frame .lt-t2 { width: 56px; height: 7px; border-radius: 3px; background: var(--text-3); }
+/* tool 02 — auto-edit: transcript drives graphic markers onto a track */
+.ae { width: 78%; }
+.ae .ae-line { height: 6px; border-radius: 3px; background: var(--s3); margin-bottom: 6px; }
+.ae .ae-line.s { width: 60%; }
+.ae .ae-track { margin-top: 15px; height: 14px; border-radius: 4px; background: var(--s2); border: 1px solid var(--line); position: relative; }
+.ae .ae-track .m { position: absolute; top: 2px; bottom: 2px; width: 12px; border-radius: 2px; background: var(--coral); box-shadow: 0 0 8px -1px var(--coral); transform-origin: bottom; animation: mPop 3s var(--ease) infinite; }
+.ae .ae-track .m:nth-child(2) { animation-delay: 0.25s; } .ae .ae-track .m:nth-child(3) { animation-delay: 0.5s; }
+@keyframes mPop { 0%, 10% { transform: scaleY(0); opacity: 0; } 32%, 100% { transform: none; opacity: 1; } }
+/* tool 03 — auto-cut: waveform with silence collapsing out */
+.ac { display: flex; align-items: center; gap: 3px; height: 48px; }
+.ac span { width: 3px; border-radius: 2px; background: var(--text-3); height: var(--h, 30%); }
+.ac span.cut { background: var(--coral); animation: cutbar 3s var(--ease) infinite; }
+@keyframes cutbar { 0%, 38% { height: var(--h); opacity: 1; } 58%, 100% { height: 3px; opacity: 0.25; } }
+/* capability strip — everything else, without 8 identical cards */
+.caps { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
+.caps span { display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-2); background: var(--s1s); border: 1px solid var(--line); border-radius: 99px; padding: 9px 15px; }
+.caps span svg { width: 15px; height: 15px; color: var(--coral); flex: 0 0 auto; }
 
 /* ── Demo ── */
-.video-frame { margin-top: clamp(32px, 5vw, 50px); border-radius: 16px; overflow: hidden; border: 1px solid var(--line-2); background: #0c0c0f; aspect-ratio: 16/9; position: relative; display: grid; place-items: center; box-shadow: 0 1px 0 var(--hi) inset, 0 50px 100px -45px rgba(0,0,0,0.85); }
-.video-frame::before { content: ""; position: absolute; inset: 0; background: url(panel-home.png) center/cover; opacity: 0.32; }
-.video-frame::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(9,9,11,0.55), rgba(9,9,11,0.9)); }
+.video-frame { margin-top: clamp(32px, 5vw, 50px); border-radius: 16px; overflow: hidden; border: 1px solid var(--line-2); background: radial-gradient(125% 90% at 50% 0%, #16121c, #0a0a0d); aspect-ratio: 16/9; position: relative; display: grid; place-items: center; box-shadow: 0 1px 0 var(--hi) inset, 0 50px 100px -45px rgba(0,0,0,0.85); }
+.video-frame::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 44px 44px; -webkit-mask-image: radial-gradient(ellipse 62% 60% at 50% 46%, #000, transparent 78%); mask-image: radial-gradient(ellipse 62% 60% at 50% 46%, #000, transparent 78%); opacity: 0.55; }
+.video-frame::after { content: ""; position: absolute; left: 50%; top: 46%; width: 300px; height: 300px; transform: translate(-50%,-50%); background: radial-gradient(circle, rgba(226,136,95,0.16), transparent 66%); pointer-events: none; }
 .video-frame .play, .video-frame .cap { z-index: 2; }
 .video-frame .play { position: relative; width: 80px; height: 80px; border-radius: 50%; background: var(--btn); color: var(--btn-ink); display: grid; place-items: center; cursor: pointer; transition: transform 0.2s var(--ease); }
 .video-frame .play::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 0 rgba(226,136,95,0.5); animation: playPulse 2.6s ease-out infinite; }
@@ -243,8 +283,13 @@ body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-eve
 
 /* ── Final CTA ── */
 .cta-panel { position: relative; border: 1px solid var(--line-2); border-radius: 22px; background: linear-gradient(180deg, var(--s2), #0d0d10); padding: clamp(44px, 6vw, 78px) var(--gutter); text-align: center; overflow: hidden; box-shadow: 0 1px 0 var(--hi) inset; }
-.cta-panel::before { content: ""; position: absolute; left: 50%; top: -40%; width: 70%; height: 120%; transform: translateX(-50%); background: radial-gradient(ellipse, rgba(226,136,95,0.18), transparent 60%); filter: blur(10px); pointer-events: none; }
-.cta-panel > * { position: relative; }
+.cta-panel::before { content: ""; position: absolute; left: 50%; top: -30%; width: 70%; height: 120%; transform: translateX(-50%); background: radial-gradient(ellipse, rgba(226,136,95,0.12), transparent 62%); filter: blur(10px); pointer-events: none; }
+/* lamp beam (Aceternity-style) — a crisp glowing line that lamp-lights the heading */
+.cta-panel .lamp { position: absolute; top: 0; left: 0; right: 0; height: 1px; pointer-events: none; }
+.cta-panel .lamp::before { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 58%; height: 2px; background: linear-gradient(90deg, transparent, var(--coral) 22%, var(--coral-2) 50%, var(--coral) 78%, transparent); box-shadow: 0 0 24px 4px rgba(226,136,95,0.55); border-radius: 99px; }
+.cta-panel .lamp::after { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 56%; height: 230px; background: radial-gradient(ellipse 50% 100% at 50% 0%, rgba(226,136,95,0.30), transparent 72%); filter: blur(7px); }
+.cta-panel > *:not(.lamp) { position: relative; }
+.cta-panel .eyebrow { display: block; margin-bottom: 14px; }
 .cta-panel h2 { max-width: 20ch; margin: 0 auto 26px; }
 .cta-panel .small { margin-top: 16px; font-family: var(--mono); font-size: 0.72rem; color: var(--text-3); }
 
@@ -303,24 +348,46 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 /* gradient accent on the hero words */
 .hero-h1 .coral { background: linear-gradient(180deg, var(--coral-2), var(--coral-press)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
 
-/* ── Hero screenshot frame (clean app window, real panel inside) ── */
-.shot {
-  border: 1px solid var(--line-2); border-radius: 16px; overflow: hidden;
-  background: #100c1c;
-  box-shadow: 0 1px 0 var(--hi) inset, 0 50px 110px -40px rgba(0,0,0,0.85), 0 0 90px -30px rgba(226,136,95,0.22);
+/* ── Hero chat-output mockup — the panel showing what Claude returns ── */
+.glass {
+  max-width: 600px; margin: 0 auto; text-align: left;
+  border: 1px solid var(--line-2); border-radius: 18px; overflow: hidden;
+  background: linear-gradient(180deg, #141019, #0c0a11);
+  box-shadow: 0 1px 0 var(--hi) inset, 0 60px 120px -42px rgba(0,0,0,0.9), 0 0 100px -34px rgba(226,136,95,0.28);
   will-change: transform; transition: transform 0.3s var(--ease);
 }
-.shot-bar { display: flex; align-items: center; gap: 9px; padding: 11px 15px; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--line); }
-.shot-bar .lights { display: flex; gap: 6px; }
-.shot-bar .lights i { width: 11px; height: 11px; border-radius: 50%; }
-.shot-bar .lights i:nth-child(1){ background:#e1664f; } .shot-bar .lights i:nth-child(2){ background:#e0b04a; } .shot-bar .lights i:nth-child(3){ background:#6cbf7a; }
-.shot-title { font-family: var(--mono); font-size: 0.7rem; color: var(--text-3); margin-left: 6px; }
-.shot img { width: 100%; display: block; }
+.mock-bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.02); }
+.mock-bar .lights { display: flex; gap: 6px; }
+.mock-bar .lights i { width: 11px; height: 11px; border-radius: 50%; }
+.mock-bar .lights i:nth-child(1){ background:#e1664f; } .mock-bar .lights i:nth-child(2){ background:#e0b04a; } .mock-bar .lights i:nth-child(3){ background:#6cbf7a; }
+.mock-bar .title { font-family: var(--mono); font-size: 0.7rem; color: var(--text-3); margin-left: 4px; }
+.mock-bar .ver { margin-left: auto; font-family: var(--mono); font-size: 0.62rem; color: var(--text-3); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; }
+.mock-body { padding: 22px 20px; display: flex; flex-direction: column; gap: 18px; }
+.mrow { display: flex; gap: 12px; align-items: flex-start; }
+.mav { width: 26px; height: 26px; border-radius: 7px; flex: 0 0 auto; display: grid; place-items: center; font-size: 0.72rem; font-weight: 700; }
+.mav.you { background: var(--s3); color: var(--text-2); }
+.mav.cla { background: var(--coral); color: #15110d; font-family: Georgia, serif; font-style: italic; box-shadow: 0 0 16px -4px var(--coral); }
+.mname { font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.14em; color: var(--coral); margin-bottom: 5px; }
+.mrow .txt { font-size: 0.9rem; line-height: 1.5; color: var(--text-2); }
+.mrow .txt b { color: var(--text); font-weight: 600; }
+.rendercard { margin-top: 14px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--bg-soft); overflow: hidden; box-shadow: 0 0 34px -18px var(--coral); }
+.rendercard .file { display: flex; align-items: center; gap: 9px; padding: 12px 14px; font-family: var(--mono); font-size: 0.74rem; color: var(--text); border-bottom: 1px solid var(--line); }
+.rendercard .file svg { width: 16px; height: 16px; color: var(--coral); flex: 0 0 auto; }
+.rendercard .file .meta { margin-left: auto; color: var(--text-3); font-size: 0.62rem; letter-spacing: 0.02em; }
+.rendercard .acts { display: flex; gap: 8px; padding: 12px 14px; flex-wrap: wrap; }
+.chip { font-family: var(--sans); font-size: 0.76rem; font-weight: 600; padding: 7px 12px; border-radius: 8px; cursor: default; transition: filter 0.15s var(--ease); }
+.chip.solid { background: var(--btn); color: var(--btn-ink); box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset; }
+.chip.outline { background: var(--s2); color: var(--text); border: 1px solid var(--line-2); }
+.mock-composer { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--line); background: rgba(255,255,255,0.015); }
+.mock-composer .field { flex: 1; font-family: var(--sans); font-size: 0.84rem; color: var(--text-3); padding: 9px 12px; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 9px; position: relative; }
+.mock-composer .field::after { content: ""; display: inline-block; width: 1.5px; height: 0.95em; background: var(--coral); margin-left: 2px; vertical-align: -2px; animation: caret 1.1s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+.mock-composer .send { width: 34px; height: 34px; border-radius: 8px; background: var(--coral); color: #15110d; display: grid; place-items: center; flex: 0 0 auto; box-shadow: 0 0 18px -6px var(--coral); }
+.mock-composer .send svg { width: 16px; height: 16px; }
 
 /* ── Responsive ── */
 @media (max-width: 980px) {
-  .feat-grid { grid-template-columns: repeat(2, 1fr); }
-  .feat.span2 { grid-column: span 2; }
+  .tools { grid-template-columns: 1fr; }
 }
 @media (max-width: 860px) {
   .nav-links, .nav-cta .btn-ghost { display: none; }
@@ -328,8 +395,10 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   .stats { grid-template-columns: repeat(2, 1fr); }
   .stat:nth-child(3) { border-left: none; }
   .stat { border-top: 1px solid var(--line); } .stat:nth-child(-n+2){ border-top: none; }
-  .steps { grid-template-columns: 1fr; }
-  .feat-grid { grid-template-columns: 1fr; } .feat.span2 { grid-column: span 1; }
+  .flow { grid-template-columns: 1fr; gap: 14px; } .flow-rail { display: none; }
+  .fstep { padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--s1s); }
+  .fstep .fviz { aspect-ratio: 16/7; }
+  .tools { grid-template-columns: 1fr; }
   .compare { grid-template-columns: 1fr; }
   .tiers { grid-template-columns: 1fr; max-width: 420px; margin-inline: auto; } .tier.featured { order: -1; }
   .footer-grid { grid-template-columns: 1fr 1fr; gap: 34px 22px; } .footer-grid .footer-about { grid-column: 1 / -1; }
@@ -395,9 +464,20 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
     <p class="trust load-up l5"><span>Runs on your Claude plan</span><span class="dot"></span><span>No API key</span><span class="dot"></span><span>macOS &amp; Windows</span></p>
 
     <div class="hero-stage load-up l6">
-      <div class="shot" id="heroPanel">
-        <div class="shot-bar"><span class="lights"><i></i><i></i><i></i></span><span class="shot-title">Claude — Adobe Premiere Pro</span></div>
-        <img src="panel-home.png" alt="The Claude panel running inside Adobe Premiere Pro" />
+      <div class="glass glow" id="heroPanel">
+        <div class="mock-bar"><span class="lights"><i></i><i></i><i></i></span><span class="title">Claude — Adobe Premiere Pro</span><span class="ver">short 2 · 1 sel</span></div>
+        <div class="mock-body">
+          <div class="mrow"><div class="mav you">Y</div><div class="txt">Make a glassy subscribe button, vertical, 4s — calm, not flashy. Soft tap + ripple.</div></div>
+          <div class="mrow"><div class="mav cla">C</div><div style="flex:1">
+            <div class="mname">CLAUDE</div>
+            <div class="txt"><b>Done.</b> A frosted-glass subscribe pill that springs in, with a cursor tap and a soft ripple. Rendered transparent so it drops over your footage — 1080×1920, 4s.</div>
+            <div class="rendercard">
+              <div class="file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg> SubscribePill_v3.mov <span class="meta">imported · V2 @ 0:14</span></div>
+              <div class="acts"><span class="chip solid">Import to timeline</span><span class="chip outline">Preview</span><span class="chip outline">Changes</span></div>
+            </div>
+          </div></div>
+        </div>
+        <div class="mock-composer"><span class="field">Ask Claude…</span><span class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
       </div>
     </div>
 
@@ -415,11 +495,27 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <!-- HOW -->
 <section class="section" id="how">
   <div class="wrap">
-    <div class="section-head reveal"><p class="eyebrow">How it works</p><h2>Three steps.</h2></div>
-    <div class="steps">
-      <div class="step glow reveal"><div class="num">01</div><h3>Describe it</h3><p>Type what you want.</p><div class="pic"><span class="kbd">make a 3-step checklist ⏎</span></div></div>
-      <div class="step glow reveal d1"><div class="num">02</div><h3>Claude builds it</h3><p>It writes the code and renders it.</p><div class="pic"><div class="miniwin"><div class="row"></div><div class="row c"></div><div class="row s"></div><div class="row"></div></div></div></div>
-      <div class="step glow reveal d2"><div class="num">03</div><h3>It's on your timeline</h3><p>One click. Ready to play.</p><div class="pic"><div class="tl"><div class="track"><span class="clip a"></span></div><div class="track"><span class="clip b"></span></div></div></div></div>
+    <div class="section-head center reveal"><p class="eyebrow">How it works</p><h2>Prompt to timeline in three.</h2></div>
+    <div class="flow">
+      <div class="flow-rail"></div>
+      <div class="fstep reveal">
+        <div class="fnode">01</div>
+        <h3>Describe it</h3>
+        <p>Type it in plain words.</p>
+        <div class="fviz"><div class="viz-prompt"><span class="vp-dot"></span>make a 3-step checklist<span class="vp-caret"></span></div></div>
+      </div>
+      <div class="fstep reveal d1">
+        <div class="fnode">02</div>
+        <h3>Claude builds it</h3>
+        <p>Writes the code, renders it.</p>
+        <div class="fviz"><div class="viz-render"><div class="vr-line"></div><div class="vr-line s"></div><div class="vr-bar"><i></i></div><div class="vr-label">rendering · subscribe_v3</div></div></div>
+      </div>
+      <div class="fstep reveal d2">
+        <div class="fnode">03</div>
+        <h3>On your timeline</h3>
+        <p>One click. Ready to play.</p>
+        <div class="fviz"><div class="viz-tl"><div class="vt-track"><span class="clip a"></span></div><div class="vt-track"><span class="clip b"></span></div><div class="vt-play"></div></div></div>
+      </div>
     </div>
   </div>
 </section>
@@ -427,19 +523,33 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <!-- FEATURES -->
 <section class="section" id="features">
   <div class="wrap">
-    <div class="section-head reveal"><p class="eyebrow">What's inside</p><h2>One panel. Three tools.</h2></div>
-    <div class="feat-grid">
-      <div class="feat span2 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 6.3L21 11l-6.6 1.7L12 19l-2.4-6.3L3 11l6.6-1.7z"/></svg></div>
-        <h3>Prompt → motion graphics</h3><p>Titles, lower thirds, callouts, kinetic type — built fresh with Remotion, never a template with the text swapped.</p>
+    <div class="section-head center reveal"><p class="eyebrow">What's inside</p><h2>One panel. Three tools.</h2></div>
+    <div class="tools">
+      <div class="tool reveal">
+        <div class="tlabel">TOOL 01 — GENERATE</div>
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 6.3L21 11l-6.6 1.7L12 19l-2.4-6.3L3 11l6.6-1.7z"/></svg>Prompt → graphics</h3>
+        <p>Titles, lower thirds, callouts, kinetic type — built fresh in code, never a template with the text swapped.</p>
+        <div class="tviz"><div class="gen-frame"><div class="lt"><span class="lt-bar"></span><span class="lt-t1"></span><span class="lt-t2"></span></div></div></div>
       </div>
-      <div class="feat reveal d1"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h16"/><circle cx="19" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg></div><h3>Auto-Edit</h3><p>Reads the speech, drops graphics across the whole video.</p></div>
-      <div class="feat reveal d2"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v18M18 3v18"/><circle cx="6" cy="9" r="2.4"/><circle cx="18" cy="15" r="2.4"/></svg></div><h3>Auto-Cut</h3><p>Strips silences and filler in one pass.</p></div>
-      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div><h3>10 versions at once</h3><p>Generate takes, pick the best.</p></div>
-      <div class="feat reveal d1"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3 2.45c-.9.2-1.5 1-1.5 1.95"/><path d="M12 17h.01"/></svg></div><h3>Ask Questions</h3><p>It interviews you first.</p></div>
-      <div class="feat reveal d2"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7L3 21"/><path d="M3 16v5h5"/></svg></div><h3>Iterate in place</h3><p>Just say what to change.</p></div>
-      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 3-2 4.5-2 7H7c0-2.5-2-4-2-7a7 7 0 0 1 7-7z"/><path d="M9 21h6"/></svg></div><h3>No API key</h3><p>Runs on your Claude plan.</p></div>
-      <div class="feat reveal d1"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><h3>One-click install</h3><p>macOS &amp; Windows.</p></div>
+      <div class="tool reveal d1">
+        <div class="tlabel">TOOL 02 — AUTO-EDIT</div>
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h16"/><circle cx="19" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>Reads your speech</h3>
+        <p>Transcribes the cut and drops matching graphics across the whole video.</p>
+        <div class="tviz"><div class="ae"><div class="ae-line"></div><div class="ae-line s"></div><div class="ae-line"></div><div class="ae-track"><span class="m" style="left:18%"></span><span class="m" style="left:46%"></span><span class="m" style="left:73%"></span></div></div></div>
+      </div>
+      <div class="tool reveal d2">
+        <div class="tlabel">TOOL 03 — AUTO-CUT</div>
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v18M18 3v18"/><circle cx="6" cy="9" r="2.4"/><circle cx="18" cy="15" r="2.4"/></svg>Strips the dead air</h3>
+        <p>Finds silences and filler and removes them in a single pass.</p>
+        <div class="tviz"><div class="ac"><span style="--h:34%"></span><span style="--h:62%"></span><span style="--h:44%"></span><span style="--h:78%"></span><span style="--h:52%"></span><span class="cut" style="--h:24%"></span><span class="cut" style="--h:18%"></span><span class="cut" style="--h:22%"></span><span style="--h:66%"></span><span style="--h:88%"></span><span style="--h:48%"></span><span style="--h:70%"></span><span style="--h:38%"></span><span class="cut" style="--h:20%"></span><span class="cut" style="--h:16%"></span><span style="--h:58%"></span><span style="--h:80%"></span><span style="--h:42%"></span><span style="--h:64%"></span><span style="--h:30%"></span></div></div>
+      </div>
+    </div>
+    <div class="caps reveal d2">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Runs on your Claude plan — no API key</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Up to 10 versions per prompt</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Iterate by just chatting</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Asks before it builds</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> One-click install · Mac &amp; Windows</span>
     </div>
   </div>
 </section>
@@ -517,6 +627,8 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <section class="section" style="padding-top:0;">
   <div class="wrap">
     <div class="cta-panel reveal">
+      <span class="lamp"></span>
+      <p class="eyebrow">Ready when you are</p>
       <h2>Stop leaving Premiere to make graphics.</h2>
       <a href="#pricing" class="btn btn-primary btn-lg magnetic" data-buy>Get it — <span data-price-inline>$19</span></a>
       <p class="small">5 free renders · No API key · Mac &amp; Windows</p>
@@ -604,7 +716,7 @@ document.getElementById('playDemo').addEventListener('click', () => alert('Drop 
 })();
 
 /* spotlight on feature cards */
-document.querySelectorAll('.feat').forEach(card => card.addEventListener('pointermove', e => {
+document.querySelectorAll('.tool').forEach(card => card.addEventListener('pointermove', e => {
   const r = card.getBoundingClientRect();
   card.style.setProperty('--mx', (e.clientX - r.left) + 'px'); card.style.setProperty('--my', (e.clientY - r.top) + 'px');
 }));
