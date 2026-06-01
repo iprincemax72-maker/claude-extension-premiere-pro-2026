@@ -2250,6 +2250,47 @@
   .ae-optbtn.selected { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(217,119,87,0.3); }
   .ae-err { font-size: 11.5px; color: var(--accent); margin: 8px 0 2px; min-height: 1px; }
 
+  /* ───── Ask-Questions (Plan mode) interview card ───── */
+  .plan-card {
+    border: 1px solid var(--accent-line);
+    border-radius: 12px;
+    background: var(--accent-soft);
+    padding: 13px 14px 12px;
+    margin: 2px 0;
+  }
+  .plan-loading { display: flex; align-items: center; gap: 9px; color: var(--text-dim); font-size: 12.5px; }
+  .plan-card-head { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 11px; }
+  .plan-qs { display: flex; flex-direction: column; gap: 12px; }
+  .plan-q-title { font-size: 12px; color: var(--text); font-weight: 600; margin-bottom: 7px; }
+  .plan-q-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .plan-optbtn {
+    font: inherit; font-size: 11.5px; color: var(--text-dim);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 999px;
+    padding: 5px 12px; cursor: pointer;
+    transition: background .14s var(--ease-out), border-color .14s var(--ease-out), color .14s var(--ease-out), transform .1s var(--ease-out), box-shadow .14s var(--ease-out);
+  }
+  .plan-optbtn:hover { color: var(--text); border-color: var(--accent-line); }
+  .plan-optbtn:active { transform: scale(0.96); }
+  .plan-optbtn.selected { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 10px var(--accent-glow); }
+  .plan-card-actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .plan-build-btn {
+    font: inherit; font-size: 12px; font-weight: 700; color: #fff;
+    background: var(--accent); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 7px 16px; cursor: pointer;
+    transition: filter .14s var(--ease-out), transform .1s var(--ease-out);
+  }
+  .plan-build-btn:hover { filter: brightness(1.08); }
+  .plan-build-btn:active { transform: scale(0.97); }
+  .plan-skip-btn {
+    font: inherit; font-size: 11.5px; color: var(--text-faint);
+    background: transparent; border: none; cursor: pointer; padding: 7px 4px;
+  }
+  .plan-skip-btn:hover { color: var(--text-dim); }
+  .plan-card-locked { opacity: 0.62; }
+  .plan-card-locked .plan-card-actions { display: none; }
+  .plan-card-locked button { cursor: default; }
+
   /* Minimized Auto-Edit chip — lets you work in Premiere while it transcribes */
   .ae-mini {
     position: fixed; right: 14px; bottom: 14px; z-index: 10000;
@@ -3044,7 +3085,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.70</span>
+    <span class="version-tag" id="versionTag">10.71</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -3058,12 +3099,13 @@
   </div>
   <div style="display:flex;align-items:center">
     <button class="plan-toggle" id="planBtn" type="button" role="switch" aria-checked="false"
-            title="Plan mode — when on, Claude asks clarifying questions and shows a plan before building, instead of rendering right away">
+            title="Ask Questions — when on, Claude asks a few smart multiple-choice questions about your request before building, so the result matches what you want">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M9 11l3 3L22 4"/>
-        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+        <path d="M9.5 9a2.5 2.5 0 1 1 3 2.45c-.9.2-1.5 1-1.5 1.95v.6"/>
+        <line x1="12" y1="17" x2="12" y2="17"/>
+        <circle cx="12" cy="12" r="10"/>
       </svg>
-      <span>Plan</span>
+      <span>Ask Questions</span>
     </button>
     <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5659,7 +5701,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.70';
+  const PANEL_VERSION = '10.71';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -6228,8 +6270,8 @@ if (planBtn) {
     saveSettings();
     syncPlanBtn();
     try { toast(userSettings.planMode
-      ? 'Plan mode ON — Claude will ask questions & plan before building.'
-      : 'Plan mode OFF — Claude builds right away.'); } catch {}
+      ? 'Ask Questions ON — Claude asks a few smart questions before building.'
+      : 'Ask Questions OFF — Claude builds right away.'); } catch {}
   });
   syncPlanBtn();
 }
@@ -8413,8 +8455,95 @@ function _maybeDrainQueue(tab, opts) {
   });
 })();
 
-async function sendMessage() {
-  const msg = input.value.trim();
+// ── PLAN / "Ask Questions" mode — interview before building ────────────────
+// Calls /plan/questions for smart multiple-choice questions, renders them as a
+// selectable card in the chat, and on "Build it" re-enters sendMessage with the
+// chosen answers baked in (skipPlan so it actually renders this time).
+async function runPlanInterview(msg) {
+  const placeholder = makeMsg('claude',
+    '<div class="plan-card"><div class="plan-loading"><span class="ae-spinner" style="width:15px;height:15px"></span> Thinking of a few quick questions…</div></div>');
+  const card = placeholder.body.querySelector('.plan-card');
+  setBusy(true);
+  const abort = new AbortController();
+  activeChatAbort = abort;
+
+  let questions = [];
+  try {
+    const r = await fetch(BRIDGE + '/plan/questions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg }),
+      signal: abort.signal,
+    });
+    const data = await r.json();
+    questions = (data && data.questions) || [];
+  } catch (e) {
+    activeChatAbort = null; setBusy(false);
+    try { placeholder.wrap.remove(); } catch {}
+    // Don't strand the user — build directly if questions can't be generated.
+    return sendMessage(msg, { skipPlan: true, skipYou: true });
+  }
+  activeChatAbort = null; setBusy(false);
+
+  if (!questions.length) {
+    try { placeholder.wrap.remove(); } catch {}
+    return sendMessage(msg, { skipPlan: true, skipYou: true });
+  }
+  renderPlanCard(card, msg, questions);
+}
+
+function renderPlanCard(card, originalMsg, questions) {
+  const answers = {};
+  questions.forEach(q => { if (q.options && q.options.length) answers[q.id] = q.options[0].value; });
+
+  let html = '<div class="plan-card-head">'
+    + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><circle cx="12" cy="12" r="10"/><path d="M9.5 9a2.5 2.5 0 1 1 3 2.45c-.9.2-1.5 1-1.5 1.95v.4"/><line x1="12" y1="17" x2="12" y2="17"/></svg>'
+    + '<span>A few quick questions</span></div>';
+  html += '<div class="plan-qs">';
+  questions.forEach((q) => {
+    html += '<div class="plan-q"><div class="plan-q-title">' + escapeHTML(q.q) + '</div><div class="plan-q-opts">';
+    (q.options || []).forEach((op, oi) => {
+      html += '<button type="button" class="plan-optbtn' + (oi === 0 ? ' selected' : '') + '" '
+        + 'data-qid="' + escapeHTML(q.id) + '" data-val="' + escapeHTML(op.value) + '">' + escapeHTML(op.label) + '</button>';
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+  html += '<div class="plan-card-actions">'
+    + '<button type="button" class="plan-build-btn">Build it</button>'
+    + '<button type="button" class="plan-skip-btn">Skip &amp; build now</button></div>';
+  card.innerHTML = html;
+
+  card.querySelectorAll('.plan-optbtn').forEach(b => {
+    b.addEventListener('click', () => {
+      const qid = b.getAttribute('data-qid');
+      answers[qid] = b.getAttribute('data-val');
+      card.querySelectorAll('.plan-optbtn[data-qid="' + qid + '"]').forEach(x => x.classList.remove('selected'));
+      b.classList.add('selected');
+    });
+  });
+
+  const build = (useAnswers) => {
+    let ansText = '';
+    if (useAnswers) {
+      const parts = questions.map(q => {
+        const val = answers[q.id];
+        const op = (q.options || []).find(o => o.value === val);
+        return q.q.replace(/[\s:?]+$/, '') + ': ' + (op ? op.label : val);
+      });
+      ansText = '[MY CHOICES — build exactly to these]\n- ' + parts.join('\n- ');
+    }
+    card.querySelectorAll('button').forEach(x => x.disabled = true);
+    card.classList.add('plan-card-locked');
+    sendMessage(originalMsg, { skipPlan: true, skipYou: true, planAnswers: ansText });
+  };
+  card.querySelector('.plan-build-btn').addEventListener('click', () => build(true));
+  card.querySelector('.plan-skip-btn').addEventListener('click', () => build(false));
+}
+
+async function sendMessage(presetMsg, sendOpts) {
+  sendOpts = sendOpts || {};
+  const _fromPreset = (typeof presetMsg === 'string');
+  const msg = (_fromPreset ? presetMsg : input.value).trim();
   if (!msg) return;
   // Busy → queue this prompt instead of dropping it (per-tab, auto-run).
   if (activeChatAbort) { enqueueCurrentSend(); return; }
@@ -8422,10 +8551,12 @@ async function sendMessage() {
   // the user switches tabs while it runs.
   const _sendTab = tabs[activeTabIdx];
   clearEmpty();
-  input.value = '';
-  try { localStorage.removeItem(DRAFT_KEY); } catch {}
-  autosize();
-  clearGhost();
+  if (!_fromPreset) {
+    input.value = '';
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    autosize();
+    clearGhost();
+  }
 
   // Build the message that goes to Claude — one [REFERENCE: ...] line per attached file.
   // Iteration context (from the Changes button) is prepended invisibly so the
@@ -8462,35 +8593,11 @@ async function sendMessage() {
     }
   }
 
-  // Plan mode: on the FIRST command of a turn, ask Claude to interview + plan
-  // instead of building. The per-tab _planAwaitingAnswer flag makes the very
-  // next send (the user's answers / "go ahead") skip the directive so it
-  // actually builds. Chat tabs are exempt — they're already conversational.
-  if (userSettings.planMode && !_isChatTab && _activeTab) {
-    if (_activeTab._planAwaitingAnswer) {
-      // This send is the user's answer to the plan — BUILD it now. The bridge
-      // is stateless (--no-session-persistence), so replay the original
-      // request + the plan Claude gave, then the answers, so it has full
-      // context to build from.
-      _activeTab._planAwaitingAnswer = false;
-      const orig = _activeTab._planOriginalMsg || '';
-      const planReply = _activeTab._planReply || '';
-      outboundMsg =
-        '[PLAN MODE FOLLOW-UP — you already asked me clarifying questions and gave a plan. Here are my answers. Now BUILD it for real, following the plan + my answers.]\n' +
-        (orig ? 'Original request: ' + orig + '\n' : '') +
-        (planReply ? 'Your questions & plan were:\n' + planReply + '\n' : '') +
-        'My answers: ' + outboundMsg;
-      _activeTab._planOriginalMsg = '';
-      _activeTab._planReply = '';
-    } else {
-      // First command of the turn: tell the bridge to interview + plan, not
-      // render. The flag is the real enforcement (bridge swaps the system
-      // prompt); this invisible note is a belt-and-suspenders hint.
-      _activeTab._planAwaitingAnswer = true;
-      _activeTab._planOriginalMsg = msg;
-      outboundPlanMode = true;
-      outboundMsg = '[PLAN MODE: ask clarifying questions + give a short plan, then stop. Do NOT build/render this turn.]\n' + outboundMsg;
-    }
+  // If this send carries pre-chosen Plan-mode answers (the "Build it" button
+  // from the interview card), bake them into the prompt so the stateless
+  // bridge builds exactly what was selected.
+  if (sendOpts.planAnswers) {
+    outboundMsg = outboundMsg + '\n\n' + sendOpts.planAnswers;
   }
 
   // Build the user-message bubble with inline thumbnails for any images.
@@ -8519,11 +8626,24 @@ async function sendMessage() {
     thumbsHTML += '</div>';
     youHTML += thumbsHTML;
   }
-  makeMsg('you', youHTML);
+  if (!sendOpts.skipYou) makeMsg('you', youHTML);
   // Auto-label the current tab from the first prompt (only if still default)
   if (tabs[activeTabIdx] && tabs[activeTabIdx].label === 'New animation') {
     setTabLabel(activeTabIdx, msg);
   }
+
+  // ── PLAN MODE — ask smart questions FIRST (animation tabs only) ──────────
+  // When the Plan toggle is on and this isn't already a build-from-answers
+  // send, pop a question card with selectable options instead of rendering.
+  // Clicking "Build it" re-enters sendMessage with skipPlan + planAnswers.
+  const _tabTypeNow = (tabs[activeTabIdx] && tabs[activeTabIdx].type) || 'animation';
+  if (userSettings.planMode && _tabTypeNow !== 'chat' && !sendOpts.skipPlan) {
+    if (iterationContext) setIterationContext(null);
+    if (activeReferences.length) clearReferences();
+    await runPlanInterview(msg);
+    return;
+  }
+
   setBusy(true);
   // The iteration context was already baked into outboundMsg; clear it so the
   // next prompt is fresh unless the user explicitly hits Changes again.
@@ -8600,10 +8720,6 @@ async function sendMessage() {
     const replyText = data.reply || '(no response)';
     placeholder.body.innerHTML = renderMarkdown(replyText);
     streamReveal(placeholder.body);
-
-    // If this was a Plan-mode interview turn, remember Claude's questions/plan
-    // so the next (answer) turn can replay it to the stateless bridge.
-    if (outboundPlanMode && _activeTab) { _activeTab._planReply = replyText; }
 
     if (activeTabType !== 'chat' && data.imports && data.imports.length) {
       for (const p of data.imports) {

@@ -1004,6 +1004,60 @@ async function detectInterviewQuestions(sentences, density, log) {
   }
 }
 
+// PLAN MODE — read the user's animation request and ask a few SMART
+// multiple-choice questions (like the Auto-Edit interview, but driven by the
+// build prompt instead of a transcript). Two fixed questions (aspect ratio +
+// tone) plus up to 3 content-driven ones. Returns [{id,q,type,options:[{value,label}]}].
+async function detectPlanQuestions(message, log) {
+  const fixed = [
+    { id: 'ratio', q: 'Aspect ratio?', type: 'single', options: [
+      { value: '1920x1080', label: 'Landscape 16:9' },
+      { value: '1080x1920', label: 'Vertical 9:16' },
+      { value: '1080x1080', label: 'Square 1:1' },
+      { value: '1080x1350', label: 'Portrait 4:5' },
+    ] },
+    { id: 'tone', q: 'Visual tone?', type: 'single', options: [
+      { value: 'minimal',   label: 'Clean & minimal' },
+      { value: 'energetic', label: 'Energetic & punchy' },
+      { value: 'editorial', label: 'Bold editorial' },
+      { value: 'luxury',    label: 'Luxury & moody' },
+    ] },
+  ];
+  try {
+    const system = [
+      'You are a senior motion-graphics designer about to build ONE Remotion animation for the user.',
+      'Read their request and ask UP TO 3 short multiple-choice questions whose answers would genuinely change HOW you design and animate it — based on the SPECIFIC request (the actual text, shapes, mood, content they mentioned).',
+      'Make them SMART and specific to THIS request — e.g. what element should be the focal point, what animates in first, how the accent/border/glow is treated, what the background does, how it exits, which word gets emphasized, icon or no icon, etc.',
+      'Do NOT ask about aspect ratio or overall visual tone — those are asked separately. Do NOT ask trivial yes/no filler.',
+      'Output JSONL — ONE compact JSON object per line. No array, no prose, no markdown fences:',
+      '{"id":"c1","q":"The headline — how should each word arrive?","options":[{"value":"word","label":"One word at a time"},{"value":"all","label":"All together"},{"value":"char","label":"Letter by letter"}]}',
+      'Each question: 2-4 options, each with a short value and a human label. Max 3 questions. If the request is already fully specified, you may output NOTHING.',
+    ].join('\n');
+    const raw = await runClaudeText(system + '\n\nUSER REQUEST:\n' + String(message).slice(0, 4000), 60000, log, 'planq');
+    const content = [];
+    for (const line of String(raw).split('\n')) {
+      let t = line.trim();
+      if (!t || t[0] !== '{') continue;
+      t = t.replace(/,\s*$/, '');
+      try {
+        const o = JSON.parse(t);
+        if (o && o.q && Array.isArray(o.options) && o.options.length >= 2) {
+          o.id = 'c' + (content.length + 1);
+          o.type = 'single';
+          o.options = o.options.slice(0, 4).map(op => ({ value: String(op.value || op.label || ''), label: String(op.label || op.value || '') }));
+          content.push({ id: o.id, q: String(o.q), type: 'single', options: o.options });
+        }
+      } catch {}
+      if (content.length >= 3) break;
+    }
+    log && log(`planq: ${content.length} smart questions generated`);
+    return fixed.concat(content);
+  } catch (e) {
+    log && log('planq failed, using fixed only: ' + e.message);
+    return fixed;
+  }
+}
+
 // Double-check the plan FITS the video before the expensive generate step.
 // (1) deterministic clamp — every moment must lie inside the span, have a
 // positive duration, and not run past the end. (2) a light Claude review that
@@ -2229,7 +2283,7 @@ const server = http.createServer((req, res) => {
 
   // Track in-flight heavy requests so the periodic auto-update never restarts
   // the bridge mid-render. res 'close' fires on normal finish OR client abort.
-  if (req.method === 'POST' && (req.url === '/chat' || req.url === '/autoedit' || req.url === '/autoedit/run' || req.url === '/autoedit/analyze' || req.url === '/autocut')) {
+  if (req.method === 'POST' && (req.url === '/chat' || req.url === '/autoedit' || req.url === '/autoedit/run' || req.url === '/autoedit/analyze' || req.url === '/autocut' || req.url === '/plan/questions')) {
     _heavyInflight++;
     res.on('close', () => { _heavyInflight = Math.max(0, _heavyInflight - 1); });
   }
@@ -2550,6 +2604,30 @@ const server = http.createServer((req, res) => {
       req.on('aborted', () => {
         if (!done) { try { proc.kill('SIGKILL'); } catch {} finish(''); }
       });
+    });
+    return;
+  }
+
+  // PLAN MODE — generate smart multiple-choice questions for a build request.
+  // The panel calls this first (when the Plan toggle is on), renders the
+  // questions as clickable options, then sends the answers to /chat to build.
+  if (req.method === 'POST' && req.url === '/plan/questions') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      let p;
+      try { p = JSON.parse(body); }
+      catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+      const message = (p.message || '').toString();
+      if (!message.trim()) { res.writeHead(400); res.end('{"error":"empty message"}'); return; }
+      try {
+        const questions = await detectPlanQuestions(message, (m) => { console.log('  [planq] ' + m); });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, questions }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: String(e.message || e) }));
+      }
     });
     return;
   }
