@@ -149,7 +149,7 @@ body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-eve
 .stat .l { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); margin-top: 8px; }
 
 /* ── Sections ── */
-.section { padding: clamp(70px, 10vw, 130px) 0; position: relative; }
+.section { padding: clamp(64px, 8vw, 112px) 0; position: relative; }
 .section-head { max-width: 56ch; margin-bottom: clamp(38px, 6vw, 60px); }
 .section-head.center { text-align: center; margin-inline: auto; }
 .section-head h2 { margin-top: 0.7rem; }
@@ -245,7 +245,11 @@ body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-eve
 .compare .new { border-color: var(--coral); box-shadow: 0 0 40px -20px var(--coral), 0 1px 0 var(--hi) inset; }
 .compare .tag { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
 .compare .new .tag { color: var(--coral); }
-.compare h3 { margin: 12px 0 18px; font-size: 1.4rem; }
+.compare .ctime { font-size: clamp(2.4rem, 5vw, 3.4rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1; margin: 14px 0 2px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.compare .ctime span { font-size: 0.38em; font-weight: 500; margin-left: 3px; letter-spacing: 0; }
+.compare .new .ctime { color: var(--coral); }
+.compare h3 { margin: 6px 0 18px; font-size: 1.25rem; color: var(--text-2); font-weight: 600; }
+.compare .new h3 { color: var(--text); }
 .compare ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
 .compare li { display: flex; gap: 11px; font-size: 0.94rem; color: var(--text-2); }
 .compare li svg { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 2px; }
@@ -575,13 +579,13 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   <div class="wrap">
     <div class="section-head center reveal"><h2>Before &amp; after.</h2></div>
     <div class="compare">
-      <div class="col old reveal"><span class="tag">Without</span><h3>The usual way</h3><ul>
+      <div class="col old reveal"><span class="tag">Without</span><div class="ctime">~2<span>hrs</span></div><h3>The usual way</h3><ul>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Open After Effects</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Keyframe by keyframe</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Export, import, hope it fits</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> A change? Start over</li>
       </ul></div>
-      <div class="col new reveal d1"><span class="tag">With Claude</span><h3>The new way</h3><ul>
+      <div class="col new reveal d1"><span class="tag">With Claude</span><div class="ctime">~90<span>sec</span></div><h3>The new way</h3><ul>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Type one sentence</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> On your timeline in ~90s</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Fitted, ready to play</li>
