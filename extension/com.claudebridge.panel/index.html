@@ -1938,6 +1938,57 @@
   }
   .rmode-pill:active { transform: scale(0.94); transition-duration: 0.1s; }
 
+  /* ───── Outputs selector (generate N versions from one prompt) ───── */
+  .out-group { position: relative; display: inline-flex; flex: 0 0 auto; }
+  .out-btn {
+    display: inline-flex; align-items: center; gap: 3px;
+    height: 24px; padding: 0 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-family: var(--font-ui); font-size: 11px; font-weight: 700;
+    cursor: pointer; user-select: none;
+    transition: background .12s var(--ease-out), color .12s var(--ease-out), border-color .12s var(--ease-out);
+  }
+  .out-btn svg { width: 12px; height: 12px; opacity: 0.85; }
+  .out-btn:hover { color: var(--text); border-color: var(--accent-line); }
+  .out-group.multi .out-btn {
+    color: var(--accent); border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .out-menu {
+    position: absolute; bottom: calc(100% + 6px); right: 0;
+    display: none; grid-template-columns: repeat(5, 1fr); gap: 4px;
+    padding: 7px; width: 168px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 8px 26px rgba(0,0,0,0.45);
+    z-index: 40;
+    backdrop-filter: none;
+  }
+  .out-menu.show { display: grid; }
+  .out-opt {
+    height: 26px; border-radius: 6px;
+    border: 1px solid var(--border); background: rgba(255,255,255,0.03);
+    color: var(--text-dim); font-family: var(--font-ui); font-size: 11.5px; font-weight: 700;
+    cursor: pointer; transition: background .1s var(--ease-out), color .1s var(--ease-out), border-color .1s var(--ease-out);
+  }
+  .out-opt:hover { color: var(--text); border-color: var(--accent-line); }
+  .out-opt.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .out-menu-hint { grid-column: 1 / -1; font-size: 9.5px; color: var(--text-faint); text-align: center; margin-top: 2px; }
+  body.chat-mode #outputGroup { display: none !important; }
+
+  /* Version divider in the chat when generating multiple outputs */
+  .ver-divider {
+    display: flex; align-items: center; gap: 8px;
+    margin: 14px 2px 4px; font-size: 11px; font-weight: 700;
+    color: var(--accent); letter-spacing: 0.02em;
+  }
+  .ver-divider::before, .ver-divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--accent-line); opacity: 0.5;
+  }
+
   /* Auto-Cut button — sits in the mode-bar next to placement pills */
   .autocut-btn {
     margin-left: auto;
@@ -3151,7 +3202,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.81</span>
+    <span class="version-tag" id="versionTag">10.82</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -3532,6 +3583,13 @@
         <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
         <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Claude takes its time, ~3-5 min">Slow</button>
       </div>
+      <div class="out-group" id="outputGroup" title="How many different versions to generate from one prompt. They render one after another so you can pick the best.">
+        <button class="out-btn" id="outputBtn" type="button" aria-haspopup="true" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          <span>×</span><span id="outputCount">1</span>
+        </button>
+        <div class="out-menu" id="outputMenu" role="menu"></div>
+      </div>
       <button class="ae-pill" id="autoeditBtn" type="button" title="Auto-Edit — read the speech and drop motion graphics on V2/V3">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h16"/><circle cx="19" cy="12" r="2.5" fill="currentColor"/></svg>
         Auto-Edit
@@ -3737,6 +3795,7 @@ function newTab(opts) {
     // state. New tabs inherit the last-used values as their starting point.
     renderMode: userSettings.renderMode || 'default',
     planMode: !!userSettings.planMode,
+    outputs: 1,   // how many versions one prompt generates (1-10)
   });
   activeTabIdx = tabs.length - 1;
   applyActiveTabState();
@@ -3814,6 +3873,7 @@ function applyActiveTabState() {
   // Per-tab controls — reflect THIS tab's render mode + Ask-Questions state.
   try { syncRenderModeUI && syncRenderModeUI(); } catch {}
   try { syncPlanBtn && syncPlanBtn(); } catch {}
+  try { syncOutputUI && syncOutputUI(); } catch {}
   // Show this tab's queue; if it has items, is idle, and wasn't paused by a
   // user cancel, resume draining it (the "switched away mid-run" case).
   try { renderQueueStrip && renderQueueStrip(); } catch {}
@@ -5812,7 +5872,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.81';
+  const PANEL_VERSION = '10.82';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -6394,6 +6454,51 @@ if (planBtn) {
       : 'Ask Questions OFF for this tab — Claude builds right away.'); } catch {}
   });
   syncPlanBtn();
+}
+
+// ── Outputs selector — one prompt → N different versions (1-10), PER-TAB ────
+const outputGroup = document.getElementById('outputGroup');
+const outputBtn   = document.getElementById('outputBtn');
+const outputMenu  = document.getElementById('outputMenu');
+const outputCount = document.getElementById('outputCount');
+function _activeOutputs() {
+  const t = (typeof tabs !== 'undefined') ? tabs[activeTabIdx] : null;
+  const n = t && t.outputs ? t.outputs : 1;
+  return Math.max(1, Math.min(10, n));
+}
+function syncOutputUI() {
+  if (!outputGroup) return;
+  const n = _activeOutputs();
+  if (outputCount) outputCount.textContent = n;
+  outputGroup.classList.toggle('multi', n > 1);
+  if (outputMenu) outputMenu.querySelectorAll('.out-opt').forEach(b => b.classList.toggle('active', Number(b.dataset.n) === n));
+}
+if (outputGroup && outputBtn && outputMenu) {
+  let mh = '';
+  for (let i = 1; i <= 10; i++) mh += '<button type="button" class="out-opt" role="menuitem" data-n="' + i + '">' + i + '</button>';
+  mh += '<div class="out-menu-hint">versions per prompt</div>';
+  outputMenu.innerHTML = mh;
+  const closeOutMenu = () => { outputMenu.classList.remove('show'); outputBtn.setAttribute('aria-expanded', 'false'); };
+  outputBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = outputMenu.classList.toggle('show');
+    outputBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  outputMenu.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('.out-opt');
+    if (!b) return;
+    const n = Math.max(1, Math.min(10, Number(b.dataset.n) || 1));
+    const t = tabs[activeTabIdx];
+    if (t) t.outputs = n;
+    syncOutputUI();
+    closeOutMenu();
+    try { toast(n > 1
+      ? n + ' versions — one prompt will render ' + n + ' different takes, one after another.'
+      : 'Single output.'); } catch {}
+  });
+  document.addEventListener('click', (e) => { if (!outputGroup.contains(e.target)) closeOutMenu(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeOutMenu(); });
+  syncOutputUI();
 }
 
 // Open/close the settings panel
@@ -8550,12 +8655,15 @@ function renderQueueStrip() {
     ? '<button type="button" class="queue-run" id="queueRunBtn" title="Run the next queued prompt now">'
       + '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>Run</button>'
     : '';
-  const items = q.map((it, i) =>
-    '<span class="queue-item' + (i === 0 && !idle ? ' running' : '') + '" data-id="' + it.id + '">'
-    + '<span class="queue-item-text">' + escapeHTML(it.msg.slice(0, 60)) + (it.msg.length > 60 ? '…' : '') + '</span>'
-    + '<button type="button" class="queue-item-x" data-id="' + it.id + '" title="Remove from queue" aria-label="Remove">×</button>'
-    + '</span>'
-  ).join('');
+  const items = q.map((it, i) => {
+    const label = it.varCtx
+      ? 'Version ' + it.varCtx.index + ' of ' + it.varCtx.total
+      : escapeHTML(it.msg.slice(0, 60)) + (it.msg.length > 60 ? '…' : '');
+    return '<span class="queue-item' + (i === 0 && !idle ? ' running' : '') + '" data-id="' + it.id + '">'
+      + '<span class="queue-item-text">' + label + '</span>'
+      + '<button type="button" class="queue-item-x" data-id="' + it.id + '" title="Remove from queue" aria-label="Remove">×</button>'
+      + '</span>';
+  }).join('');
   strip.innerHTML = '<span class="queue-label">Queue · ' + q.length + '</span>' + runBtn + items;
 }
 
@@ -8563,12 +8671,19 @@ function renderQueueStrip() {
 // normal sendMessage path (which reads + clears those globals).
 function _runQueuedIntent(intent) {
   if (!intent) return;
-  input.value = intent.msg || '';
   activeReferences = (intent.refs && intent.refs.slice()) || [];
   try { renderRefBar(); } catch {}
   setIterationContext(intent.iterCtx || null);
-  autosize();
-  sendMessage();
+  // Multi-output variation copies carry their own context (version k/N, plan
+  // answers) — pass it through sendOpts so they don't re-interview or repeat
+  // the prompt bubble. Regular queued prompts have none of these → normal send.
+  if (intent.varCtx) {
+    sendMessage(intent.msg || '', { varCtx: intent.varCtx, planAnswers: intent.planAnswers || undefined, skipPlan: !!intent.skipPlan });
+  } else {
+    input.value = intent.msg || '';
+    autosize();
+    sendMessage();
+  }
 }
 
 // After a send finishes, advance the queue if appropriate. Only drains when:
@@ -8781,6 +8896,35 @@ async function sendMessage(presetMsg, sendOpts) {
     clearGhost();
   }
 
+  // ── MULTI-OUTPUT — one prompt → N different versions ──────────────────────
+  // Fan a fresh animation build into N sequential variation renders: this send
+  // becomes version 1/N and N-1 variation copies queue + drain one-by-one
+  // (concurrent renders peg the CPU and collide on the shared project, so
+  // SEQUENTIAL is the safe shape). Skip for iterations, chat tabs, already-a-
+  // variation sends, and when we're about to show the Ask-Questions interview
+  // (the build that follows will fan out instead). Runs BEFORE the message is
+  // built so version 1 gets its variation nudge + label too.
+  {
+    const _ttype = (tabs[activeTabIdx] && tabs[activeTabIdx].type) || 'animation';
+    const _pOn = (tabs[activeTabIdx] && typeof tabs[activeTabIdx].planMode === 'boolean') ? tabs[activeTabIdx].planMode : !!userSettings.planMode;
+    const _willInterview = _pOn && _ttype !== 'chat' && !sendOpts.skipPlan && !iterationContext && !sendOpts.varCtx;
+    const _outN = (_sendTab && _sendTab.outputs) ? Math.max(1, Math.min(10, _sendTab.outputs)) : 1;
+    if (!_willInterview && _outN > 1 && !sendOpts.varCtx && !iterationContext && _ttype !== 'chat') {
+      sendOpts.varCtx = { index: 1, total: _outN };
+      if (!_sendTab.queue) _sendTab.queue = [];
+      const _refsCopy = (activeReferences || []).slice();
+      for (let k = 2; k <= _outN; k++) {
+        _sendTab.queue.push({
+          id: _queueId(), msg: msg, refs: _refsCopy.slice(), iterCtx: null,
+          varCtx: { index: k, total: _outN },
+          planAnswers: sendOpts.planAnswers || null,
+          skipPlan: true,
+        });
+      }
+      try { renderQueueStrip(); } catch {}
+    }
+  }
+
   // Build the message that goes to Claude — one [REFERENCE: ...] line per attached file.
   // Iteration context (from the Changes button) is prepended invisibly so the
   // user's bubble shows just their tweak.
@@ -8826,6 +8970,20 @@ async function sendMessage(presetMsg, sendOpts) {
     outboundMsg = outboundMsg + '\n\n' + sendOpts.planAnswers;
   }
 
+  // Multi-output: tell the bridge this is one of N versions and to make it a
+  // genuinely distinct take so the user has real options to choose between —
+  // vary composition, motion, type and detail while keeping what the prompt
+  // actually asked for.
+  if (sendOpts.varCtx && sendOpts.varCtx.total > 1) {
+    const vc = sendOpts.varCtx;
+    outboundMsg = '[VERSION ' + vc.index + ' OF ' + vc.total + ' — the user wants ' + vc.total
+      + ' DIFFERENT versions of this to choose from. Make THIS one a distinct take: a different '
+      + 'composition, layout, motion feel and detailing from the other versions. Commit to one '
+      + 'strong direction. Keep whatever the prompt explicitly specified (text, colors, ratio), but '
+      + 'vary everything it left open. Variation seed ' + vc.index + '/' + vc.total + '.]\n'
+      + outboundMsg;
+  }
+
   // Build the user-message bubble with inline thumbnails for any images.
   // If this send was an iteration (Changes button), prepend a small
   // "Replying to <filename>" header so the bubble visibly shows what it's
@@ -8852,7 +9010,27 @@ async function sendMessage(presetMsg, sendOpts) {
     thumbsHTML += '</div>';
     youHTML += thumbsHTML;
   }
-  if (!sendOpts.skipYou) makeMsg('you', youHTML);
+  // Multi-output labeling: output 1 shows the prompt + a "generating N versions"
+  // note; later versions show a slim "Version k of N" divider instead of
+  // repeating the whole prompt.
+  const _vc = sendOpts.varCtx;
+  if (_vc && _vc.total > 1) {
+    if (_vc.index === 1) {
+      youHTML += '<div style="margin-top:6px;font-size:11px;color:var(--accent);font-weight:600">↳ generating ' + _vc.total + ' different versions, one after another…</div>';
+      makeMsg('you', youHTML);
+    } else {
+      // Slim "Version k of N" divider (raw element, not a chat bubble).
+      try {
+        const d = document.createElement('div');
+        d.className = 'ver-divider';
+        d.textContent = 'Version ' + _vc.index + ' of ' + _vc.total;
+        (getActiveLogContent() || log).appendChild(d);
+        log.scrollTop = log.scrollHeight;
+      } catch {}
+    }
+  } else if (!sendOpts.skipYou) {
+    makeMsg('you', youHTML);
+  }
   // Auto-label the current tab from the first prompt (only if still default)
   if (tabs[activeTabIdx] && tabs[activeTabIdx].label === 'New animation') {
     setTabLabel(activeTabIdx, msg);
@@ -8866,7 +9044,7 @@ async function sendMessage(presetMsg, sendOpts) {
   // user is tweaking an existing render, not starting fresh, so just apply it.
   const _tabTypeNow = (tabs[activeTabIdx] && tabs[activeTabIdx].type) || 'animation';
   const _planOn = (tabs[activeTabIdx] && typeof tabs[activeTabIdx].planMode === 'boolean') ? tabs[activeTabIdx].planMode : !!userSettings.planMode;
-  if (_planOn && _tabTypeNow !== 'chat' && !sendOpts.skipPlan && !iterationContext) {
+  if (_planOn && _tabTypeNow !== 'chat' && !sendOpts.skipPlan && !iterationContext && !sendOpts.varCtx) {
     if (activeReferences.length) clearReferences();
     await runPlanInterview(msg);
     return;
