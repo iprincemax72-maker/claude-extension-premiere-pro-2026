@@ -1067,7 +1067,22 @@ async function extractConcatAudio(segments, reqId, log) {
       ff.stderr.on('data', d => er += d.toString().slice(-1500));
       const k = setTimeout(() => { try { ff.kill('SIGKILL'); } catch {} rej(new Error('segment extract timeout')); }, 120000);
       ff.on('error', e => { clearTimeout(k); rej(e); });
-      ff.on('close', c => { clearTimeout(k); (c === 0 && fs.existsSync(out)) ? res() : rej(new Error('segment ffmpeg exit ' + c + ': ' + er.slice(-200))); });
+      ff.on('close', c => {
+        clearTimeout(k);
+        if (c === 0 && fs.existsSync(out)) { res(); return; }
+        // Translate ffmpeg's cryptic failures into something a human can act on.
+        const lc = (er || '').toLowerCase();
+        let msg;
+        if (/does not contain any stream|matches no streams|output file is empty|no audio/.test(lc)) {
+          msg = 'This clip has no audio for Auto-Edit to read. Pick a clip with speech/sound (the one whose voice you want captioned) — not a silent graphics or HUD overlay.';
+        } else if (/no such file|does not exist|cannot find|could not open .*input/.test(lc)) {
+          msg = "Couldn't find this clip's media file on disk — it may have been moved or renamed.";
+        } else {
+          msg = "Couldn't read this clip's audio. The clip may have no audio track. (ffmpeg exit " + c + ")";
+        }
+        log && log('segment ffmpeg failed: ' + er.slice(-200));
+        rej(new Error(msg));
+      });
     });
     partPaths.push(out);
     timeMap.push({ concatStart: cum, dur, timelineStart: Number(s.timelineStart) || 0,
