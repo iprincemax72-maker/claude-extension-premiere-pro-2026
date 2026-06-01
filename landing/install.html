@@ -108,6 +108,12 @@ section.step .lead { margin-bottom: 22px; }
 .runsteps li b { color: var(--text); }
 .runsteps li span { color: var(--text-2); font-size: 0.95rem; }
 
+/* keyboard shortcuts */
+.keys { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 18px; margin-top: 8px; }
+.keys .k { display: flex; align-items: center; gap: 12px; padding: 11px 4px; border-bottom: 1px solid var(--line); }
+.keys .k kbd { font-family: var(--mono); font-size: 0.74rem; background: var(--s2); border: 1px solid var(--line-2); border-radius: 7px; padding: 5px 9px; color: var(--text); box-shadow: 0 2px 0 rgba(0,0,0,0.45), 0 1px 0 var(--hi) inset; flex: 0 0 auto; min-width: 30px; text-align: center; }
+.keys .k span { color: var(--text-2); font-size: 0.9rem; }
+
 /* troubleshooting */
 .tbl { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin-top: 8px; }
 .trow { display: grid; grid-template-columns: 1fr 1.4fr; gap: 0; border-top: 1px solid var(--line); }
@@ -129,6 +135,7 @@ section.step .lead { margin-bottom: 22px; }
 .foot a:hover { color: var(--coral); }
 
 @media (max-width: 620px) {
+  .keys { grid-template-columns: 1fr; gap: 0; }
   .trow { grid-template-columns: 1fr; }
   .trow .a { border-left: none; border-top: 1px solid var(--line); padding-top: 10px; }
   .trow .q { padding-bottom: 6px; }
@@ -225,6 +232,18 @@ powershell -ExecutionPolicy Bypass -File install.ps1</code></pre>
       <li><b>Place it</b> — <span>the render card shows <b>Import to Timeline / Preview / Changes</b>. Nothing is auto-imported — you decide.</span></li>
       <li><b>When you're done</b> — <span>close the bridge terminal window to stop the server.</span></li>
     </ol>
+
+    <h3 style="margin:32px 0 4px">Handy shortcuts in the panel</h3>
+    <div class="keys">
+      <div class="k"><kbd>↵</kbd><span>Send message</span></div>
+      <div class="k"><kbd>⇧↵</kbd><span>New line</span></div>
+      <div class="k"><kbd>⇥</kbd><span>Accept ghost-text autocomplete</span></div>
+      <div class="k"><kbd>⇧V</kbd><span>Paste text at cursor</span></div>
+      <div class="k"><kbd>⇧B</kbd><span>Paste image as reference</span></div>
+      <div class="k"><kbd>`</kbd><span>Maximize the panel frame</span></div>
+      <div class="k"><kbd>Esc</kbd><span>Cancel request / close lightbox</span></div>
+      <div class="k"><kbd>⇧C</kbd><span>Copy selected text</span></div>
+    </div>
   </div>
 </section>
 
