@@ -23,6 +23,7 @@
     --accent-soft: rgba(217, 119, 87, 0.14);
     --accent-line: rgba(217, 119, 87, 0.45);
     --accent-glow: rgba(217, 119, 87, 0.55);
+    --accent-rgb:  217, 119, 87;
 
     --ok:          #6fbf8a;
     --err:         #e07474;
@@ -64,9 +65,21 @@
     overflow: hidden;
     pointer-events: none;
     background:
-      radial-gradient(380px 380px at 12% 8%,  rgba(217, 119, 87, 0.20), transparent 70%),
-      radial-gradient(320px 320px at 92% 98%, rgba(232, 154, 108, 0.13), transparent 70%);
+      radial-gradient(380px 380px at 12% 8%,  rgba(var(--accent-rgb), 0.18), transparent 70%),
+      radial-gradient(320px 320px at 92% 98%, rgba(var(--accent-rgb), 0.11), transparent 70%);
   }
+  /* Particle background — fixed canvas behind all content, above the aurora glow */
+  #particleCanvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+    display: block;
+  }
+  /* Let segmented controls wrap when they hold many options (theme/particles) */
+  .settings-segmented-wrap { flex-wrap: wrap; justify-content: flex-end; max-width: 60%; }
   .aurora .blob { display: none; }
 
   /* Visibly chunky scrollbars — CEP's older Chromium hides thin ones */
@@ -1463,6 +1476,7 @@
     gap: 8px;
     flex-wrap: nowrap;
     padding: 3px 8px 5px;
+    position: relative;   /* anchor the centered esc-cancel pill */
   }
   /* Two zones: hint (left) · Auto-Edit + Fast/Default/Slow + EXTEND + send (right) */
   .tb-left  { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
@@ -1620,7 +1634,20 @@
     transition: opacity 0.25s var(--ease);
     user-select: none;
   }
-  .esc-hint.show { display: inline-flex; opacity: 1; pointer-events: auto; cursor: pointer; }
+  .esc-hint.show {
+    display: inline-flex; opacity: 1; pointer-events: auto; cursor: pointer;
+    /* Float dead-center of the toolbar instead of crammed on the left edge */
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    margin-right: 0;
+    z-index: 6;
+  }
+  /* When a request is in flight the esc pill takes the center stage —
+     hide the Tab/Enter hint so they don't collide. (Class toggled in JS;
+     CEP's Chrome 99 has no :has() support.) */
+  .input-toolbar.busy .tb-left .hint-text { visibility: hidden; }
   .esc-hint kbd {
     background: rgba(196, 75, 58, 0.22);
     border: 1px solid rgba(196, 75, 58, 0.5);
@@ -2974,6 +3001,7 @@
 <body>
 
 <div class="aurora"><div class="blob"></div></div>
+<canvas id="particleCanvas" aria-hidden="true"></canvas>
 
 <!-- Boot intro — plays once when panel mounts, auto-hides ~1.8s in -->
 <div class="boot-intro" id="bootIntro">
@@ -2989,7 +3017,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.65</span>
+    <span class="version-tag" id="versionTag">10.67</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -3178,10 +3206,13 @@
           <div class="settings-row-name">Theme</div>
           <div class="settings-row-hint">Color scheme for the panel</div>
         </div>
-        <div class="settings-segmented" id="settingTheme">
+        <div class="settings-segmented settings-segmented-wrap" id="settingTheme">
           <button data-val="dark" class="seg active">Dark</button>
           <button data-val="dim">Dim</button>
           <button data-val="midnight">Midnight</button>
+          <button data-val="aurora">Aurora</button>
+          <button data-val="nebula">Nebula</button>
+          <button data-val="carbon">Carbon</button>
         </div>
       </div>
       <div class="settings-row">
@@ -3195,6 +3226,26 @@
           <button data-val="emerald" class="sw"        style="background:#6fbf8a" aria-label="Emerald"></button>
           <button data-val="amber"   class="sw"        style="background:#e89a4e" aria-label="Amber"></button>
           <button data-val="sky"     class="sw"        style="background:#5eb6e8" aria-label="Sky"></button>
+          <button data-val="rose"    class="sw"        style="background:#e85d8a" aria-label="Rose"></button>
+          <button data-val="cyan"    class="sw"        style="background:#43d6c8" aria-label="Cyan"></button>
+          <button data-val="lime"    class="sw"        style="background:#a8d85c" aria-label="Lime"></button>
+          <button data-val="gold"    class="sw"        style="background:#e8c44e" aria-label="Gold"></button>
+          <button data-val="magenta" class="sw"        style="background:#c95ee8" aria-label="Magenta"></button>
+          <button data-val="crimson" class="sw"        style="background:#e8526a" aria-label="Crimson"></button>
+          <button data-val="ice"     class="sw"        style="background:#8fb8f0" aria-label="Ice"></button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Particles</div>
+          <div class="settings-row-hint">Animated accent-colored background</div>
+        </div>
+        <div class="settings-segmented settings-segmented-wrap" id="settingParticles">
+          <button data-val="off">Off</button>
+          <button data-val="dust" class="active">Dust</button>
+          <button data-val="bokeh">Bokeh</button>
+          <button data-val="stars">Stars</button>
+          <button data-val="network">Network</button>
         </div>
       </div>
       <div class="settings-row">
@@ -5573,7 +5624,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.65';
+  const PANEL_VERSION = '10.67';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -5671,9 +5722,28 @@ input.addEventListener('paste', () => setTimeout(_scheduleDraftSave, 50));
    skip a reload than to nuke someone's prompt mid-typing. ───── */
 (function setupAutoReload() {
   let baseline = null;
+  let sessionBaseline = null;
   let fails = 0;
   const POLL_OK_MS = 5000;
   const POLL_FAIL_BASE = 8000;
+
+  // The bridge mints a fresh SESSION_ID (UUID) on every boot. If it changes
+  // between polls, the bridge process restarted (crash, auto-update, manual
+  // kill). Any /chat, autocut, or autoedit that was mid-flight died with the
+  // old process — but in CEP's old Chrome the dropped keep-alive socket can
+  // stay half-open, so the in-flight fetch never rejects and the panel is
+  // stuck "busy" forever: red stop button, esc-cancel pill, and a blocked
+  // refresh/auto-update. Force-clear that dead state so the user recovers.
+  function _recoverFromBridgeRestart() {
+    const wasBusy = (typeof activeChatAbort !== 'undefined' && activeChatAbort)
+      || (typeof activeAutocut  !== 'undefined' && activeAutocut)
+      || (typeof activeAutoedit !== 'undefined' && activeAutoedit)
+      || (typeof expanding      !== 'undefined' && expanding);
+    if (!wasBusy) return;
+    try { cancelActive && cancelActive(); } catch {}
+    try { setBusy && setBusy(false); } catch {}
+    try { toast('Bridge restarted — cleared a stuck request. You can send again.'); } catch {}
+  }
 
   function isUnsafeToReload() {
     // Any text in the textarea — even if not focused
@@ -5705,8 +5775,16 @@ input.addEventListener('paste', () => setTimeout(_scheduleDraftSave, 50));
       const r = await fetch(BRIDGE + '/version', { signal: ctrl.signal, cache: 'no-store' });
       clearTimeout(tt);
       if (!r.ok) throw new Error(r.status);
-      const { mtime } = await r.json();
+      const { mtime, session } = await r.json();
       fails = 0;
+      // Detect a bridge restart and recover any stuck in-flight state.
+      if (session) {
+        if (sessionBaseline === null) sessionBaseline = session;
+        else if (session !== sessionBaseline) {
+          sessionBaseline = session;
+          _recoverFromBridgeRestart();
+        }
+      }
       if (baseline === null) {
         baseline = mtime;
       } else if (mtime !== baseline) {
@@ -5735,6 +5813,7 @@ const SETTINGS_KEY = 'claudeBridge.settings';
 const SETTINGS_DEFAULTS = {
   theme: 'dark',
   accent: 'coral',
+  particles: 'dust',     // off | dust | bokeh | stars | network
   bootIntro: true,
   placement: 'overlay',
   expand: 'light',
@@ -5745,16 +5824,26 @@ const SETTINGS_DEFAULTS = {
   confirmImport: false,   // when true, render cards ask before auto-placing on timeline
 };
 const ACCENT_PALETTES = {
-  coral:   { accent:'#d97757', accent2:'#e89a6c', hover:'#e88566', soft:'rgba(217,119,87,0.14)', line:'rgba(217,119,87,0.45)', glow:'rgba(217,119,87,0.55)' },
-  violet:  { accent:'#8b6dd9', accent2:'#a48de0', hover:'#9a7fe0', soft:'rgba(139,109,217,0.14)', line:'rgba(139,109,217,0.45)', glow:'rgba(139,109,217,0.55)' },
-  emerald: { accent:'#6fbf8a', accent2:'#89cfa1', hover:'#7fc998', soft:'rgba(111,191,138,0.14)', line:'rgba(111,191,138,0.45)', glow:'rgba(111,191,138,0.55)' },
-  amber:   { accent:'#e89a4e', accent2:'#f0b370', hover:'#eda864', soft:'rgba(232,154,78,0.14)',  line:'rgba(232,154,78,0.45)',  glow:'rgba(232,154,78,0.55)'  },
-  sky:     { accent:'#5eb6e8', accent2:'#7fc6ec', hover:'#73beea', soft:'rgba(94,182,232,0.14)',  line:'rgba(94,182,232,0.45)',  glow:'rgba(94,182,232,0.55)'  },
+  coral:   { accent:'#d97757', accent2:'#e89a6c', hover:'#e88566', soft:'rgba(217,119,87,0.14)', line:'rgba(217,119,87,0.45)', glow:'rgba(217,119,87,0.55)', rgb:'217,119,87' },
+  violet:  { accent:'#8b6dd9', accent2:'#a48de0', hover:'#9a7fe0', soft:'rgba(139,109,217,0.14)', line:'rgba(139,109,217,0.45)', glow:'rgba(139,109,217,0.55)', rgb:'139,109,217' },
+  emerald: { accent:'#6fbf8a', accent2:'#89cfa1', hover:'#7fc998', soft:'rgba(111,191,138,0.14)', line:'rgba(111,191,138,0.45)', glow:'rgba(111,191,138,0.55)', rgb:'111,191,138' },
+  amber:   { accent:'#e89a4e', accent2:'#f0b370', hover:'#eda864', soft:'rgba(232,154,78,0.14)',  line:'rgba(232,154,78,0.45)',  glow:'rgba(232,154,78,0.55)',  rgb:'232,154,78' },
+  sky:     { accent:'#5eb6e8', accent2:'#7fc6ec', hover:'#73beea', soft:'rgba(94,182,232,0.14)',  line:'rgba(94,182,232,0.45)',  glow:'rgba(94,182,232,0.55)',  rgb:'94,182,232' },
+  rose:    { accent:'#e85d8a', accent2:'#f07ea3', hover:'#ec6e96', soft:'rgba(232,93,138,0.14)',  line:'rgba(232,93,138,0.45)',  glow:'rgba(232,93,138,0.55)',  rgb:'232,93,138' },
+  cyan:    { accent:'#43d6c8', accent2:'#6ee0d5', hover:'#57dbce', soft:'rgba(67,214,200,0.14)',  line:'rgba(67,214,200,0.45)',  glow:'rgba(67,214,200,0.55)',  rgb:'67,214,200' },
+  lime:    { accent:'#a8d85c', accent2:'#bce07e', hover:'#b2dc6d', soft:'rgba(168,216,92,0.14)',  line:'rgba(168,216,92,0.45)',  glow:'rgba(168,216,92,0.55)',  rgb:'168,216,92' },
+  gold:    { accent:'#e8c44e', accent2:'#f0d375', hover:'#eccb61', soft:'rgba(232,196,78,0.14)',  line:'rgba(232,196,78,0.45)',  glow:'rgba(232,196,78,0.55)',  rgb:'232,196,78' },
+  magenta: { accent:'#c95ee8', accent2:'#d77fee', hover:'#d06eeb', soft:'rgba(201,94,232,0.14)',  line:'rgba(201,94,232,0.45)',  glow:'rgba(201,94,232,0.55)',  rgb:'201,94,232' },
+  crimson: { accent:'#e8526a', accent2:'#f0758a', hover:'#ec6378', soft:'rgba(232,82,106,0.14)',  line:'rgba(232,82,106,0.45)',  glow:'rgba(232,82,106,0.55)',  rgb:'232,82,106' },
+  ice:     { accent:'#8fb8f0', accent2:'#aacaf4', hover:'#9cc1f2', soft:'rgba(143,184,240,0.14)', line:'rgba(143,184,240,0.45)', glow:'rgba(143,184,240,0.55)', rgb:'143,184,240' },
 };
 const THEME_BGS = {
   dark:     { base:'#0d0d10', elevated:'rgba(24,24,28,0.72)' },
   dim:      { base:'#16161a', elevated:'rgba(34,34,38,0.78)' },
   midnight: { base:'#06060a', elevated:'rgba(14,14,18,0.85)' },
+  aurora:   { base:'#07120f', elevated:'rgba(13,28,24,0.80)' },
+  nebula:   { base:'#0c0814', elevated:'rgba(22,15,32,0.82)' },
+  carbon:   { base:'#050506', elevated:'rgba(16,16,18,0.88)' },
 };
 let userSettings = Object.assign({}, SETTINGS_DEFAULTS);
 try {
@@ -5780,6 +5869,10 @@ function applySettings() {
     const t = THEME_BGS[userSettings.theme] || THEME_BGS.dark;
     root.setProperty('--bg-base',     t.base);
     root.setProperty('--bg-elevated', t.elevated);
+    // Expose accent as raw RGB for canvas/particle tinting
+    root.setProperty('--accent-rgb', p.rgb || '217,119,87');
+    // Repaint the particle field with the new accent + style
+    try { Particles.configure(userSettings.particles, p.rgb || '217,119,87'); } catch {}
   } catch (e) { /* swallow — never let a setting break init */ }
   // Default placement is applied AFTER activeMode + setMode are defined,
   // via a microtask so we don't hit the TDZ for those let-bindings.
@@ -5803,6 +5896,7 @@ function syncSettingsUI() {
     el.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === String(val)));
   }
   setSeg('settingTheme',     userSettings.theme);
+  setSeg('settingParticles', userSettings.particles);
   setSeg('settingPlacement', userSettings.placement);
   setSeg('settingExpand',    userSettings.expand);
   setSeg('settingAspect',    userSettings.aspect);
@@ -5833,6 +5927,7 @@ function bindSettingsHandlers() {
     });
   }
   bindSeg('settingTheme',     'theme');
+  bindSeg('settingParticles', 'particles');
   bindSeg('settingPlacement', 'placement');
   // Placement lives only in Settings now (removed from the composer bar) — keep
   // the live activeMode/MODE_STORAGE in sync when it's changed here.
@@ -5913,6 +6008,168 @@ function bindSettingsHandlers() {
     applySettings();
   });
 }
+
+/* ───── Particle background engine ─────────────────────────────────────────
+   Lightweight accent-tinted ambient field rendered on a fixed canvas behind
+   all content. Built for CEP's old Chrome 99: no per-frame shadowBlur (slow) —
+   each particle is a cached radial-gradient sprite drawn with drawImage, which
+   the GPU compositor handles cheaply. Pauses when the panel is hidden, caps
+   particle count, and degrades gracefully if 2D canvas is unavailable.
+
+   Styles:
+     off     — nothing (canvas cleared, RAF stopped)
+     dust    — many tiny slow motes drifting up
+     bokeh   — fewer large soft out-of-focus orbs, gentle float
+     stars   — pinpoints that twinkle (alpha pulse), minimal drift
+     network — nodes with lines drawn between near neighbours (constellation)
+─────────────────────────────────────────────────────────────────────────── */
+const Particles = (function () {
+  const cvs = document.getElementById('particleCanvas');
+  const ctx = cvs ? cvs.getContext('2d') : null;
+  let W = 0, H = 0, dpr = 1;
+  let raf = 0, running = false;
+  let style = 'dust';
+  let rgb = '217,119,87';
+  let sprite = null, spriteR = 0;
+  let parts = [];
+
+  const STYLE_CFG = {
+    dust:    { count: 60, rMin: 0.6, rMax: 2.0, speed: 0.12, alpha: 0.55, twinkle: 0.0, lines: false, drift: 'up'  },
+    bokeh:   { count: 22, rMin: 6.0, rMax: 18.0, speed: 0.06, alpha: 0.22, twinkle: 0.0, lines: false, drift: 'free' },
+    stars:   { count: 80, rMin: 0.5, rMax: 1.8, speed: 0.03, alpha: 0.8,  twinkle: 1.0, lines: false, drift: 'free' },
+    network: { count: 46, rMin: 1.2, rMax: 2.6, speed: 0.16, alpha: 0.7,  twinkle: 0.0, lines: true,  drift: 'free' },
+  };
+
+  function cfg() { return STYLE_CFG[style] || STYLE_CFG.dust; }
+
+  // Deterministic-ish pseudo-random (no Math.random ban concerns at runtime —
+  // this runs in the panel, not a workflow — but keep it simple).
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+
+  function resize() {
+    if (!cvs) return;
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = cvs.clientWidth || window.innerWidth;
+    H = cvs.clientHeight || window.innerHeight;
+    cvs.width = Math.max(1, Math.floor(W * dpr));
+    cvs.height = Math.max(1, Math.floor(H * dpr));
+    if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // Build a soft round sprite tinted to the accent, sized to the largest
+  // particle the current style uses. Drawn scaled per-particle.
+  function buildSprite() {
+    const c = cfg();
+    spriteR = Math.ceil(c.rMax * 2 + 4);
+    const s = document.createElement('canvas');
+    s.width = s.height = spriteR * 2;
+    const g = s.getContext('2d');
+    const grad = g.createRadialGradient(spriteR, spriteR, 0, spriteR, spriteR, spriteR);
+    grad.addColorStop(0,   'rgba(' + rgb + ',1)');
+    grad.addColorStop(0.4, 'rgba(' + rgb + ',0.55)');
+    grad.addColorStop(1,   'rgba(' + rgb + ',0)');
+    g.fillStyle = grad;
+    g.beginPath();
+    g.arc(spriteR, spriteR, spriteR, 0, Math.PI * 2);
+    g.fill();
+    sprite = s;
+  }
+
+  function spawn() {
+    const c = cfg();
+    parts = [];
+    for (let i = 0; i < c.count; i++) {
+      parts.push({
+        x: rnd(0, W), y: rnd(0, H),
+        r: rnd(c.rMin, c.rMax),
+        vx: rnd(-c.speed, c.speed),
+        vy: c.drift === 'up' ? -rnd(c.speed * 0.4, c.speed * 1.4) : rnd(-c.speed, c.speed),
+        ph: rnd(0, Math.PI * 2),         // twinkle phase
+        tw: rnd(0.6, 1.4),               // twinkle rate
+        a:  rnd(c.alpha * 0.5, c.alpha),
+      });
+    }
+  }
+
+  let t = 0;
+  function frame() {
+    if (!running || !ctx) return;
+    t += 0.016;
+    const c = cfg();
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+
+    for (const p of parts) {
+      p.x += p.vx; p.y += p.vy;
+      // wrap
+      if (p.x < -spriteR) p.x = W + spriteR; else if (p.x > W + spriteR) p.x = -spriteR;
+      if (p.y < -spriteR) p.y = H + spriteR; else if (p.y > H + spriteR) p.y = -spriteR;
+      let alpha = p.a;
+      if (c.twinkle) alpha = p.a * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * p.tw + p.ph)));
+      ctx.globalAlpha = alpha;
+      const d = (p.r + 2) * 2;
+      if (sprite) ctx.drawImage(sprite, p.x - d / 2, p.y - d / 2, d, d);
+    }
+
+    if (c.lines) {
+      ctx.globalCompositeOperation = 'source-over';
+      const maxD = 120, maxD2 = maxD * maxD;
+      for (let i = 0; i < parts.length; i++) {
+        for (let j = i + 1; j < parts.length; j++) {
+          const dx = parts[i].x - parts[j].x, dy = parts[i].y - parts[j].y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < maxD2) {
+            const o = (1 - d2 / maxD2) * 0.18;
+            ctx.strokeStyle = 'rgba(' + rgb + ',' + o.toFixed(3) + ')';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(parts[i].x, parts[i].y);
+            ctx.lineTo(parts[j].x, parts[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    raf = requestAnimationFrame(frame);
+  }
+
+  function start() {
+    if (running || !ctx) return;
+    running = true;
+    raf = requestAnimationFrame(frame);
+  }
+  function stop() {
+    running = false;
+    if (raf) cancelAnimationFrame(raf), raf = 0;
+    if (ctx) ctx.clearRect(0, 0, W, H);
+  }
+
+  function configure(newStyle, newRgb) {
+    if (!cvs || !ctx) return;
+    style = newStyle || 'dust';
+    if (newRgb) rgb = newRgb;
+    if (style === 'off') { stop(); return; }
+    resize();
+    buildSprite();
+    spawn();
+    start();
+  }
+
+  // Pause when the panel/tab is backgrounded — saves CPU in CEP.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stop();
+    else if (style !== 'off') { resize(); start(); }
+  });
+  let rt = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => { if (style !== 'off' && cvs && ctx) { resize(); buildSprite(); spawn(); } }, 150);
+  });
+
+  return { configure };
+})();
 
 applySettings();
 bindSettingsHandlers();
@@ -7907,6 +8164,10 @@ const escHint = document.getElementById('escHint');
 function updateEscHint() {
   const anyBusy = !!activeChatAbort || expanding || !!activeAutocut || !!activeAutoedit;
   escHint.classList.toggle('show', anyBusy);
+  try {
+    const tb = escHint.closest('.input-toolbar');
+    if (tb) tb.classList.toggle('busy', anyBusy);
+  } catch {}
   // Refresh the tab strip so the pulsing dot tracks in-flight work
   try {
     if (tabs[activeTabIdx]) {

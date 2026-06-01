@@ -1212,6 +1212,25 @@ function fillGaps(moments, sentences, inP, outP, maxGapSec = 2.0) {
   return result.sort((a, b) => a.startSec - b.startSec);
 }
 
+// FULL coverage means literally no gaps: every second of [start,end] is under a
+// graphic. fillGaps can't invent cards for silent spans (no transcript text),
+// so for full density we tile instead — stretch each moment's end to where the
+// next one begins. A graphic simply holds across the silence rather than the
+// timeline showing bare video. First moment is pulled back to `start`, last is
+// pushed to `end`.
+function makeContiguous(moments, start, end) {
+  const s = [...moments].sort((a, b) => a.startSec - b.startSec);
+  if (!s.length) return s;
+  s[0].startSec = Math.min(s[0].startSec, start);
+  for (let i = 0; i < s.length; i++) {
+    const nextStart = (i + 1 < s.length) ? s[i + 1].startSec : end;
+    if (nextStart > s[i].endSec) s[i].endSec = nextStart;   // grow to close the gap
+  }
+  const last = s[s.length - 1];
+  if (end > last.endSec) last.endSec = end;
+  return s;
+}
+
 // Map a moment type + index → a recommended trend pack name. Rotates across
 // moments so adjacent graphics don't share a style.
 function momentTypeToTrendPack(type, idx) {
@@ -3818,7 +3837,13 @@ const server = http.createServer((req, res) => {
         if (_activeAutoedit.aborted) throw new Error('cancelled');
         const verified = await verifyPlan(filtered, sentences, spanStart, spanEnd, log);
         log(`verify: ${verified.report}`);
-        const plan = verified.moments;
+        let plan = verified.moments;
+        // FULL coverage: tile the final plan so verify-dropped moments can't
+        // re-open a gap. Every second of the span ends up under a graphic.
+        if (density === 'full' && plan.length) {
+          plan = makeContiguous(plan, spanStart, spanEnd);
+          log(`full coverage: tiled ${plan.length} moments contiguous ${spanStart.toFixed(1)}-${spanEnd.toFixed(1)}s`);
+        }
         if (!plan.length) {
           broadcastProgressDone(reqId);
           res.writeHead(200, { 'Content-Type': 'application/json' });
