@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "5.3";
+var HOST_JSX_VERSION = "5.4";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -566,7 +566,11 @@ function ccGetSelectedClips() {
             var path = _ccResolveMediaPath(pi);
             var nested = false, segs = [];
             if (path) {
-                segs = [{ path: path, inSec: inV, outSec: outV, timelineStart: tlStart }];
+                // timelineDur (tlEnd-tlStart) vs source span (outV-inV): they
+                // differ when the clip has a speed change, so the bridge can
+                // scale source-seconds → timeline-seconds. 1x clips: equal.
+                segs = [{ path: path, inSec: inV, outSec: outV, timelineStart: tlStart,
+                          timelineDur: (typeof dur === "number" && dur > 0) ? dur : (outV - inV) }];
             } else {
                 var nseq = _ccFindNestedSequence(pi);
                 if (nseq) { nested = true; segs = _ccNestedAudioSegments(nseq, tlStart, inV, outV); }

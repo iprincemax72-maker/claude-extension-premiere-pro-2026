@@ -1070,7 +1070,8 @@ async function extractConcatAudio(segments, reqId, log) {
       ff.on('close', c => { clearTimeout(k); (c === 0 && fs.existsSync(out)) ? res() : rej(new Error('segment ffmpeg exit ' + c + ': ' + er.slice(-200))); });
     });
     partPaths.push(out);
-    timeMap.push({ concatStart: cum, dur, timelineStart: Number(s.timelineStart) || 0 });
+    timeMap.push({ concatStart: cum, dur, timelineStart: Number(s.timelineStart) || 0,
+                   timelineDur: (Number(s.timelineDur) > 0 ? Number(s.timelineDur) : dur) });
     cum += dur;
   }
   if (!partPaths.length) throw new Error('no audio segments extracted');
@@ -1110,7 +1111,11 @@ function concatToTimeline(timeMap, t) {
   for (let i = 0; i < timeMap.length; i++) {
     const seg = timeMap[i];
     if (t < seg.concatStart + seg.dur + 0.001 || i === timeMap.length - 1) {
-      return seg.timelineStart + Math.max(0, Math.min(t - seg.concatStart, seg.dur));
+      const off = Math.max(0, Math.min(t - seg.concatStart, seg.dur));
+      // Scale source-seconds → timeline-seconds for speed-changed clips
+      // (1x clips: timelineDur == dur, so scale is 1).
+      const scale = (seg.timelineDur > 0 && seg.dur > 0) ? (seg.timelineDur / seg.dur) : 1;
+      return seg.timelineStart + off * scale;
     }
   }
   return t;
