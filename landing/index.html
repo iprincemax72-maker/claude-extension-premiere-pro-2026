@@ -334,7 +334,11 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 @media (prefers-reduced-motion: reduce) {
   .load-up, .hero-h1 .w { opacity: 1; filter: none; transform: none; animation: none; }
   html.js .reveal { opacity: 1; transform: none; filter: none; transition: none; }
-  .atmos b, .glow::after, .feat::before { animation: none; }
+  .atmos b, .glow::after, .flow-rail::after, .viz-prompt .vp-caret, .viz-render .vr-bar i,
+  .viz-tl .clip.b, .gen-frame .lt, .ae .ae-track .m, .ac span.cut,
+  .mock-composer .field::after, .video-frame .play::after { animation: none; }
+  .viz-render .vr-bar i { width: 72%; }
+  .viz-tl .clip.b, .gen-frame .lt, .ae .ae-track .m { opacity: 1; transform: none; }
 }
 
 /* ── Aceternity-style grid backdrop (fades from top) ── */
