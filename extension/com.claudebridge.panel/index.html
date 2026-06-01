@@ -2278,7 +2278,21 @@
   .plan-optbtn:hover { color: var(--text); border-color: var(--accent-line); }
   .plan-optbtn:active { transform: scale(0.96); }
   .plan-optbtn.selected { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 10px var(--accent-glow); }
-  .plan-card-actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  /* "Explain more" free-text box inside the question card */
+  .plan-note-wrap { margin-top: 14px; }
+  .plan-note-label { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-faint); margin-bottom: 6px; }
+  .plan-note-label svg { flex-shrink: 0; opacity: 0.8; }
+  .plan-note {
+    width: 100%; box-sizing: border-box; resize: vertical; min-height: 38px;
+    font: inherit; font-size: 12px; line-height: 1.45; color: var(--text);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 9px;
+    padding: 8px 10px; outline: none;
+    transition: border-color .14s var(--ease-out), box-shadow .14s var(--ease-out);
+  }
+  .plan-note::placeholder { color: var(--text-faint); }
+  .plan-note:focus { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .plan-card-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
   .plan-build-btn {
     font: inherit; font-size: 12px; font-weight: 700; color: #fff;
     background: var(--accent); border: 1px solid var(--accent);
@@ -3090,7 +3104,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.73</span>
+    <span class="version-tag" id="versionTag">10.74</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -5706,7 +5720,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.73';
+  const PANEL_VERSION = '10.74';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -8513,6 +8527,14 @@ function renderPlanCard(card, originalMsg, questions) {
     html += '</div></div>';
   });
   html += '</div>';
+  // Free-text box so the user can explain in their own words — context, what
+  // Claude is misunderstanding, what to focus on. Sent along with the choices.
+  html += '<div class="plan-note-wrap">'
+    + '<div class="plan-note-label">'
+    + '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
+    + '<span>Or just tell me yourself — explain more, add context, anything I should know</span></div>'
+    + '<textarea class="plan-note" rows="2" placeholder="e.g. the rectangle should feel like a glassy iOS card, the text is a video title, keep it calm not flashy…"></textarea>'
+    + '</div>';
   html += '<div class="plan-card-actions">'
     + '<button type="button" class="plan-build-btn">Build it</button>'
     + '<button type="button" class="plan-skip-btn">Skip &amp; build now</button></div>';
@@ -8537,12 +8559,21 @@ function renderPlanCard(card, originalMsg, questions) {
       });
       ansText = '[MY CHOICES — build exactly to these]\n- ' + parts.join('\n- ');
     }
-    card.querySelectorAll('button').forEach(x => x.disabled = true);
+    // The free-text note is included whether or not they used the choices.
+    const noteEl = card.querySelector('.plan-note');
+    const note = (noteEl && noteEl.value || '').trim();
+    if (note) ansText += (ansText ? '\n\n' : '') + '[EXTRA CONTEXT FROM ME — read this carefully, it overrides assumptions]\n' + note;
+    card.querySelectorAll('button, textarea').forEach(x => x.disabled = true);
     card.classList.add('plan-card-locked');
     sendMessage(originalMsg, { skipPlan: true, skipYou: true, planAnswers: ansText });
   };
   card.querySelector('.plan-build-btn').addEventListener('click', () => build(true));
   card.querySelector('.plan-skip-btn').addEventListener('click', () => build(false));
+  // ⌘/Ctrl+Enter in the note box → Build it (Enter alone stays a newline).
+  const noteEl = card.querySelector('.plan-note');
+  if (noteEl) noteEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); build(true); }
+  });
 }
 
 async function sendMessage(presetMsg, sendOpts) {
