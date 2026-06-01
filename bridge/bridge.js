@@ -2762,7 +2762,11 @@ const server = http.createServer((req, res) => {
       // these, do NOT nudge toward "a fresh look" — that's what made the
       // subscribe button come out yellow instead of YouTube red. Let Claude
       // apply real brand logic.
-      const _hasBrandCue = /\b(subscribe|unsubscribe|youtube|yt|instagram|insta|reels?|tiktok|twitter|tweet|facebook|spotify|netflix|whatsapp|imessage|messages?|snapchat|linkedin|twitch|discord|google|apple|spotify|like button|notification|bell|follow|story|stories|logo of|brand)\b/i.test(message);
+      // Tightened to strong brand/platform signals only — standalone common
+      // words (follow, bell, apple, google, story, notification…) were
+      // over-triggering the brand note on ordinary prompts. Phrase forms
+      // ("like button", "notification bell") stay because they ARE brand UI.
+      const _hasBrandCue = /\b(subscribe|unsubscribe|you ?tube|instagram\b|tiktok|imessage|snapchat|linkedin|twitch|discord|spotify|netflix|whatsapp|facebook|like button|follow button|notification bell|subscribe button|bell icon)\b/i.test(message);
       const _seed = Math.random().toString(36).slice(2, 8);
       // PLAN-FIRST — the terminal gets great results partly because Claude
       // thinks the piece through before coding. Nudge the same here, plus
