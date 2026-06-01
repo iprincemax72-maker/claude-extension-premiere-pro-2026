@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- Mark JS as available BEFORE paint so reveal-animations can hide content
+     only when JS can also reveal it. No JS → everything stays visible. -->
+<script>document.documentElement.classList.add('js');</script>
+<title>Claude for Premiere Pro — motion graphics by just asking</title>
+<meta name="description" content="Claude lives inside Adobe Premiere Pro. Describe a title, lower third, or full animation — it writes the code, renders it, and drops it on your timeline. No keyframes, no After Effects." />
+<meta name="theme-color" content="#F6F2EA" />
+
+<!-- Open Graph -->
+<meta property="og:title" content="Claude for Premiere Pro — motion graphics by just asking" />
+<meta property="og:description" content="Describe it. Claude builds it with Remotion. It lands on your timeline. Runs on your Claude plan, no API key." />
+<meta property="og:type" content="website" />
+<!-- TODO: replace with a real 1200×630 share image once you have one -->
+<meta property="og:image" content="og.png" />
+
+<!-- Favicon (inline, no extra file) -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23D97757'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%23F6F2EA' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E" />
+
+<!-- Fonts: Fraunces (editorial serif display) + Hanken Grotesk (refined body) + JetBrains Mono (technical labels) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<style>
+/* ─────────────────────────────────────────────────────────────────────────
+   Claude for Premiere Pro — landing page
+   Aesthetic: warm editorial. Ivory paper, ink, one clay/coral accent,
+   serif display + grotesk body + mono labels, grain texture, restrained motion.
+   Single self-contained file. Set the config values in <script> at the bottom.
+───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --paper:      #F6F2EA;   /* warm ivory base */
+  --paper-2:    #EFE9DD;   /* deeper paper for alt sections / cards */
+  --paper-3:    #E9E2D3;
+  --ink:        #1C1A15;   /* warm near-black */
+  --ink-soft:   #585249;   /* muted body text */
+  --ink-faint:  #8A8273;
+  --line:       #E0D8C8;   /* warm hairline */
+  --line-2:     #D6CCB8;
+  --coral:      #D97757;   /* Claude clay/coral */
+  --coral-deep: #BE5E3D;
+  --coral-soft: #F4E3D8;
+  --espresso:   #1A1610;   /* dark showcase sections */
+  --espresso-2: #232017;
+  --cream:      #F3ECDF;   /* text on dark */
+  --cream-soft: #B9AF9C;
+
+  --maxw: 1180px;
+  --gutter: clamp(20px, 5vw, 48px);
+
+  --serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --sans:  "Hanken Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  --ease:  cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+  font-family: var(--sans);
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.6;
+  font-size: 17px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: clip;   /* contains the decorative hero glow without a scrollbar (and, unlike hidden, keeps the sticky nav working) */
+}
+
+/* Grain overlay — subtle paper texture over everything */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; display: block; }
+
+.wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding-inline: var(--gutter); }
+
+/* ── Typography ── */
+h1, h2, h3 { font-family: var(--serif); font-weight: 500; line-height: 1.04; letter-spacing: -0.01em; color: var(--ink); }
+h1 { font-size: clamp(2.7rem, 6.4vw, 5.2rem); letter-spacing: -0.025em; }
+h2 { font-size: clamp(2rem, 4.4vw, 3.4rem); letter-spacing: -0.02em; }
+h3 { font-size: 1.35rem; line-height: 1.15; }
+em, .ital { font-style: italic; }
+.serif-italic { font-family: var(--serif); font-style: italic; font-weight: 500; }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--coral-deep);
+  font-weight: 500;
+}
+.lede { font-size: clamp(1.05rem, 2vw, 1.3rem); color: var(--ink-soft); line-height: 1.55; max-width: 56ch; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 0.55em;
+  font-family: var(--sans); font-weight: 600; font-size: 0.98rem;
+  padding: 0.85em 1.45em; border-radius: 999px; cursor: pointer;
+  border: 1px solid transparent; transition: transform 0.18s var(--ease), background 0.18s var(--ease), box-shadow 0.18s var(--ease), color 0.18s var(--ease);
+  white-space: nowrap; line-height: 1;
+}
+.btn svg { width: 1.05em; height: 1.05em; }
+.btn-primary { background: var(--coral); color: #fff; box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 8px 22px -10px rgba(190,94,61,0.6); }
+.btn-primary:hover { background: var(--coral-deep); transform: translateY(-2px); box-shadow: 0 14px 30px -12px rgba(190,94,61,0.7); }
+.btn-ghost { background: transparent; color: var(--ink); border-color: var(--line-2); }
+.btn-ghost:hover { border-color: var(--ink); transform: translateY(-2px); }
+.btn-dark { background: var(--ink); color: var(--cream); }
+.btn-dark:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -12px rgba(0,0,0,0.5); }
+.btn-lg { font-size: 1.05rem; padding: 1em 1.7em; }
+.btn-block { width: 100%; justify-content: center; }
+.link-arrow { display: inline-flex; align-items: center; gap: 0.4em; font-weight: 600; color: var(--ink); }
+.link-arrow .a { transition: transform 0.2s var(--ease); }
+.link-arrow:hover .a { transform: translateX(4px); }
+
+/* ── Nav ── */
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  background: color-mix(in srgb, var(--paper) 80%, transparent);
+  backdrop-filter: saturate(1.2) blur(10px);
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.25s var(--ease), background 0.25s var(--ease);
+}
+.nav.scrolled { border-bottom-color: var(--line); }
+.nav-in { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+.brand { display: flex; align-items: center; gap: 0.6em; font-family: var(--serif); font-weight: 600; font-size: 1.12rem; letter-spacing: -0.01em; }
+.brand .glyph {
+  width: 30px; height: 30px; border-radius: 8px; flex: 0 0 auto;
+  background: var(--coral); color: #fff;
+  display: grid; place-items: center; font-family: var(--serif); font-style: italic; font-size: 1.05rem;
+  box-shadow: 0 4px 12px -4px rgba(190,94,61,0.6);
+}
+.brand small { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); font-weight: 500; display: block; margin-top: 1px; }
+.nav-links { display: flex; align-items: center; gap: 2rem; }
+.nav-links a { font-size: 0.92rem; font-weight: 500; color: var(--ink-soft); transition: color 0.15s; }
+.nav-links a:hover { color: var(--ink); }
+.nav-cta { display: flex; align-items: center; gap: 0.9rem; }
+.nav-toggle { display: none; background: none; border: none; cursor: pointer; padding: 8px; color: var(--ink); }
+.nav-toggle svg { width: 24px; height: 24px; }
+
+/* ── Hero ── */
+.hero { position: relative; padding: clamp(56px, 9vw, 110px) 0 clamp(40px, 6vw, 70px); }
+.hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: clamp(32px, 5vw, 64px); align-items: center; }
+.hero h1 { margin: 0.5rem 0 0; }
+.hero h1 .accent { color: var(--coral); }
+.hero .lede { margin-top: 1.5rem; }
+.hero-cta { display: flex; align-items: center; gap: 1rem; margin-top: 2.2rem; flex-wrap: wrap; }
+.trust { margin-top: 1.6rem; font-family: var(--mono); font-size: 0.78rem; color: var(--ink-faint); letter-spacing: 0.02em; display: flex; align-items: center; gap: 0.6em; flex-wrap: wrap; }
+.trust .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--line-2); }
+
+/* Hero ambient glow */
+.hero::after {
+  content: ""; position: absolute; z-index: -1; top: -10%; right: 0;
+  width: min(58vw, 720px); height: min(58vw, 720px);
+  background: radial-gradient(circle, rgba(217,119,87,0.16), transparent 62%);
+  pointer-events: none;
+}
+
+/* ── Product mockup (CSS recreation of the panel) ── */
+.mock {
+  background: linear-gradient(180deg, #211d16, #16130d);
+  border: 1px solid #36302322; border-radius: 18px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 40px 80px -36px rgba(40,28,16,0.55), 0 12px 28px -18px rgba(0,0,0,0.4);
+  overflow: hidden; color: var(--cream);
+  transform: rotate(0.4deg);
+}
+.mock-bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.mock-bar .lights { display: flex; gap: 6px; }
+.mock-bar .lights i { width: 10px; height: 10px; border-radius: 50%; display: block; }
+.mock-bar .lights i:nth-child(1){ background:#e1664f; } .mock-bar .lights i:nth-child(2){ background:#e0b04a; } .mock-bar .lights i:nth-child(3){ background:#6cbf7a; }
+.mock-bar .title { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.04em; color: var(--cream-soft); margin-left: 4px; }
+.mock-bar .ver { margin-left: auto; font-family: var(--mono); font-size: 0.62rem; color: #6f6757; }
+.mock-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.mrow { display: flex; gap: 10px; align-items: flex-start; }
+.mav { width: 26px; height: 26px; border-radius: 7px; flex: 0 0 auto; display: grid; place-items: center; font-family: var(--serif); font-size: 0.82rem; font-style: italic; }
+.mav.you { background: #2f2a20; color: #c9bfa9; }
+.mav.cla { background: linear-gradient(135deg, #e89a6c, #d97757); color: #fff; }
+.mrow .txt { font-size: 0.86rem; line-height: 1.5; color: #ded4c0; }
+.mrow .txt b { color: #fff; font-weight: 600; }
+.mname { font-family: var(--mono); font-size: 0.62rem; color: var(--coral); letter-spacing: 0.06em; margin-bottom: 3px; }
+.rendercard { margin-top: 10px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 13px; }
+.rendercard .file { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 0.74rem; color: #efe7d6; }
+.rendercard .file svg { width: 15px; height: 15px; color: var(--coral); }
+.rendercard .file .meta { margin-left: auto; font-size: 0.62rem; color: #6f6757; }
+.rendercard .acts { display: flex; gap: 7px; margin-top: 11px; }
+.chip { font-family: var(--sans); font-size: 0.7rem; font-weight: 600; padding: 6px 11px; border-radius: 7px; }
+.chip.solid { background: var(--coral); color: #fff; }
+.chip.outline { background: transparent; border: 1px solid rgba(255,255,255,0.14); color: #c9bfa9; }
+.mbar { height: 4px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; margin-top: 4px; }
+.mbar i { display: block; height: 100%; width: 64%; background: linear-gradient(90deg, var(--coral), #e89a6c); border-radius: 4px; animation: load 2.6s var(--ease) infinite; }
+@keyframes load { 0%{ width: 8%; } 60%{ width: 92%; } 100%{ width: 8%; } }
+.mock-composer { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.06); }
+.mock-composer .field { flex: 1; font-family: var(--sans); font-size: 0.78rem; color: #6f6757; }
+.mock-composer .send { width: 28px; height: 28px; border-radius: 8px; background: var(--coral); display: grid; place-items: center; }
+.mock-composer .send svg { width: 14px; height: 14px; color: #fff; }
+
+/* ── Stat bar ── */
+.stats { border-block: 1px solid var(--line); background: var(--paper-2); }
+.stats-in { display: grid; grid-template-columns: repeat(4, 1fr); }
+.stat { padding: 30px var(--gutter); text-align: center; border-left: 1px solid var(--line); }
+.stat:first-child { border-left: none; }
+.stat .n { font-family: var(--serif); font-size: clamp(1.9rem, 3vw, 2.6rem); line-height: 1; color: var(--ink); }
+.stat .n .u { color: var(--coral); }
+.stat .l { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); margin-top: 8px; }
+
+/* ── Section scaffolding ── */
+section { position: relative; }
+.section { padding: clamp(64px, 10vw, 120px) 0; }
+.section-head { max-width: 60ch; margin-bottom: clamp(40px, 6vw, 64px); }
+.section-head h2 { margin-top: 0.7rem; }
+.section-head .lede { margin-top: 1.1rem; }
+.center { text-align: center; margin-inline: auto; }
+.center .lede { margin-inline: auto; }
+
+/* ── How it works ── */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.step { position: relative; padding-top: 26px; border-top: 2px solid var(--ink); }
+.step .num { font-family: var(--mono); font-size: 0.78rem; color: var(--coral-deep); letter-spacing: 0.1em; }
+.step h3 { margin: 14px 0 10px; }
+.step p { color: var(--ink-soft); font-size: 0.98rem; }
+.step .pic { margin-top: 18px; aspect-ratio: 16/10; border-radius: 12px; border: 1px solid var(--line); background: var(--paper-2); display: grid; place-items: center; overflow: hidden; }
+
+/* tiny inline visuals inside steps */
+.kbd { font-family: var(--mono); font-size: 0.8rem; background: var(--paper-3); border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 12px; color: var(--ink); box-shadow: 0 2px 0 var(--line-2); }
+.miniwin { width: 78%; }
+.miniwin .row { height: 9px; border-radius: 4px; background: var(--line-2); margin-bottom: 7px; }
+.miniwin .row.s { width: 60%; } .miniwin .row.c { width: 88%; background: var(--coral-soft); }
+.tl { width: 80%; }
+.tl .track { height: 16px; border-radius: 4px; background: var(--paper-3); border: 1px solid var(--line-2); position: relative; margin-bottom: 6px; }
+.tl .clip { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; }
+.tl .track .clip.a { left: 8%; width: 50%; background: #cbb9a0; }
+.tl .track:nth-child(2) .clip.b { left: 30%; width: 26%; background: var(--coral); }
+
+/* ── Features ── */
+.feat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.feat { background: var(--paper); padding: clamp(26px, 3vw, 38px); transition: background 0.2s var(--ease); }
+.feat:hover { background: var(--paper-2); }
+.feat .ic { width: 40px; height: 40px; border-radius: 11px; background: var(--coral-soft); color: var(--coral-deep); display: grid; place-items: center; margin-bottom: 18px; }
+.feat .ic svg { width: 21px; height: 21px; }
+.feat h3 { font-size: 1.18rem; margin-bottom: 9px; }
+.feat p { color: var(--ink-soft); font-size: 0.96rem; }
+
+/* ── Showcase (dark) ── */
+.showcase { background: var(--espresso); color: var(--cream); }
+.showcase .eyebrow { color: var(--coral); }
+.showcase h2 { color: var(--cream); }
+.showcase .lede { color: var(--cream-soft); }
+.video-frame {
+  margin-top: clamp(34px, 5vw, 54px); border-radius: 18px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(160deg, #211d16, #14110b);
+  aspect-ratio: 16/9; position: relative; display: grid; place-items: center;
+  box-shadow: 0 40px 90px -40px rgba(0,0,0,0.7);
+}
+.video-frame .play {
+  width: 84px; height: 84px; border-radius: 50%; background: var(--coral); color: #fff;
+  display: grid; place-items: center; cursor: pointer; transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  box-shadow: 0 0 0 0 rgba(217,119,87,0.5);
+}
+.video-frame .play:hover { transform: scale(1.06); box-shadow: 0 0 0 16px rgba(217,119,87,0.12); }
+.video-frame .play svg { width: 30px; height: 30px; margin-left: 4px; }
+.video-frame .cap { position: absolute; bottom: 18px; left: 20px; font-family: var(--mono); font-size: 0.72rem; color: var(--cream-soft); letter-spacing: 0.04em; }
+
+/* ── Comparison ── */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.compare .col { border-radius: 18px; padding: clamp(28px, 3vw, 40px); border: 1px solid var(--line); }
+.compare .old { background: var(--paper-2); }
+.compare .new { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+.compare .tag { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.compare .old .tag { color: var(--ink-faint); }
+.compare .new .tag { color: var(--coral); }
+.compare h3 { margin: 12px 0 18px; font-size: 1.5rem; }
+.compare .new h3 { color: var(--cream); }
+.compare ul { list-style: none; display: flex; flex-direction: column; gap: 13px; }
+.compare li { display: flex; gap: 11px; font-size: 0.96rem; line-height: 1.45; }
+.compare li svg { width: 19px; height: 19px; flex: 0 0 auto; margin-top: 2px; }
+.compare .old li { color: var(--ink-soft); } .compare .old li svg { color: var(--ink-faint); }
+.compare .new li { color: var(--cream-soft); } .compare .new li svg { color: var(--coral); }
+
+/* ── Pricing ── */
+.toggle { display: inline-flex; align-items: center; gap: 10px; margin: 22px auto 0; font-family: var(--mono); font-size: 0.78rem; }
+.toggle .sw { width: 48px; height: 27px; border-radius: 999px; background: var(--line-2); position: relative; cursor: pointer; transition: background 0.2s var(--ease); border: none; }
+.toggle .sw i { position: absolute; top: 3px; left: 3px; width: 21px; height: 21px; border-radius: 50%; background: #fff; transition: transform 0.22s var(--ease); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.toggle .sw.on { background: var(--coral); }
+.toggle .sw.on i { transform: translateX(21px); }
+.toggle .save { color: var(--coral-deep); }
+.toggle b { color: var(--ink); }
+.toggle .muted { color: var(--ink-faint); }
+.tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 48px; align-items: start; }
+.tier { border: 1px solid var(--line); border-radius: 20px; padding: 32px; background: var(--paper); position: relative; }
+.tier.featured { border-color: var(--coral); background: var(--paper); box-shadow: 0 30px 70px -40px rgba(190,94,61,0.45); }
+.tier.featured::before { content: "Most popular"; position: absolute; top: -12px; left: 32px; background: var(--coral); color: #fff; font-family: var(--mono); font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 12px; border-radius: 999px; }
+.tier .name { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+.tier .price { font-family: var(--serif); font-size: 3.1rem; line-height: 1; margin: 16px 0 4px; display: flex; align-items: baseline; gap: 4px; }
+.tier .price .cur { font-size: 1.6rem; color: var(--ink-soft); }
+.tier .price .per { font-family: var(--sans); font-size: 0.92rem; color: var(--ink-faint); align-self: flex-end; margin-bottom: 8px; }
+.tier .desc { color: var(--ink-soft); font-size: 0.94rem; min-height: 42px; }
+.tier ul { list-style: none; display: flex; flex-direction: column; gap: 11px; margin: 24px 0; }
+.tier li { display: flex; gap: 10px; font-size: 0.93rem; color: var(--ink); align-items: flex-start; }
+.tier li svg { width: 18px; height: 18px; color: var(--coral); flex: 0 0 auto; margin-top: 2px; }
+.pay-note { text-align: center; margin-top: 26px; font-family: var(--mono); font-size: 0.74rem; color: var(--ink-faint); }
+
+/* ── FAQ ── */
+.faq { max-width: 800px; margin-inline: auto; border-top: 1px solid var(--line); }
+.qa { border-bottom: 1px solid var(--line); }
+.qa button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px 4px; background: none; border: none; cursor: pointer; text-align: left; font-family: var(--serif); font-size: 1.22rem; color: var(--ink); }
+.qa .pm { width: 22px; height: 22px; flex: 0 0 auto; position: relative; color: var(--coral-deep); }
+.qa .pm::before, .qa .pm::after { content: ""; position: absolute; background: currentColor; border-radius: 2px; transition: transform 0.25s var(--ease); }
+.qa .pm::before { top: 10px; left: 2px; width: 18px; height: 2px; }
+.qa .pm::after { top: 2px; left: 10px; width: 2px; height: 18px; }
+.qa.open .pm::after { transform: scaleY(0); }
+.qa .ans { max-height: 0; overflow: hidden; transition: max-height 0.32s var(--ease); }
+.qa .ans p { padding: 0 4px 24px; color: var(--ink-soft); font-size: 1rem; max-width: 68ch; }
+.qa .ans a { color: var(--coral-deep); text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── Final CTA ── */
+.cta-band { background: var(--coral); color: #fff; border-radius: clamp(20px, 3vw, 32px); padding: clamp(44px, 6vw, 80px) var(--gutter); text-align: center; position: relative; overflow: hidden; }
+.cta-band::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 80% -20%, rgba(255,255,255,0.22), transparent 50%); pointer-events: none; }
+.cta-band h2 { color: #fff; max-width: 18ch; margin-inline: auto; }
+.cta-band .lede { color: #fff; opacity: 0.92; margin: 18px auto 30px; }
+.cta-band .btn-dark { background: #fff; color: var(--coral-deep); }
+.cta-band .btn-dark:hover { background: var(--ink); color: #fff; }
+.cta-band .small { margin-top: 16px; font-family: var(--mono); font-size: 0.72rem; opacity: 0.85; }
+
+/* ── Footer ── */
+.footer { padding: clamp(48px, 6vw, 80px) 0 40px; border-top: 1px solid var(--line); }
+.footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 32px; }
+.footer .brand { margin-bottom: 14px; }
+.footer .blurb { color: var(--ink-soft); font-size: 0.92rem; max-width: 30ch; }
+.footer h4 { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 16px; font-weight: 500; }
+.footer ul { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+.footer ul a { font-size: 0.92rem; color: var(--ink-soft); transition: color 0.15s; }
+.footer ul a:hover { color: var(--coral-deep); }
+.footer-bottom { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.footer-bottom p { font-family: var(--mono); font-size: 0.72rem; color: var(--ink-faint); }
+.disclaimer { font-family: var(--mono); font-size: 0.68rem; color: var(--ink-faint); line-height: 1.5; margin-top: 14px; max-width: 80ch; }
+
+/* ── Scroll reveal ──
+   Hidden state only applies when JS is present (html.js). No JS → visible. */
+.reveal { transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
+html.js .reveal { opacity: 0; transform: translateY(22px); }
+html.js .reveal.in { opacity: 1; transform: none; }
+.reveal.d1 { transition-delay: 0.08s; } .reveal.d2 { transition-delay: 0.16s; } .reveal.d3 { transition-delay: 0.24s; } .reveal.d4 { transition-delay: 0.32s; }
+@media (prefers-reduced-motion: reduce) { html.js .reveal { opacity: 1; transform: none; transition: none; } }
+
+/* Hero load animation */
+.hero .load-up { opacity: 0; transform: translateY(20px); animation: up 0.9s var(--ease) forwards; }
+.hero .l1{animation-delay:.05s} .hero .l2{animation-delay:.16s} .hero .l3{animation-delay:.27s} .hero .l4{animation-delay:.38s} .hero .l5{animation-delay:.5s} .hero .l6{animation-delay:.64s}
+@keyframes up { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .hero .load-up { opacity: 1; transform: none; animation: none; } }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .nav-links, .nav-cta .btn-ghost { display: none; }
+  .nav-toggle { display: inline-flex; }
+  .hero-grid { grid-template-columns: 1fr; }
+  .hero-mock { max-width: 480px; }
+  .stats-in { grid-template-columns: repeat(2, 1fr); }
+  .stat:nth-child(3) { border-left: none; }
+  .stat { border-top: 1px solid var(--line); }
+  .stat:nth-child(-n+2) { border-top: none; }
+  .steps { grid-template-columns: 1fr; gap: 36px; }
+  .feat-grid { grid-template-columns: 1fr; }
+  .compare { grid-template-columns: 1fr; }
+  .tiers { grid-template-columns: 1fr; max-width: 440px; margin-inline: auto; }
+  .tier.featured { order: -1; }
+  .footer-grid { grid-template-columns: 1fr 1fr; gap: 36px 24px; }
+  .footer-grid .footer-about { grid-column: 1 / -1; }
+}
+@media (max-width: 520px) {
+  .stats-in { grid-template-columns: 1fr; }
+  .stat { border-left: none; }
+  .footer-grid { grid-template-columns: 1fr; }
+}
+
+/* Mobile menu */
+.mobile-menu { position: fixed; inset: 0; z-index: 200; background: var(--paper); padding: 24px var(--gutter); transform: translateY(-100%); transition: transform 0.32s var(--ease); display: flex; flex-direction: column; }
+.mobile-menu.open { transform: none; }
+.mobile-menu .mm-top { display: flex; align-items: center; justify-content: space-between; height: 44px; }
+.mobile-menu nav { display: flex; flex-direction: column; gap: 4px; margin-top: 40px; }
+.mobile-menu nav a { font-family: var(--serif); font-size: 2rem; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.mobile-menu .btn { margin-top: 32px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a href="#top" class="brand">
+      <span class="glyph">C</span>
+      <span>Claude <small>for Premiere Pro</small></span>
+    </a>
+    <nav class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav-cta">
+      <a href="#demo" class="btn btn-ghost">Watch demo</a>
+      <a href="#pricing" class="btn btn-primary" data-buy>Get it</a>
+      <button class="nav-toggle" id="navToggle" aria-label="Open menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- mobile menu -->
+<div class="mobile-menu" id="mobileMenu">
+  <div class="mm-top">
+    <span class="brand"><span class="glyph">C</span> Claude</span>
+    <button class="nav-toggle" id="navClose" aria-label="Close menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <nav>
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
+  </nav>
+  <a href="#pricing" class="btn btn-primary btn-block btn-lg" data-buy>Get it</a>
+</div>
+
+<main id="top">
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow load-up l1">Adobe Premiere Pro · Extension</p>
+      <h1 class="load-up l2">Motion graphics,<br>by <span class="serif-italic accent">just asking.</span></h1>
+      <p class="lede load-up l3">Claude lives inside Premiere Pro. Describe a title, a lower third, or a full animated sequence — it writes the code, renders it, and drops it straight onto your timeline. No keyframes. No After Effects. No leaving your edit.</p>
+      <div class="hero-cta load-up l4">
+        <a href="#pricing" class="btn btn-primary btn-lg" data-buy>Get it — <span data-price-inline>$39</span></a>
+        <a href="#demo" class="link-arrow">Watch the 60-sec demo <span class="a">→</span></a>
+      </div>
+      <p class="trust load-up l5">
+        <span>Runs on your Claude plan</span><span class="dot"></span>
+        <span>No API key</span><span class="dot"></span>
+        <span>macOS &amp; Windows</span>
+      </p>
+    </div>
+
+    <div class="hero-mock load-up l6">
+      <div class="mock">
+        <div class="mock-bar">
+          <span class="lights"><i></i><i></i><i></i></span>
+          <span class="title">Claude — Premiere Pro</span>
+          <span class="ver">v10.8</span>
+        </div>
+        <div class="mock-body">
+          <div class="mrow">
+            <div class="mav you">Y</div>
+            <div class="txt">Make a glassy subscribe button, vertical, 4 seconds — calm, not flashy. White text, soft tap + ripple.</div>
+          </div>
+          <div class="mrow">
+            <div class="mav cla">C</div>
+            <div style="flex:1">
+              <div class="mname">CLAUDE</div>
+              <div class="txt"><b>Done.</b> A frosted-glass subscribe pill that springs in, with a cursor tap and a soft ripple on press. Rendered transparent so it drops over your footage — 1080×1920, 4s.</div>
+              <div class="rendercard">
+                <div class="file">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>
+                  SubscribePill_v3.mov
+                  <span class="meta">imported · V2 @ 0:14</span>
+                </div>
+                <div class="acts">
+                  <span class="chip solid">Import to timeline</span>
+                  <span class="chip outline">Preview</span>
+                  <span class="chip outline">Changes</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mock-composer">
+          <span class="field">Ask Claude…</span>
+          <span class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ STATS ═══════════════ -->
+<section class="stats">
+  <div class="stats-in">
+    <div class="stat reveal"><div class="n">~90<span class="u">s</span></div><div class="l">Avg. render</div></div>
+    <div class="stat reveal d1"><div class="n">1–10</div><div class="l">Versions / prompt</div></div>
+    <div class="stat reveal d2"><div class="n">3</div><div class="l">Tools in one panel</div></div>
+    <div class="stat reveal d3"><div class="n">0</div><div class="l">API keys needed</div></div>
+  </div>
+</section>
+
+<!-- ═══════════════ HOW IT WORKS ═══════════════ -->
+<section class="section" id="how">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">How it works</p>
+      <h2>From a sentence to your timeline in three steps.</h2>
+      <p class="lede">No new app to learn. It's a panel inside Premiere — you type, it builds, it lands.</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="num">STEP 01</div>
+        <h3>Describe it</h3>
+        <p>Type what you want in plain English — “a bold stat callout that says 87%, dark, 3 seconds.” Attach a reference image if you have one.</p>
+        <div class="pic"><span class="kbd">make a 3-step checklist, kinetic ⏎</span></div>
+      </div>
+      <div class="step reveal d1">
+        <div class="num">STEP 02</div>
+        <h3>Claude builds it</h3>
+        <p>It writes a fresh Remotion composition, renders an MP4 — or a transparent MOV — and checks the frame itself before handing it back.</p>
+        <div class="pic"><div class="miniwin"><div class="row"></div><div class="row c"></div><div class="row s"></div><div class="row"></div></div></div>
+      </div>
+      <div class="step reveal d2">
+        <div class="num">STEP 03</div>
+        <h3>It lands on your timeline</h3>
+        <p>One click drops it on V2 or V3 right at your playhead. Want it different? Hit <em>Changes</em> and Claude tweaks it in place.</p>
+        <div class="pic"><div class="tl"><div class="track"><span class="clip a"></span></div><div class="track"><span class="clip b"></span></div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ FEATURES ═══════════════ -->
+<section class="section" id="features" style="background:var(--paper-2);">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">What's in the panel</p>
+      <h2>Three ways to create, one place to do it.</h2>
+      <p class="lede">Generate graphics, edit footage, and clean up speech — all without leaving Premiere or touching a timeline tool you don't want to.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 6.3L21 11l-6.6 1.7L12 19l-2.4-6.3L3 11l6.6-1.7z"/></svg></div>
+        <h3>Prompt → motion graphics</h3>
+        <p>Titles, lower thirds, callouts, kinetic type, logo stings — built fresh each time with Remotion, never a template with the text swapped.</p>
+      </div>
+      <div class="feat reveal d1">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h16"/><circle cx="19" cy="12" r="2.5" fill="currentColor" stroke="none"/></svg></div>
+        <h3>Auto-Edit</h3>
+        <p>Point it at a talking-head clip. It reads the speech and places relevant graphics across the whole video — timed to exactly what's being said.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v18M18 3v18"/><circle cx="6" cy="9" r="2.5"/><circle cx="18" cy="15" r="2.5"/></svg></div>
+        <h3>Auto-Cut</h3>
+        <p>Strips silences, filler words and false starts in one pass, ripple-deleting cleanly across every track. One button, full undo.</p>
+      </div>
+      <div class="feat reveal d1">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+        <h3>Up to 10 versions at once</h3>
+        <p>Not sure of the direction? Generate several distinct takes from one prompt and pick the winner — they render one after another, safely.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3 2.45c-.9.2-1.5 1-1.5 1.95"/><path d="M12 17h.01"/></svg></div>
+        <h3>Ask Questions mode</h3>
+        <p>Flip it on and Claude interviews you first — ratio, mood, motion, the bits it's unsure about — so the result matches what's in your head.</p>
+      </div>
+      <div class="feat reveal d1">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7L3 21"/><path d="M3 16v5h5"/></svg></div>
+        <h3>Iterate in place</h3>
+        <p>Hit <em>Changes</em> on any render and tweak it — “make the title red, slower” — and Claude edits that exact piece instead of starting over.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 3-2 4.5-2 7H7c0-2.5-2-4-2-7a7 7 0 0 1 7-7z"/><path d="M9 21h6"/></svg></div>
+        <h3>Your Claude plan, no API key</h3>
+        <p>It runs on your existing Claude Pro or Max subscription. Nothing to wire up, no key to paste, no per-render usage fees.</p>
+      </div>
+      <div class="feat reveal d1">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <h3>Installs in one click</h3>
+        <p>A guided installer sets up everything for you. macOS and Windows, Premiere Pro 2024 and newer. No terminal, no fiddling.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ DEMO (dark showcase) ═══════════════ -->
+<section class="section showcase" id="demo">
+  <div class="wrap center reveal">
+    <p class="eyebrow">See it in motion</p>
+    <h2>Sixty seconds, start to timeline.</h2>
+    <p class="lede center">Watch a prompt become a finished, transparent graphic sitting on V2 — without a single keyframe.</p>
+  </div>
+  <div class="wrap reveal d1">
+    <div class="video-frame">
+      <!-- TODO: replace this placeholder with your embedded demo (YouTube/Vimeo iframe or a <video> tag) -->
+      <button class="play" id="playDemo" aria-label="Play demo">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <span class="cap">demo.mp4 — drop your screen recording here</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ COMPARISON ═══════════════ -->
+<section class="section">
+  <div class="wrap">
+    <div class="section-head center reveal">
+      <p class="eyebrow">Why it's different</p>
+      <h2>The slow way, and the new way.</h2>
+    </div>
+    <div class="compare">
+      <div class="col old reveal">
+        <span class="tag">The usual route</span>
+        <h3>Leave your edit to make one graphic</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Open After Effects or hunt for a template</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Build it keyframe by keyframe</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Export, import, hope it fits the shot</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Want a change? Do it all again</li>
+        </ul>
+      </div>
+      <div class="col new reveal d1">
+        <span class="tag">With Claude</span>
+        <h3>Stay in Premiere and describe it</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Type one sentence in the panel</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> It's rendered and on your timeline in ~90s</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Transparent, fitted, ready to play</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Want a change? Just say so</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ PRICING ═══════════════ -->
+<section class="section" id="pricing" style="background:var(--paper-2);">
+  <div class="wrap">
+    <div class="section-head center reveal">
+      <p class="eyebrow">Pricing</p>
+      <h2>Start free. Upgrade when it earns its keep.</h2>
+      <p class="lede center">Simple plans, no usage meter — it runs on your own Claude subscription.</p>
+      <div class="toggle">
+        <span class="muted" data-bill="m"><b>Monthly</b></span>
+        <button class="sw" id="billToggle" aria-label="Toggle annual billing"><i></i></button>
+        <span class="muted" data-bill="a">Annual <span class="save">— 2 months free</span></span>
+      </div>
+    </div>
+
+    <div class="tiers">
+      <div class="tier reveal">
+        <div class="name">Trial</div>
+        <div class="price"><span class="cur">$</span><span data-amt="0">0</span></div>
+        <div class="desc">Five renders to feel it out. No card required.</div>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 5 motion-graphics renders</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Auto-Cut included</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> macOS &amp; Windows</li>
+        </ul>
+        <a href="#" class="btn btn-ghost btn-block" data-buy>Try it free</a>
+      </div>
+
+      <div class="tier featured reveal d1">
+        <div class="name">Creator</div>
+        <div class="price"><span class="cur">$</span><span data-amt-m="19" data-amt-a="15">19</span><span class="per">/ mo</span></div>
+        <div class="desc">For editors shipping work every week.</div>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Unlimited renders</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Motion graphics · Auto-Edit · Auto-Cut</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Up to 10 versions per prompt</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> All future updates</li>
+        </ul>
+        <a href="#" class="btn btn-primary btn-block" data-buy>Get Creator</a>
+      </div>
+
+      <div class="tier reveal d2">
+        <div class="name">Studio</div>
+        <div class="price"><span class="cur">$</span><span data-amt-m="49" data-amt-a="39">49</span><span class="per">/ mo</span></div>
+        <div class="desc">For teams and post houses.</div>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Everything in Creator</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Up to 5 seats</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Priority support</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Shared preset library</li>
+        </ul>
+        <a href="#" class="btn btn-ghost btn-block" data-buy>Get Studio</a>
+      </div>
+    </div>
+    <p class="pay-note">Secure checkout · Cancel anytime · 14-day money-back guarantee <span style="opacity:.6">— placeholder, wire up your checkout link</span></p>
+  </div>
+</section>
+
+<!-- ═══════════════ FAQ ═══════════════ -->
+<section class="section" id="faq">
+  <div class="wrap">
+    <div class="section-head center reveal">
+      <p class="eyebrow">Questions</p>
+      <h2>Good to know.</h2>
+    </div>
+    <div class="faq reveal d1">
+      <div class="qa">
+        <button>What do I need to run it?<span class="pm"></span></button>
+        <div class="ans"><p>Adobe Premiere Pro 2024 or newer, a Claude Pro or Max subscription, and macOS or Windows. That's the whole list.</p></div>
+      </div>
+      <div class="qa">
+        <button>Do I need an API key or developer account?<span class="pm"></span></button>
+        <div class="ans"><p>No. It uses your existing Claude subscription through the Claude command-line tool — there's nothing to paste, configure, or top up.</p></div>
+      </div>
+      <div class="qa">
+        <button>Is my footage uploaded anywhere?<span class="pm"></span></button>
+        <div class="ans"><p>No. Everything runs locally on your machine — transcription, rendering, and editing all happen on your computer. Your media never leaves it.</p></div>
+      </div>
+      <div class="qa">
+        <button>How fast is a render?<span class="pm"></span></button>
+        <div class="ans"><p>Usually around 90 seconds once it's warmed up. Simple titles are quicker; a layered, cinematic sequence can take a few minutes.</p></div>
+      </div>
+      <div class="qa">
+        <button>Can I edit what it makes?<span class="pm"></span></button>
+        <div class="ans"><p>Always. Every render is a real video file on your timeline. You can treat it like any clip, or hit <em>Changes</em> to have Claude adjust the original — colors, timing, copy, whatever.</p></div>
+      </div>
+      <div class="qa">
+        <button>How does billing work?<span class="pm"></span></button>
+        <div class="ans"><p>Secure checkout through our payment provider, billed monthly or annually, cancel anytime. <a href="#">Replace this with your Stripe / Gumroad / LemonSqueezy details.</a></p></div>
+      </div>
+      <div class="qa">
+        <button>Is this made by Adobe or Anthropic?<span class="pm"></span></button>
+        <div class="ans"><p>No. This is an independent extension that connects Adobe Premiere Pro to Claude. It isn't affiliated with, endorsed by, or sponsored by Adobe or Anthropic.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ FINAL CTA ═══════════════ -->
+<section class="section" style="padding-top:0;">
+  <div class="wrap">
+    <div class="cta-band reveal">
+      <h2>Stop leaving Premiere to make graphics.</h2>
+      <p class="lede">Describe it once. Let Claude build it, render it, and put it on your timeline — while you stay in the edit.</p>
+      <a href="#pricing" class="btn btn-dark btn-lg" data-buy>Get it — <span data-price-inline>$39</span></a>
+      <p class="small">Five free renders · No API key · macOS &amp; Windows</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-about">
+        <a href="#top" class="brand"><span class="glyph">C</span><span>Claude <small>for Premiere Pro</small></span></a>
+        <p class="blurb">An AI motion-graphics and editing copilot that lives inside Adobe Premiere Pro.</p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#pricing">Pricing</a></li>
+          <li><a href="#demo">Demo</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="#">Install guide</a></li>
+          <li><a href="#">Contact</a></li>
+          <li><a href="#">Changelog</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="#">Terms</a></li>
+          <li><a href="#">Privacy</a></li>
+          <li><a href="#">Refunds</a></li>
+          <li><a href="#">License</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© <span id="year">2026</span> Claude for Premiere Pro</p>
+      <p>Built with Remotion &amp; Claude</p>
+    </div>
+    <p class="disclaimer">Independent third-party extension. Not affiliated with, endorsed by, or sponsored by Adobe Inc. or Anthropic. “Adobe”, “Premiere Pro”, and “Claude” are trademarks of their respective owners. Remotion is used under its own license.</p>
+  </div>
+</footer>
+
+<script>
+/* ═══════════════ CONFIG — edit these ═══════════════ */
+const CONFIG = {
+  // Where every "Get it" / "Buy" button should send people.
+  // Paste your Stripe Payment Link, Gumroad, LemonSqueezy, Paddle, or Adobe Exchange URL.
+  checkoutUrl: "#",          // e.g. "https://buy.stripe.com/xxxx"
+  // The price shown inline in the hero + final CTA buttons.
+  headlinePrice: "$19",
+};
+
+/* Apply config */
+(function () {
+  document.querySelectorAll('[data-buy]').forEach(el => {
+    if (CONFIG.checkoutUrl && CONFIG.checkoutUrl !== "#") el.setAttribute('href', CONFIG.checkoutUrl);
+  });
+  document.querySelectorAll('[data-price-inline]').forEach(el => { el.textContent = CONFIG.headlinePrice; });
+  document.getElementById('year').textContent = new Date().getFullYear();
+})();
+
+/* Nav shadow on scroll */
+const nav = document.getElementById('nav');
+const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
+
+/* Mobile menu */
+const mm = document.getElementById('mobileMenu');
+document.getElementById('navToggle').addEventListener('click', () => mm.classList.add('open'));
+document.getElementById('navClose').addEventListener('click', () => mm.classList.remove('open'));
+mm.querySelectorAll('a').forEach(a => a.addEventListener('click', () => mm.classList.remove('open')));
+
+/* FAQ accordion */
+document.querySelectorAll('.qa button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const qa = btn.parentElement;
+    const ans = qa.querySelector('.ans');
+    const isOpen = qa.classList.contains('open');
+    // close others
+    document.querySelectorAll('.qa.open').forEach(o => { o.classList.remove('open'); o.querySelector('.ans').style.maxHeight = null; });
+    if (!isOpen) { qa.classList.add('open'); ans.style.maxHeight = ans.scrollHeight + 'px'; }
+  });
+});
+
+/* Pricing monthly/annual toggle */
+const billToggle = document.getElementById('billToggle');
+billToggle.addEventListener('click', () => {
+  const annual = billToggle.classList.toggle('on');
+  document.querySelectorAll('[data-amt-m]').forEach(el => {
+    el.textContent = annual ? el.getAttribute('data-amt-a') : el.getAttribute('data-amt-m');
+  });
+  document.querySelectorAll('.tier .per').forEach(el => { el.textContent = annual ? '/ mo, billed yearly' : '/ mo'; });
+});
+
+/* Demo placeholder */
+document.getElementById('playDemo').addEventListener('click', () => {
+  alert('Drop your demo video in here.\n\nReplace the .video-frame block with a YouTube/Vimeo iframe or a <video> tag.');
+});
+
+/* Scroll reveal — simple, reliable: reveal each element once its top crosses
+   into the viewport. Runs on load, scroll, and resize. A failsafe also reveals
+   everything shortly after load so content can never be stuck hidden. */
+(function () {
+  let reveals = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+  function check() {
+    const h = window.innerHeight || document.documentElement.clientHeight;
+    for (let i = reveals.length - 1; i >= 0; i--) {
+      const el = reveals[i];
+      if (el.getBoundingClientRect().top < h - 60) { el.classList.add('in'); reveals.splice(i, 1); }
+    }
+  }
+  check();
+  window.addEventListener('scroll', check, { passive: true });
+  window.addEventListener('resize', check, { passive: true });
+  window.addEventListener('load', check);
+  // Failsafe — if anything is somehow still hidden 2.5s after load, show it.
+  window.addEventListener('load', () => setTimeout(() => {
+    document.querySelectorAll('.reveal:not(.in)').forEach(el => el.classList.add('in'));
+  }, 2500));
+})();
+</script>
+</body>
+</html>
