@@ -1486,6 +1486,34 @@
   /* Tactile press feedback — buttery micro-interactions on the main controls */
   .icon-btn { transition: background .12s var(--ease-out), color .12s var(--ease-out), border-color .12s var(--ease-out), transform .12s var(--ease-out); }
   .icon-btn:active:not(:disabled) { transform: scale(0.9); }
+  /* Plan-mode toggle in the header */
+  .plan-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    padding: 0 9px 0 7px;
+    margin-right: 6px;
+    border-radius: 7px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    transition: background .14s var(--ease-out), color .14s var(--ease-out), border-color .14s var(--ease-out), box-shadow .14s var(--ease-out), transform .1s var(--ease-out);
+  }
+  .plan-toggle svg { width: 13px; height: 13px; flex-shrink: 0; }
+  .plan-toggle:hover { color: var(--text); border-color: var(--accent-line); background: var(--accent-soft); }
+  .plan-toggle:active { transform: scale(0.95); }
+  .plan-toggle.active {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent-line), 0 0 10px var(--accent-glow);
+  }
   .tab-pill { transition: background .15s var(--ease-out), color .15s var(--ease-out), transform .12s var(--ease-out); }
   .tab-pill:active { transform: scale(0.97); }
   .ae-pill:active:not(:disabled) { transform: scale(0.96); }
@@ -3016,7 +3044,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot">C</div>
     <span>Claude</span>
-    <span class="version-tag" id="versionTag">10.68</span>
+    <span class="version-tag" id="versionTag">10.69</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -3029,6 +3057,14 @@
     </button>
   </div>
   <div style="display:flex;align-items:center">
+    <button class="plan-toggle" id="planBtn" type="button" role="switch" aria-checked="false"
+            title="Plan mode — when on, Claude asks clarifying questions and shows a plan before building, instead of rendering right away">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 11l3 3L22 4"/>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+      <span>Plan</span>
+    </button>
     <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings" style="margin-right:4px">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
@@ -5623,7 +5659,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.68';
+  const PANEL_VERSION = '10.69';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -5813,6 +5849,7 @@ const SETTINGS_DEFAULTS = {
   theme: 'dark',
   accent: 'coral',
   particles: 'dust',     // off | dust | bokeh | stars | network
+  planMode: false,       // when true, Claude asks questions + plans before building
   bootIntro: true,
   placement: 'overlay',
   expand: 'light',
@@ -6173,6 +6210,29 @@ const Particles = (function () {
 applySettings();
 bindSettingsHandlers();
 syncSettingsUI();
+
+// ───── Plan-mode toggle (header) ─────────────────────────────────────────
+// When on, sendMessage() prepends a [PLAN MODE] directive to the prompt so
+// Claude asks clarifying questions + presents a short plan and waits for the
+// go-ahead instead of rendering immediately. State persists in userSettings.
+const planBtn = document.getElementById('planBtn');
+function syncPlanBtn() {
+  if (!planBtn) return;
+  const on = !!userSettings.planMode;
+  planBtn.classList.toggle('active', on);
+  planBtn.setAttribute('aria-checked', on ? 'true' : 'false');
+}
+if (planBtn) {
+  planBtn.addEventListener('click', () => {
+    userSettings.planMode = !userSettings.planMode;
+    saveSettings();
+    syncPlanBtn();
+    try { toast(userSettings.planMode
+      ? 'Plan mode ON — Claude will ask questions & plan before building.'
+      : 'Plan mode OFF — Claude builds right away.'); } catch {}
+  });
+  syncPlanBtn();
+}
 
 // Open/close the settings panel
 const settingsPanel = document.getElementById('settingsPanel');
@@ -8398,6 +8458,26 @@ async function sendMessage() {
     }
     if (prefs.length) {
       outboundMsg = '[USER PREFS: ' + prefs.join(', ') + ' — use these unless the prompt explicitly says otherwise]\n' + outboundMsg;
+    }
+  }
+
+  // Plan mode: on the FIRST command of a turn, ask Claude to interview + plan
+  // instead of building. The per-tab _planAwaitingAnswer flag makes the very
+  // next send (the user's answers / "go ahead") skip the directive so it
+  // actually builds. Chat tabs are exempt — they're already conversational.
+  if (userSettings.planMode && !_isChatTab && _activeTab) {
+    if (_activeTab._planAwaitingAnswer) {
+      // This send is the user's answer to the plan — build it now.
+      _activeTab._planAwaitingAnswer = false;
+    } else {
+      _activeTab._planAwaitingAnswer = true;
+      outboundMsg =
+        '[PLAN MODE — do NOT build or render yet]\n' +
+        'Before generating anything, do two things and then STOP and wait for my reply:\n' +
+        '1. Ask me any clarifying questions you need to nail this (aspect ratio, duration, style/mood, colors, exact text/content, how many graphics, where they go).\n' +
+        '2. Give a short numbered plan of what you will build.\n' +
+        'Keep it concise. Do NOT write code or render in this turn — my next message will answer your questions and approve the plan, and THEN you build.\n\n' +
+        'My request: ' + outboundMsg;
     }
   }
 
