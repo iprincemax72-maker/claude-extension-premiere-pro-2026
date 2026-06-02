@@ -94,7 +94,8 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 .btn-ghost:hover { background: var(--s3); border-color: rgba(255,255,255,0.22); }
 .btn-lg { font-size: 1rem; padding: 0.95em 1.55em; }
 .btn-block { width: 100%; justify-content: center; }
-.magnetic { transition: transform 0.28s var(--ease), background 0.16s var(--ease), filter 0.16s var(--ease), box-shadow 0.16s var(--ease); }
+.magnetic { transition: transform 0.2s var(--ease), background 0.16s var(--ease), filter 0.16s var(--ease), box-shadow 0.16s var(--ease); }
+.magnetic:hover { transform: translateY(-2px); }
 .link-arrow { display: inline-flex; align-items: center; gap: 0.4em; font-weight: 500; color: var(--text); font-size: 0.95rem; }
 .link-arrow .a { transition: transform 0.2s var(--ease); }
 .link-arrow:hover { color: var(--coral); } .link-arrow:hover .a { transform: translateX(4px); }
@@ -774,13 +775,6 @@ document.querySelectorAll('.tool').forEach(card => card.addEventListener('pointe
   hero.addEventListener('pointerleave', () => { panel.style.transform = ''; });
 })();
 
-/* magnetic buttons */
-document.querySelectorAll('.magnetic').forEach(btn => {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  btn.addEventListener('pointermove', e => { const r = btn.getBoundingClientRect();
-    btn.style.transform = 'translate(' + ((e.clientX-(r.left+r.width/2))*0.25) + 'px,' + ((e.clientY-(r.top+r.height/2))*0.35) + 'px)'; });
-  btn.addEventListener('pointerleave', () => { btn.style.transform = ''; });
-});
 </script>
 </body>
 </html>
