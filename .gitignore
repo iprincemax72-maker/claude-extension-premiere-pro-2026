@@ -17,3 +17,6 @@ landing/serve.py
 bridge/bridge-auth.json
 bridge/session.json
 **/session.json
+
+# NSIS installer build output
+windows-installer/build/

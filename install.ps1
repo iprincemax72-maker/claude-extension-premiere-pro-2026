@@ -28,6 +28,10 @@ function Refresh-Path {
                 [System.Environment]::GetEnvironmentVariable('Path','User')
 }
 
+# Always run relative to THIS script's folder, no matter how we were launched
+# (double-click INSTALL.bat, the NSIS setup.exe, or a manual command).
+if ($PSScriptRoot) { Set-Location -LiteralPath $PSScriptRoot }
+
 # ---------- 0. Sanity check: are we in the repo root? ----------
 if (-not (Test-Path "extension\com.claudebridge.panel\index.html") -or -not (Test-Path "bridge\bridge.js")) {
     Fail "Run this from the repo root (where extension\ and bridge\ live)."
