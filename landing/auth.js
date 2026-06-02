@@ -36,8 +36,10 @@ export async function sessionUser() {
   return data?.session?.user ?? null;
 }
 
-/* Paint the nav auth state on index.html. No-op if the nodes aren't present. */
-export async function paintNav() {
+/* Synchronously paint the nav for a given user (or null). Safe to call from
+   inside onAuthStateChange — it does NOT call any supabase method (which would
+   risk a deadlock and leave the nav stuck on "Sign in"). */
+export function renderNav(u) {
   const signin = document.getElementById("navSignin");
   const acct = document.getElementById("navAcct");
   const board = document.getElementById("navBoard");
@@ -45,7 +47,6 @@ export async function paintNav() {
   // Toggle via display (not the `hidden` attribute) — `.btn`/flex display rules
   // override `[hidden]`, which is why Sign in wouldn't disappear before.
   const setVis = (el, vis) => { if (!el) return; if (vis) { el.removeAttribute("hidden"); el.style.display = ""; } else { el.style.display = "none"; } };
-  const u = await sessionUser();
   if (u) {
     const name = u.user_metadata?.full_name || u.user_metadata?.name || u.email || "Account";
     const avatar = u.user_metadata?.avatar_url;
@@ -67,3 +68,6 @@ export async function paintNav() {
     setVis(acct, false);
   }
 }
+
+/* Async convenience: read the stored session once and paint. */
+export async function paintNav() { renderNav(await sessionUser()); }
