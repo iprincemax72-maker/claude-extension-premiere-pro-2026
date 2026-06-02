@@ -215,7 +215,7 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .viz-tl .vt-play::before { content: ""; position: absolute; top: -1px; left: -3px; width: 8px; height: 6px; border-radius: 2px; background: var(--coral); }
 
 /* ── Features — three tools, each with a real mini-visual ── */
-.tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 820px; margin-inline: auto; }
 .tool { background: var(--s1s); border: 1px solid var(--line); border-radius: 18px; padding: 24px; box-shadow: 0 1px 0 var(--hi) inset; position: relative; overflow: hidden; transition: transform 0.25s var(--ease), border-color 0.25s var(--ease); }
 .tool > * { position: relative; z-index: 1; }
 .tool::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: radial-gradient(260px circle at var(--mx,50%) var(--my,50%), rgba(226,136,95,0.12), transparent 60%); opacity: 0; transition: opacity 0.35s var(--ease); }
@@ -242,12 +242,7 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .ae .ae-track .m { position: absolute; top: 2px; bottom: 2px; width: 12px; border-radius: 2px; background: var(--coral); box-shadow: 0 0 8px -1px var(--coral); transform-origin: bottom; animation: mPop 3s var(--ease) infinite; }
 .ae .ae-track .m:nth-child(2) { animation-delay: 0.25s; } .ae .ae-track .m:nth-child(3) { animation-delay: 0.5s; }
 @keyframes mPop { 0%, 10% { transform: scaleY(0); opacity: 0; } 32%, 100% { transform: none; opacity: 1; } }
-/* tool 03 — auto-cut: waveform with silence collapsing out */
-.ac { display: flex; align-items: center; gap: 3px; height: 48px; }
-.ac span { width: 3px; border-radius: 2px; background: var(--text-3); height: var(--h, 30%); }
-.ac span.cut { background: var(--coral); animation: cutbar 3s var(--ease) infinite; }
-@keyframes cutbar { 0%, 38% { height: var(--h); opacity: 1; } 58%, 100% { height: 3px; opacity: 0.25; } }
-/* capability strip — everything else, without 8 identical cards */
+/* capability strip */
 .caps { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
 .caps span { display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-2); background: var(--s1s); border: 1px solid var(--line); border-radius: 99px; padding: 9px 15px; transition: transform 0.2s var(--ease), border-color 0.2s var(--ease), color 0.2s var(--ease); }
 .caps span:hover { transform: translateY(-2px); border-color: var(--line-2); color: var(--text); }
@@ -549,7 +544,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
         <span class="dot"></span>
         <span class="cl"><b>1–10</b> takes a prompt</span>
         <span class="dot"></span>
-        <span class="cl"><b><span class="cnt" data-to="3">3</span></b> tools, one panel</span>
+        <span class="cl"><b><span class="cnt" data-to="2">2</span></b> tools, one panel</span>
         <span class="dot"></span>
         <span class="cl"><b><span class="cnt" data-to="100">100</span><span class="u">%</span></b> on your machine</span>
       </div>
@@ -588,7 +583,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <!-- FEATURES -->
 <section class="section" id="features">
   <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">What's inside</p><h2>One panel. Three tools.</h2></div>
+    <div class="section-head center reveal"><p class="eyebrow">What's inside</p><h2>One panel. Two tools.</h2></div>
     <div class="tools">
       <div class="tool reveal">
         <div class="tlabel">TOOL 01 — GENERATE</div>
@@ -602,16 +597,10 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
         <p>Transcribes the cut and drops matching graphics across the whole video.</p>
         <div class="tviz glow"><div class="ae"><div class="ae-line"></div><div class="ae-line s"></div><div class="ae-line"></div><div class="ae-track"><span class="m" style="left:18%"></span><span class="m" style="left:46%"></span><span class="m" style="left:73%"></span></div></div></div>
       </div>
-      <div class="tool reveal d2">
-        <div class="tlabel">TOOL 03 — AUTO-CUT</div>
-        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v18M18 3v18"/><circle cx="6" cy="9" r="2.4"/><circle cx="18" cy="15" r="2.4"/></svg>Strips the dead air</h3>
-        <p>Finds silences and filler and removes them in a single pass.</p>
-        <div class="tviz glow"><div class="ac"><span style="--h:34%"></span><span style="--h:62%"></span><span style="--h:44%"></span><span style="--h:78%"></span><span style="--h:52%"></span><span class="cut" style="--h:24%"></span><span class="cut" style="--h:18%"></span><span class="cut" style="--h:22%"></span><span style="--h:66%"></span><span style="--h:88%"></span><span style="--h:48%"></span><span style="--h:70%"></span><span style="--h:38%"></span><span class="cut" style="--h:20%"></span><span class="cut" style="--h:16%"></span><span style="--h:58%"></span><span style="--h:80%"></span><span style="--h:42%"></span><span style="--h:64%"></span><span style="--h:30%"></span></div></div>
-      </div>
     </div>
     <div class="caps reveal d2">
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Runs on your Claude plan — no API key</span>
-      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Up to 10 versions per prompt</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Match a reference image or video</span>
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Iterate by just chatting</span>
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Asks before it builds</span>
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> One-click install · Mac &amp; Windows</span>
@@ -660,10 +649,10 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
     </div>
     <div class="tiers">
       <div class="tier reveal"><div class="name">Trial</div><div class="price"><span class="cur">$</span><span>0</span></div><div class="desc">5 renders. No card.</div>
-        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 5 renders</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Auto-Cut included</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Mac &amp; Windows</li></ul>
+        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 5 renders</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> No API key needed</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Mac &amp; Windows</li></ul>
         <a href="#" class="btn btn-ghost btn-block" data-buy>Try it free</a></div>
       <div class="tier featured reveal d1"><div class="name">Creator</div><div class="price"><span class="cur">$</span><span data-amt-m="19" data-amt-a="15">19</span><span class="per">/ mo</span></div><div class="desc">For working editors.</div>
-        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Unlimited renders</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> All three tools</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 10 versions / prompt</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> All updates</li></ul>
+        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Unlimited renders</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Both tools</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Reference images &amp; video</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> All updates</li></ul>
         <a href="#" class="btn btn-primary btn-block magnetic" data-buy>Get Creator</a></div>
       <div class="tier reveal d2"><div class="name">Studio</div><div class="price"><span class="cur">$</span><span data-amt-m="49" data-amt-a="39">49</span><span class="per">/ mo</span></div><div class="desc">For teams.</div>
         <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Everything in Creator</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Up to 5 seats</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Priority support</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Shared presets</li></ul>
