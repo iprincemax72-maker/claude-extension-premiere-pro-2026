@@ -524,33 +524,37 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 .see-output:hover { background: color-mix(in srgb, var(--coral) 18%, transparent); }
 .see-output .ar { transition: transform 0.18s var(--ease); }
 .see-output:hover .ar { transform: translateX(3px); }
-.preview { display: none; position: relative; }
-.preview-x { position: absolute; top: -10px; right: 2px; width: 34px; height: 34px; border-radius: 50%; background: var(--s2); border: 1px solid var(--line-2); color: var(--text); display: grid; place-items: center; cursor: pointer; font-size: 1rem; z-index: 3; }
-.preview-x:hover { background: var(--s3); }
-.preview-stage { display: flex; align-items: center; justify-content: center; gap: clamp(6px, 2.4vw, 26px); perspective: 1700px; width: 100%; max-width: 980px; }
-.pv-card { background: var(--s1s); border: 1px solid var(--line-2); border-radius: 16px; box-shadow: 0 1px 0 var(--hi) inset, 0 50px 110px -50px rgba(0,0,0,0.9); overflow: hidden; }
-/* 1) prompt slides smoothly to the left */
-.pv-ask { width: clamp(270px, 33vw, 358px); flex: 0 0 auto; transform: translateX(54px) rotateY(10deg); opacity: 0; transition: transform 0.6s var(--ease), opacity 0.5s var(--ease); }
-.preview.open .pv-ask { transform: translateX(0) rotateY(10deg); opacity: 1; }
-/* 2) then the render fades UP (delayed until the prompt has settled) */
-.pv-out { width: clamp(300px, 39vw, 430px); flex: 0 0 auto; background: #000; transform: translateY(42px) rotateY(-10deg); opacity: 0; transition: transform 0.65s var(--ease) 0.55s, opacity 0.6s var(--ease) 0.55s; }
-.preview.open .pv-out { transform: translateY(0) rotateY(-10deg); opacity: 1; }
-.pv-out video { width: 100%; display: block; }
-.pv-bar { display: flex; align-items: center; gap: 7px; padding: 11px 14px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.02); }
-.pv-bar i { width: 10px; height: 10px; border-radius: 50%; }
-.pv-bar i:nth-child(1){ background:#e1664f; } .pv-bar i:nth-child(2){ background:#e0b04a; } .pv-bar i:nth-child(3){ background:#6cbf7a; }
-.pv-bar span { margin-left: 5px; font-family: var(--mono); font-size: 0.66rem; color: var(--text-3); }
-.pv-ask-body { padding: 20px 17px; }
-.pv-you { font-size: 0.92rem; color: var(--text-2); line-height: 1.55; margin-bottom: 15px; }
-.pv-file { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 0.72rem; color: var(--text); border: 1px solid var(--line-2); border-radius: 9px; padding: 9px 12px; background: var(--bg-soft); }
-.pv-file svg { width: 15px; height: 15px; color: var(--coral); flex: 0 0 auto; }
-.pv-arrow { flex: 0 0 auto; color: var(--coral); opacity: 0; transition: opacity 0.4s var(--ease) 0.42s; }
-.pv-arrow svg { width: 26px; height: 26px; }
-.preview.open .pv-arrow { opacity: 1; }
-@media (max-width: 720px) {
-  .preview-stage { flex-direction: column; gap: 14px; perspective: none; }
-  .pv-ask, .pv-out, .preview.open .pv-ask, .preview.open .pv-out { transform: none; width: min(86vw, 380px); }
-  .pv-arrow { transform: rotate(90deg); }
+/* ── Output preview: the mockup shrinks + slides left (JS), and the real render
+      fades UP beside it as a GIF-like 3D card with the SAME spinning neon-corner
+      glow as the mockup. Everything stays on the page — just movement. ── */
+.hero-stage { position: relative; }
+.preview {
+  position: absolute; top: 50%; right: clamp(-12px, 1vw, 28px);
+  width: clamp(232px, 29vw, 350px);
+  transform: translateY(calc(-50% + 48px)) rotateY(-14deg) scale(0.95);
+  opacity: 0; visibility: hidden;
+  transition: transform 0.7s var(--ease) 0.34s, opacity 0.6s var(--ease) 0.34s, visibility 0s 1.1s;
+  transform-style: preserve-3d; z-index: 4;
+}
+.hero-stage.previewing .preview {
+  transform: translateY(-50%) rotateY(-14deg) scale(1);
+  opacity: 1; visibility: visible;
+  transition: transform 0.7s var(--ease) 0.34s, opacity 0.6s var(--ease) 0.34s, visibility 0s;
+}
+/* same glass shell + shadow as the mockup so it reads as a sibling render card */
+.pv-card {
+  position: relative; border-radius: 16px; overflow: hidden;
+  border: 1px solid var(--line-2);
+  background: linear-gradient(180deg, #141019, #0c0a11);
+  box-shadow: 0 1px 0 var(--hi) inset, 0 50px 110px -40px rgba(0,0,0,0.9), 0 0 90px -28px rgba(226,136,95,0.36);
+}
+.pv-out video { width: 100%; display: block; border-radius: inherit; }
+.preview-x { position: absolute; top: 8px; right: 8px; z-index: 6; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.5); border: 1px solid var(--line-2); color: var(--text); display: grid; place-items: center; cursor: pointer; font-size: 0.85rem; backdrop-filter: blur(4px); }
+.preview-x:hover { background: rgba(0,0,0,0.78); }
+@media (max-width: 860px) {
+  /* no room beside the mockup — stack the render under it, flat (no 3D angle) */
+  .preview { position: relative; top: auto; right: auto; width: min(86vw, 380px); margin: 18px auto 0; transform: translateY(28px) rotateY(0deg) scale(0.98); }
+  .hero-stage.previewing .preview { transform: translateY(0) rotateY(0deg) scale(1); }
 }
 .chip { font-family: var(--sans); font-size: 0.76rem; font-weight: 600; padding: 7px 12px; border-radius: 8px; cursor: default; transition: filter 0.15s var(--ease); }
 .chip.solid { background: var(--btn); color: var(--btn-ink); box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset; }
@@ -697,19 +701,12 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
         <div class="mock-composer"><span class="field">Ask Claude…</span><span class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
         <div class="shine" aria-hidden="true"></div>
       </div>
-      <!-- Output preview (inline, in place of the mockup) — prompt → real render, 3D-tilted -->
+      <!-- Output preview — the real render as a GIF-like 3D card with the same
+           neon-corner glow as the mockup; fades up on the right -->
       <div class="preview" id="outBox">
-        <button class="preview-x" id="outClose" aria-label="Back to chat">✕</button>
-        <div class="preview-stage">
-          <div class="pv-card pv-ask">
-            <div class="pv-bar"><i></i><i></i><i></i><span>Claude — Premiere Pro</span></div>
-            <div class="pv-ask-body">
-              <p class="pv-you">“Make a glassy subscribe button, vertical, 4s — calm, not flashy.”</p>
-              <div class="pv-file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg> SubscribePill_v3.mov</div>
-            </div>
-          </div>
-          <div class="pv-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
-          <div class="pv-card pv-out"><video id="outVideo" src="output-preview.mp4" controls playsinline preload="none"></video></div>
+        <div class="pv-card pv-out glow">
+          <button class="preview-x" id="outClose" aria-label="Hide preview">✕</button>
+          <video id="outVideo" src="output-preview.mp4" playsinline muted loop preload="auto"></video>
         </div>
       </div>
     </div>
@@ -1191,46 +1188,61 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
   const shine = panel.querySelector('.shine');
   let raf = 0;
   hero.addEventListener('pointermove', e => {
+    if (window.__previewOn) return;   // preview owns the panel transform (slide-left)
     const r = panel.getBoundingClientRect();
     const px = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
     const py = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
     cancelAnimationFrame(raf); raf = requestAnimationFrame(() => {
+      if (window.__previewOn) return;   // a stray queued frame must not clobber the preview slide
       panel.style.transform = 'rotateX(' + ((0.5 - py) * 16).toFixed(2) + 'deg) rotateY(' + ((px - 0.5) * 16).toFixed(2) + 'deg) scale(1.02)';
       if (shine) { shine.style.setProperty('--gx', (px * 100) + '%'); shine.style.setProperty('--gy', (py * 100) + '%'); shine.style.opacity = '1'; }
     });
   });
-  hero.addEventListener('pointerleave', () => { panel.style.transform = ''; if (shine) shine.style.opacity = '0'; });
+  hero.addEventListener('pointerleave', () => { if (window.__previewOn) return; panel.style.transform = ''; if (shine) shine.style.opacity = '0'; });
 })();
 
 
-/* output preview lightbox — the real render behind the hero mockup.
-   (lookups are lazy: the #outBox markup is parsed after this script runs) */
+/* output preview — keep the hero mockup, nudge it LEFT, fade the real render
+   UP on the right beside it. (#outBox markup is parsed after this script runs) */
 (function () {
   const btn = document.getElementById('seeOutput');
   if (!btn) return;
-  const hero = document.getElementById('heroPanel');
-  let _playTimer = null;
-  const close = () => {
-    const box = document.getElementById('outBox'), vid = document.getElementById('outVideo');
-    if (_playTimer) { clearTimeout(_playTimer); _playTimer = null; }
-    if (box) { box.classList.remove('open'); box.style.display = 'none'; }
-    if (hero) hero.style.display = '';
-    if (vid) try { vid.pause(); } catch {}
+  const panel = document.getElementById('heroPanel');
+  const stage = panel && panel.closest('.hero-stage');
+  if (!stage) return;
+  let open = false, _playTimer = null;
+  // shrink the mockup AND slide it slightly left, smoothly, to free space for
+  // the render — origin pinned left so it shrinks toward its own left edge.
+  const SHIFT = 'translateX(-7%) scale(0.8)';
+
+  const sideBySide = () => !window.matchMedia('(max-width: 860px)').matches;
+  const show = () => {
+    if (open) return; open = true;
+    window.__previewOn = true;               // freeze the cursor-tilt; preview owns the transform
+    if (sideBySide()) {                      // wide screens: shrink + slide left to make room beside it
+      panel.style.transformOrigin = 'left center';
+      panel.style.transition = 'transform 0.7s var(--ease)';
+      panel.style.transform = SHIFT;
+    }                                        // narrow screens: leave it centered, render stacks below
+    stage.classList.add('previewing');       // render fades up (right on wide, below on narrow)
+    const vid = document.getElementById('outVideo');
+    if (vid) { vid.currentTime = 0; _playTimer = setTimeout(() => { vid.play().catch(() => {}); }, 520); }
   };
-  btn.addEventListener('click', () => {
-    const box = document.getElementById('outBox'), vid = document.getElementById('outVideo');
-    if (!box) return;
-    if (hero) hero.style.display = 'none';   // swap the mockup out, in place
-    box.style.display = 'block';             // render at the offset/hidden start state
-    void box.offsetWidth;                    // reflow so the slide + fade-up actually animate
-    box.classList.add('open');               // prompt slides left, then render fades up
-    if (vid) { vid.currentTime = 0; _playTimer = setTimeout(() => { vid.play().catch(() => {}); }, 560); }  // play as it fades up
-  });
+  const close = () => {
+    if (!open) return; open = false;
+    if (_playTimer) { clearTimeout(_playTimer); _playTimer = null; }
+    stage.classList.remove('previewing');    // render fades back down
+    panel.style.transform = '';              // mockup glides back to center
+    const vid = document.getElementById('outVideo');
+    if (vid) try { vid.pause(); } catch {}
+    setTimeout(() => { if (!open) { panel.style.transition = ''; panel.style.transformOrigin = ''; window.__previewOn = false; } }, 750);
+  };
+
+  btn.addEventListener('click', show);
   document.addEventListener('click', e => {
-    const box = document.getElementById('outBox');
-    if (box && box.classList.contains('open') && e.target.closest && e.target.closest('#outClose')) close();
+    if (open && e.target.closest && e.target.closest('#outClose')) close();
   });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && open) close(); });
 })();
 
 /* rotating text — cycles through what the panel makes */

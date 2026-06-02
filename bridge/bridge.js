@@ -2928,6 +2928,18 @@ const server = http.createServer((req, res) => {
       if (!['fast', 'default', 'slow'].includes(renderMode)) renderMode = 'default';
       if (!message) { res.writeHead(400); res.end('{"error":"empty message"}'); return; }
 
+      // Multi-version fan-out — render N distinct takes of one prompt AT ONCE
+      // (each in an isolated workspace), instead of one-after-another. Only
+      // meaningful for animation tabs. maxParallel caps how many render
+      // simultaneously (a Settings dial — rendering pegs the CPU, so bound it).
+      let versionCount = parseInt(payload.versions, 10);
+      if (!Number.isFinite(versionCount) || versionCount < 1) versionCount = 1;
+      versionCount = Math.min(10, versionCount);
+      if (tabMode === 'chat' || payload.planMode) versionCount = 1;
+      let maxParallel = parseInt(payload.maxParallel, 10);
+      if (!Number.isFinite(maxParallel) || maxParallel < 1) maxParallel = 3;
+      maxParallel = Math.max(1, Math.min(versionCount, maxParallel));
+
       // Render metering — only gates actual renders (animation mode), never free chat.
       // Fail-open when auth isn't configured, so existing installs are unaffected.
       if (tabMode === 'animation') {
@@ -3226,30 +3238,39 @@ const server = http.createServer((req, res) => {
       console.log('  [chat] render mode: ' + renderMode + (payload.planMode ? ' [PLAN MODE]' : ''));
       clog('bridge', 'info', 'chat request', { renderMode, tabMode, msgLen: (message || '').length, hasContext: !!context }, reqId);
 
-      const args = [
-        '-p',
-        '--output-format', 'stream-json',
-        '--verbose',
-        '--permission-mode', 'bypassPermissions',
-        '--append-system-prompt', resolvedSystemPrompt,
-        '--no-session-persistence',
-      ];
-      args.push(fullMessage);
-
       console.log('\n> ' + message.slice(0, 80));
       broadcastProgress('Thinking', null, reqId);
 
       // Run claude once. Returns { ok, reply, error, idleKilled }. The caller
       // can retry if idleKilled=true and reply is empty.
-      function runClaudeOnce(retry) {
+      // opts (multi-version fan-out): { sysPrompt, message, cwd, quiet, procs }
+      // override the shared single-render params so each parallel version runs
+      // in its own isolated workspace, silently (no per-line progress spam),
+      // and registers its child proc with the orchestrator for group-abort.
+      function runClaudeOnce(retry, opts) {
+        opts = opts || {};
+        const useSys = opts.sysPrompt || resolvedSystemPrompt;
+        const useMsg = opts.message   || fullMessage;
+        const useCwd = opts.cwd       || WORK_DIR;
+        const quiet  = !!opts.quiet;
+        const args = [
+          '-p',
+          '--output-format', 'stream-json',
+          '--verbose',
+          '--permission-mode', 'bypassPermissions',
+          '--append-system-prompt', useSys,
+          '--no-session-persistence',
+          useMsg,
+        ];
         return new Promise(resolve => {
           // stdin 'ignore' — without it the claude CLI emits a benign stderr
           // warning ("Warning: no stdin data received in 3s") that the panel
           // surfaces as an error mid-animation. This is the main /chat path,
           // so it was the most visible offender.
           const proc = spawn('claude', args, {
-            cwd: WORK_DIR, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
+            cwd: useCwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
           });
+          if (opts.procs) opts.procs.push(proc);
           let stderr = '';
           let lineBuf = '';
           let finalReply = '';
@@ -3262,7 +3283,9 @@ const server = http.createServer((req, res) => {
             aborted = true;
             try { proc.kill('SIGKILL'); } catch {}
           };
-          req.once('aborted', onAbort);
+          // In fan-out mode the orchestrator kills every child via opts.procs,
+          // so skip the per-proc listener (keeps us under Node's listener cap).
+          if (!opts.procs) req.once('aborted', onAbort);
 
           // Filter out the benign "no stdin data received in 3s" warning — it
           // is harmless (claude proceeds anyway) but if it ever leaks through
@@ -3284,7 +3307,7 @@ const server = http.createServer((req, res) => {
               let evt;
               try { evt = JSON.parse(line); } catch { continue; }
               const status = streamEventToStatus(evt);
-              if (status) broadcastProgress(status, null, reqId);
+              if (status && !quiet) broadcastProgress(status, null, reqId);
               if (evt.type === 'result' && typeof evt.result === 'string') finalReply = evt.result;
               if (evt.type === 'assistant' && evt.message && Array.isArray(evt.message.content)) {
                 for (const blk of evt.message.content) {
@@ -3311,7 +3334,7 @@ const server = http.createServer((req, res) => {
             if (resolved) return;
             resolved = true;
             clearTimeout(hardKiller);
-            try { req.off('aborted', onAbort); } catch {}
+            if (!opts.procs) { try { req.off('aborted', onAbort); } catch {} }
             resolve(obj);
           };
 
@@ -3354,6 +3377,100 @@ const server = http.createServer((req, res) => {
         broadcastProgressDone(reqId);
         try { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(Object.assign({ reqId }, obj))); } catch {}
       };
+
+      // ── MULTI-VERSION FAN-OUT — render N distinct takes in parallel ────────
+      // One prompt → N isolated workspaces → N claude builds running at once
+      // (capped by maxParallel) → every render returned in a single response.
+      // The panel drops one card per import. Each version is told to make a
+      // genuinely different take and to suffix its output filename so the
+      // concurrent renders don't collide in the shared output dir.
+      if (versionCount > 1 && tabMode !== 'chat') {
+        const REMOTION_BASE = WORK_DIR + '/remotion-intro';
+        // Metering: version 1's credit was already consumed by gateRender()
+        // above. Consume one more per additional version; stop when the user
+        // runs out, so a 10-version ask gracefully degrades to "as many as you
+        // can afford" instead of failing the whole batch.
+        let allowedN = 1;
+        if (AUTH_ENABLED) {
+          for (let i = 2; i <= versionCount; i++) {
+            const g = await gateRender();
+            if (g && g.allowed) allowedN++; else break;
+          }
+        } else {
+          allowedN = versionCount;
+        }
+        const N = Math.max(1, allowedN);
+        const par = Math.max(1, Math.min(maxParallel, N));
+        clog('bridge', 'info', 'multi-version fan-out', { requested: versionCount, rendering: N, parallel: par }, reqId);
+        broadcastProgress('Building ' + N + ' versions in parallel', null, reqId);
+
+        try { req.setMaxListeners(0); } catch {}
+        const procs = [];
+        let batchAborted = false;
+        const onAbortAll = () => { batchAborted = true; for (const p of procs) { try { p.kill('SIGKILL'); } catch {} } };
+        req.once('aborted', onAbortAll);
+
+        const wsPaths = [];
+        let doneCount = 0;
+        const thunks = [];
+        for (let i = 1; i <= N; i++) {
+          const idx = i;
+          thunks.push(async () => {
+            let ws;
+            try { ws = setupVersionWorkspace(reqId, idx); wsPaths.push(ws); }
+            catch (e) { return { ok: false, error: 'workspace setup failed: ' + e.message }; }
+            const vSys = resolvedSystemPrompt.split(REMOTION_BASE).join(ws);
+            const seed = Math.random().toString(36).slice(2, 6);
+            const vMsg =
+                '[VERSION ' + idx + ' OF ' + N + ' — the user wants ' + N + ' DIFFERENT versions of this to '
+              + 'choose from. Make THIS one a distinct take: a different composition, layout, motion feel and '
+              + 'detailing from the other versions. Commit to one strong direction. Keep whatever the prompt '
+              + 'explicitly specified (text, colors, ratio); vary everything it left open. Variation seed '
+              + idx + '/' + N + '-' + seed + '.]\n'
+              + '[OUTPUT FILENAME: end the rendered file name with "_v' + idx + '_' + seed + '" so it does not '
+              + 'collide with the other versions rendering at the same time.]\n'
+              + fullMessage;
+            const rr = await runClaudeOnce(false, { sysPrompt: vSys, message: vMsg, cwd: ws, quiet: true, procs });
+            doneCount++;
+            broadcastProgress(doneCount + '/' + N + ' versions done', null, reqId);
+            if (!rr.ok) return { ok: false, error: rr.error };
+            const vReply = (rr.reply || '').trim();
+            const imports = [];
+            const reV = /\[\[IMPORT:([^\]]+)\]\]/g; let mv;
+            while ((mv = reV.exec(vReply)) !== null) imports.push(mv[1].trim());
+            return { ok: true, reply: vReply, imports };
+          });
+        }
+
+        const results = await runWithConcurrency(thunks, par);
+        try { req.off('aborted', onAbortAll); } catch {}
+
+        // Best-effort cleanup of just THIS request's workspaces — never nuke the
+        // whole .versions dir, a concurrent /chat may own siblings in there.
+        for (const w of wsPaths) { try { fs.rmSync(w, { recursive: true, force: true }); } catch {} }
+
+        if (batchAborted) { chatDone = true; broadcastProgressDone(reqId); clog('bridge', 'info', 'multi-version aborted by user', null, reqId); return; }
+
+        const rawImports = [];
+        for (const rr of results) { if (rr && rr.ok && Array.isArray(rr.imports)) rawImports.push(...rr.imports); }
+        let safe;
+        try { safe = (await Promise.all(rawImports.map(p => ensurePremiereImportable(p)))).filter(Boolean); }
+        catch { safe = rawImports; }
+
+        const made = safe.length;
+        clog('bridge', 'info', 'multi-version done', { requested: versionCount, rendered: made }, reqId);
+        let reply;
+        if (made === 0) {
+          reply = "I tried to make those versions but none rendered — give it another go.";
+        } else {
+          reply = (made === 1 ? "Here's your take" : "Here are " + made + " different takes")
+            + " — preview each and import the one you like"
+            + (made < versionCount ? " (rendered " + made + " of " + versionCount + " — you're out of renders for the rest this month)" : "")
+            + ".";
+        }
+        sendOk({ reply, imports: safe, versions: made });
+        return;
+      }
 
       let r = await runClaudeOnce(false);
       // If claude was idle-killed and produced no output, the bridge process is

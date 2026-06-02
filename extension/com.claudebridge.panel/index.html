@@ -3479,6 +3479,19 @@
       </div>
       <div class="settings-row">
         <div class="settings-row-label">
+          <div class="settings-row-name">Versions at once</div>
+          <div class="settings-row-hint">When generating multiple versions (× selector), how many render in parallel. Higher = faster but heavier on your CPU.</div>
+        </div>
+        <div class="settings-segmented" id="settingMaxParallel">
+          <button data-val="1">1</button>
+          <button data-val="2">2</button>
+          <button data-val="3" class="active">3</button>
+          <button data-val="5">5</button>
+          <button data-val="all">All</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-label">
           <div class="settings-row-name">Auto-update</div>
           <div class="settings-row-hint">Bridge checks for new code every few minutes and applies it automatically</div>
         </div>
@@ -3586,7 +3599,7 @@
         <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
         <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Claude takes its time, ~3-5 min">Slow</button>
       </div>
-      <div class="out-group" id="outputGroup" title="How many different versions to generate from one prompt. They render one after another so you can pick the best.">
+      <div class="out-group" id="outputGroup" title="How many different versions to generate from one prompt. They render all at once (in parallel) so you can pick the best.">
         <button class="out-btn" id="outputBtn" type="button" aria-haspopup="true" aria-expanded="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
           <span>×</span><span id="outputCount">1</span>
@@ -6273,6 +6286,7 @@ const SETTINGS_DEFAULTS = {
   aspect: 'auto',         // auto | 9:16 | 16:9 | 1:1 — prepended to every prompt
   duration: 'auto',       // auto | 3 | 5 | 10 | 15 | 30 — prepended when prompt doesn't specify
   confirmImport: false,   // when true, render cards ask before auto-placing on timeline
+  maxParallel: '3',       // 1 | 2 | 3 | 5 | all — how many versions render at once
 };
 const ACCENT_PALETTES = {
   coral:   { accent:'#d97757', accent2:'#e89a6c', hover:'#e88566', soft:'rgba(217,119,87,0.14)', line:'rgba(217,119,87,0.45)', glow:'rgba(217,119,87,0.55)', rgb:'217,119,87' },
@@ -6352,6 +6366,7 @@ function syncSettingsUI() {
   setSeg('settingExpand',    userSettings.expand);
   setSeg('settingAspect',    userSettings.aspect);
   setSeg('settingDuration',  userSettings.duration);
+  setSeg('settingMaxParallel', userSettings.maxParallel);
   // Swatches
   const sw = document.getElementById('settingAccent');
   if (sw) sw.querySelectorAll('.sw').forEach(b => b.classList.toggle('active', b.dataset.val === userSettings.accent));
@@ -6386,6 +6401,7 @@ function bindSettingsHandlers() {
   bindSeg('settingExpand',    'expand');
   bindSeg('settingAspect',    'aspect');
   bindSeg('settingDuration',  'duration');
+  bindSeg('settingMaxParallel', 'maxParallel');
   // Swatches
   const sw = document.getElementById('settingAccent');
   if (sw) sw.addEventListener('click', (e) => {
@@ -6696,7 +6712,7 @@ if (outputGroup && outputBtn && outputMenu) {
     syncOutputUI();
     closeOutMenu();
     try { toast(n > 1
-      ? n + ' versions — one prompt will render ' + n + ' different takes, one after another.'
+      ? n + ' versions — one prompt renders ' + n + ' different takes, all at once.'
       : 'Single output.'); } catch {}
   });
   document.addEventListener('click', (e) => { if (!outputGroup.contains(e.target)) closeOutMenu(); });
@@ -9101,32 +9117,24 @@ async function sendMessage(presetMsg, sendOpts) {
     clearGhost();
   }
 
-  // ── MULTI-OUTPUT — one prompt → N different versions ──────────────────────
-  // Fan a fresh animation build into N sequential variation renders: this send
-  // becomes version 1/N and N-1 variation copies queue + drain one-by-one
-  // (concurrent renders peg the CPU and collide on the shared project, so
-  // SEQUENTIAL is the safe shape). Skip for iterations, chat tabs, already-a-
-  // variation sends, and when we're about to show the Ask-Questions interview
-  // (the build that follows will fan out instead). Runs BEFORE the message is
-  // built so version 1 gets its variation nudge + label too.
+  // ── MULTI-OUTPUT — one prompt → N different versions, ALL AT ONCE ─────────
+  // The bridge fans this single send out into N isolated workspaces and renders
+  // them in parallel (capped by the maxParallel setting), then returns every
+  // render in one response — the import loop below drops a card per version.
+  // We just tell the bridge how many to make and how many to run concurrently.
+  // Skip for iterations, chat tabs, already-a-variation sends, and when we're
+  // about to show the Ask-Questions interview (that build follows separately).
+  let _multiN = 1, _maxPar = 1;
   {
     const _ttype = (tabs[activeTabIdx] && tabs[activeTabIdx].type) || 'animation';
     const _pOn = (tabs[activeTabIdx] && typeof tabs[activeTabIdx].planMode === 'boolean') ? tabs[activeTabIdx].planMode : !!userSettings.planMode;
     const _willInterview = _pOn && _ttype !== 'chat' && !sendOpts.skipPlan && !iterationContext && !sendOpts.varCtx;
     const _outN = (_sendTab && _sendTab.outputs) ? Math.max(1, Math.min(10, _sendTab.outputs)) : 1;
     if (!_willInterview && _outN > 1 && !sendOpts.varCtx && !iterationContext && _ttype !== 'chat') {
-      sendOpts.varCtx = { index: 1, total: _outN };
-      if (!_sendTab.queue) _sendTab.queue = [];
-      const _refsCopy = (activeReferences || []).slice();
-      for (let k = 2; k <= _outN; k++) {
-        _sendTab.queue.push({
-          id: _queueId(), msg: msg, refs: _refsCopy.slice(), iterCtx: null,
-          varCtx: { index: k, total: _outN },
-          planAnswers: sendOpts.planAnswers || null,
-          skipPlan: true,
-        });
-      }
-      try { renderQueueStrip(); } catch {}
+      _multiN = _outN;
+      const _mp = userSettings.maxParallel;
+      _maxPar = (_mp === 'all' || _mp == null) ? _outN : (Math.max(1, parseInt(_mp, 10) || 3));
+      _maxPar = Math.max(1, Math.min(_outN, _maxPar));
     }
   }
 
@@ -9215,24 +9223,11 @@ async function sendMessage(presetMsg, sendOpts) {
     thumbsHTML += '</div>';
     youHTML += thumbsHTML;
   }
-  // Multi-output labeling: output 1 shows the prompt + a "generating N versions"
-  // note; later versions show a slim "Version k of N" divider instead of
-  // repeating the whole prompt.
-  const _vc = sendOpts.varCtx;
-  if (_vc && _vc.total > 1) {
-    if (_vc.index === 1) {
-      youHTML += '<div style="margin-top:6px;font-size:11px;color:var(--accent);font-weight:600">↳ generating ' + _vc.total + ' different versions, one after another…</div>';
-      makeMsg('you', youHTML);
-    } else {
-      // Slim "Version k of N" divider (raw element, not a chat bubble).
-      try {
-        const d = document.createElement('div');
-        d.className = 'ver-divider';
-        d.textContent = 'Version ' + _vc.index + ' of ' + _vc.total;
-        (getActiveLogContent() || log).appendChild(d);
-        log.scrollTop = log.scrollHeight;
-      } catch {}
-    }
+  // Multi-output labeling: a single "generating N versions in parallel" note
+  // under the prompt — all N renders come back together as cards below.
+  if (_multiN > 1) {
+    youHTML += '<div style="margin-top:6px;font-size:11px;color:var(--accent);font-weight:600">↳ generating ' + _multiN + ' different versions in parallel…</div>';
+    makeMsg('you', youHTML);
   } else if (!sendOpts.skipYou) {
     makeMsg('you', youHTML);
   }
@@ -9319,6 +9314,8 @@ async function sendMessage(presetMsg, sendOpts) {
         renderMode: (_sendTab && _sendTab.renderMode) || userSettings.renderMode || 'default',
         mode: activeTabType,
         planMode: outboundPlanMode,
+        versions: _multiN,        // >1 → bridge fans out into N parallel renders
+        maxParallel: _maxPar,     // how many of those run concurrently
       }),
       signal: activeChatAbort.signal,
     });
