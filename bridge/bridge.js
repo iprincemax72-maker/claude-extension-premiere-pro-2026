@@ -2310,6 +2310,126 @@ function buildBestPracticesBlock(renderMode) {
   ].join('\n');
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  Account auth + render metering (OPTIONAL — fail-open when not configured).
+//
+//  Reads Supabase PUBLIC config from env vars or <WORK_DIR>/bridge-auth.json:
+//      { "SUPABASE_URL": "https://xxxx.supabase.co", "SUPABASE_ANON_KEY": "ey..." }
+//  When unset, AUTH_ENABLED=false and every render proceeds exactly as before —
+//  so existing installs are unaffected until the owner opts in.
+// ════════════════════════════════════════════════════════════════════════════
+const alog = (m) => { try { clog('auth', /fail|error/i.test(String(m)) ? 'error' : 'info', String(m)); } catch {} };
+let AUTH = { url: process.env.SUPABASE_URL || '', anon: process.env.SUPABASE_ANON_KEY || '' };
+try {
+  const cfgFile = path.join(WORK_DIR, 'bridge-auth.json');
+  if ((!AUTH.url || !AUTH.anon) && fs.existsSync(cfgFile)) {
+    const j = JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
+    AUTH.url = AUTH.url || j.SUPABASE_URL || j.url || '';
+    AUTH.anon = AUTH.anon || j.SUPABASE_ANON_KEY || j.anon || '';
+  }
+} catch (e) { alog('config read failed: ' + e.message); }
+AUTH.url = String(AUTH.url).replace(/\/+$/, '');
+const AUTH_ENABLED = !!(AUTH.url && AUTH.anon);
+if (AUTH_ENABLED) alog('auth enabled for ' + AUTH.url); else alog('auth disabled (no Supabase config) — renders are ungated');
+
+const SESSION_FILE = path.join(WORK_DIR, 'session.json');
+let _session = null;
+function loadSession() {
+  if (_session) return _session;
+  try { if (fs.existsSync(SESSION_FILE)) _session = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8')); } catch {}
+  return _session;
+}
+function saveSession(s) { _session = s; try { fs.writeFileSync(SESSION_FILE, JSON.stringify(s), { mode: 0o600 }); } catch (e) { alog('session save failed: ' + e.message); } }
+function clearSession() { _session = null; try { fs.unlinkSync(SESSION_FILE); } catch {} }
+
+// Return a non-expired access token, refreshing via the refresh_token if needed.
+async function freshToken() {
+  const s = loadSession();
+  if (!s || !s.access_token) return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (s.expires_at && (s.expires_at - now) > 60) return s.access_token;
+  if (!s.refresh_token) return s.access_token;
+  try {
+    const r = await fetch(AUTH.url + '/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: AUTH.anon },
+      body: JSON.stringify({ refresh_token: s.refresh_token }),
+    });
+    if (!r.ok) { alog('token refresh http ' + r.status); return s.access_token; }
+    const j = await r.json();
+    saveSession({ access_token: j.access_token, refresh_token: j.refresh_token || s.refresh_token, expires_at: j.expires_at || (now + (j.expires_in || 3600)), user: j.user || s.user });
+    return _session.access_token;
+  } catch (e) { alog('token refresh failed: ' + e.message); return s.access_token; }
+}
+
+// Call a Postgres RPC as the signed-in user. Returns parsed JSON (scalar/array) or null on error.
+async function supaRPC(fn, token) {
+  try {
+    const r = await fetch(AUTH.url + '/rest/v1/rpc/' + fn, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: AUTH.anon, Authorization: 'Bearer ' + token },
+      body: '{}',
+    });
+    if (!r.ok) { alog('rpc ' + fn + ' http ' + r.status); return null; }
+    return await r.json();
+  } catch (e) { alog('rpc ' + fn + ' failed: ' + e.message); return null; }
+}
+
+async function authStatus() {
+  if (!AUTH_ENABLED) return { enabled: false, signedIn: false };
+  const s = loadSession();
+  if (!s || !s.access_token) return { enabled: true, signedIn: false };
+  const token = await freshToken();
+  const usage = await supaRPC('my_usage', token);
+  const u = Array.isArray(usage) ? usage[0] : usage;
+  const meta = (s.user && (s.user.user_metadata || {})) || {};
+  return {
+    enabled: true, signedIn: true,
+    email: (s.user && s.user.email) || '',
+    name: meta.full_name || meta.name || (s.user && s.user.email) || 'Account',
+    avatar: meta.avatar_url || '',
+    plan: (u && u.plan) || 'free',
+    renders_used: (u && u.renders_used != null) ? u.renders_used : 0,
+    renders_limit: (u && u.renders_limit != null) ? u.renders_limit : 5,
+  };
+}
+
+// Gate one render. { allowed:true } when ok; { allowed:false, reason:'signin'|'limit' } when blocked.
+// Fail-open on config-absent or RPC error so we never wrongly block a paying user.
+async function gateRender() {
+  if (!AUTH_ENABLED) return { allowed: true };
+  const s = loadSession();
+  if (!s || !s.access_token) return { allowed: false, reason: 'signin' };
+  const token = await freshToken();
+  const remaining = await supaRPC('consume_render', token);
+  if (remaining === null) return { allowed: true };
+  if (remaining === -1) return { allowed: false, reason: 'limit' };
+  return { allowed: true, remaining };
+}
+
+// Page served in the system browser when the panel says "Sign in". It runs the
+// Google OAuth flow, then hands the resulting session back to THIS bridge.
+const CONNECT_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8">'
++ '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect your extension</title>'
++ '<style>:root{color-scheme:dark}*{box-sizing:border-box;margin:0}body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#09090b;color:#fafafa;min-height:100vh;display:grid;place-items:center;padding:24px}'
++ '.card{width:100%;max-width:420px;background:#121215;border:1px solid rgba(255,255,255,.09);border-radius:20px;padding:34px;box-shadow:0 30px 80px -50px #000}'
++ '.brand{display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:22px}.glyph{width:30px;height:30px;border-radius:8px;background:#E2885F;color:#15110d;display:grid;place-items:center;font-family:Georgia,serif;font-style:italic;font-size:18px}'
++ '.big{font-size:1.5rem;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}.sub{color:#9a9aa1;font-size:.95rem;line-height:1.55;margin-bottom:22px}'
++ '.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;font:600 1rem system-ui;color:#0a0a0b;background:#F4F4F5;border:0;border-radius:12px;padding:.9em;cursor:pointer}.gbtn:hover{filter:brightness(1.05)}.gbtn svg{width:18px;height:18px}b{color:#fafafa}</style></head>'
++ '<body><div class="card"><div class="brand"><span class="glyph">C</span><span>Claude <small style="color:#7c7d87">for Premiere Pro</small></span></div><div id="view"><p class="sub">Loading…</p></div></div>'
++ '<script type="module">'
++ 'import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";'
++ 'var SB_URL="' + AUTH.url + '",SB_ANON="' + AUTH.anon + '";'
++ 'var supabase=createClient(SB_URL,SB_ANON,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:"pkce"}});'
++ 'var view=document.getElementById("view");function show(h){view.innerHTML=h;}'
++ 'var GSVG=\'<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.11a6.6 6.6 0 0 1 0-4.22V7.05H2.18a11 11 0 0 0 0 9.9z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.05l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z"/></svg>\';'
++ 'async function pushToBridge(s){var body=JSON.stringify({access_token:s.access_token,refresh_token:s.refresh_token,expires_at:s.expires_at,user:s.user});try{var r=await fetch("/auth/session",{method:"POST",headers:{"Content-Type":"application/json"},body:body});return r.ok;}catch(e){return false;}}'
++ '(async function(){var res=await supabase.auth.getSession();var session=res.data.session;'
++ 'if(session){show(\'<p class="big">Connecting…</p>\');var ok=await pushToBridge(session);'
++ 'show(ok?\'<p class="big">&#10003; Connected</p><p class="sub">Your extension is signed in as <b>\'+(session.user.email||"")+\'</b>. Close this tab and head back to Premiere.</p>\':\'<p class="big">Almost there</p><p class="sub">Couldn&#39;t reach the local bridge. Make sure the Claude Bridge app is running, then reload this page.</p>\');return;}'
++ 'show(\'<p class="big">Connect your extension</p><p class="sub">Sign in with Google to link this device. Free plan includes 5 renders a month.</p><button id="g" class="gbtn">\'+GSVG+\' Continue with Google</button>\');'
++ 'document.getElementById("g").onclick=async function(){var r=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+"/connect",queryParams:{prompt:"select_account"}}});if(r.error)show(\'<p class="big">Error</p><p class="sub">\'+r.error.message+\'</p>\');};'
++ '})();'
++ '<\/script></body></html>';
+
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
@@ -2345,7 +2465,44 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'GET' && req.url === '/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, session: SESSION_ID, outputDir: OUTPUT_DIR }));
+    res.end(JSON.stringify({ ok: true, session: SESSION_ID, outputDir: OUTPUT_DIR, auth: AUTH_ENABLED }));
+    return;
+  }
+
+  // ── Account auth ────────────────────────────────────────────────────────
+  // GET /connect — the sign-in page the panel opens in the system browser.
+  if (req.method === 'GET' && (req.url === '/connect' || req.url.startsWith('/connect?'))) {
+    if (!AUTH_ENABLED) { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<body style="font-family:system-ui;background:#09090b;color:#fafafa;display:grid;place-items:center;height:100vh"><p>Sign-in isn\'t configured on this bridge yet.</p></body>'); return; }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(CONNECT_HTML);
+    return;
+  }
+  // POST /auth/session — the connect page hands us the signed-in session.
+  if (req.method === 'POST' && req.url === '/auth/session') {
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 256 * 1024) req.destroy(); });
+    req.on('end', () => {
+      try {
+        const p = JSON.parse(body || '{}');
+        if (!p.access_token) { res.writeHead(400); res.end('{"error":"no token"}'); return; }
+        saveSession({ access_token: p.access_token, refresh_token: p.refresh_token || '', expires_at: p.expires_at || 0, user: p.user || null });
+        alog('signed in: ' + ((p.user && p.user.email) || '?'));
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}');
+      } catch (e) { res.writeHead(400); res.end('{"error":"bad json"}'); }
+    });
+    return;
+  }
+  // GET /auth/status — { enabled, signedIn, email, name, avatar, plan, renders_used, renders_limit }
+  if (req.method === 'GET' && req.url === '/auth/status') {
+    authStatus()
+      .then(st => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(st)); })
+      .catch(e => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ enabled: AUTH_ENABLED, signedIn: false, error: String(e) })); });
+    return;
+  }
+  // POST /auth/signout — forget the local session.
+  if (req.method === 'POST' && req.url === '/auth/signout') {
+    clearSession();
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}');
     return;
   }
 
@@ -2693,6 +2850,23 @@ const server = http.createServer((req, res) => {
       }
       if (!['fast', 'default', 'slow'].includes(renderMode)) renderMode = 'default';
       if (!message) { res.writeHead(400); res.end('{"error":"empty message"}'); return; }
+
+      // Render metering — only gates actual renders (animation mode), never free chat.
+      // Fail-open when auth isn't configured, so existing installs are unaffected.
+      if (tabMode === 'animation') {
+        const gate = await gateRender();
+        if (!gate.allowed) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            reply: gate.reason === 'signin'
+              ? "You're not signed in yet. Click the account icon at the top of the panel → **Sign in with Google** (takes 5 seconds), then try again."
+              : "You've used all your renders for this month. Open your account from the panel's account menu to upgrade your plan, or wait for the monthly reset.",
+            imports: [],
+            authBlock: gate.reason || 'limit',
+          }));
+          return;
+        }
+      }
 
       // Resolve the output dir for THIS render. If the panel sent the
       // project's on-disk path, render INTO the project folder so the

@@ -12,3 +12,8 @@ landing/serve.py
 # local preview + tooling
 landing/.playwright-mcp/
 landing/serve.py
+
+# bridge runtime secrets/session (never commit real ones)
+bridge/bridge-auth.json
+bridge/session.json
+**/session.json

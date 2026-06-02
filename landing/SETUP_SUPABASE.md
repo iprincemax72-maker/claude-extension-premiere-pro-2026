@@ -65,4 +65,45 @@ Supabase: **Authentication → URL Configuration**:
 | Account page shows defaults, no DB row | Re-run `schema.sql` (the signup trigger must exist). |
 | “Invalid API key” in console | `config.js` still has placeholders, or you pasted the wrong key. |
 
-When this works, tell me and we'll do **Phase 2 (Stripe monthly billing)** and **Phase 3 (login + render metering inside the extension)**.
+---
+
+## Phase 3 — Sign-in + render limits inside the extension
+
+The extension (CEP panel + local bridge) now has its own login that reuses the **same** Supabase project. The bridge serves a `/connect` page, the panel opens it in your browser, you sign in with Google, and the session is handed back to the bridge. Before each render the bridge calls `consume_render()` — so the **render limit is actually enforced**, and free chat stays open.
+
+It's **fail-open**: if the bridge has no Supabase config, renders work exactly as before. So this only switches on once you do the two steps below.
+
+### a) Tell the bridge your Supabase keys
+Create `~/PremiereClaude/bridge-auth.json` (same values as `config.js`):
+```json
+{
+  "SUPABASE_URL": "https://abcd1234.supabase.co",
+  "SUPABASE_ANON_KEY": "eyJhbGciOi..."
+}
+```
+(There's a template at `bridge/bridge-auth.example.json`. You can also set `SUPABASE_URL` / `SUPABASE_ANON_KEY` as env vars instead.)
+
+### b) Allow the bridge's connect URL
+Supabase → **Authentication → URL Configuration → Redirect URLs**, add:
+```
+http://localhost:3737/connect
+```
+
+### c) Update the installed extension + bridge
+Re-run the installer so the new panel + bridge land in place, then restart the bridge:
+```bash
+bash install.sh
+```
+(Or copy `bridge/bridge.js` → `~/PremiereClaude/` and the panel folder manually.)
+
+### d) Use it
+1. Open the panel in Premiere → click the **account icon** (top bar) → **Sign in with Google**.
+2. A browser tab opens (`localhost:3737/connect`) → sign in → "✓ Connected" → back to Premiere.
+3. The account icon turns coral and shows **plan + renders used / limit**.
+4. Try to render past your limit → the panel replies that you're out and to upgrade. Each successful render increments the count in Supabase.
+
+> Note (v1): a render is counted when it starts, so a failed render still consumes one. We can move counting to on-success later if you want.
+
+---
+
+When this works, tell me and we'll do **Phase 2 (Stripe monthly billing)** — wire the pricing buttons to Checkout, a webhook that flips `plan` / `renders_limit`, and the "Manage billing" portal.

@@ -3242,6 +3242,9 @@
         <path d="M12 7v5l3 2"/>
       </svg>
     </button>
+    <button class="icon-btn" id="acctBtn" type="button" title="Account" aria-label="Account" hidden style="margin-right:4px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20.5C4 16.9 7.6 15 12 15s8 1.9 8 5.5"/></svg>
+    </button>
     <div id="status" class="pill">
       <span class="led"></span>
       <span class="status-text">Connecting…</span>
@@ -3646,6 +3649,9 @@
 
 <script>
 const BRIDGE = 'http://127.0.0.1:3737';
+// Public marketing/account site — where "Upgrade" / "Manage account" opens.
+// TODO: switch to your deployed domain once it's live.
+const SITE_URL = 'http://localhost:8899';
 
 /* ═══════════════════════════════════════════════════════════════════════
    UNIFIED LOG COLLECTOR (panel side)
@@ -5924,6 +5930,116 @@ function openExternalURL(url) {
     e.preventDefault();
     openExternalURL(href);
   });
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ACCOUNT / SIGN-IN  (only appears when the bridge has Supabase configured)
+   The header button opens a popover: sign in with Google (via the bridge's
+   /connect page in the system browser), see your plan + renders, or sign out.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function accountWidget() {
+  const btn = document.getElementById('acctBtn');
+  if (!btn) return;
+
+  const style = document.createElement('style');
+  style.textContent =
+    '#acctBtn.signed-in{color:#E2885F}'
+  + '.acct-pop{position:fixed;z-index:9999;width:260px;background:#161619;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:14px;'
+  + 'box-shadow:0 24px 60px -30px rgba(0,0,0,.9);opacity:0;transform:translateY(-6px) scale(.98);pointer-events:none;transition:opacity .14s,transform .14s;font-size:13px}'
+  + '.acct-pop.open{opacity:1;transform:none;pointer-events:auto}'
+  + '.acct-pop .ap-h{font-weight:700;font-size:15px;margin-bottom:4px}'
+  + '.acct-pop .ap-sub{color:#9a9aa1;line-height:1.5;margin-bottom:12px}'
+  + '.acct-pop .ap-who{display:flex;align-items:center;gap:10px;margin-bottom:12px}'
+  + '.acct-pop .ap-who img,.acct-pop .ap-i{width:36px;height:36px;border-radius:50%;flex:0 0 auto;object-fit:cover}'
+  + '.acct-pop .ap-i{display:grid;place-items:center;background:#E2885F;color:#15110d;font-weight:700;font-size:15px}'
+  + '.acct-pop .ap-who b{display:block;font-weight:600}.acct-pop .ap-who span{display:block;color:#7c7d87;font-size:11px;overflow:hidden;text-overflow:ellipsis;max-width:170px;white-space:nowrap}'
+  + '.acct-pop .ap-usage{background:#0e0e11;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:11px;margin-bottom:12px}'
+  + '.acct-pop .ap-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}.acct-pop .ap-row span{color:#9a9aa1}.acct-pop .ap-row b{font-size:14px}'
+  + '.acct-pop .ap-bar{height:6px;border-radius:4px;background:#26262c;overflow:hidden}.acct-pop .ap-bar i{display:block;height:100%;background:linear-gradient(90deg,#E2885F,#F0A87E)}'
+  + '.acct-pop.full .ap-bar i{background:linear-gradient(90deg,#cf6f4a,#e98c7a)}'
+  + '.acct-pop .ap-reset{color:#7c7d87;font-size:11px;margin-top:7px}'
+  + '.acct-pop .ap-acts{display:flex;gap:8px}'
+  + '.acct-pop .ap-btn{flex:1;font:600 13px system-ui;border:0;border-radius:9px;padding:.7em;cursor:pointer;background:#232329;color:#fafafa}'
+  + '.acct-pop .ap-btn:hover{background:#2c2c33}.acct-pop .ap-btn.primary{background:#E2885F;color:#15110d}.acct-pop .ap-btn.primary:hover{filter:brightness(1.06)}.acct-pop .ap-btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.14)}';
+  document.head.appendChild(style);
+
+  let pop = null, status = null, pollTimer = null;
+  const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+
+  async function refresh() {
+    try { status = await fetch(BRIDGE + '/auth/status', { cache: 'no-store' }).then(r => r.json()); }
+    catch { status = { enabled: false }; }
+    if (!status || !status.enabled) { btn.hidden = true; return status; }
+    btn.hidden = false;
+    btn.classList.toggle('signed-in', !!status.signedIn);
+    if (pop && pop.classList.contains('open')) renderPop();
+    return status;
+  }
+
+  function ensurePop() {
+    if (pop) return pop;
+    pop = document.createElement('div');
+    pop.className = 'acct-pop';
+    document.body.appendChild(pop);
+    document.addEventListener('click', e => {
+      if (pop.classList.contains('open') && !pop.contains(e.target) && !btn.contains(e.target)) pop.classList.remove('open');
+    });
+    return pop;
+  }
+
+  function renderPop() {
+    ensurePop();
+    pop.classList.remove('full');
+    if (!status || !status.signedIn) {
+      pop.innerHTML = '<div class="ap-h">Sign in</div>'
+        + '<p class="ap-sub">Link your Claude account to render. Free plan includes 5 renders a month.</p>'
+        + '<button class="ap-btn primary" id="apSignin">Sign in with Google</button>';
+      pop.querySelector('#apSignin').onclick = startSignin;
+    } else {
+      const used = status.renders_used || 0, lim = status.renders_limit || 5;
+      const pct = lim > 0 ? Math.min(100, Math.round(used / lim * 100)) : 0;
+      const avatar = status.avatar
+        ? '<img src="' + status.avatar + '" referrerpolicy="no-referrer" alt="">'
+        : '<span class="ap-i">' + ((status.name || 'U').trim().charAt(0).toUpperCase()) + '</span>';
+      pop.innerHTML = '<div class="ap-who">' + avatar
+          + '<div><b>' + (status.name || status.email || 'Account') + '</b><span>' + (status.email || '') + '</span></div></div>'
+        + '<div class="ap-usage"><div class="ap-row"><span>' + cap(status.plan || 'free') + ' plan</span><b>' + used + ' / ' + lim + '</b></div>'
+          + '<div class="ap-bar"><i style="width:' + pct + '%"></i></div>'
+          + '<p class="ap-reset">renders used this month</p></div>'
+        + '<div class="ap-acts"><button class="ap-btn primary" id="apUp">Upgrade</button><button class="ap-btn ghost" id="apOut">Sign out</button></div>';
+      if (used >= lim) pop.classList.add('full');
+      pop.querySelector('#apUp').onclick = () => openExternalURL(SITE_URL + '/account.html');
+      pop.querySelector('#apOut').onclick = signout;
+    }
+    const r = btn.getBoundingClientRect();
+    pop.style.top = (r.bottom + 8) + 'px';
+    pop.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+  }
+
+  function toggle() {
+    ensurePop();
+    if (pop.classList.contains('open')) pop.classList.remove('open');
+    else { renderPop(); pop.classList.add('open'); }
+  }
+
+  function startSignin() {
+    openExternalURL(BRIDGE + '/connect');
+    if (pollTimer) clearInterval(pollTimer);
+    let tries = 0;
+    pollTimer = setInterval(async () => {
+      const s = await refresh();
+      if ((s && s.signedIn) || ++tries > 150) { clearInterval(pollTimer); pollTimer = null; if (s && s.signedIn) renderPop(); }
+    }, 2000);
+  }
+
+  async function signout() {
+    try { await fetch(BRIDGE + '/auth/signout', { method: 'POST' }); } catch {}
+    await refresh(); renderPop();
+  }
+
+  btn.addEventListener('click', toggle);
+  refresh();
+  setInterval(refresh, 30000);
 })();
 
 /* DRAFT AUTOSAVE — every keystroke, save input.value to localStorage so the
