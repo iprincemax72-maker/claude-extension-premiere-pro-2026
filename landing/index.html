@@ -115,10 +115,6 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 .nav-acct .acct-chip img, .nav-acct .acct-chip .acct-i { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; border: 2px solid var(--line-2); transition: border-color 0.15s var(--ease), transform 0.15s var(--ease); }
 .nav-acct .acct-chip:hover img, .nav-acct .acct-chip:hover .acct-i { border-color: var(--coral); transform: translateY(-1px); }
 .nav-acct .acct-chip .acct-i { display: grid; place-items: center; background: var(--coral); color: #15110d; font-size: 0.92rem; font-weight: 700; }
-/* Board — pill button shown only when logged in */
-.nav-links a.nav-board { color: var(--coral); font-weight: 600; padding: 6px 14px; border: 1px solid color-mix(in srgb, var(--coral) 42%, transparent); border-radius: 999px; }
-.nav-links a.nav-board::after { display: none; }
-.nav-links a.nav-board:hover { background: color-mix(in srgb, var(--coral) 13%, transparent); color: var(--coral-2); }
 .nav-cta { display: flex; align-items: center; gap: 0.8rem; }
 .nav-builder { display: inline-flex; align-items: center; gap: 0.4em; font-size: 0.84rem; font-weight: 600; color: var(--text); border: 1px solid var(--line-2); border-radius: 99px; padding: 7px 13px; transition: color 0.15s, border-color 0.15s; }
 .nav-builder svg { color: var(--coral); }
@@ -554,11 +550,11 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   <div class="nav-in">
     <a href="#top" class="brand"><span class="glyph">C</span><span>Claude <small>for Premiere Pro</small></span></a>
     <nav class="nav-links">
-      <a href="account.html" id="navBoard" class="nav-board" hidden>Board</a><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a>
+      <a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a>
     </nav>
     <div class="nav-cta">
       <a href="login.html" class="btn btn-ghost nav-signin" id="navSignin">Sign in</a>
-      <a href="#pricing" class="btn btn-primary magnetic" data-buy>Get it</a>
+      <a href="#pricing" class="btn btn-primary magnetic" id="navCta" data-buy>Get it</a>
       <div class="nav-acct" id="navAcct" hidden></div>
       <button class="nav-toggle" id="navToggle" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
     </div>
@@ -569,7 +565,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   <div class="mm-top"><span class="brand"><span class="glyph">C</span> Claude</span>
     <button class="nav-toggle" id="navClose" aria-label="Close menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
-  <nav><a href="account.html" id="mmBoard" hidden>Board</a><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a><a href="login.html" id="mmSignin">Sign in</a></nav>
+  <nav><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a><a href="login.html" id="mmSignin">Sign in</a></nav>
   <a href="#pricing" class="btn btn-primary btn-block btn-lg" data-buy>Get it</a>
 </div>
 
@@ -1210,11 +1206,11 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
 <script type="module">
   import { renderNav, supabase, sessionUser } from "./auth.js";
   const mm = document.getElementById("mmSignin");
-  const mmBoard = document.getElementById("mmBoard");
+  const navCta = document.getElementById("navCta");
   function apply(u) {
     renderNav(u);
+    if (navCta) navCta.textContent = u ? "Upgrade" : "Get it";   // logged in → Upgrade
     if (mm) { if (u) { mm.textContent = "Your account"; mm.setAttribute("href", "account.html"); } else { mm.textContent = "Sign in"; mm.setAttribute("href", "login.html"); } }
-    if (mmBoard) mmBoard.hidden = !u;
   }
   sessionUser().then(apply);                                                    // fast first paint
   supabase.auth.onAuthStateChange((_event, session) => apply(session?.user ?? null));  // authoritative — uses the event's own session (no nested call = no deadlock)

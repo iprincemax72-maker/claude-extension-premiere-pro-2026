@@ -42,8 +42,7 @@ export async function sessionUser() {
 export function renderNav(u) {
   const signin = document.getElementById("navSignin");
   const acct = document.getElementById("navAcct");
-  const board = document.getElementById("navBoard");
-  if (!signin && !acct && !board) return;
+  if (!signin && !acct) return;
   // Toggle via display (not the `hidden` attribute) — `.btn`/flex display rules
   // override `[hidden]`, which is why Sign in wouldn't disappear before.
   const setVis = (el, vis) => { if (!el) return; if (vis) { el.removeAttribute("hidden"); el.style.display = ""; } else { el.style.display = "none"; } };
@@ -52,7 +51,6 @@ export function renderNav(u) {
     const avatar = u.user_metadata?.avatar_url;
     const initial = (name.trim()[0] || "U").toUpperCase();
     setVis(signin, false);
-    setVis(board, true);
     if (acct) {
       acct.innerHTML =
         '<a href="account.html" class="acct-chip" title="' + name + ' · Dashboard" aria-label="' + name + ' — open dashboard">' +
@@ -64,7 +62,6 @@ export function renderNav(u) {
     }
   } else {
     setVis(signin, true);
-    setVis(board, false);
     setVis(acct, false);
   }
 }
