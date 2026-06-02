@@ -2454,7 +2454,7 @@ async function supaRPC(fn, token) {
 
 // Owner accounts get unlimited everything (all features, no render metering),
 // independent of their Supabase plan. Set OWNER_EMAILS (comma-separated) to override.
-const OWNER_EMAILS = (process.env.OWNER_EMAILS || 'iprincemax72@gmail.com').toLowerCase().split(',').map(e => e.trim()).filter(Boolean);
+const OWNER_EMAILS = (process.env.OWNER_EMAILS || 'iprincemax72@gmail.com,anshdhakad9@gmail.com').toLowerCase().split(',').map(e => e.trim()).filter(Boolean);
 function isOwnerEmail(email) { return !!email && OWNER_EMAILS.includes(String(email).toLowerCase()); }
 
 async function authStatus() {
