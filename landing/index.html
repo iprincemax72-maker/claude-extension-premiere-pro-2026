@@ -264,6 +264,14 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .vplayer .vscrub i { position: absolute; left: 0; top: 0; bottom: 0; width: 22%; background: linear-gradient(90deg, var(--coral), var(--coral-2)); border-radius: 2px; }
 .vplayer .vscrub::after { content: ""; position: absolute; left: 22%; top: 50%; width: 11px; height: 11px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(0,0,0,0.6); }
 .vplayer .vtime { font-family: var(--mono); font-size: 0.64rem; color: var(--text-2); flex: 0 0 auto; }
+/* elastic volume slider (React Bits) */
+.evol { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; }
+.evol .vicon { width: 15px; height: 15px; color: var(--text-2); flex: 0 0 auto; }
+.eslider { position: relative; width: 64px; height: 16px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
+.eslider .etrack { position: relative; width: 100%; height: 4px; border-radius: 99px; background: rgba(255,255,255,0.22); transform-origin: center; }
+.eslider .efill { position: absolute; left: 0; top: 0; bottom: 0; width: 65%; border-radius: 99px; background: #fff; }
+.eslider .ehandle { position: absolute; top: 50%; left: 65%; width: 11px; height: 11px; border-radius: 50%; background: #fff; transform: translate(-50%,-50%); box-shadow: 0 1px 4px rgba(0,0,0,0.5); transition: width 0.14s var(--ease), height 0.14s var(--ease); }
+.eslider.grab .ehandle { width: 14px; height: 14px; }
 
 /* ── Compare ── */
 .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
@@ -483,7 +491,6 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
       <a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a>
     </nav>
     <div class="nav-cta">
-      <a href="app.html" class="nav-builder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M12 3l2.4 6.3L21 11l-6.6 1.7L12 19l-2.4-6.3L3 11l6.6-1.7z"/></svg> Motion Builder</a>
       <a href="#demo" class="btn btn-ghost">Watch demo</a>
       <a href="#pricing" class="btn btn-primary magnetic" data-buy>Get it</a>
       <button class="nav-toggle" id="navToggle" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
@@ -495,7 +502,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   <div class="mm-top"><span class="brand"><span class="glyph">C</span> Claude</span>
     <button class="nav-toggle" id="navClose" aria-label="Close menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
-  <nav><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a><a href="app.html">Motion Builder</a></nav>
+  <nav><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a></nav>
   <a href="#pricing" class="btn btn-primary btn-block btn-lg" data-buy>Get it</a>
 </div>
 
@@ -615,7 +622,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
     <div class="video-frame reveal d1">
       <button class="play magnetic" id="playDemo" aria-label="Play demo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
       <span class="cap">60-second walkthrough</span>
-      <div class="vplayer"><span class="vscrub"><i></i></span><span class="vtime">0:13 / 1:00</span></div>
+      <div class="vplayer"><span class="vscrub"><i></i></span><span class="vtime">0:13 / 1:00</span><span class="evol"><svg class="vicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg><span class="eslider" id="evol"><span class="etrack"><span class="efill"></span><span class="ehandle"></span></span></span></span></div>
     </div>
   </div>
 </section>
@@ -699,7 +706,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   <div class="wrap">
     <div class="footer-grid">
       <div class="footer-about"><a href="#top" class="brand"><span class="glyph">C</span><span>Claude <small>for Premiere Pro</small></span></a><p class="blurb">An AI motion-graphics and editing copilot that lives inside Adobe Premiere Pro.</p></div>
-      <div><h4>Product</h4><ul><li><a href="#how">How it works</a></li><li><a href="#features">Features</a></li><li><a href="#pricing">Pricing</a></li><li><a href="app.html">Motion Builder</a></li><li><a href="install.html">Install guide</a></li></ul></div>
+      <div><h4>Product</h4><ul><li><a href="#how">How it works</a></li><li><a href="#features">Features</a></li><li><a href="#pricing">Pricing</a></li><li><a href="install.html">Install guide</a></li></ul></div>
       <div><h4>Support</h4><ul><li><a href="#faq">FAQ</a></li><li><a href="install.html">Install guide</a></li><li><a href="#">Contact</a></li><li><a href="#">Changelog</a></li></ul></div>
       <div><h4>Legal</h4><ul><li><a href="#">Terms</a></li><li><a href="#">Privacy</a></li><li><a href="#">Refunds</a></li><li><a href="#">License</a></li></ul></div>
     </div>
@@ -757,6 +764,26 @@ billToggle.addEventListener('click', () => {
 
 /* demo placeholder */
 document.getElementById('playDemo').addEventListener('click', () => alert('Drop your demo video here.\n\nReplace the .video-frame block with a YouTube/Vimeo iframe or a <video> tag.'));
+
+/* elastic volume slider — rubber-bands when dragged past the ends */
+(function () {
+  const s = document.getElementById('evol'); if (!s) return;
+  const track = s.querySelector('.etrack'), fill = s.querySelector('.efill'), handle = s.querySelector('.ehandle');
+  let v = 0.65, dragging = false;
+  const setV = val => { v = Math.max(0, Math.min(1, val)); fill.style.width = (v * 100) + '%'; handle.style.left = (v * 100) + '%'; /* wire to your <video>: video.volume = v */ };
+  const rawV = x => { const r = track.getBoundingClientRect(); return (x - r.left) / r.width; };
+  function move(e){
+    const raw = rawV(e.clientX); setV(raw);
+    const over = raw < 0 ? raw : raw > 1 ? raw - 1 : 0;
+    if (over){ track.style.transition = 'none'; track.style.transform = 'scaleX(' + (1 + Math.min(0.28, Math.abs(over) * 0.4)) + ')'; track.style.transformOrigin = over < 0 ? 'right' : 'left'; }
+    else { track.style.transition = ''; track.style.transform = ''; }
+  }
+  s.addEventListener('pointerdown', e => { dragging = true; s.classList.add('grab'); try { s.setPointerCapture(e.pointerId); } catch(_){} move(e); });
+  s.addEventListener('pointermove', e => { if (dragging) move(e); });
+  const end = () => { if (!dragging) return; dragging = false; s.classList.remove('grab'); track.style.transition = 'transform 0.45s cubic-bezier(0.34,1.56,0.64,1)'; track.style.transform = ''; };
+  s.addEventListener('pointerup', end); s.addEventListener('pointercancel', end);
+  setV(v);
+})();
 
 /* scroll reveal */
 (function () {
