@@ -276,7 +276,12 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 
 /* ── Compare ── */
 .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-.compare .col { border-radius: 16px; padding: clamp(24px, 3vw, 34px); border: 1px solid var(--line); background: var(--s1s); }
+.compare .col { border-radius: 16px; padding: clamp(24px, 3vw, 34px); border: 1px solid var(--line); background: var(--s1s); position: relative; overflow: hidden; }
+.compare .col > * { position: relative; z-index: 1; }
+.compare .col::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 0.35s var(--ease); }
+.compare .old::before { background: radial-gradient(300px circle at var(--mx,50%) var(--my,50%), rgba(126,98,232,0.18), transparent 62%); }
+.compare .new::before { background: radial-gradient(300px circle at var(--mx,50%) var(--my,50%), rgba(226,136,95,0.22), transparent 62%); }
+.compare .col:hover::before { opacity: 1; }
 .compare .new { border-color: var(--coral); box-shadow: 0 0 40px -20px var(--coral), 0 1px 0 var(--hi) inset; }
 .compare .tag { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
 .compare .new .tag { color: var(--coral); }
@@ -803,8 +808,8 @@ document.getElementById('playDemo').addEventListener('click', () => alert('Drop 
   if ('IntersectionObserver' in window) { const io = new IntersectionObserver((es,o)=>es.forEach(e=>{ if(e.isIntersecting){run(e.target);o.unobserve(e.target);} }),{threshold:0.6}); nums.forEach(n=>io.observe(n)); } else nums.forEach(run);
 })();
 
-/* spotlight on feature cards */
-document.querySelectorAll('.tool').forEach(card => card.addEventListener('pointermove', e => {
+/* cursor spotlight / chroma reveal on cards */
+document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventListener('pointermove', e => {
   const r = card.getBoundingClientRect();
   card.style.setProperty('--mx', (e.clientX - r.left) + 'px'); card.style.setProperty('--my', (e.clientY - r.top) + 'px');
 }));
