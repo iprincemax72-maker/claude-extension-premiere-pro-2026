@@ -4573,7 +4573,14 @@ async function checkForUpdates(opts) {
         // install file (critical now that startup force-kills other bridges).
         const tmp = target.dest + '.tmp-' + process.pid;
         fs.writeFileSync(tmp, remote);
-        fs.renameSync(tmp, target.dest);
+        try {
+          fs.renameSync(tmp, target.dest);
+        } catch (renameErr) {
+          // Windows: rename can fail (EPERM/EEXIST/EACCES) when the destination
+          // is momentarily locked. Fall back to an in-place overwrite so the
+          // update still lands, then clean up the temp file.
+          try { fs.writeFileSync(target.dest, remote); } finally { try { fs.rmSync(tmp, { force: true }); } catch {} }
+        }
         if (bytesDiffer) {
           result.updated.push(target.label);
           if (target.needsBridgeRestart) result.bridgeChanged = true;
