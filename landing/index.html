@@ -148,7 +148,10 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none; opacity: 0.025; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
 
 /* ── Hero ── */
-.hero { text-align: center; padding: clamp(38px, 6vw, 72px) 0 clamp(14px, 3vw, 34px); }
+.hero { text-align: center; padding: clamp(38px, 6vw, 72px) 0 clamp(14px, 3vw, 34px); position: relative; }
+.hero > .wrap { position: relative; z-index: 1; }
+.prism-bg { position: absolute; inset: -10% 0 -5%; z-index: 0; pointer-events: none; overflow: hidden; opacity: 0.85; -webkit-mask-image: radial-gradient(ellipse 85% 95% at 50% 42%, #000 55%, transparent 92%); mask-image: radial-gradient(ellipse 85% 95% at 50% 42%, #000 55%, transparent 92%); }
+@media (prefers-reduced-motion: reduce) { .prism-bg { display: none; } }
 .hero .eyebrow { display: inline-block; }
 .hero h1 { margin: 1.1rem auto 0; max-width: 16ch; }
 .hero .lede { margin: 1.4rem auto 0; text-align: center; }
@@ -510,6 +513,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 
 <!-- HERO -->
 <section class="hero">
+  <div class="prism-bg" id="prism" aria-hidden="true"></div>
   <div class="wrap">
     <p class="eyebrow load-up l1">Premiere Pro extension</p>
     <h1 class="hero-h1">
@@ -866,6 +870,106 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
 })();
 
 
+</script>
+
+<!-- React Bits Prism, ported to vanilla JS (ogl via CDN) — hero background -->
+<script type="module">
+(async () => {
+  const container = document.getElementById('prism');
+  if (!container || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let ogl;
+  try { ogl = await import('https://esm.sh/ogl@1.0.11'); } catch (e) { return; }
+  const { Renderer, Triangle, Program, Mesh } = ogl;
+
+  /* ── config (tweak these to taste) ── */
+  const height = 3.5, baseWidth = 5.5, animationType = 'rotate', glow = 1, noise = 0.4,
+        transparent = true, scale = 3.6, hueShift = 0.0, colorFrequency = 1, bloom = 1,
+        timeScale = 0.5, suspendWhenOffscreen = true, offset = { x: 0, y: 0 };
+
+  const H = Math.max(0.001, height), BW = Math.max(0.001, baseWidth), BASE_HALF = BW * 0.5;
+  const GLOW = Math.max(0, glow), NOISE = Math.max(0, noise);
+  const offX = offset.x || 0, offY = offset.y || 0;
+  const SAT = transparent ? 1.5 : 1, SCALE = Math.max(0.001, scale), HUE = hueShift || 0;
+  const CFREQ = Math.max(0, colorFrequency || 1), BLOOM = Math.max(0, bloom || 1);
+  const TS = Math.max(0, timeScale || 1);
+
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const renderer = new Renderer({ dpr, alpha: transparent, antialias: false });
+  const gl = renderer.gl;
+  gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND);
+  Object.assign(gl.canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', display: 'block' });
+  container.appendChild(gl.canvas);
+
+  const vertex = 'attribute vec2 position;void main(){gl_Position=vec4(position,0.0,1.0);}';
+  const fragment = `
+    precision highp float;
+    uniform vec2 iResolution; uniform float iTime;
+    uniform float uHeight; uniform float uBaseHalf; uniform mat3 uRot; uniform int uUseBaseWobble;
+    uniform float uGlow; uniform vec2 uOffsetPx; uniform float uNoise; uniform float uSaturation;
+    uniform float uScale; uniform float uHueShift; uniform float uColorFreq; uniform float uBloom;
+    uniform float uCenterShift; uniform float uInvBaseHalf; uniform float uInvHeight; uniform float uMinAxis;
+    uniform float uPxScale; uniform float uTimeScale;
+    vec4 tanh4(vec4 x){ vec4 e2x=exp(2.0*x); return (e2x-1.0)/(e2x+1.0); }
+    float rand(vec2 co){ return fract(sin(dot(co,vec2(12.9898,78.233)))*43758.5453123); }
+    float sdOctaAnisoInv(vec3 p){ vec3 q=vec3(abs(p.x)*uInvBaseHalf,abs(p.y)*uInvHeight,abs(p.z)*uInvBaseHalf); float m=q.x+q.y+q.z-1.0; return m*uMinAxis*0.5773502691896258; }
+    float sdPyramidUpInv(vec3 p){ float oct=sdOctaAnisoInv(p); float halfSpace=-p.y; return max(oct,halfSpace); }
+    mat3 hueRotation(float a){ float c=cos(a),s=sin(a);
+      mat3 W=mat3(0.299,0.587,0.114,0.299,0.587,0.114,0.299,0.587,0.114);
+      mat3 U=mat3(0.701,-0.587,-0.114,-0.299,0.413,-0.114,-0.300,-0.588,0.886);
+      mat3 V=mat3(0.168,-0.331,0.500,0.328,0.035,-0.500,-0.497,0.296,0.201);
+      return W+U*c+V*s; }
+    void main(){
+      vec2 f=(gl_FragCoord.xy-0.5*iResolution.xy-uOffsetPx)*uPxScale;
+      float z=5.0; float d=0.0; vec3 p; vec4 o=vec4(0.0);
+      float centerShift=uCenterShift; float cf=uColorFreq;
+      mat2 wob=mat2(1.0);
+      if(uUseBaseWobble==1){ float t=iTime*uTimeScale; float c0=cos(t+0.0); float c1=cos(t+33.0); float c2=cos(t+11.0); wob=mat2(c0,c1,c2,c0); }
+      const int STEPS=100;
+      for(int i=0;i<STEPS;i++){ p=vec3(f,z); p.xz=p.xz*wob; p=uRot*p; vec3 q=p; q.y+=centerShift; d=0.1+0.2*abs(sdPyramidUpInv(q)); z-=d; o+=(sin((p.y+z)*cf+vec4(0.0,1.0,2.0,3.0))+1.0)/d; }
+      o=tanh4(o*o*(uGlow*uBloom)/1e5);
+      vec3 col=o.rgb; float n=rand(gl_FragCoord.xy+vec2(iTime)); col+=(n-0.5)*uNoise; col=clamp(col,0.0,1.0);
+      float L=dot(col,vec3(0.2126,0.7152,0.0722)); col=clamp(mix(vec3(L),col,uSaturation),0.0,1.0);
+      if(abs(uHueShift)>0.0001){ col=clamp(hueRotation(uHueShift)*col,0.0,1.0); }
+      gl_FragColor=vec4(col,o.a);
+    }`;
+
+  const geometry = new Triangle(gl);
+  const iResBuf = new Float32Array(2), offsetPxBuf = new Float32Array(2);
+  const program = new Program(gl, { vertex, fragment, uniforms: {
+    iResolution: { value: iResBuf }, iTime: { value: 0 }, uHeight: { value: H }, uBaseHalf: { value: BASE_HALF },
+    uUseBaseWobble: { value: 1 }, uRot: { value: new Float32Array([1,0,0,0,1,0,0,0,1]) }, uGlow: { value: GLOW },
+    uOffsetPx: { value: offsetPxBuf }, uNoise: { value: NOISE }, uSaturation: { value: SAT }, uScale: { value: SCALE },
+    uHueShift: { value: HUE }, uColorFreq: { value: CFREQ }, uBloom: { value: BLOOM }, uCenterShift: { value: H * 0.25 },
+    uInvBaseHalf: { value: 1 / BASE_HALF }, uInvHeight: { value: 1 / H }, uMinAxis: { value: Math.min(BASE_HALF, H) },
+    uPxScale: { value: 1 / ((gl.drawingBufferHeight || 1) * 0.1 * SCALE) }, uTimeScale: { value: TS }
+  } });
+  const mesh = new Mesh(gl, { geometry, program });
+
+  const resize = () => {
+    const w = container.clientWidth || 1, h = container.clientHeight || 1;
+    renderer.setSize(w, h);
+    iResBuf[0] = gl.drawingBufferWidth; iResBuf[1] = gl.drawingBufferHeight;
+    offsetPxBuf[0] = offX * dpr; offsetPxBuf[1] = offY * dpr;
+    program.uniforms.uPxScale.value = 1 / ((gl.drawingBufferHeight || 1) * 0.1 * SCALE);
+  };
+  const ro = new ResizeObserver(resize); ro.observe(container); resize();
+
+  let raf = 0; const t0 = performance.now();
+  const startRAF = () => { if (!raf) raf = requestAnimationFrame(render); };
+  const stopRAF = () => { if (raf) { cancelAnimationFrame(raf); raf = 0; } };
+  const idn = new Float32Array([1,0,0,0,1,0,0,0,1]);
+  function render(t) {
+    program.uniforms.iTime.value = (t - t0) * 0.001;
+    program.uniforms.uRot.value = idn;
+    renderer.render({ scene: mesh });
+    raf = (TS < 1e-6) ? 0 : requestAnimationFrame(render);
+  }
+  if (suspendWhenOffscreen) {
+    const io = new IntersectionObserver(es => { es.some(e => e.isIntersecting) ? startRAF() : stopRAF(); });
+    io.observe(container);
+  }
+  startRAF();
+})();
 </script>
 </body>
 </html>
