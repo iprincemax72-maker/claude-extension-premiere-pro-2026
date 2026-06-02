@@ -5958,9 +5958,9 @@ function openExternalURL(url) {
   + '.acct-pop .ap-bar{height:6px;border-radius:4px;background:#26262c;overflow:hidden}.acct-pop .ap-bar i{display:block;height:100%;background:linear-gradient(90deg,#E2885F,#F0A87E)}'
   + '.acct-pop.full .ap-bar i{background:linear-gradient(90deg,#cf6f4a,#e98c7a)}'
   + '.acct-pop .ap-reset{color:#7c7d87;font-size:11px;margin-top:7px}'
-  + '.acct-pop .ap-acts{display:flex;gap:8px}'
-  + '.acct-pop .ap-btn{flex:1;font:600 13px system-ui;border:0;border-radius:9px;padding:.7em;cursor:pointer;background:#232329;color:#fafafa}'
-  + '.acct-pop .ap-btn:hover{background:#2c2c33}.acct-pop .ap-btn.primary{background:#E2885F;color:#15110d}.acct-pop .ap-btn.primary:hover{filter:brightness(1.06)}.acct-pop .ap-btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.14)}';
+  + '.acct-pop .ap-acts{display:flex;gap:8px;width:100%}'
+  + '.acct-pop .ap-btn{flex:1 1 0;min-width:0;margin:0;position:static;box-shadow:none;text-align:center;font:600 13px system-ui;border:0;border-radius:9px;padding:.7em;cursor:pointer;background:#232329;color:#fafafa}'
+  + '.acct-pop .ap-btn:hover{background:#2c2c33}.acct-pop .ap-btn.ap-primary{background:#E2885F;color:#15110d}.acct-pop .ap-btn.ap-primary:hover{filter:brightness(1.06)}.acct-pop .ap-btn.ap-ghost{background:transparent;border:1px solid rgba(255,255,255,.14)}';
   document.head.appendChild(style);
 
   let pop = null, status = null, pollTimer = null;
@@ -5993,7 +5993,7 @@ function openExternalURL(url) {
     if (!status || !status.signedIn) {
       pop.innerHTML = '<div class="ap-h">Sign in</div>'
         + '<p class="ap-sub">Link your Claude account to render. Free plan includes 5 renders a month.</p>'
-        + '<button class="ap-btn primary" id="apSignin">Sign in with Google</button>';
+        + '<button class="ap-btn ap-primary" id="apSignin">Sign in with Google</button>';
       pop.querySelector('#apSignin').onclick = startSignin;
     } else {
       const used = status.renders_used || 0, lim = status.renders_limit || 5;
@@ -6006,7 +6006,7 @@ function openExternalURL(url) {
         + '<div class="ap-usage"><div class="ap-row"><span>' + cap(status.plan || 'free') + ' plan</span><b>' + used + ' / ' + lim + '</b></div>'
           + '<div class="ap-bar"><i style="width:' + pct + '%"></i></div>'
           + '<p class="ap-reset">renders used this month</p></div>'
-        + '<div class="ap-acts"><button class="ap-btn primary" id="apUp">Upgrade</button><button class="ap-btn ghost" id="apOut">Sign out</button></div>';
+        + '<div class="ap-acts"><button class="ap-btn ap-primary" id="apUp">Upgrade</button><button class="ap-btn ap-ghost" id="apOut">Sign out</button></div>';
       if (used >= lim) pop.classList.add('full');
       pop.querySelector('#apUp').onclick = () => openExternalURL(SITE_URL + '/account.html');
       pop.querySelector('#apOut').onclick = signout;
