@@ -2,7 +2,7 @@
 setlocal EnableDelayedExpansion
 title Claude Bridge
 
-REM Claude Bridge launcher for Windows — double-click to start the bridge.
+REM Claude Bridge launcher for Windows - double-click to start the bridge.
 
 cd /d "%USERPROFILE%\PremiereClaude" 2>nul
 if errorlevel 1 (
@@ -12,7 +12,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Find node.exe — try common install locations, then PATH
+REM Find node.exe - try common install locations, then PATH
 set "NODE_BIN="
 for %%P in (
     "%ProgramFiles%\nodejs\node.exe"
@@ -47,7 +47,7 @@ echo.
 REM If port 3737 is already taken, surface that instead of a cryptic crash
 netstat -ano | findstr :3737 | findstr LISTENING >nul
 if %errorlevel% equ 0 (
-    echo Port 3737 is already in use — the bridge is probably already running.
+    echo Port 3737 is already in use - the bridge is probably already running.
     echo If you want to restart it, run:
     echo     for /f "tokens=5" %%%%a in ('netstat -ano ^^^| findstr :3737 ^^^| findstr LISTENING') do taskkill /F /PID %%%%a
     echo.

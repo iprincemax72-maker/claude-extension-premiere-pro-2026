@@ -1,13 +1,13 @@
-# install.ps1 — Claude Extension Premiere Pro 2026 (Windows installer)
+# install.ps1 - Claude Extension Premiere Pro 2026 (Windows installer)
 # ---------------------------------------------------------------------
 # Run from the repo root:
 #     powershell -ExecutionPolicy Bypass -File install.ps1
-# Idempotent — safe to re-run.
+# Idempotent - safe to re-run.
 #
 # This installer auto-installs missing dependencies via winget + npm:
 #   - Node.js LTS  (OpenJS.NodeJS.LTS)
 #   - Claude Code CLI  (npm i -g @anthropic-ai/claude-code)
-#   - ffmpeg  (Gyan.FFmpeg) — required by Remotion for video encoding
+#   - ffmpeg  (Gyan.FFmpeg) - required by Remotion for video encoding
 
 $ErrorActionPreference = 'Stop'
 
@@ -40,7 +40,7 @@ if (Test-Cmd 'winget') {
 } else {
     Warn "winget not found. Install 'App Installer' from the Microsoft Store, then re-run."
     Info "https://apps.microsoft.com/store/detail/app-installer/9NBLGGH4NNS1"
-    Info "Continuing — will fall back to manual instructions for missing deps."
+    Info "Continuing - will fall back to manual instructions for missing deps."
 }
 
 # ---------- 2. Node.js ----------
@@ -49,7 +49,7 @@ if (Test-Cmd 'node') {
     Ok "node $((& node --version))"
 } else {
     if (Test-Cmd 'winget') {
-        Info "Installing Node.js LTS via winget…"
+        Info "Installing Node.js LTS via winget..."
         winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements --silent | Out-Null
         Refresh-Path
         if (Test-Cmd 'node') {
@@ -67,7 +67,7 @@ Step "Checking Claude Code CLI"
 if (Test-Cmd 'claude') {
     Ok "$((& claude --version))"
 } else {
-    Info "Installing Claude Code CLI via npm…"
+    Info "Installing Claude Code CLI via npm..."
     & npm install -g "@anthropic-ai/claude-code" 2>&1 | Out-Null
     Refresh-Path
     if (Test-Cmd 'claude') {
@@ -85,11 +85,11 @@ if (Test-Cmd 'ffmpeg') {
     Ok "ffmpeg present"
 } else {
     if (Test-Cmd 'winget') {
-        Info "Installing ffmpeg via winget…"
+        Info "Installing ffmpeg via winget..."
         winget install -e --id Gyan.FFmpeg --accept-source-agreements --accept-package-agreements --silent | Out-Null
         Refresh-Path
         if (Test-Cmd 'ffmpeg') { Ok "ffmpeg installed" }
-        else { Warn "ffmpeg install completed but not on PATH yet — open a new shell after this script." }
+        else { Warn "ffmpeg install completed but not on PATH yet - open a new shell after this script." }
     } else {
         Warn "ffmpeg not installed. Remotion needs it for rendering."
         Info "Install via Chocolatey:  choco install ffmpeg"
@@ -130,7 +130,7 @@ $panelDest = Join-Path $cepDir 'com.claudebridge.panel'
 if (Test-Path $panelDest) { Remove-Item -Recurse -Force $panelDest }
 Copy-Item -Recurse -Force "extension\com.claudebridge.panel" $cepDir
 if (-not (Test-Path (Join-Path $panelDest 'index.html'))) {
-    Fail "Panel copy failed — $panelDest missing index.html"
+    Fail "Panel copy failed - $panelDest missing index.html"
 }
 Ok "$panelDest"
 
@@ -141,7 +141,7 @@ New-Item -ItemType Directory -Force -Path $bridgeDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $bridgeDir 'output') | Out-Null
 Copy-Item -Force "bridge\bridge.js" $bridgeDir
 if (-not (Test-Path (Join-Path $bridgeDir 'bridge.js'))) {
-    Fail "Bridge copy failed — $bridgeDir\bridge.js missing"
+    Fail "Bridge copy failed - $bridgeDir\bridge.js missing"
 }
 Ok "$bridgeDir\bridge.js"
 
@@ -149,36 +149,36 @@ Ok "$bridgeDir\bridge.js"
 Step "Setting up Remotion project (first install: 2-4 min for npm install)"
 $remotionDir = Join-Path $bridgeDir 'remotion-intro'
 if (Test-Path (Join-Path $remotionDir 'node_modules')) {
-    Ok "Remotion already installed at $remotionDir — skipping npm install"
+    Ok "Remotion already installed at $remotionDir - skipping npm install"
 } else {
     New-Item -ItemType Directory -Force -Path $remotionDir | Out-Null
     if (-not (Test-Path (Join-Path $remotionDir 'package.json'))) {
         Copy-Item -Recurse -Force "bridge\remotion-template\*" $remotionDir
-        # PowerShell's wildcard skips dotfiles — copy .gitignore explicitly
+        # PowerShell's wildcard skips dotfiles - copy .gitignore explicitly
         if (Test-Path "bridge\remotion-template\.gitignore") {
             Copy-Item -Force "bridge\remotion-template\.gitignore" $remotionDir
         }
     }
     if (Test-Cmd 'npm') {
-        Info "Running npm install in $remotionDir (this is the slow part — be patient)…"
+        Info "Running npm install in $remotionDir (this is the slow part - be patient)..."
         Push-Location $remotionDir
         try {
             & npm install --silent --no-audit --no-fund 2>&1 | Out-Null
         } catch {
-            Warn "npm install hit issues — first render may need to retry"
+            Warn "npm install hit issues - first render may need to retry"
         }
         Pop-Location
         if (Test-Path (Join-Path $remotionDir 'node_modules\remotion')) {
             Ok "Remotion installed"
         } else {
-            Warn "Remotion node_modules missing — first render will install it"
+            Warn "Remotion node_modules missing - first render will install it"
         }
     } else {
-        Warn "npm not on PATH — Remotion will install itself on the first render (slower)"
+        Warn "npm not on PATH - Remotion will install itself on the first render (slower)"
     }
 }
 
-# ---------- 9. Place launcher on Desktop (fallback — the panel auto-starts
+# ---------- 9. Place launcher on Desktop (fallback - the panel auto-starts
 #               the bridge on its own; this is only for manual restarts) ----------
 Step "Placing launcher on Desktop (fallback)"
 $desktop = [Environment]::GetFolderPath('Desktop')
@@ -189,7 +189,7 @@ Ok "$launcherDst"
 
 # ---------- 9b. Make sure the npm global bin is on the user PATH ----------
 # claude.cmd lives in %APPDATA%\npm. npm usually adds it, but if a shell was
-# already open before Node was installed it can be missing — ensure it so the
+# already open before Node was installed it can be missing - ensure it so the
 # bridge (and `claude /login`) can always find the CLI.
 Step "Ensuring npm global bin is on PATH"
 $npmBin = Join-Path $env:APPDATA 'npm'
@@ -202,7 +202,7 @@ if (Test-Path $npmBin) {
         Ok "$npmBin already on PATH"
     }
 } else {
-    Warn "npm global bin ($npmBin) not found yet — it appears after the Claude CLI installs"
+    Warn "npm global bin ($npmBin) not found yet - it appears after the Claude CLI installs"
 }
 
 # ---------- 10. Premiere Pro detection (informational) ----------
@@ -214,7 +214,7 @@ $ppPaths = @(
 )
 $ppFound = $ppPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 if ($ppFound) { Ok "Found at $ppFound" }
-else { Warn "Premiere Pro not detected in default locations — install it before using the panel." }
+else { Warn "Premiere Pro not detected in default locations - install it before using the panel." }
 
 # ---------- 11. Done ----------
 Write-Host ""
