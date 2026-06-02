@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Builder — make a website with Claude</title>
-<meta name="description" content="Paste your Claude API key and generate a complete website from a prompt — live in your browser. Your key never leaves your device." />
+<title>Motion Builder — make motion graphics with Claude</title>
+<meta name="description" content="Paste your Claude API key, describe a motion graphic, and Claude writes a Remotion composition that plays live in your browser. Your key never leaves your device." />
 <meta name="theme-color" content="#09090b" />
 <meta name="robots" content="noindex" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23E2885F'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='19' font-style='italic' fill='%23111' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E" />
@@ -40,7 +40,6 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
 .linkback:hover{color:var(--text)}
 
 .main{flex:1 1 auto;display:grid;grid-template-columns:380px 1fr;min-height:0}
-/* ── controls ── */
 .controls{border-right:1px solid var(--line);padding:clamp(16px,2vw,24px);overflow-y:auto;display:flex;flex-direction:column;gap:20px;background:var(--bg-soft)}
 .field label{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px}
 .field label .req{color:var(--coral)}
@@ -60,17 +59,16 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
 .chips{display:flex;flex-wrap:wrap;gap:7px}
 .chip{font-size:.76rem;color:var(--text-2);background:var(--s1s);border:1px solid var(--line);border-radius:99px;padding:6px 11px;cursor:pointer;transition:.15s}
 .chip:hover{border-color:var(--line-2);color:var(--text)}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5em;font-family:var(--sans);font-weight:600;font-size:.95rem;padding:.9em 1.3em;border-radius:10px;cursor:pointer;border:1px solid transparent;transition:filter .15s,background .15s,opacity .15s;width:100%}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5em;font-family:var(--sans);font-weight:600;font-size:.95rem;padding:.9em 1.3em;border-radius:10px;cursor:pointer;border:1px solid transparent;transition:filter .15s,opacity .15s;width:100%}
 .btn-primary{background:var(--btn);color:var(--btn-ink);box-shadow:0 1px 0 rgba(255,255,255,.4) inset}
 .btn-primary:hover{filter:brightness(1.06)}
 .btn-primary:disabled{opacity:.5;cursor:not-allowed;filter:none}
 .btn svg{width:1.05em;height:1.05em}
 .spin{width:15px;height:15px;border:2px solid rgba(0,0,0,.25);border-top-color:#15110d;border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.err{font-size:.82rem;color:#f0a895;background:rgba(225,102,79,.1);border:1px solid rgba(225,102,79,.3);border-radius:9px;padding:10px 12px;display:none}
+.err{font-size:.82rem;color:#f0a895;background:rgba(225,102,79,.1);border:1px solid rgba(225,102,79,.3);border-radius:9px;padding:10px 12px;display:none;white-space:pre-wrap;word-break:break-word;max-height:160px;overflow:auto}
 .err.show{display:block}
 
-/* ── preview ── */
 .preview{display:flex;flex-direction:column;min-width:0;min-height:0}
 .pv-bar{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);flex:0 0 auto;background:var(--bg-soft)}
 .tabs{display:inline-flex;gap:3px;background:var(--s1s);border:1px solid var(--line);border-radius:9px;padding:3px}
@@ -82,13 +80,17 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
 .act:hover{background:var(--s3)}
 .act:disabled{opacity:.4;cursor:not-allowed}
 .act svg{width:14px;height:14px}
-.stage{flex:1 1 auto;position:relative;min-height:0;background:#0c0c0f}
-.stage iframe{width:100%;height:100%;border:0;background:#fff;display:block}
+.stage{flex:1 1 auto;position:relative;min-height:0;display:grid;place-items:center;padding:20px;
+  background:#0c0c0f;
+  background-image:linear-gradient(45deg,#141418 25%,transparent 25%),linear-gradient(-45deg,#141418 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#141418 75%),linear-gradient(-45deg,transparent 75%,#141418 75%);
+  background-size:22px 22px;background-position:0 0,0 11px,11px -11px,-11px 0}
+.player{width:100%;height:100%;display:grid;place-items:center}
+.player>*{max-width:100%;max-height:100%}
 .codewrap{position:absolute;inset:0;display:none;overflow:auto;background:#0c0c10}
 .codewrap.show{display:block}
 .codewrap pre{margin:0;padding:18px;font-family:var(--mono);font-size:.76rem;line-height:1.65;color:#e9e3da;white-space:pre-wrap;word-break:break-word}
 .empty,.loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:30px;color:var(--text-3)}
-.loading{display:none;background:rgba(9,9,11,.7);backdrop-filter:blur(3px);z-index:3}
+.loading{display:none;background:rgba(9,9,11,.72);backdrop-filter:blur(3px);z-index:3}
 .loading.show{display:flex}
 .empty h2{font-size:1.4rem;color:var(--text);font-weight:600;letter-spacing:-0.02em}
 .empty p{max-width:42ch;font-size:.92rem}
@@ -101,7 +103,7 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
   body{overflow:auto}
   .main{grid-template-columns:1fr}
   .controls{border-right:none;border-bottom:1px solid var(--line)}
-  .stage{min-height:62vh}
+  .stage{min-height:60vh}
 }
 </style>
 </head>
@@ -109,7 +111,7 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
 <div class="bloom"></div><div class="bloom b2"></div>
 <div class="app">
   <header class="bar">
-    <a href="index.html" class="brand"><span class="glyph">C</span><span>Claude <small>Web Builder</small></span></a>
+    <a href="index.html" class="brand"><span class="glyph">C</span><span>Claude <small>Motion Builder</small></span></a>
     <div class="right">
       <span class="badge">Bring your own key</span>
       <a href="index.html" class="linkback"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Home</a>
@@ -137,18 +139,19 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
       </div>
 
       <div class="field">
-        <label>Describe your website <span class="req">*</span></label>
-        <textarea id="prompt" class="ta" placeholder="e.g. A landing page for a specialty coffee roaster — warm, editorial, with a hero, story, bean menu, and newsletter signup."></textarea>
+        <label>Describe the motion graphic <span class="req">*</span></label>
+        <textarea id="prompt" class="ta" placeholder="e.g. A glassy subscribe button, vertical 1080×1920, that springs in with a soft cursor tap and a ripple. Calm, not flashy."></textarea>
         <div class="chips" id="chips">
-          <span class="chip">Portfolio for a 3D artist</span>
-          <span class="chip">SaaS pricing page</span>
-          <span class="chip">Coffee roaster landing</span>
-          <span class="chip">Personal résumé site</span>
+          <span class="chip">Glassy subscribe button, vertical</span>
+          <span class="chip">Animated lower third with name + title</span>
+          <span class="chip">5-to-1 countdown, big white numerals</span>
+          <span class="chip">Kinetic title that pops in word by word</span>
         </div>
       </div>
 
-      <button class="btn btn-primary" id="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 6.3L21 11l-6.6 1.7L12 19l-2.4-6.3L3 11l6.6-1.7z"/></svg><span id="goTxt">Generate website</span></button>
+      <button class="btn btn-primary" id="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 6.3L21 11l-6.6 1.7L12 19l-2.4-6.3L3 11l6.6-1.7z"/></svg><span id="goTxt">Generate motion graphic</span></button>
       <div class="err" id="err"></div>
+      <p class="hint">Previews live with Remotion's Player. To render a transparent MP4 for your timeline, drop the composition into the Premiere panel or your Remotion project.</p>
     </aside>
 
     <section class="preview">
@@ -159,20 +162,19 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
         </div>
         <span class="grow"></span>
         <span class="mini" id="meta"></span>
-        <button class="act" id="openTab" disabled title="Open in new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14L21 3"/></svg></button>
-        <button class="act" id="download" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Download</button>
+        <button class="act" id="download" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Get .jsx</button>
       </div>
       <div class="stage">
-        <iframe id="frame" title="Generated site preview" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe>
+        <div class="player" id="player"></div>
         <div class="codewrap" id="codewrap"><pre id="code"></pre></div>
         <div class="empty" id="empty">
-          <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 14h6"/></svg></div>
-          <h2>Describe it, Claude builds it.</h2>
-          <p>Paste your API key, write what you want, and a complete single-file website appears here, live. Then download the HTML.</p>
+          <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg></div>
+          <h2>Describe it, Claude animates it.</h2>
+          <p>Paste your API key and describe a motion graphic. Claude writes a Remotion composition and it plays right here. Then grab the code for your timeline.</p>
         </div>
         <div class="loading" id="loading">
           <div class="ring"></div>
-          <div class="lt" id="loadingTxt">Claude is building your site…</div>
+          <div class="lt" id="loadingTxt">Claude is animating…</div>
         </div>
       </div>
     </section>
@@ -181,112 +183,134 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
 
 <script>
 const $ = s => document.querySelector(s);
-const key = $('#key'), model = $('#model'), prompt = $('#prompt'), go = $('#go'), goTxt = $('#goTxt');
-const err = $('#err'), frame = $('#frame'), code = $('#code'), codewrap = $('#codewrap'), empty = $('#empty'),
-      loading = $('#loading'), loadingTxt = $('#loadingTxt'), meta = $('#meta'),
-      download = $('#download'), openTab = $('#openTab');
-let lastHTML = '';
+const key=$('#key'), model=$('#model'), prompt=$('#prompt'), go=$('#go'), goTxt=$('#goTxt'),
+  err=$('#err'), code=$('#code'), codewrap=$('#codewrap'), empty=$('#empty'),
+  loading=$('#loading'), loadingTxt=$('#loadingTxt'), meta=$('#meta'),
+  download=$('#download'), playerMount=$('#player');
+let lastCode='', playerRoot=null;
 
-/* persistence */
 key.value = localStorage.getItem('anthropic_key') || '';
 model.value = localStorage.getItem('builder_model') || 'claude-sonnet-4-6';
 model.addEventListener('change', () => localStorage.setItem('builder_model', model.value));
-$('#eye').addEventListener('click', () => { key.type = key.type === 'password' ? 'text' : 'password'; });
-$('#chips').addEventListener('click', e => { if (e.target.classList.contains('chip')) { prompt.value = e.target.textContent + '.'; prompt.focus(); } });
-
-/* tabs */
+$('#eye').addEventListener('click', () => { key.type = key.type==='password' ? 'text':'password'; });
+$('#chips').addEventListener('click', e => { if (e.target.classList.contains('chip')){ prompt.value = e.target.textContent + '.'; prompt.focus(); } });
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
-  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
-  codewrap.classList.toggle('show', t.dataset.tab === 'code');
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x===t));
+  codewrap.classList.toggle('show', t.dataset.tab==='code');
 }));
 
-function showErr(m){ err.textContent = m; err.classList.add('show'); }
+function showErr(m){ err.textContent=m; err.classList.add('show'); }
 function clearErr(){ err.classList.remove('show'); }
-function setLoading(on){
+function setLoading(on, label){
   loading.classList.toggle('show', on);
-  go.disabled = on;
-  goTxt.textContent = on ? 'Generating…' : 'Generate website';
+  if (label) loadingTxt.textContent = label;
+  go.disabled = on; goTxt.textContent = on ? 'Generating…' : 'Generate motion graphic';
   go.querySelector('svg').style.display = on ? 'none' : '';
-  if (on && !go.querySelector('.spin')) { const s = document.createElement('span'); s.className = 'spin'; go.prepend(s); }
-  if (!on) { const s = go.querySelector('.spin'); if (s) s.remove(); }
+  let s = go.querySelector('.spin');
+  if (on && !s){ s=document.createElement('span'); s.className='spin'; go.prepend(s); }
+  if (!on && s) s.remove();
 }
 
-function stripFences(t){
+/* lazy-load the heavy preview deps only when first needed */
+let depsP=null;
+function loadDeps(){
+  if (depsP) return depsP;
+  depsP = (async () => {
+    const R = 'https://esm.sh/react@18.3.1';
+    const [React, ReactDOMClient, PlayerMod, Remotion] = await Promise.all([
+      import(R),
+      import('https://esm.sh/react-dom@18.3.1/client'),
+      import('https://esm.sh/@remotion/player@4.0.272?deps=react@18.3.1,react-dom@18.3.1'),
+      import('https://esm.sh/remotion@4.0.272?deps=react@18.3.1')
+    ]);
+    await loadBabel();
+    return { React: React.default || React, ReactDOM: ReactDOMClient, Player: PlayerMod.Player, Remotion };
+  })();
+  return depsP;
+}
+function loadBabel(){
+  return new Promise((res, rej) => {
+    if (window.Babel) return res();
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/@babel/standalone@7/babel.min.js';
+    s.onload = () => res(); s.onerror = () => rej(new Error('Could not load the transpiler (network).'));
+    document.head.appendChild(s);
+  });
+}
+
+function extractJSON(t){
   t = t.trim();
-  const m = t.match(/```(?:html)?\s*([\s\S]*?)```/i);
-  if (m) return m[1].trim();
-  const i = t.search(/<!DOCTYPE|<html/i);
-  return i >= 0 ? t.slice(i).trim() : t;
+  const f = t.match(/```(?:json)?\s*([\s\S]*?)```/i); if (f) t = f[1].trim();
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b < 0) throw new Error('Model did not return JSON.');
+  return JSON.parse(t.slice(a, b + 1));
 }
 
-function showResult(html){
-  lastHTML = html;
-  frame.srcdoc = html;
-  code.textContent = html;
-  empty.style.display = 'none';
-  download.disabled = false; openTab.disabled = false;
-  meta.textContent = (html.length / 1024).toFixed(1) + ' KB';
+async function buildAndPlay(cfg){
+  const { React, ReactDOM, Player, Remotion } = await loadDeps();
+  const transpiled = window.Babel.transform(cfg.code, { presets: ['react'] }).code;
+  const factory = new Function('React', 'Remotion', transpiled + '\nreturn typeof MyComposition!=="undefined" ? MyComposition : null;');
+  const Comp = factory(React, Remotion);
+  if (!Comp) throw new Error('The generated code did not define a MyComposition component.');
+  if (!playerRoot) playerRoot = ReactDOM.createRoot(playerMount);
+  playerRoot.render(React.createElement(Player, {
+    component: Comp,
+    durationInFrames: (cfg.durationInFrames|0) || 120,
+    fps: (cfg.fps|0) || 30,
+    compositionWidth: (cfg.width|0) || 1080,
+    compositionHeight: (cfg.height|0) || 1920,
+    controls: true, loop: true, autoPlay: true, clickToPlay: true,
+    acknowledgeRemotionLicense: true,
+    style: { width: '100%', height: '100%' }
+  }));
 }
 
-const SYS = "You are an elite web designer and front-end engineer. Output ONE complete, self-contained HTML document (DOCTYPE through </html>) with all CSS in a <style> tag and any JS in a <script> tag inline. You may load fonts/icons from public CDNs but no other external dependencies. Make it genuinely polished, modern, responsive, and accessible — strong typography, thoughtful spacing, tasteful motion, a coherent color system. Do not use placeholder lorem ipsum; write real, fitting copy. Respond with ONLY the HTML — no markdown code fences, no commentary before or after.";
+const SYS = "You are a Remotion motion-graphics expert. Respond with ONLY a single JSON object (no markdown fences, no prose) shaped exactly: {\"durationInFrames\": <int>, \"fps\": <int>, \"width\": <int>, \"height\": <int>, \"code\": <string>}. The \"code\" string is the body of a module that defines ONE React function component named MyComposition. Inside the code you have two globals available: React, and Remotion (the remotion package, exposing AbsoluteFill, Sequence, Series, useCurrentFrame, useVideoConfig, interpolate, spring, Easing, random, Img). Do NOT write import or export statements. You MUST use JSX (it is transpiled). Use inline style objects only. No external assets, fonts, or network requests (use system font stacks). Animate using useCurrentFrame(), interpolate(), and spring() with the provided fps. Prefer a transparent or solid background as fits the request. Pick width/height to match the ask (1080x1920 vertical, 1920x1080 wide, or 1080x1080 square) and a 2 to 6 second duration. Make it smooth, modern, and broadcast-clean. Example: {\"durationInFrames\":120,\"fps\":30,\"width\":1080,\"height\":1920,\"code\":\"const {AbsoluteFill,useCurrentFrame,interpolate,spring,useVideoConfig}=Remotion;\\nfunction MyComposition(){const frame=useCurrentFrame();const {fps}=useVideoConfig();const s=spring({frame,fps,config:{damping:14}});const o=interpolate(frame,[0,15],[0,1],{extrapolateRight:'clamp'});return (<AbsoluteFill style={{justifyContent:'center',alignItems:'center',background:'transparent'}}><div style={{transform:`scale(${s})`,opacity:o,color:'#fff',fontSize:96,fontWeight:800,fontFamily:'system-ui'}}>Subscribe</div></AbsoluteFill>);}\"}";
 
 async function generate(){
   clearErr();
-  const k = key.value.trim();
-  if (!k){ showErr('Paste your Anthropic API key first.'); key.focus(); return; }
-  const p = prompt.value.trim();
-  if (!p){ showErr('Describe the website you want.'); prompt.focus(); return; }
+  const k = key.value.trim(); if (!k){ showErr('Paste your Anthropic API key first.'); key.focus(); return; }
+  const p = prompt.value.trim(); if (!p){ showErr('Describe the motion graphic you want.'); prompt.focus(); return; }
   localStorage.setItem('anthropic_key', k);
-  setLoading(true);
+  setLoading(true, 'Claude is animating…');
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': k,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: model.value,
-        max_tokens: 16000,
-        system: SYS,
-        messages: [{ role: 'user', content: 'Build a website: ' + p }]
-      })
+      method:'POST',
+      headers:{ 'content-type':'application/json','x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+      body: JSON.stringify({ model: model.value, max_tokens: 8000, system: SYS, messages:[{ role:'user', content:'Make this motion graphic: ' + p }] })
     });
     if (!res.ok){
-      let detail = '';
-      try { const j = await res.json(); detail = j.error && j.error.message ? j.error.message : JSON.stringify(j); }
-      catch(_) { detail = await res.text(); }
-      if (res.status === 401) detail = 'Invalid API key.';
-      if (res.status === 429) detail = 'Rate limit / quota reached on your account.';
-      throw new Error('Anthropic API ' + res.status + ' — ' + detail);
+      let d=''; try { const j=await res.json(); d=j.error&&j.error.message?j.error.message:JSON.stringify(j); } catch(_){ d=await res.text(); }
+      if (res.status===401) d='Invalid API key.'; if (res.status===429) d='Rate limit / quota reached on your account.';
+      throw new Error('Anthropic API ' + res.status + ' — ' + d);
     }
     const data = await res.json();
-    const text = (data.content || []).map(b => b.text || '').join('');
-    const html = stripFences(text);
-    if (!/<html|<!DOCTYPE/i.test(html)) throw new Error('Model did not return a full HTML page. Try again or switch model.');
-    showResult(html);
-  } catch (e){
-    showErr(/Failed to fetch/i.test(e.message)
-      ? 'Network/CORS error reaching Anthropic. Check your key and connection.'
-      : e.message);
+    const text = (data.content||[]).map(b=>b.text||'').join('');
+    const cfg = extractJSON(text);
+    if (!cfg.code || typeof cfg.code !== 'string') throw new Error('No composition code returned.');
+    lastCode = cfg.code;
+    code.textContent = cfg.code;
+    setLoading(true, 'Compiling preview…');
+    await buildAndPlay(cfg);
+    empty.style.display='none';
+    download.disabled=false;
+    meta.textContent = (cfg.width||1080)+'×'+(cfg.height||1920)+' · '+(((cfg.durationInFrames||120)/(cfg.fps||30)).toFixed(1))+'s';
+  } catch(e){
+    const m = /Failed to fetch/i.test(e.message) ? 'Network/CORS error reaching Anthropic. Check your key and connection.' : e.message;
+    showErr(m);
   }
   setLoading(false);
 }
 go.addEventListener('click', generate);
-prompt.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') generate(); });
-
+prompt.addEventListener('keydown', e => { if ((e.metaKey||e.ctrlKey) && e.key==='Enter') generate(); });
 download.addEventListener('click', () => {
-  const blob = new Blob([lastHTML], { type: 'text/html' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = 'website.html'; a.click();
+  const blob = new Blob([lastCode], { type:'text/plain' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='MyComposition.jsx'; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
-openTab.addEventListener('click', () => {
-  const blob = new Blob([lastHTML], { type: 'text/html' });
-  window.open(URL.createObjectURL(blob), '_blank');
-});
+
+/* expose for self-test */
+window.__buildAndPlay = buildAndPlay;
 </script>
 </body>
 </html>

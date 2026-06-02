@@ -99,18 +99,18 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 .link-arrow:hover { color: var(--coral); } .link-arrow:hover .a { transform: translateX(4px); }
 
 /* ── Nav ── */
-.nav { position: sticky; top: 0; z-index: 100; background: color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter: saturate(1.4) blur(14px); border-bottom: 1px solid transparent; transition: border-color 0.25s var(--ease); }
-.nav.scrolled { border-bottom-color: var(--line); }
-.nav-in { display: flex; align-items: center; justify-content: space-between; height: 66px; }
+.nav { position: sticky; top: 0; z-index: 100; padding: 12px clamp(12px, 3vw, 26px) 0; }
+.nav-in { max-width: var(--maxw); margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 58px; padding: 0 10px 0 16px; background: color-mix(in srgb, var(--bg) 80%, transparent); backdrop-filter: saturate(1.4) blur(14px); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 1px 0 var(--hi) inset, 0 14px 34px -18px rgba(0,0,0,0.7); transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease); }
+.nav.scrolled .nav-in { border-color: var(--line-2); box-shadow: 0 1px 0 var(--hi) inset, 0 18px 40px -16px rgba(0,0,0,0.85); }
 .brand { display: flex; align-items: center; gap: 0.6em; font-weight: 600; font-size: 1.04rem; letter-spacing: -0.02em; }
 .brand .glyph { width: 28px; height: 28px; border-radius: 7px; flex: 0 0 auto; background: var(--coral); color: #15110d; display: grid; place-items: center; font-style: italic; font-weight: 700; font-size: 0.95rem; box-shadow: 0 0 18px -4px var(--coral); font-family: Georgia, serif; }
 .brand small { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); display: block; margin-top: 1px; font-weight: 400; }
-.nav-links { display: flex; align-items: center; gap: 1.9rem; position: relative; }
-.nav-links a { font-size: 0.9rem; font-weight: 500; color: var(--text-2); transition: color 0.18s; position: relative; z-index: 2; }
-.nav-links a:hover, .nav-links a.active { color: var(--text); }
-/* gooey nav indicator */
-.goo-layer { position: absolute; left: 0; right: 0; bottom: -7px; height: 18px; z-index: 1; pointer-events: none; filter: url(#goo) drop-shadow(0 0 5px rgba(226,136,95,0.55)); }
-.nav-pill { position: absolute; bottom: 4px; left: 0; height: 7px; width: 40px; border-radius: 99px; background: var(--coral); opacity: 0; transition: transform 0.34s var(--ease), width 0.34s var(--ease), opacity 0.25s var(--ease); will-change: transform, width; }
+.nav-links { display: flex; align-items: center; gap: 1.9rem; }
+.nav-links a { font-size: 0.9rem; font-weight: 500; color: var(--text-2); transition: color 0.18s; position: relative; }
+.nav-links a:hover { color: var(--text); }
+/* simple underline that draws in on hover */
+.nav-links a::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; border-radius: 2px; background: var(--coral); transform: scaleX(0); transform-origin: left; transition: transform 0.28s var(--ease); }
+.nav-links a:hover::after { transform: scaleX(1); }
 .nav-cta { display: flex; align-items: center; gap: 0.8rem; }
 .nav-builder { display: inline-flex; align-items: center; gap: 0.4em; font-size: 0.84rem; font-weight: 600; color: var(--text); border: 1px solid var(--line-2); border-radius: 99px; padding: 7px 13px; transition: color 0.15s, border-color 0.15s; }
 .nav-builder svg { color: var(--coral); }
@@ -119,20 +119,14 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 .nav-toggle svg { width: 24px; height: 24px; }
 
 /* ── Atmosphere — a living aurora gradient (drifting, screen-blended orbs) ── */
-.atmos { position: fixed; inset: -12%; z-index: -2; pointer-events: none; overflow: hidden; }
-.atmos::before { content: ""; position: absolute; inset: -25%; background: conic-gradient(from 0deg at 50% 42%, transparent 0deg, rgba(226,136,95,0.10) 38deg, transparent 110deg, rgba(126,98,232,0.11) 188deg, transparent 250deg, rgba(226,136,95,0.07) 320deg, transparent 360deg); filter: blur(58px); animation: veilSpin 46s linear infinite; }
-@keyframes veilSpin { to { transform: rotate(360deg); } }
-.atmos b { position: absolute; border-radius: 50%; filter: blur(74px); mix-blend-mode: screen; will-change: transform; }
-.atmos .b1 { top: -6%; left: 4%; width: 48vw; height: 48vw; max-width: 700px; background: radial-gradient(circle, rgba(226,136,95,0.38), transparent 62%); animation: orb1 23s ease-in-out infinite alternate; }
-.atmos .b2 { top: -2%; right: -2%; width: 45vw; height: 45vw; max-width: 660px; background: radial-gradient(circle, rgba(126,98,232,0.32), transparent 62%); animation: orb2 29s ease-in-out infinite alternate; }
-.atmos .b3 { top: 32%; left: 38%; width: 44vw; height: 44vw; max-width: 620px; background: radial-gradient(circle, rgba(226,136,95,0.22), transparent 64%); animation: orb3 35s ease-in-out infinite alternate; }
-@keyframes orb1 { from { transform: translate(0,0) scale(1); } to { transform: translate(16%, 22%) scale(1.24); } }
-@keyframes orb2 { from { transform: translate(0,0) scale(1.05); } to { transform: translate(-18%, 16%) scale(1.2); } }
-@keyframes orb3 { from { transform: translate(0,0) scale(1); } to { transform: translate(14%, -16%) scale(1.3); } }
+.atmos { position: fixed; inset: 0; z-index: -2; pointer-events: none; overflow: hidden; }
+.atmos b { position: absolute; border-radius: 50%; filter: blur(10px); opacity: 0.5; }
+.atmos .b1 { top: -16%; left: 50%; width: 75vw; height: 55vw; max-width: 1000px; max-height: 720px; transform: translateX(-50%); background: radial-gradient(circle, rgba(226,136,95,0.20), transparent 60%); animation: drift1 20s ease-in-out infinite alternate; }
+.atmos .b2 { top: 24%; right: -10%; width: 50vw; height: 50vw; max-width: 620px; background: radial-gradient(circle, rgba(109,106,224,0.10), transparent 62%); animation: drift2 26s ease-in-out infinite alternate; }
+@keyframes drift1 { from { transform: translateX(-50%) translateY(0) scale(1); } to { transform: translateX(-54%) translateY(36px) scale(1.12); } }
+@keyframes drift2 { from { transform: translateY(0) scale(1); opacity: 0.1; } to { transform: translateY(-50px) scale(1.18); opacity: 0.16; } }
 
 /* ── Cursor — a soft light that follows you + a trailing dot/ring ── */
-.cursor-glow { position: fixed; top: 0; left: 0; width: 640px; height: 640px; border-radius: 50%; pointer-events: none; z-index: -1; background: radial-gradient(circle, rgba(226,136,95,0.11), transparent 60%); opacity: 0; transition: opacity 0.6s ease; will-change: transform; }
-@media (hover: none), (pointer: coarse) { .cursor-glow { display: none !important; } }
 
 /* ── React Bits-style rotating text (coral pill, per-character slide) ── */
 .rotate { display: inline-flex; align-items: center; justify-content: center; overflow: hidden; vertical-align: -0.2em; height: 1.5em; width: 7.4em; padding: 0 0.4em; border-radius: 0.5em; background: linear-gradient(180deg, var(--coral-2), var(--coral-press)); color: #1a1109; font-weight: 700; letter-spacing: -0.01em; box-shadow: 0 8px 24px -8px var(--coral); }
@@ -154,7 +148,7 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none; opacity: 0.025; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
 
 /* ── Hero ── */
-.hero { text-align: center; padding: clamp(54px, 9vw, 104px) 0 clamp(20px, 4vw, 48px); }
+.hero { text-align: center; padding: clamp(38px, 6vw, 72px) 0 clamp(14px, 3vw, 34px); }
 .hero .eyebrow { display: inline-block; }
 .hero h1 { margin: 1.1rem auto 0; max-width: 16ch; }
 .hero .lede { margin: 1.4rem auto 0; text-align: center; }
@@ -163,14 +157,14 @@ body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-eve
 .trust .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--line-2); }
 
 /* hero product panel */
-.hero-stage { margin-top: clamp(40px, 6vw, 72px); position: relative; perspective: 1600px; }
+.hero-stage { margin-top: clamp(28px, 4vw, 52px); position: relative; perspective: 1600px; }
 .hero-stage::before { content: ""; position: absolute; left: 50%; top: 6%; width: 72%; height: 88%; transform: translateX(-50%); background: radial-gradient(ellipse, rgba(226,136,95,0.22), transparent 65%); filter: blur(20px); z-index: -1; }
 
 /* scroll progress bar */
 .progress { position: fixed; top: 0; left: 0; height: 2px; width: 0; z-index: 200; background: linear-gradient(90deg, var(--coral), var(--coral-2)); box-shadow: 0 0 12px var(--coral); transition: width 0.08s linear; }
 
 /* ── Stats — editorial spec line, not a boxed dashboard grid ── */
-.stats-wrap { margin-top: clamp(40px, 6vw, 72px); }
+.stats-wrap { margin-top: clamp(26px, 4vw, 46px); }
 .claimline { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px 24px; max-width: 900px; margin: 0 auto; }
 .claimline .cl { display: inline-flex; align-items: baseline; gap: 9px; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.01em; color: var(--text-3); text-transform: lowercase; }
 .claimline .cl b { font-family: var(--sans); font-weight: 700; font-size: clamp(1.7rem, 2.6vw, 2.3rem); line-height: 1; letter-spacing: -0.035em; color: var(--text); font-variant-numeric: tabular-nums; }
@@ -178,9 +172,9 @@ body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-eve
 .claimline .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--coral); opacity: 0.7; flex: 0 0 auto; align-self: center; }
 
 /* ── Sections ── */
-.section { padding: clamp(64px, 8vw, 112px) 0; position: relative; scroll-margin-top: 82px; }
-#top { scroll-margin-top: 82px; }
-.section-head { max-width: 56ch; margin-bottom: clamp(38px, 6vw, 60px); }
+.section { padding: clamp(44px, 6vw, 80px) 0; position: relative; scroll-margin-top: 40px; }
+#top { scroll-margin-top: 80px; }
+.section-head { max-width: 56ch; margin-bottom: clamp(26px, 4vw, 44px); }
 .section-head.center { text-align: center; margin-inline: auto; }
 .section-head h2 { margin-top: 0.7rem; }
 .section-head .lede { margin-top: 1rem; }
@@ -482,22 +476,19 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <body>
 
 <div class="progress" id="progress"></div>
-<div class="cursor-glow" id="cursorGlow"></div>
 <div class="grid-bg"></div>
-<div class="atmos"><b class="b1"></b><b class="b2"></b><b class="b3"></b></div>
+<div class="atmos"><b class="b1"></b><b class="b2"></b></div>
 <div class="gblur" aria-hidden="true"><div></div><div></div><div></div><div></div><div></div></div>
-<svg class="goo-def" aria-hidden="true" width="0" height="0"><defs><filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10" result="g"/><feComposite in="SourceGraphic" in2="g" operator="atop"/></filter></defs></svg>
 
 <!-- NAV -->
 <header class="nav" id="nav">
-  <div class="wrap nav-in">
+  <div class="nav-in">
     <a href="#top" class="brand"><span class="glyph">C</span><span>Claude <small>for Premiere Pro</small></span></a>
-    <nav class="nav-links" id="navLinks">
-      <span class="goo-layer"><span class="nav-pill" id="navPill"></span></span>
+    <nav class="nav-links">
       <a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a>
     </nav>
     <div class="nav-cta">
-      <a href="app.html" class="nav-builder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M12 3l2.4 6.3L21 11l-6.6 1.7L12 19l-2.4-6.3L3 11l6.6-1.7z"/></svg> Web Builder</a>
+      <a href="app.html" class="nav-builder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M12 3l2.4 6.3L21 11l-6.6 1.7L12 19l-2.4-6.3L3 11l6.6-1.7z"/></svg> Motion Builder</a>
       <a href="#demo" class="btn btn-ghost">Watch demo</a>
       <a href="#pricing" class="btn btn-primary magnetic" data-buy>Get it</a>
       <button class="nav-toggle" id="navToggle" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
@@ -509,7 +500,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   <div class="mm-top"><span class="brand"><span class="glyph">C</span> Claude</span>
     <button class="nav-toggle" id="navClose" aria-label="Close menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
-  <nav><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a><a href="app.html">Web Builder</a></nav>
+  <nav><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a><a href="app.html">Motion Builder</a></nav>
   <a href="#pricing" class="btn btn-primary btn-block btn-lg" data-buy>Get it</a>
 </div>
 
@@ -719,7 +710,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   <div class="wrap">
     <div class="footer-grid">
       <div class="footer-about"><a href="#top" class="brand"><span class="glyph">C</span><span>Claude <small>for Premiere Pro</small></span></a><p class="blurb">An AI motion-graphics and editing copilot that lives inside Adobe Premiere Pro.</p></div>
-      <div><h4>Product</h4><ul><li><a href="#how">How it works</a></li><li><a href="#features">Features</a></li><li><a href="#pricing">Pricing</a></li><li><a href="app.html">Web Builder</a></li><li><a href="install.html">Install guide</a></li></ul></div>
+      <div><h4>Product</h4><ul><li><a href="#how">How it works</a></li><li><a href="#features">Features</a></li><li><a href="#pricing">Pricing</a></li><li><a href="app.html">Motion Builder</a></li><li><a href="install.html">Install guide</a></li></ul></div>
       <div><h4>Support</h4><ul><li><a href="#faq">FAQ</a></li><li><a href="install.html">Install guide</a></li><li><a href="#">Contact</a></li><li><a href="#">Changelog</a></li></ul></div>
       <div><h4>Legal</h4><ul><li><a href="#">Terms</a></li><li><a href="#">Privacy</a></li><li><a href="#">Refunds</a></li><li><a href="#">License</a></li></ul></div>
     </div>
@@ -834,23 +825,6 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
   hero.addEventListener('pointerleave', () => { panel.style.transform = ''; if (shine) shine.style.opacity = '0'; });
 })();
 
-/* cursor — a soft light that follows the pointer and lights the background */
-(function () {
-  if (window.matchMedia('(hover: none)').matches || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const glow = document.getElementById('cursorGlow');
-  if (!glow) return;
-  let mx = innerWidth / 2, my = innerHeight / 2, gx = mx, gy = my, shown = false;
-  addEventListener('pointermove', e => {
-    if (e.pointerType === 'touch') return;
-    mx = e.clientX; my = e.clientY;
-    if (!shown) { shown = true; glow.style.opacity = '1'; }
-  }, { passive: true });
-  (function loop() {
-    gx += (mx - gx) * 0.12; gy += (my - gy) * 0.12;
-    glow.style.transform = 'translate3d(' + gx + 'px,' + gy + 'px,0) translate(-50%,-50%)';
-    requestAnimationFrame(loop);
-  })();
-})();
 
 /* rotating text — cycles through what the panel makes */
 (function () {
@@ -875,40 +849,6 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
   }, 2400);
 })();
 
-/* gooey nav — liquid coral indicator with scroll-spy */
-(function () {
-  const navLinks = document.getElementById('navLinks'), pill = document.getElementById('navPill');
-  if (!navLinks || !pill) return;
-  const links = [].slice.call(navLinks.querySelectorAll('a'));
-  const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
-  let active = 0, settle = 0;
-  function place(link, instant) {
-    const lr = link.getBoundingClientRect(), nr = navLinks.getBoundingClientRect();
-    const left = lr.left - nr.left, w = link.offsetWidth;
-    const curL = parseFloat(pill.dataset.l || left), curW = parseFloat(pill.dataset.w || w);
-    pill.style.opacity = '1';
-    if (instant) { pill.style.transform = 'translateX(' + left + 'px)'; pill.style.width = w + 'px'; }
-    else {
-      const sL = Math.min(curL, left), sR = Math.max(curL + curW, left + w);
-      pill.style.transform = 'translateX(' + sL + 'px)'; pill.style.width = (sR - sL) + 'px';
-      clearTimeout(settle);
-      settle = setTimeout(() => { pill.style.transform = 'translateX(' + left + 'px)'; pill.style.width = w + 'px'; }, 170);
-    }
-    pill.dataset.l = left; pill.dataset.w = w;
-  }
-  function setActive(i, instant) { active = i; links.forEach((l, k) => l.classList.toggle('active', k === i)); place(links[i], instant); }
-  links.forEach(l => l.addEventListener('pointerenter', () => place(l)));
-  navLinks.addEventListener('pointerleave', () => place(links[active]));
-  let raf2 = 0;
-  addEventListener('scroll', () => { cancelAnimationFrame(raf2); raf2 = requestAnimationFrame(() => {
-    const y = scrollY + 130; let idx = 0;
-    sections.forEach((s, i) => { if (s && s.offsetTop <= y) idx = i; });
-    if (idx !== active) setActive(idx);
-  }); }, { passive: true });
-  addEventListener('resize', () => place(links[active], true), { passive: true });
-  addEventListener('load', () => setActive(0, true));
-  setActive(0, true);
-})();
 
 </script>
 </body>
