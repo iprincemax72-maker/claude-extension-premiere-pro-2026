@@ -866,8 +866,8 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
         <h3>Download the extension</h3>
         <p class="lead">Grab it for your computer, then unzip it anywhere.</p>
         <div class="dlrow">
-          <a class="dl mac" data-dlos="mac" href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/latest/download/claude-premiere-pro-macos.zip"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.5-.4 6.1 1 8.1.7 1 1.4 2.1 2.4 2 1-.04 1.3-.6 2.5-.6s1.5.6 2.6.6c1.1-.02 1.7-1 2.4-2 .8-1.2 1.1-2.3 1.1-2.3-.02-.01-2.1-.8-2.1-3.2zM14.5 6.1c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.5.9.07 1.8-.5 2.4-1.1z"/></svg> Download for macOS</a>
-          <a class="dl win" data-dlos="win" href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/latest/download/claude-premiere-pro-windows.zip"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.5 10.5 4.4v7.1H3zM11.4 4.3 21 3v8.5h-9.6zM3 12.5h7.5v7.1L3 18.5zM11.4 12.5H21V21l-9.6-1.3z"/></svg> Download for Windows</a>
+          <a class="dl mac" data-dlos="mac" href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/download/v1.0.1/claude-premiere-pro-macos.zip"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.5-.4 6.1 1 8.1.7 1 1.4 2.1 2.4 2 1-.04 1.3-.6 2.5-.6s1.5.6 2.6.6c1.1-.02 1.7-1 2.4-2 .8-1.2 1.1-2.3 1.1-2.3-.02-.01-2.1-.8-2.1-3.2zM14.5 6.1c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.5.9.07 1.8-.5 2.4-1.1z"/></svg> Download for macOS</a>
+          <a class="dl win" data-dlos="win" href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/download/v1.0.1/claude-premiere-pro-windows.zip"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.5 10.5 4.4v7.1H3zM11.4 4.3 21 3v8.5h-9.6zM3 12.5h7.5v7.1L3 18.5zM11.4 12.5H21V21l-9.6-1.3z"/></svg> Download for Windows</a>
         </div>
         <p style="color:var(--text-3);font-size:0.84rem;margin-top:2px">Same panel, cross-platform — each download bundles the right installer for your OS.</p>
       </div>
@@ -875,13 +875,16 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
       <div class="spanel" data-spanel="1">
         <div class="pn">Step 2</div>
         <h3>Run the one-step installer</h3>
-        <p class="lead">Open the unzipped folder in a terminal and run one command — it sets up everything (Node, the Claude CLI, ffmpeg, Remotion) and adds the panel to Premiere. ~3 minutes.</p>
+        <p class="lead">It sets up everything (Node, the Claude CLI, ffmpeg, Remotion) and adds the panel to Premiere. ~3 minutes.</p>
         <div class="os">
           <button class="on" data-os="mac">macOS</button>
           <button data-os="win">Windows</button>
         </div>
         <div class="os-pane on" data-os="mac"><div class="scode"><div class="scode-bar"><i></i><i></i><i></i><span class="lab">Terminal — macOS</span><button class="copy">Copy</button></div><pre><code>bash install.sh</code></pre></div></div>
-        <div class="os-pane" data-os="win"><div class="scode"><div class="scode-bar"><i></i><i></i><i></i><span class="lab">PowerShell — Windows</span><button class="copy">Copy</button></div><pre><code>powershell -ExecutionPolicy Bypass -File install.ps1</code></pre></div></div>
+        <div class="os-pane" data-os="win">
+          <div class="icallout" style="margin-top:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 4H8zM7 7h10l-1 12.5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 8 19.5z"/></svg><p>Just <b>double-click <code>INSTALL.bat</code></b> in the unzipped folder. No terminal, no commands. If Windows asks for permission, click <b>Yes</b>.</p></div>
+          <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--text-3);font-size:0.84rem">Prefer a command?</summary><div class="scode" style="margin-top:8px"><div class="scode-bar"><i></i><i></i><i></i><span class="lab">PowerShell — Windows</span><button class="copy">Copy</button></div><pre><code>powershell -ExecutionPolicy Bypass -File install.ps1</code></pre></div></details>
+        </div>
         <div class="icallout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><p><b>Close Premiere Pro first</b> so it picks up the panel when you reopen it.</p></div>
       </div>
 

