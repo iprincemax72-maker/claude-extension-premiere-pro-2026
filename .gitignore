@@ -8,3 +8,7 @@ _ref_frame.png
 .vscode/
 .idea/
 landing/serve.py
+
+# local preview + tooling
+landing/.playwright-mcp/
+landing/serve.py
