@@ -108,28 +108,37 @@
     else { $("chipAva").textContent = (name.trim()[0] || "U").toUpperCase(); }
 
     // ── usage ──
+    const OWNER = ["iprincemax72@gmail.com"];
+    const owner = OWNER.includes((u.email || "").toLowerCase());
     let p = await getProfile();
     if (!p) p = { plan: "free", renders_used: 0, renders_limit: 5 };
+    if (owner) p = Object.assign({}, p, { plan: "studio" });
+    const unlimited = owner;
     const used = p.renders_used ?? 0, limit = p.renders_limit ?? 5;
-    const paid = p.plan && p.plan !== "free";
-    const pct = limit > 0 ? Math.min(1, used / limit) : 0;
-    $("plan").textContent = PLAN_LABEL[p.plan] || "Free";
+    const paid = (p.plan && p.plan !== "free") || owner;
+    const pct = unlimited ? 0 : (limit > 0 ? Math.min(1, used / limit) : 0);
+    $("plan").textContent = owner ? "Owner" : (PLAN_LABEL[p.plan] || "Free");
     $("plan").classList.toggle("paid", !!paid);
-    $("used").textContent = used; $("ringNum").textContent = used;
-    $("limit").textContent = "/ " + limit + " renders";
+    $("used").textContent = unlimited ? "∞" : used;
+    $("ringNum").textContent = unlimited ? "∞" : used;
+    $("limit").textContent = unlimited ? "renders" : ("/ " + limit + " renders");
     $("barFill").style.width = Math.round(pct * 100) + "%";
     requestAnimationFrame(() => { $("ringProg").style.strokeDashoffset = (RING_C * (1 - pct)).toFixed(1); });
-    if (used >= limit) $("usageCard").classList.add("full");
+    if (!unlimited && used >= limit) $("usageCard").classList.add("full");
     const next = new Date(); const reset = new Date(next.getFullYear(), next.getMonth() + 1, 1);
     const resetStr = reset.toLocaleDateString(undefined, { month: "long", day: "numeric" });
-    $("reset").textContent = used >= limit ? "Out of renders — resets " + resetStr + "." : (limit - used) + " left · resets " + resetStr + ".";
+    $("reset").textContent = unlimited ? "Unlimited renders — you're the owner."
+      : (used >= limit ? "Out of renders — resets " + resetStr + "." : (limit - used) + " left · resets " + resetStr + ".");
 
     // ── plan card ──
     const tick = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
-    const feats = [limit + " renders / month", "Generate + Auto-Edit tools", "Reference images & video", "Runs on your own Claude plan"];
-    $("planName").textContent = (PLAN_LABEL[p.plan] || "Free") + " plan";
+    const feats = unlimited
+      ? ["Unlimited renders", "Auto-Edit + everything unlocked", "Reference images & video", "Owner account"]
+      : [limit + " renders / month", "Generate + Auto-Edit tools", "Reference images & video", "Runs on your own Claude plan"];
+    $("planName").textContent = owner ? "Owner" : ((PLAN_LABEL[p.plan] || "Free") + " plan");
     $("planFeat").innerHTML = feats.map(f => "<li>" + tick + "<span>" + f + "</span></li>").join("");
-    if (paid) $("upgrade").textContent = "Change plan";
+    if (paid && !owner) $("upgrade").textContent = "Change plan";
+    if (owner) { $("upgrade").style.display = "none"; }
     $("billing").addEventListener("click", () => { $("note").textContent = "Billing portal connects once Stripe is set up (Phase 2)."; });
 
     // ── live extension status (optional; localhost bridge, fails gracefully) ──

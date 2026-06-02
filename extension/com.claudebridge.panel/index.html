@@ -6070,28 +6070,31 @@ function openExternalURL(url) {
       pop.querySelector('#apSignin').onclick = startSignin;
       pop.querySelector('#apBrowser2').onclick = () => openExternalURL(SITE_URL);
     } else {
+      const owner = !!status.owner, unlimited = !!status.unlimited;
       const known = status.usageKnown !== false;
       const used = (status.renders_used != null) ? status.renders_used : 0;
       const lim = (status.renders_limit != null) ? status.renders_limit : 5;
-      const pct = (known && lim > 0) ? Math.min(100, Math.round(used / lim * 100)) : 0;
-      const usageText = known ? (used + ' / ' + lim) : '—';
-      const outOfRenders = known && used >= lim;
-      const resetText = outOfRenders
+      const pct = unlimited ? 0 : ((known && lim > 0) ? Math.min(100, Math.round(used / lim * 100)) : 0);
+      const usageText = unlimited ? '∞' : (known ? (used + ' / ' + lim) : '—');
+      const outOfRenders = !unlimited && known && used >= lim;
+      const resetText = unlimited ? 'Unlimited renders' : (outOfRenders
         ? "You've hit your monthly render limit. Upgrade for more."
-        : 'renders used this month';
+        : 'renders used this month');
+      const planLabel = owner ? 'Owner' : cap(status.plan || 'free');
       const avatar = status.avatar
         ? '<img src="' + status.avatar + '" referrerpolicy="no-referrer" alt="">'
         : '<span class="ap-i">' + ((status.name || 'U').trim().charAt(0).toUpperCase()) + '</span>';
       pop.innerHTML = '<div class="ap-who">' + avatar
           + '<div><b>' + (status.name || status.email || 'Account') + '</b><span>' + (status.email || '') + '</span></div></div>'
-        + '<div class="ap-usage"><div class="ap-row"><span>' + cap(status.plan || 'free') + ' plan</span><b>' + usageText + '</b></div>'
+        + '<div class="ap-usage"><div class="ap-row"><span>' + planLabel + (owner ? '' : ' plan') + '</span><b>' + usageText + '</b></div>'
           + '<div class="ap-bar"><i style="width:' + pct + '%"></i></div>'
           + '<p class="ap-reset">' + resetText + '</p></div>'
         + '<button class="ap-btn ap-primary" id="apBrowser" style="width:100%;margin-bottom:8px">Open in browser ↗</button>'
-        + '<div class="ap-acts"><button class="ap-btn ap-ghost" id="apUp">Upgrade</button><button class="ap-btn ap-ghost" id="apOut">Sign out</button></div>';
-      if (used >= lim) pop.classList.add('full');
+        + (owner ? '<button class="ap-btn ap-ghost" id="apOut" style="width:100%">Sign out</button>'
+                 : '<div class="ap-acts"><button class="ap-btn ap-ghost" id="apUp">Upgrade</button><button class="ap-btn ap-ghost" id="apOut">Sign out</button></div>');
+      if (outOfRenders) pop.classList.add('full');
       pop.querySelector('#apBrowser').onclick = () => openExternalURL(SITE_URL + '/account.html');
-      pop.querySelector('#apUp').onclick = () => openExternalURL(SITE_URL + '/#pricing');
+      const apUp = pop.querySelector('#apUp'); if (apUp) apUp.onclick = () => openExternalURL(SITE_URL + '/#pricing');
       pop.querySelector('#apOut').onclick = signout;
     }
     const r = btn.getBoundingClientRect();

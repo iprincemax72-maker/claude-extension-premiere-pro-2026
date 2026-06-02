@@ -2387,6 +2387,11 @@ async function supaRPC(fn, token) {
   } catch (e) { alog('rpc ' + fn + ' failed: ' + e.message); return null; }
 }
 
+// Owner accounts get unlimited everything (all features, no render metering),
+// independent of their Supabase plan. Set OWNER_EMAILS (comma-separated) to override.
+const OWNER_EMAILS = (process.env.OWNER_EMAILS || 'iprincemax72@gmail.com').toLowerCase().split(',').map(e => e.trim()).filter(Boolean);
+function isOwnerEmail(email) { return !!email && OWNER_EMAILS.includes(String(email).toLowerCase()); }
+
 async function authStatus() {
   if (!AUTH_ENABLED) return { enabled: false, signedIn: false };
   const s = loadSession();
@@ -2395,17 +2400,23 @@ async function authStatus() {
   if (!token) return { enabled: true, signedIn: false };   // session expired & couldn't refresh → re-connect
   const usage = await supaRPC('my_usage', token);
   const u = Array.isArray(usage) ? usage[0] : usage;
-  if (u && u.plan) _planCache = { plan: u.plan, at: Date.now() };   // feeds the Auto-Edit backstop
+  const email = (s.user && s.user.email) || '';
+  const owner = isOwnerEmail(email);
+  const plan = owner ? 'studio' : ((u && u.plan) || 'free');
+  if (owner) _planCache = { plan: 'studio', at: Date.now() };
+  else if (u && u.plan) _planCache = { plan: u.plan, at: Date.now() };   // don't cache 'free' on a transient RPC failure
   const meta = (s.user && (s.user.user_metadata || {})) || {};
   return {
     enabled: true, signedIn: true,
-    email: (s.user && s.user.email) || '',
-    name: meta.full_name || meta.name || (s.user && s.user.email) || 'Account',
+    email,
+    name: meta.full_name || meta.name || email || 'Account',
     avatar: meta.avatar_url || '',
-    usageKnown: !!u,                                        // false when the lookup failed — panel shows "—" not a fake 0
-    plan: (u && u.plan) || 'free',
+    owner,
+    unlimited: owner,                                       // panel/dashboard show ∞ instead of X/Y
+    usageKnown: owner ? true : !!u,                         // false when the lookup failed — UI shows "—" not a fake 0
+    plan,
     renders_used: (u && u.renders_used != null) ? u.renders_used : 0,
-    renders_limit: (u && u.renders_limit != null) ? u.renders_limit : 5,
+    renders_limit: owner ? 999999 : ((u && u.renders_limit != null) ? u.renders_limit : 5),
   };
 }
 
@@ -2415,6 +2426,7 @@ async function gateRender() {
   if (!AUTH_ENABLED) return { allowed: true };
   const s = loadSession();
   if (!s || !s.access_token) return { allowed: false, reason: 'signin' };
+  if (isOwnerEmail(s.user && s.user.email)) return { allowed: true };   // owner = unlimited, no metering
   const token = await freshToken();
   if (!token) return { allowed: false, reason: 'signin' };   // session died → must re-connect
   const remaining = await supaRPC('consume_render', token);
