@@ -5992,8 +5992,10 @@ function openExternalURL(url) {
     if (!status || !status.signedIn) {
       pop.innerHTML = '<div class="ap-h">Sign in</div>'
         + '<p class="ap-sub">Link your Claude account to render. Free plan includes 5 renders a month.</p>'
-        + '<button class="ap-btn ap-primary" id="apSignin">Sign in with Google</button>';
+        + '<button class="ap-btn ap-primary" id="apSignin">Sign in with Google</button>'
+        + '<button class="ap-btn ap-ghost" id="apBrowser2" style="width:100%;margin-top:8px">Open in browser ↗</button>';
       pop.querySelector('#apSignin').onclick = startSignin;
+      pop.querySelector('#apBrowser2').onclick = () => openExternalURL(SITE_URL);
     } else {
       const used = status.renders_used || 0, lim = status.renders_limit || 5;
       const pct = lim > 0 ? Math.min(100, Math.round(used / lim * 100)) : 0;
@@ -6005,9 +6007,11 @@ function openExternalURL(url) {
         + '<div class="ap-usage"><div class="ap-row"><span>' + cap(status.plan || 'free') + ' plan</span><b>' + used + ' / ' + lim + '</b></div>'
           + '<div class="ap-bar"><i style="width:' + pct + '%"></i></div>'
           + '<p class="ap-reset">renders used this month</p></div>'
-        + '<div class="ap-acts"><button class="ap-btn ap-primary" id="apUp">Upgrade</button><button class="ap-btn ap-ghost" id="apOut">Sign out</button></div>';
+        + '<button class="ap-btn ap-primary" id="apBrowser" style="width:100%;margin-bottom:8px">Open in browser ↗</button>'
+        + '<div class="ap-acts"><button class="ap-btn ap-ghost" id="apUp">Upgrade</button><button class="ap-btn ap-ghost" id="apOut">Sign out</button></div>';
       if (used >= lim) pop.classList.add('full');
-      pop.querySelector('#apUp').onclick = () => openExternalURL(SITE_URL + '/account.html');
+      pop.querySelector('#apBrowser').onclick = () => openExternalURL(SITE_URL + '/account.html');
+      pop.querySelector('#apUp').onclick = () => openExternalURL(SITE_URL + '/#pricing');
       pop.querySelector('#apOut').onclick = signout;
     }
     const r = btn.getBoundingClientRect();
