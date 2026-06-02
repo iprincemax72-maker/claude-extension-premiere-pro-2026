@@ -112,6 +112,9 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 .goo-layer { position: absolute; left: 0; right: 0; bottom: -7px; height: 18px; z-index: 1; pointer-events: none; filter: url(#goo) drop-shadow(0 0 5px rgba(226,136,95,0.55)); }
 .nav-pill { position: absolute; bottom: 4px; left: 0; height: 7px; width: 40px; border-radius: 99px; background: var(--coral); opacity: 0; transition: transform 0.34s var(--ease), width 0.34s var(--ease), opacity 0.25s var(--ease); will-change: transform, width; }
 .nav-cta { display: flex; align-items: center; gap: 0.8rem; }
+.nav-builder { display: inline-flex; align-items: center; gap: 0.4em; font-size: 0.84rem; font-weight: 600; color: var(--text); border: 1px solid var(--line-2); border-radius: 99px; padding: 7px 13px; transition: color 0.15s, border-color 0.15s; }
+.nav-builder svg { color: var(--coral); }
+.nav-builder:hover { color: var(--coral); border-color: rgba(226,136,95,0.5); }
 .nav-toggle { display: none; background: none; border: none; cursor: pointer; padding: 8px; color: var(--text); }
 .nav-toggle svg { width: 24px; height: 24px; }
 
@@ -129,10 +132,7 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 
 /* ── Cursor — a soft light that follows you + a trailing dot/ring ── */
 .cursor-glow { position: fixed; top: 0; left: 0; width: 640px; height: 640px; border-radius: 50%; pointer-events: none; z-index: -1; background: radial-gradient(circle, rgba(226,136,95,0.11), transparent 60%); opacity: 0; transition: opacity 0.6s ease; will-change: transform; }
-.cursor-dot { position: fixed; top: 0; left: 0; width: 11px; height: 11px; border-radius: 50%; pointer-events: none; z-index: 10000; background: var(--coral); box-shadow: 0 0 14px 2px rgba(226,136,95,0.75); opacity: 0; mix-blend-mode: screen; will-change: transform; transition: opacity 0.4s ease, width 0.22s var(--ease), height 0.22s var(--ease), background 0.22s var(--ease), border-color 0.22s var(--ease); border: 0 solid var(--coral); }
-.cursor-dot.hovering { width: 40px; height: 40px; background: rgba(226,136,95,0); border-width: 1.5px; box-shadow: 0 0 22px rgba(226,136,95,0.35); }
-.cursor-dot.down { width: 8px; height: 8px; }
-@media (hover: none), (pointer: coarse) { .cursor-glow, .cursor-dot { display: none !important; } }
+@media (hover: none), (pointer: coarse) { .cursor-glow { display: none !important; } }
 
 /* ── React Bits-style rotating text (coral pill, per-character slide) ── */
 .rotate { display: inline-flex; align-items: center; justify-content: center; overflow: hidden; vertical-align: -0.2em; height: 1.5em; width: 7.4em; padding: 0 0.4em; border-radius: 0.5em; background: linear-gradient(180deg, var(--coral-2), var(--coral-press)); color: #1a1109; font-weight: 700; letter-spacing: -0.01em; box-shadow: 0 8px 24px -8px var(--coral); }
@@ -457,7 +457,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 
 /* ── Responsive ── */
 @media (max-width: 860px) {
-  .nav-links, .nav-cta .btn-ghost { display: none; }
+  .nav-links, .nav-cta .btn-ghost, .nav-builder { display: none; }
   .nav-toggle { display: inline-flex; }
   .claimline { gap: 16px 22px; } .claimline .dot { display: none; }
   .flow { grid-template-columns: 1fr; gap: 14px; } .flow-rail { display: none; }
@@ -483,7 +483,6 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 
 <div class="progress" id="progress"></div>
 <div class="cursor-glow" id="cursorGlow"></div>
-<div class="cursor-dot" id="cursorDot"></div>
 <div class="grid-bg"></div>
 <div class="atmos"><b class="b1"></b><b class="b2"></b><b class="b3"></b></div>
 <div class="gblur" aria-hidden="true"><div></div><div></div><div></div><div></div><div></div></div>
@@ -498,6 +497,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
       <a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a>
     </nav>
     <div class="nav-cta">
+      <a href="app.html" class="nav-builder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M12 3l2.4 6.3L21 11l-6.6 1.7L12 19l-2.4-6.3L3 11l6.6-1.7z"/></svg> Web Builder</a>
       <a href="#demo" class="btn btn-ghost">Watch demo</a>
       <a href="#pricing" class="btn btn-primary magnetic" data-buy>Get it</a>
       <button class="nav-toggle" id="navToggle" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
@@ -509,7 +509,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   <div class="mm-top"><span class="brand"><span class="glyph">C</span> Claude</span>
     <button class="nav-toggle" id="navClose" aria-label="Close menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
-  <nav><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a></nav>
+  <nav><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a><a href="app.html">Web Builder</a></nav>
   <a href="#pricing" class="btn btn-primary btn-block btn-lg" data-buy>Get it</a>
 </div>
 
@@ -526,7 +526,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
       <span class="w coral" style="animation-delay:.42s">just</span>
       <span class="w coral" style="animation-delay:.52s">asking.</span>
     </h1>
-    <p class="lede load-up l3">Make the <span class="rotate" id="rotate" aria-label="title, lower third, caption, countdown and more">title</span> — just describe it.</p>
+    <p class="lede load-up l3">Make the <span class="rotate" id="rotate" aria-label="title, lower third, caption, countdown and more">title</span>. Just describe it.</p>
     <div class="hero-cta load-up l4">
       <a href="#pricing" class="btn btn-primary btn-lg magnetic" data-buy>Get it — <span data-price-inline>$19</span></a>
       <a href="#demo" class="link-arrow">Watch the 60-sec demo <span class="a">→</span></a>
@@ -719,7 +719,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   <div class="wrap">
     <div class="footer-grid">
       <div class="footer-about"><a href="#top" class="brand"><span class="glyph">C</span><span>Claude <small>for Premiere Pro</small></span></a><p class="blurb">An AI motion-graphics and editing copilot that lives inside Adobe Premiere Pro.</p></div>
-      <div><h4>Product</h4><ul><li><a href="#how">How it works</a></li><li><a href="#features">Features</a></li><li><a href="#pricing">Pricing</a></li><li><a href="#demo">Demo</a></li></ul></div>
+      <div><h4>Product</h4><ul><li><a href="#how">How it works</a></li><li><a href="#features">Features</a></li><li><a href="#pricing">Pricing</a></li><li><a href="app.html">Web Builder</a></li><li><a href="install.html">Install guide</a></li></ul></div>
       <div><h4>Support</h4><ul><li><a href="#faq">FAQ</a></li><li><a href="install.html">Install guide</a></li><li><a href="#">Contact</a></li><li><a href="#">Changelog</a></li></ul></div>
       <div><h4>Legal</h4><ul><li><a href="#">Terms</a></li><li><a href="#">Privacy</a></li><li><a href="#">Refunds</a></li><li><a href="#">License</a></li></ul></div>
     </div>
@@ -834,28 +834,20 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
   hero.addEventListener('pointerleave', () => { panel.style.transform = ''; if (shine) shine.style.opacity = '0'; });
 })();
 
-/* cursor — a soft light that follows you + a trailing ring dot */
+/* cursor — a soft light that follows the pointer and lights the background */
 (function () {
   if (window.matchMedia('(hover: none)').matches || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const glow = document.getElementById('cursorGlow'), dot = document.getElementById('cursorDot');
-  if (!glow || !dot) return;
-  let mx = innerWidth / 2, my = innerHeight / 2, gx = mx, gy = my, dx = mx, dy = my, shown = false;
+  const glow = document.getElementById('cursorGlow');
+  if (!glow) return;
+  let mx = innerWidth / 2, my = innerHeight / 2, gx = mx, gy = my, shown = false;
   addEventListener('pointermove', e => {
     if (e.pointerType === 'touch') return;
     mx = e.clientX; my = e.clientY;
-    if (!shown) { shown = true; glow.style.opacity = '1'; dot.style.opacity = '1'; }
+    if (!shown) { shown = true; glow.style.opacity = '1'; }
   }, { passive: true });
-  addEventListener('pointerdown', () => dot.classList.add('down'));
-  addEventListener('pointerup', () => dot.classList.remove('down'));
-  document.querySelectorAll('a, button, .tool, .tier, .qa, [data-buy], .sw').forEach(el => {
-    el.addEventListener('pointerenter', () => dot.classList.add('hovering'));
-    el.addEventListener('pointerleave', () => dot.classList.remove('hovering'));
-  });
   (function loop() {
     gx += (mx - gx) * 0.12; gy += (my - gy) * 0.12;
-    dx += (mx - dx) * 0.35; dy += (my - dy) * 0.35;
     glow.style.transform = 'translate3d(' + gx + 'px,' + gy + 'px,0) translate(-50%,-50%)';
-    dot.style.transform = 'translate3d(' + dx + 'px,' + dy + 'px,0) translate(-50%,-50%)';
     requestAnimationFrame(loop);
   })();
 })();

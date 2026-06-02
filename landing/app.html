@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Builder — make a website with Claude</title>
+<meta name="description" content="Paste your Claude API key and generate a complete website from a prompt — live in your browser. Your key never leaves your device." />
+<meta name="theme-color" content="#09090b" />
+<meta name="robots" content="noindex" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23E2885F'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='19' font-style='italic' fill='%23111' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#09090b; --bg-soft:#0b0b0e; --s1s:#121215; --s2:#1a1a1e; --s3:#232329;
+  --text:#FAFAFA; --text-2:#9a9aa1; --text-3:#7c7d87;
+  --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.14); --hi:rgba(255,255,255,0.05);
+  --coral:#E2885F; --coral-2:#F0A87E; --coral-press:#cc6f44; --btn:#F4F4F5; --btn-ink:#0a0a0b;
+  --red:#e1664f; --green:#6cbf7a;
+  --sans:"Schibsted Grotesk",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --ease:cubic-bezier(0.22,1,0.36,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.55;overflow:hidden}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--coral);outline-offset:2px;border-radius:6px}
+.bloom{position:fixed;top:-20%;left:-10%;width:50vw;height:40vw;max-width:760px;background:radial-gradient(circle,rgba(226,136,95,0.14),transparent 60%);filter:blur(50px);z-index:0;pointer-events:none}
+.bloom.b2{left:auto;right:-10%;top:auto;bottom:-25%;background:radial-gradient(circle,rgba(126,98,232,0.12),transparent 62%)}
+
+.app{position:relative;z-index:1;height:100%;display:flex;flex-direction:column}
+header.bar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 clamp(14px,2.5vw,24px);height:58px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 72%,transparent);backdrop-filter:blur(14px);flex:0 0 auto;z-index:5}
+.brand{display:flex;align-items:center;gap:.6em;font-weight:600;letter-spacing:-0.02em}
+.brand .glyph{width:26px;height:26px;border-radius:7px;background:var(--coral);color:#15110d;display:grid;place-items:center;font-style:italic;font-weight:700;font-family:Georgia,serif;font-size:.9rem;box-shadow:0 0 16px -4px var(--coral)}
+.brand small{display:block;font-family:var(--mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);margin-top:1px;font-weight:400}
+.bar .right{display:flex;align-items:center;gap:12px}
+.badge{font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--coral);border:1px solid rgba(226,136,95,.3);border-radius:99px;padding:5px 10px}
+.linkback{font-size:.85rem;color:var(--text-2);display:inline-flex;align-items:center;gap:.4em}
+.linkback:hover{color:var(--text)}
+
+.main{flex:1 1 auto;display:grid;grid-template-columns:380px 1fr;min-height:0}
+/* ── controls ── */
+.controls{border-right:1px solid var(--line);padding:clamp(16px,2vw,24px);overflow-y:auto;display:flex;flex-direction:column;gap:20px;background:var(--bg-soft)}
+.field label{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px}
+.field label .req{color:var(--coral)}
+.inp,.ta,.sel{width:100%;background:var(--s1s);border:1px solid var(--line-2);border-radius:10px;color:var(--text);font-family:var(--sans);font-size:.92rem;padding:11px 13px;transition:border-color .15s}
+.inp:focus,.ta:focus,.sel:focus{outline:none;border-color:rgba(226,136,95,.5)}
+.ta{resize:vertical;min-height:120px;line-height:1.5}
+.key-row{display:flex;gap:8px}
+.key-row .inp{flex:1;font-family:var(--mono);font-size:.82rem}
+.icon-btn{flex:0 0 auto;width:42px;border:1px solid var(--line-2);background:var(--s2);border-radius:10px;color:var(--text-2);cursor:pointer;display:grid;place-items:center;transition:.15s}
+.icon-btn:hover{color:var(--text);background:var(--s3)}
+.icon-btn svg{width:17px;height:17px}
+.hint{font-size:.76rem;color:var(--text-3);margin-top:8px;line-height:1.5}
+.hint a{color:var(--coral);text-decoration:underline;text-underline-offset:2px}
+.hint.safe{display:flex;gap:7px;align-items:flex-start}
+.hint.safe svg{width:14px;height:14px;color:var(--green);flex:0 0 auto;margin-top:2px}
+.sel{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%239a9aa1' stroke-width='2'%3E%3Cpath d='M3 5l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{font-size:.76rem;color:var(--text-2);background:var(--s1s);border:1px solid var(--line);border-radius:99px;padding:6px 11px;cursor:pointer;transition:.15s}
+.chip:hover{border-color:var(--line-2);color:var(--text)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5em;font-family:var(--sans);font-weight:600;font-size:.95rem;padding:.9em 1.3em;border-radius:10px;cursor:pointer;border:1px solid transparent;transition:filter .15s,background .15s,opacity .15s;width:100%}
+.btn-primary{background:var(--btn);color:var(--btn-ink);box-shadow:0 1px 0 rgba(255,255,255,.4) inset}
+.btn-primary:hover{filter:brightness(1.06)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;filter:none}
+.btn svg{width:1.05em;height:1.05em}
+.spin{width:15px;height:15px;border:2px solid rgba(0,0,0,.25);border-top-color:#15110d;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{font-size:.82rem;color:#f0a895;background:rgba(225,102,79,.1);border:1px solid rgba(225,102,79,.3);border-radius:9px;padding:10px 12px;display:none}
+.err.show{display:block}
+
+/* ── preview ── */
+.preview{display:flex;flex-direction:column;min-width:0;min-height:0}
+.pv-bar{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);flex:0 0 auto;background:var(--bg-soft)}
+.tabs{display:inline-flex;gap:3px;background:var(--s1s);border:1px solid var(--line);border-radius:9px;padding:3px}
+.tab{font-size:.82rem;font-weight:600;color:var(--text-2);background:none;border:none;cursor:pointer;padding:6px 13px;border-radius:7px;transition:.15s}
+.tab.active{background:var(--s3);color:var(--text)}
+.pv-bar .grow{flex:1}
+.pv-bar .mini{font-family:var(--mono);font-size:.66rem;color:var(--text-3)}
+.act{font-size:.82rem;font-weight:600;color:var(--text);background:var(--s2);border:1px solid var(--line-2);border-radius:8px;padding:7px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:.4em;transition:.15s}
+.act:hover{background:var(--s3)}
+.act:disabled{opacity:.4;cursor:not-allowed}
+.act svg{width:14px;height:14px}
+.stage{flex:1 1 auto;position:relative;min-height:0;background:#0c0c0f}
+.stage iframe{width:100%;height:100%;border:0;background:#fff;display:block}
+.codewrap{position:absolute;inset:0;display:none;overflow:auto;background:#0c0c10}
+.codewrap.show{display:block}
+.codewrap pre{margin:0;padding:18px;font-family:var(--mono);font-size:.76rem;line-height:1.65;color:#e9e3da;white-space:pre-wrap;word-break:break-word}
+.empty,.loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:30px;color:var(--text-3)}
+.loading{display:none;background:rgba(9,9,11,.7);backdrop-filter:blur(3px);z-index:3}
+.loading.show{display:flex}
+.empty h2{font-size:1.4rem;color:var(--text);font-weight:600;letter-spacing:-0.02em}
+.empty p{max-width:42ch;font-size:.92rem}
+.empty .big{width:64px;height:64px;border-radius:16px;background:var(--s1s);border:1px solid var(--line-2);display:grid;place-items:center;color:var(--coral);box-shadow:0 0 40px -12px var(--coral)}
+.empty .big svg{width:30px;height:30px}
+.loading .ring{width:46px;height:46px;border:3px solid var(--line-2);border-top-color:var(--coral);border-radius:50%;animation:spin .8s linear infinite}
+.loading .lt{font-family:var(--mono);font-size:.74rem;color:var(--text-2);letter-spacing:.04em}
+
+@media (max-width:880px){
+  body{overflow:auto}
+  .main{grid-template-columns:1fr}
+  .controls{border-right:none;border-bottom:1px solid var(--line)}
+  .stage{min-height:62vh}
+}
+</style>
+</head>
+<body>
+<div class="bloom"></div><div class="bloom b2"></div>
+<div class="app">
+  <header class="bar">
+    <a href="index.html" class="brand"><span class="glyph">C</span><span>Claude <small>Web Builder</small></span></a>
+    <div class="right">
+      <span class="badge">Bring your own key</span>
+      <a href="index.html" class="linkback"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Home</a>
+    </div>
+  </header>
+
+  <div class="main">
+    <aside class="controls">
+      <div class="field">
+        <label>Anthropic API key <span class="req">*</span></label>
+        <div class="key-row">
+          <input id="key" class="inp" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
+          <button class="icon-btn" id="eye" title="Show / hide" aria-label="Show or hide key"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+        <p class="hint safe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Stored only in <b>your browser</b> and sent straight to Anthropic. It never touches a server of ours. <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Get a key →</a></p>
+      </div>
+
+      <div class="field">
+        <label>Model</label>
+        <select id="model" class="sel">
+          <option value="claude-sonnet-4-6">Claude Sonnet 4.6 · fast</option>
+          <option value="claude-opus-4-8">Claude Opus 4.8 · best quality</option>
+          <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 · cheapest</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Describe your website <span class="req">*</span></label>
+        <textarea id="prompt" class="ta" placeholder="e.g. A landing page for a specialty coffee roaster — warm, editorial, with a hero, story, bean menu, and newsletter signup."></textarea>
+        <div class="chips" id="chips">
+          <span class="chip">Portfolio for a 3D artist</span>
+          <span class="chip">SaaS pricing page</span>
+          <span class="chip">Coffee roaster landing</span>
+          <span class="chip">Personal résumé site</span>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 6.3L21 11l-6.6 1.7L12 19l-2.4-6.3L3 11l6.6-1.7z"/></svg><span id="goTxt">Generate website</span></button>
+      <div class="err" id="err"></div>
+    </aside>
+
+    <section class="preview">
+      <div class="pv-bar">
+        <div class="tabs">
+          <button class="tab active" data-tab="preview">Preview</button>
+          <button class="tab" data-tab="code">Code</button>
+        </div>
+        <span class="grow"></span>
+        <span class="mini" id="meta"></span>
+        <button class="act" id="openTab" disabled title="Open in new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14L21 3"/></svg></button>
+        <button class="act" id="download" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Download</button>
+      </div>
+      <div class="stage">
+        <iframe id="frame" title="Generated site preview" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe>
+        <div class="codewrap" id="codewrap"><pre id="code"></pre></div>
+        <div class="empty" id="empty">
+          <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 14h6"/></svg></div>
+          <h2>Describe it, Claude builds it.</h2>
+          <p>Paste your API key, write what you want, and a complete single-file website appears here, live. Then download the HTML.</p>
+        </div>
+        <div class="loading" id="loading">
+          <div class="ring"></div>
+          <div class="lt" id="loadingTxt">Claude is building your site…</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const key = $('#key'), model = $('#model'), prompt = $('#prompt'), go = $('#go'), goTxt = $('#goTxt');
+const err = $('#err'), frame = $('#frame'), code = $('#code'), codewrap = $('#codewrap'), empty = $('#empty'),
+      loading = $('#loading'), loadingTxt = $('#loadingTxt'), meta = $('#meta'),
+      download = $('#download'), openTab = $('#openTab');
+let lastHTML = '';
+
+/* persistence */
+key.value = localStorage.getItem('anthropic_key') || '';
+model.value = localStorage.getItem('builder_model') || 'claude-sonnet-4-6';
+model.addEventListener('change', () => localStorage.setItem('builder_model', model.value));
+$('#eye').addEventListener('click', () => { key.type = key.type === 'password' ? 'text' : 'password'; });
+$('#chips').addEventListener('click', e => { if (e.target.classList.contains('chip')) { prompt.value = e.target.textContent + '.'; prompt.focus(); } });
+
+/* tabs */
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+  codewrap.classList.toggle('show', t.dataset.tab === 'code');
+}));
+
+function showErr(m){ err.textContent = m; err.classList.add('show'); }
+function clearErr(){ err.classList.remove('show'); }
+function setLoading(on){
+  loading.classList.toggle('show', on);
+  go.disabled = on;
+  goTxt.textContent = on ? 'Generating…' : 'Generate website';
+  go.querySelector('svg').style.display = on ? 'none' : '';
+  if (on && !go.querySelector('.spin')) { const s = document.createElement('span'); s.className = 'spin'; go.prepend(s); }
+  if (!on) { const s = go.querySelector('.spin'); if (s) s.remove(); }
+}
+
+function stripFences(t){
+  t = t.trim();
+  const m = t.match(/```(?:html)?\s*([\s\S]*?)```/i);
+  if (m) return m[1].trim();
+  const i = t.search(/<!DOCTYPE|<html/i);
+  return i >= 0 ? t.slice(i).trim() : t;
+}
+
+function showResult(html){
+  lastHTML = html;
+  frame.srcdoc = html;
+  code.textContent = html;
+  empty.style.display = 'none';
+  download.disabled = false; openTab.disabled = false;
+  meta.textContent = (html.length / 1024).toFixed(1) + ' KB';
+}
+
+const SYS = "You are an elite web designer and front-end engineer. Output ONE complete, self-contained HTML document (DOCTYPE through </html>) with all CSS in a <style> tag and any JS in a <script> tag inline. You may load fonts/icons from public CDNs but no other external dependencies. Make it genuinely polished, modern, responsive, and accessible — strong typography, thoughtful spacing, tasteful motion, a coherent color system. Do not use placeholder lorem ipsum; write real, fitting copy. Respond with ONLY the HTML — no markdown code fences, no commentary before or after.";
+
+async function generate(){
+  clearErr();
+  const k = key.value.trim();
+  if (!k){ showErr('Paste your Anthropic API key first.'); key.focus(); return; }
+  const p = prompt.value.trim();
+  if (!p){ showErr('Describe the website you want.'); prompt.focus(); return; }
+  localStorage.setItem('anthropic_key', k);
+  setLoading(true);
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': k,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: model.value,
+        max_tokens: 16000,
+        system: SYS,
+        messages: [{ role: 'user', content: 'Build a website: ' + p }]
+      })
+    });
+    if (!res.ok){
+      let detail = '';
+      try { const j = await res.json(); detail = j.error && j.error.message ? j.error.message : JSON.stringify(j); }
+      catch(_) { detail = await res.text(); }
+      if (res.status === 401) detail = 'Invalid API key.';
+      if (res.status === 429) detail = 'Rate limit / quota reached on your account.';
+      throw new Error('Anthropic API ' + res.status + ' — ' + detail);
+    }
+    const data = await res.json();
+    const text = (data.content || []).map(b => b.text || '').join('');
+    const html = stripFences(text);
+    if (!/<html|<!DOCTYPE/i.test(html)) throw new Error('Model did not return a full HTML page. Try again or switch model.');
+    showResult(html);
+  } catch (e){
+    showErr(/Failed to fetch/i.test(e.message)
+      ? 'Network/CORS error reaching Anthropic. Check your key and connection.'
+      : e.message);
+  }
+  setLoading(false);
+}
+go.addEventListener('click', generate);
+prompt.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') generate(); });
+
+download.addEventListener('click', () => {
+  const blob = new Blob([lastHTML], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'website.html'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+openTab.addEventListener('click', () => {
+  const blob = new Blob([lastHTML], { type: 'text/html' });
+  window.open(URL.createObjectURL(blob), '_blank');
+});
+</script>
+</body>
+</html>
