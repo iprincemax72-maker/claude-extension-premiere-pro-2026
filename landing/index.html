@@ -262,7 +262,10 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 @keyframes playPulse { 0% { box-shadow: 0 0 0 0 rgba(226,136,95,0.5); } 70%, 100% { box-shadow: 0 0 0 26px rgba(226,136,95,0); } }
 .video-frame .play:hover { transform: scale(1.06); box-shadow: 0 0 0 16px rgba(255,255,255,0.06); }
 .video-frame .play svg { width: 28px; height: 28px; margin-left: 3px; }
-.video-frame .cap { position: absolute; top: 15px; left: 16px; z-index: 2; font-family: var(--mono); font-size: 0.66rem; color: var(--text-2); background: rgba(0,0,0,0.35); border: 1px solid var(--line); border-radius: 7px; padding: 5px 9px; backdrop-filter: blur(4px); }
+.video-frame .cap { position: absolute; top: 15px; left: 16px; z-index: 2; font-family: var(--mono); font-size: 0.66rem; color: var(--text-2); background: rgba(0,0,0,0.35); border: 1px solid var(--line); border-radius: 7px; padding: 5px 9px; backdrop-filter: blur(4px); transition: opacity 0.3s var(--ease); }
+.video-frame .vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; background: #000; display: block; }
+.video-frame.playing .play, .video-frame.playing .cap { opacity: 0; pointer-events: none; }
+.video-frame.playing .vid { cursor: default; }
 .vplayer { position: absolute; left: 16px; right: 16px; bottom: 15px; z-index: 2; display: flex; align-items: center; gap: 12px; }
 .vplayer .vscrub { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.16); position: relative; }
 .vplayer .vscrub i { position: absolute; left: 0; top: 0; bottom: 0; width: 22%; background: linear-gradient(90deg, var(--coral), var(--coral-2)); border-radius: 2px; }
@@ -672,11 +675,13 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <!-- DEMO -->
 <section class="section" id="demo">
   <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">See it</p><h2>Sixty seconds, start to finish.</h2></div>
-    <div class="video-frame reveal d1">
+    <div class="section-head center reveal"><p class="eyebrow">See it</p><h2>Under a minute, start to finish.</h2></div>
+    <div class="video-frame reveal d1" id="demoFrame">
+      <video id="demoVideo" class="vid" poster="demo-poster.jpg" preload="metadata" playsinline>
+        <source src="demo.mp4" type="video/mp4">
+      </video>
       <button class="play magnetic" id="playDemo" aria-label="Play demo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
-      <span class="cap">60-second walkthrough</span>
-      <div class="vplayer"><span class="vscrub"><i></i></span><span class="vtime">0:13 / 1:00</span><span class="evol"><svg class="vicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg><span class="eslider" id="evol"><span class="etrack"><span class="efill"></span><span class="ehandle"></span></span></span></span></div>
+      <span class="cap">38-second walkthrough</span>
     </div>
   </div>
 </section>
@@ -885,8 +890,17 @@ billToggle.addEventListener('click', () => {
   document.querySelectorAll('.tier .per').forEach(el => { el.textContent = annual ? '/ mo, billed yearly' : '/ mo'; });
 });
 
-/* demo placeholder */
-document.getElementById('playDemo').addEventListener('click', () => alert('Drop your demo video here.\n\nReplace the .video-frame block with a YouTube/Vimeo iframe or a <video> tag.'));
+/* demo video — click the poster/play button to start (with sound) */
+(function () {
+  const frame = document.getElementById('demoFrame');
+  const v = document.getElementById('demoVideo');
+  const play = document.getElementById('playDemo');
+  if (!frame || !v) return;
+  const start = () => { frame.classList.add('playing'); v.controls = true; v.play().catch(() => {}); };
+  play.addEventListener('click', start);
+  v.addEventListener('click', () => { if (!frame.classList.contains('playing')) start(); });
+  v.addEventListener('ended', () => { frame.classList.remove('playing'); v.controls = false; v.currentTime = 0; });
+})();
 
 /* elastic volume slider — rubber-bands when dragged past the ends */
 (function () {
