@@ -2395,6 +2395,7 @@ async function authStatus() {
   if (!token) return { enabled: true, signedIn: false };   // session expired & couldn't refresh → re-connect
   const usage = await supaRPC('my_usage', token);
   const u = Array.isArray(usage) ? usage[0] : usage;
+  if (u && u.plan) _planCache = { plan: u.plan, at: Date.now() };   // feeds the Auto-Edit backstop
   const meta = (s.user && (s.user.user_metadata || {})) || {};
   return {
     enabled: true, signedIn: true,
@@ -2447,6 +2448,10 @@ const CONNECT_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"
 + '})();'
 + '<\/script></body></html>';
 
+// Plan → feature map (mirrors the panel). Auto-Edit is Studio-only.
+const PLAN_FEATURES = { free: { autoedit: false }, creator: { autoedit: false }, studio: { autoedit: true } };
+let _planCache = { plan: null, at: 0 };
+
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
@@ -2459,6 +2464,17 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && (req.url === '/chat' || req.url === '/autoedit' || req.url === '/autoedit/run' || req.url === '/autoedit/analyze' || req.url === '/autocut' || req.url === '/plan/questions')) {
     _heavyInflight++;
     res.on('close', () => { _heavyInflight = Math.max(0, _heavyInflight - 1); });
+  }
+
+  // Plan backstop: Auto-Edit / Auto-Cut are Studio-only. Only blocks when we KNOW
+  // the plan isn't Studio (cache populated by /auth/status polls) — fail-open
+  // otherwise, since the panel already locks the button.
+  if (req.method === 'POST' && (req.url === '/autoedit' || req.url === '/autoedit/run' || req.url === '/autoedit/analyze' || req.url === '/autocut')) {
+    if (AUTH_ENABLED && _planCache.plan && !(PLAN_FEATURES[_planCache.plan] || {}).autoedit) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Auto-Edit is a Studio feature — upgrade to unlock it.', planBlock: true, need: 'studio' }));
+      return;
+    }
   }
 
   // (dev /panel and /dev/reload-stream removed)

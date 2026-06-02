@@ -3652,6 +3652,77 @@ const BRIDGE = 'http://127.0.0.1:3737';
 // Public marketing/account site — where "Upgrade" / "Manage account" opens.
 const SITE_URL = 'https://claude-extension-premiere-pro-2026.vercel.app';
 
+/* ════════════════════════════════════════════════════════════════════════
+   PLAN GATING — Auto-Edit = Studio, Reference = Creator+, versions/prompt cap.
+   Plan comes from the bridge's /auth/status (applyPlan, called by the account
+   widget). When auth is disabled (no Supabase config) gating is OFF. The bridge
+   is the real backstop; this locks the panel UI so it can't be triggered. */
+const PLAN_FEATURES = {
+  free:    { autoedit: false, reference: false, maxVersions: 1,  label: 'Free' },
+  creator: { autoedit: false, reference: true,  maxVersions: 2,  label: 'Creator' },
+  studio:  { autoedit: true,  reference: true,  maxVersions: 10, label: 'Studio' },
+};
+let __authEnabled = false, __planSignedIn = false, __plan = 'studio';
+function planFeats() { return PLAN_FEATURES[__plan] || PLAN_FEATURES.free; }
+function planAllows(f) { return !__authEnabled || !!planFeats()[f]; }
+function planMaxVersions() { return __authEnabled ? planFeats().maxVersions : 10; }
+function applyPlan(status) {
+  __authEnabled = !!(status && status.enabled);
+  __planSignedIn = !!(status && status.signedIn);
+  __plan = (__planSignedIn && status.plan) ? status.plan : (__authEnabled ? 'free' : 'studio');
+  try { syncPlanLocks(); } catch (e) {}
+}
+function syncPlanLocks() {
+  const f = planFeats();
+  const ae = document.getElementById('autoeditBtn');
+  if (ae) ae.classList.toggle('plan-locked', __authEnabled && !f.autoedit);
+  const refAdd = document.getElementById('refAdd');
+  if (refAdd) refAdd.classList.toggle('plan-locked', __authEnabled && !f.reference);
+  const max = planMaxVersions();
+  document.querySelectorAll('#outputMenu .out-opt').forEach(b => b.classList.toggle('opt-locked', (Number(b.dataset.n) || 1) > max));
+  try { const t = tabs[activeTabIdx]; if (t && (t.outputs || 1) > max) { t.outputs = max; if (typeof syncOutputUI === 'function') syncOutputUI(); } } catch (e) {}
+}
+let __upsellEl = null;
+function showUpsell(feature) {
+  const free = (__plan === 'free');
+  const MAP = {
+    autoedit: { title: 'Auto-Edit is a Studio feature', desc: 'It reads your footage, finds the moments, and drops matching graphics across the whole clip.', plan: 'Studio', price: '$49' },
+    reference: { title: 'Reference matching is a Creator feature', desc: 'Drop in an image or video and Claude matches its style, colors, and motion.', plan: 'Creator', price: '$19' },
+    versions: { title: 'More versions per prompt', desc: 'Generate more takes from a single prompt and pick the best.', plan: free ? 'Creator' : 'Studio', price: free ? '$19' : '$49' },
+  };
+  const c = MAP[feature] || MAP.autoedit;
+  if (!__upsellEl) {
+    __upsellEl = document.createElement('div');
+    __upsellEl.className = 'upsell';
+    document.body.appendChild(__upsellEl);
+    __upsellEl.addEventListener('click', e => { if (e.target === __upsellEl || (e.target.closest && e.target.closest('[data-up-close]'))) __upsellEl.classList.remove('open'); });
+  }
+  __upsellEl.innerHTML = '<div class="upsell-card">'
+    + '<div class="upsell-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>'
+    + '<h3>' + c.title + '</h3><p>' + c.desc + ' Unlock it with the ' + c.plan + ' plan.</p>'
+    + '<div class="upsell-price">' + c.price + '<span> / mo</span></div>'
+    + '<button class="upsell-btn" id="upsellBuy">Get ' + c.plan + ' ↗</button>'
+    + '<button class="upsell-x" data-up-close>Maybe later</button></div>';
+  __upsellEl.querySelector('#upsellBuy').onclick = () => { openExternalURL(SITE_URL + '/#pricing'); __upsellEl.classList.remove('open'); };
+  __upsellEl.classList.add('open');
+}
+(function injectPlanCSS() {
+  const s = document.createElement('style');
+  s.textContent =
+    '.plan-locked{opacity:.5}'
+  + '.out-opt.opt-locked{opacity:.4}'
+  + '.upsell{position:fixed;inset:0;z-index:10000;display:none;place-items:center;padding:20px;background:rgba(5,5,7,.74)}'
+  + '.upsell.open{display:grid}'
+  + '.upsell-card{width:100%;max-width:300px;background:#161619;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:24px;text-align:center;box-shadow:0 30px 70px -36px #000}'
+  + '.upsell-ic{width:46px;height:46px;margin:0 auto 14px;border-radius:12px;background:rgba(226,136,95,.16);border:1px solid rgba(226,136,95,.34);display:grid;place-items:center;color:#E2885F}.upsell-ic svg{width:22px;height:22px}'
+  + '.upsell-card h3{font:700 16px system-ui;margin:0 0 6px;color:#fafafa}'
+  + '.upsell-card p{font:13px system-ui;color:#9a9aa1;line-height:1.5;margin:0 0 14px}'
+  + '.upsell-price{font:700 26px system-ui;color:#fafafa;margin-bottom:14px}.upsell-price span{font:500 13px system-ui;color:#7c7d87}'
+  + '.upsell-btn{width:100%;font:600 14px system-ui;color:#15110d;background:#E2885F;border:0;border-radius:10px;padding:11px;cursor:pointer}.upsell-btn:hover{filter:brightness(1.06)}'
+  + '.upsell-x{width:100%;margin-top:8px;background:none;border:0;color:#7c7d87;font:13px system-ui;cursor:pointer;padding:6px}.upsell-x:hover{color:#9a9aa1}';
+  document.head.appendChild(s);
+})();
+
 /* ═══════════════════════════════════════════════════════════════════════
    UNIFIED LOG COLLECTOR (panel side)
    Forwards panel events + errors to the bridge's /log endpoint so they
@@ -5969,9 +6040,10 @@ function openExternalURL(url) {
   async function refresh() {
     try { status = await fetch(BRIDGE + '/auth/status', { cache: 'no-store' }).then(r => r.json()); }
     catch { status = { enabled: false }; }
-    if (!status || !status.enabled) { btn.hidden = true; return status; }
+    if (!status || !status.enabled) { btn.hidden = true; try { applyPlan(status); } catch (e) {} return status; }
     btn.hidden = false;
     btn.classList.toggle('signed-in', !!status.signedIn);
+    try { applyPlan(status); } catch (e) {}
     if (pop && pop.classList.contains('open')) renderPop();
     return status;
   }
@@ -6615,6 +6687,7 @@ if (outputGroup && outputBtn && outputMenu) {
     const b = e.target.closest && e.target.closest('.out-opt');
     if (!b) return;
     const n = Math.max(1, Math.min(10, Number(b.dataset.n) || 1));
+    if (__authEnabled && n > planMaxVersions()) { showUpsell('versions'); closeOutMenu(); return; }   // plan cap
     const t = tabs[activeTabIdx];
     if (t) t.outputs = n;
     syncOutputUI();
@@ -6733,6 +6806,7 @@ function clearReferences() {
 }
 
 function pickReferenceFile() {
+  if (__authEnabled && !planFeats().reference) { showUpsell('reference'); return; }   // Creator+
   // CEP file API — fileTypes MUST be a comma-separated string, not array.
   try {
     if (window.cep && window.cep.fs && window.cep.fs.showOpenDialog) {
@@ -7430,6 +7504,7 @@ function aeRestore() {
   autoeditModal.classList.add('show');
 }
 async function openAutoeditModal() {
+  if (__authEnabled && !planFeats().autoedit) { showUpsell('autoedit'); return; }   // Studio-only
   try {
     const saved = JSON.parse(localStorage.getItem('claudeBridge.autoedit.opts') || 'null');
     if (saved && saved.density) {
