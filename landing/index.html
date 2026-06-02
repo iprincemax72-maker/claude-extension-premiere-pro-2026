@@ -525,15 +525,16 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 .see-output .ar { transition: transform 0.18s var(--ease); }
 .see-output:hover .ar { transform: translateX(3px); }
 .preview { display: none; position: relative; }
-.preview.open { display: block; }
 .preview-x { position: absolute; top: -10px; right: 2px; width: 34px; height: 34px; border-radius: 50%; background: var(--s2); border: 1px solid var(--line-2); color: var(--text); display: grid; place-items: center; cursor: pointer; font-size: 1rem; z-index: 3; }
 .preview-x:hover { background: var(--s3); }
 .preview-stage { display: flex; align-items: center; justify-content: center; gap: clamp(6px, 2.4vw, 26px); perspective: 1700px; width: 100%; max-width: 980px; }
-.pv-card { background: var(--s1s); border: 1px solid var(--line-2); border-radius: 16px; box-shadow: 0 1px 0 var(--hi) inset, 0 50px 110px -50px rgba(0,0,0,0.9); overflow: hidden; transition: transform 0.7s var(--ease), opacity 0.55s var(--ease); }
-.pv-ask { width: clamp(270px, 33vw, 358px); flex: 0 0 auto; transform: rotateY(15deg) translateX(-80px); opacity: 0; }
-.pv-out { width: clamp(300px, 39vw, 430px); flex: 0 0 auto; background: #000; transform: rotateY(-15deg) translateX(80px); opacity: 0; }
-.preview.open .pv-ask { transform: rotateY(10deg); opacity: 1; }
-.preview.open .pv-out { transform: rotateY(-10deg); opacity: 1; }
+.pv-card { background: var(--s1s); border: 1px solid var(--line-2); border-radius: 16px; box-shadow: 0 1px 0 var(--hi) inset, 0 50px 110px -50px rgba(0,0,0,0.9); overflow: hidden; }
+/* 1) prompt slides smoothly to the left */
+.pv-ask { width: clamp(270px, 33vw, 358px); flex: 0 0 auto; transform: translateX(54px) rotateY(10deg); opacity: 0; transition: transform 0.6s var(--ease), opacity 0.5s var(--ease); }
+.preview.open .pv-ask { transform: translateX(0) rotateY(10deg); opacity: 1; }
+/* 2) then the render fades UP (delayed until the prompt has settled) */
+.pv-out { width: clamp(300px, 39vw, 430px); flex: 0 0 auto; background: #000; transform: translateY(42px) rotateY(-10deg); opacity: 0; transition: transform 0.65s var(--ease) 0.55s, opacity 0.6s var(--ease) 0.55s; }
+.preview.open .pv-out { transform: translateY(0) rotateY(-10deg); opacity: 1; }
 .pv-out video { width: 100%; display: block; }
 .pv-bar { display: flex; align-items: center; gap: 7px; padding: 11px 14px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.02); }
 .pv-bar i { width: 10px; height: 10px; border-radius: 50%; }
@@ -543,7 +544,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 .pv-you { font-size: 0.92rem; color: var(--text-2); line-height: 1.55; margin-bottom: 15px; }
 .pv-file { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 0.72rem; color: var(--text); border: 1px solid var(--line-2); border-radius: 9px; padding: 9px 12px; background: var(--bg-soft); }
 .pv-file svg { width: 15px; height: 15px; color: var(--coral); flex: 0 0 auto; }
-.pv-arrow { flex: 0 0 auto; color: var(--coral); opacity: 0; transition: opacity 0.5s var(--ease) 0.25s; }
+.pv-arrow { flex: 0 0 auto; color: var(--coral); opacity: 0; transition: opacity 0.4s var(--ease) 0.42s; }
 .pv-arrow svg { width: 26px; height: 26px; }
 .preview.open .pv-arrow { opacity: 1; }
 @media (max-width: 720px) {
@@ -1208,9 +1209,11 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
   const btn = document.getElementById('seeOutput');
   if (!btn) return;
   const hero = document.getElementById('heroPanel');
+  let _playTimer = null;
   const close = () => {
     const box = document.getElementById('outBox'), vid = document.getElementById('outVideo');
-    if (box) box.classList.remove('open');
+    if (_playTimer) { clearTimeout(_playTimer); _playTimer = null; }
+    if (box) { box.classList.remove('open'); box.style.display = 'none'; }
     if (hero) hero.style.display = '';
     if (vid) try { vid.pause(); } catch {}
   };
@@ -1218,8 +1221,10 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
     const box = document.getElementById('outBox'), vid = document.getElementById('outVideo');
     if (!box) return;
     if (hero) hero.style.display = 'none';   // swap the mockup out, in place
-    box.classList.add('open');
-    if (vid) { vid.currentTime = 0; vid.play().catch(() => {}); }
+    box.style.display = 'block';             // render at the offset/hidden start state
+    void box.offsetWidth;                    // reflow so the slide + fade-up actually animate
+    box.classList.add('open');               // prompt slides left, then render fades up
+    if (vid) { vid.currentTime = 0; _playTimer = setTimeout(() => { vid.play().catch(() => {}); }, 560); }  // play as it fades up
   });
   document.addEventListener('click', e => {
     const box = document.getElementById('outBox');
