@@ -442,6 +442,8 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 @keyframes caret { 50% { opacity: 0; } }
 .mock-composer .send { width: 34px; height: 34px; border-radius: 8px; background: var(--coral); color: #15110d; display: grid; place-items: center; flex: 0 0 auto; box-shadow: 0 0 18px -6px var(--coral); }
 .mock-composer .send svg { width: 16px; height: 16px; }
+/* tilted-card glare (React Bits) — a highlight that tracks the cursor */
+.glass .shine { position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: inherit; opacity: 0; transition: opacity 0.3s var(--ease); background: radial-gradient(380px circle at var(--gx,50%) var(--gy,50%), rgba(255,255,255,0.16), transparent 45%); mix-blend-mode: overlay; }
 
 /* ── Responsive ── */
 @media (max-width: 860px) {
@@ -534,6 +536,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
           </div></div>
         </div>
         <div class="mock-composer"><span class="field">Ask Claude…</span><span class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        <div class="shine" aria-hidden="true"></div>
       </div>
     </div>
 
@@ -801,17 +804,22 @@ document.querySelectorAll('.tool').forEach(card => card.addEventListener('pointe
   card.style.setProperty('--mx', (e.clientX - r.left) + 'px'); card.style.setProperty('--my', (e.clientY - r.top) + 'px');
 }));
 
-/* hero panel tilt */
+/* hero panel — tilted card (3D tilt toward cursor + tracking glare) */
 (function () {
   const panel = document.getElementById('heroPanel'), hero = document.querySelector('.hero');
   if (!panel || !hero || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const shine = panel.querySelector('.shine');
   let raf = 0;
   hero.addEventListener('pointermove', e => {
     const r = panel.getBoundingClientRect();
-    const dx = (e.clientX - (r.left + r.width/2)) / r.width, dy = (e.clientY - (r.top + r.height/2)) / r.height;
-    cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { panel.style.transform = 'rotateX(' + (-dy*4) + 'deg) rotateY(' + (dx*4) + 'deg)'; });
+    const px = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    const py = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(() => {
+      panel.style.transform = 'rotateX(' + ((0.5 - py) * 16).toFixed(2) + 'deg) rotateY(' + ((px - 0.5) * 16).toFixed(2) + 'deg) scale(1.02)';
+      if (shine) { shine.style.setProperty('--gx', (px * 100) + '%'); shine.style.setProperty('--gy', (py * 100) + '%'); shine.style.opacity = '1'; }
+    });
   });
-  hero.addEventListener('pointerleave', () => { panel.style.transform = ''; });
+  hero.addEventListener('pointerleave', () => { panel.style.transform = ''; if (shine) shine.style.opacity = '0'; });
 })();
 
 /* cursor — a soft light that follows you + a trailing ring dot */
