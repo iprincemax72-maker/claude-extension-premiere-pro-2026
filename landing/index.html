@@ -144,13 +144,6 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 @keyframes rtOut { from { transform: none; opacity: 1; } to { transform: translateY(-118%); opacity: 0; } }
 
 /* ── React Bits-style gradual blur — content dissolves into the bottom edge ── */
-.gblur { position: fixed; left: 0; right: 0; bottom: 0; height: 88px; z-index: 95; pointer-events: none; }
-.gblur > div { position: absolute; inset: 0; }
-.gblur > div:nth-child(1){ -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); -webkit-mask: linear-gradient(to top, #000 0%, #000 14%, transparent 34%); mask: linear-gradient(to top, #000 0%, #000 14%, transparent 34%); }
-.gblur > div:nth-child(2){ -webkit-backdrop-filter: blur(3.5px); backdrop-filter: blur(3.5px); -webkit-mask: linear-gradient(to top, transparent 10%, #000 30%, #000 44%, transparent 62%); mask: linear-gradient(to top, transparent 10%, #000 30%, #000 44%, transparent 62%); }
-.gblur > div:nth-child(3){ -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); -webkit-mask: linear-gradient(to top, transparent 34%, #000 54%, #000 66%, transparent 82%); mask: linear-gradient(to top, transparent 34%, #000 54%, #000 66%, transparent 82%); }
-.gblur > div:nth-child(4){ -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px); -webkit-mask: linear-gradient(to top, transparent 60%, #000 80%, transparent 100%); mask: linear-gradient(to top, transparent 60%, #000 80%, transparent 100%); }
-.gblur > div:nth-child(5){ -webkit-backdrop-filter: blur(0.5px); backdrop-filter: blur(0.5px); -webkit-mask: linear-gradient(to top, transparent 80%, #000 100%); mask: linear-gradient(to top, transparent 80%, #000 100%); }
 
 /* grain */
 body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none; opacity: 0.025; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
@@ -180,7 +173,7 @@ body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-eve
 .claimline .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--coral); opacity: 0.7; flex: 0 0 auto; align-self: center; }
 
 /* ── Sections ── */
-.section { padding: clamp(44px, 6vw, 80px) 0; position: relative; scroll-margin-top: 40px; }
+.section { padding: clamp(64px, 9vw, 120px) 0; position: relative; scroll-margin-top: 40px; }
 #top { scroll-margin-top: 80px; }
 .section-head { max-width: 56ch; margin-bottom: clamp(26px, 4vw, 44px); }
 .section-head.center { text-align: center; margin-inline: auto; }
@@ -273,6 +266,18 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .video-frame .unmute { position: absolute; top: 15px; right: 16px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; font-family: var(--sans); font-size: 0.74rem; font-weight: 600; color: var(--text); background: rgba(0,0,0,0.55); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 12px 6px 10px; cursor: pointer; backdrop-filter: blur(6px); box-shadow: 0 6px 18px -8px rgba(0,0,0,0.7); transition: background 0.15s var(--ease), transform 0.15s var(--ease); }
 .video-frame .unmute:hover { background: rgba(0,0,0,0.72); transform: translateY(-1px); }
 .video-frame .unmute svg { width: 14px; height: 14px; }
+/* Electric border — vanilla port of React Bits ElectricBorder, coral to match */
+.electric-border { --eb-color: var(--coral); position: relative; margin-top: clamp(32px, 5vw, 50px); border-radius: 16px; isolation: isolate; }
+.electric-border .video-frame { margin-top: 0; }
+.eb-canvas-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; }
+.eb-canvas { display: block; }
+.electric-border .eb-content { position: relative; z-index: 1; border-radius: inherit; }
+.eb-layers { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0; }
+.eb-glow-1, .eb-glow-2, .eb-background-glow { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-sizing: border-box; }
+.eb-glow-1 { border: 2px solid color-mix(in srgb, var(--eb-color) 60%, transparent); filter: blur(1px); }
+.eb-glow-2 { border: 2px solid var(--eb-color); filter: blur(4px); }
+.eb-background-glow { z-index: -1; transform: scale(1.06); filter: blur(28px); opacity: 0.24; background: linear-gradient(-30deg, var(--eb-color), transparent, var(--eb-color)); }
+@media (prefers-reduced-motion: reduce) { .eb-canvas-container { display: none; } }
 .vplayer { position: absolute; left: 16px; right: 16px; bottom: 15px; z-index: 2; display: flex; align-items: center; gap: 12px; }
 .vplayer .vscrub { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.16); position: relative; }
 .vplayer .vscrub i { position: absolute; left: 0; top: 0; bottom: 0; width: 22%; background: linear-gradient(90deg, var(--coral), var(--coral-2)); border-radius: 2px; }
@@ -544,8 +549,6 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <div class="progress" id="progress"></div>
 <div class="grid-bg"></div>
 <div class="atmos"><b class="b1"></b><b class="b2"></b></div>
-<div class="gblur" aria-hidden="true"><div></div><div></div><div></div><div></div><div></div></div>
-
 <!-- NAV -->
 <header class="nav" id="nav">
   <div class="nav-in">
@@ -669,13 +672,6 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
         <div class="tviz glow"><div class="ae"><div class="ae-line"></div><div class="ae-line s"></div><div class="ae-line"></div><div class="ae-track"><span class="m" style="left:18%"></span><span class="m" style="left:46%"></span><span class="m" style="left:73%"></span></div></div></div>
       </div>
     </div>
-    <div class="caps reveal d2">
-      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Runs on your Claude plan — no API key</span>
-      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Match a reference image or video</span>
-      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Iterate by just chatting</span>
-      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Asks before it builds</span>
-      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> One-click install · Mac &amp; Windows</span>
-    </div>
   </div>
 </section>
 
@@ -683,13 +679,17 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <section class="section" id="demo">
   <div class="wrap">
     <div class="section-head center reveal"><p class="eyebrow">See it</p><h2>Under a minute, start to finish.</h2></div>
-    <div class="video-frame reveal d1" id="demoFrame">
-      <video id="demoVideo" class="vid" poster="demo-poster.jpg" preload="metadata" playsinline>
-        <source src="demo.mp4" type="video/mp4">
-      </video>
-      <button class="play magnetic" id="playDemo" aria-label="Play demo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
-      <span class="cap">38-second walkthrough</span>
-      <button class="unmute" id="demoUnmute" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg> Tap for sound</button>
+    <div class="electric-border reveal d1" id="demoEB">
+      <div class="eb-canvas-container"><canvas class="eb-canvas" id="ebCanvas"></canvas></div>
+      <div class="eb-layers"><span class="eb-glow-1"></span><span class="eb-glow-2"></span><span class="eb-background-glow"></span></div>
+      <div class="video-frame eb-content" id="demoFrame">
+        <video id="demoVideo" class="vid" poster="demo-poster.jpg" preload="metadata" playsinline>
+          <source src="demo.mp4" type="video/mp4">
+        </video>
+        <button class="play magnetic" id="playDemo" aria-label="Play demo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+        <span class="cap">38-second walkthrough</span>
+        <button class="unmute" id="demoUnmute" hidden></button>
+      </div>
     </div>
   </div>
 </section>
@@ -899,36 +899,128 @@ billToggle.addEventListener('click', () => {
 });
 
 /* demo video — autoplays MUTED when scrolled into view (browsers block sound-on
-   autoplay); a "Tap for sound" pill unmutes. Click the poster to play with sound. */
+   autoplay); the pill toggles sound on/off. Click the poster to play with sound. */
 (function () {
   const frame = document.getElementById('demoFrame');
   const v = document.getElementById('demoVideo');
   const play = document.getElementById('playDemo');
-  const unmute = document.getElementById('demoUnmute');
+  const pill = document.getElementById('demoUnmute');
   if (!frame || !v) return;
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const syncUnmute = () => { if (unmute) unmute.hidden = !(v.muted && !v.paused && !v.ended); };
+  const SND_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg><span>Tap for sound</span>';
+  const SND_ON  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg><span>Mute</span>';
+  const syncPill = () => {
+    if (!pill) return;
+    const playing = !v.paused && !v.ended;
+    pill.hidden = !playing;
+    if (playing) pill.innerHTML = v.muted ? SND_OFF : SND_ON;
+  };
   const reveal = () => { frame.classList.add('playing'); v.controls = true; };
-  const playLoud = () => { v.muted = false; reveal(); v.play().catch(() => {}); syncUnmute(); };
+  const playLoud = () => { v.muted = false; reveal(); v.play().catch(() => {}); };
 
   if (play) play.addEventListener('click', playLoud);
   v.addEventListener('click', () => { if (!frame.classList.contains('playing')) playLoud(); });
-  if (unmute) unmute.addEventListener('click', e => { e.stopPropagation(); v.muted = false; v.play().catch(() => {}); });
-  v.addEventListener('volumechange', syncUnmute);
-  v.addEventListener('pause', syncUnmute);
-  v.addEventListener('ended', () => { frame.classList.remove('playing'); v.controls = false; v.currentTime = 0; if (unmute) unmute.hidden = true; });
+  if (pill) pill.addEventListener('click', e => { e.stopPropagation(); v.muted = !v.muted; if (!v.muted) v.play().catch(() => {}); });
+  v.addEventListener('volumechange', syncPill);
+  v.addEventListener('play', syncPill);
+  v.addEventListener('pause', syncPill);
+  v.addEventListener('ended', () => { frame.classList.remove('playing'); v.controls = false; v.currentTime = 0; if (pill) pill.hidden = true; });
 
   if (!reduce && 'IntersectionObserver' in window) {
-    let started = false;
+    let everPlayed = false;
     const io = new IntersectionObserver(es => es.forEach(e => {
-      if (e.isIntersecting && e.intersectionRatio >= 0.4) {
-        if (v.paused && !v.ended) { v.muted = true; v.play().then(() => { reveal(); syncUnmute(); }).catch(() => {}); started = true; }
-      } else if (started && !e.isIntersecting && !v.paused && !v.ended) {
-        v.pause();
+      if (e.intersectionRatio >= 0.5) {
+        if (v.paused && !v.ended) { if (!everPlayed) v.muted = true; v.play().then(() => { reveal(); syncPill(); }).catch(() => {}); everPlayed = true; }
+      } else if (e.intersectionRatio < 0.25 && !v.paused && !v.ended) {
+        v.pause();   // scrolled mostly out of view (up or down) → pause
       }
-    }), { threshold: [0, 0.4, 0.75, 1] });
+    }), { threshold: [0, 0.25, 0.5, 0.75, 1] });
     io.observe(frame);
   }
+})();
+
+
+/* Electric border around the demo — vanilla port of React Bits ElectricBorder.
+   Animates only while on-screen; respects prefers-reduced-motion. */
+(function () {
+  const canvas = document.getElementById('ebCanvas');
+  const container = document.getElementById('demoFrame');
+  if (!canvas || !container) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const color = (getComputedStyle(document.documentElement).getPropertyValue('--coral') || '#E2885F').trim();
+  const speed = 1, chaos = 0.06, borderRadius = 16;
+  const octaves = 10, lacunarity = 1.6, gain = 0.7, frequency = 10, baseFlatness = 0, displacement = 60, borderOffset = 60;
+
+  const random = x => (Math.sin(x * 12.9898) * 43758.5453) % 1;
+  const noise2D = (x, y) => {
+    const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+    const a = random(i + j * 57), b = random(i + 1 + j * 57), c = random(i + (j + 1) * 57), d = random(i + 1 + (j + 1) * 57);
+    const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+    return a * (1 - ux) * (1 - uy) + b * ux * (1 - uy) + c * (1 - ux) * uy + d * ux * uy;
+  };
+  const octavedNoise = (x, time, seed) => {
+    let y = 0, amp = chaos, freq = frequency;
+    for (let i = 0; i < octaves; i++) {
+      let oa = amp; if (i === 0) oa *= baseFlatness;
+      y += oa * noise2D(freq * x + seed * 100, time * freq * 0.3);
+      freq *= lacunarity; amp *= gain;
+    }
+    return y;
+  };
+  const corner = (cx, cy, r, start, arc, p) => ({ x: cx + r * Math.cos(start + p * arc), y: cy + r * Math.sin(start + p * arc) });
+  const rrPoint = (t, left, top, w, h, r) => {
+    const sw = w - 2 * r, sh = h - 2 * r, ca = Math.PI * r / 2;
+    let d = t * (2 * sw + 2 * sh + 4 * ca);
+    if (d <= sw) return { x: left + r + d, y: top }; d -= sw;
+    if (d <= ca) return corner(left + w - r, top + r, r, -Math.PI / 2, Math.PI / 2, d / ca); d -= ca;
+    if (d <= sh) return { x: left + w, y: top + r + d }; d -= sh;
+    if (d <= ca) return corner(left + w - r, top + h - r, r, 0, Math.PI / 2, d / ca); d -= ca;
+    if (d <= sw) return { x: left + w - r - d, y: top + h }; d -= sw;
+    if (d <= ca) return corner(left + r, top + h - r, r, Math.PI / 2, Math.PI / 2, d / ca); d -= ca;
+    if (d <= sh) return { x: left, y: top + h - r - d }; d -= sh;
+    return corner(left + r, top + r, r, Math.PI, Math.PI / 2, Math.min(1, d / ca));
+  };
+
+  let W = 0, H = 0, dpr = 1, time = 0, lastT = 0, raf = 0, visible = false;
+  function size() {
+    const rect = container.getBoundingClientRect();
+    if (!rect.width) return;
+    W = rect.width + borderOffset * 2; H = rect.height + borderOffset * 2;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  }
+  size();
+
+  function draw(t) {
+    const dt = (t - lastT) / 1000; lastT = t;
+    time += (dt > 0 && dt < 0.1 ? dt : 0.016) * speed;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const bw = W - 2 * borderOffset, bh = H - 2 * borderOffset;
+    const r = Math.min(borderRadius, Math.min(bw, bh) / 2);
+    const samples = Math.max(64, Math.floor((2 * (bw + bh) + 2 * Math.PI * r) / 2));
+    ctx.beginPath();
+    for (let i = 0; i <= samples; i++) {
+      const p = i / samples, pt = rrPoint(p, borderOffset, borderOffset, bw, bh, r);
+      const dx = pt.x + octavedNoise(p * 8, time, 0) * displacement;
+      const dy = pt.y + octavedNoise(p * 8, time, 1) * displacement;
+      if (i === 0) ctx.moveTo(dx, dy); else ctx.lineTo(dx, dy);
+    }
+    ctx.closePath(); ctx.stroke();
+    if (visible) raf = requestAnimationFrame(draw);
+  }
+
+  if ('ResizeObserver' in window) new ResizeObserver(size).observe(container);
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting && !visible) { visible = true; lastT = performance.now(); raf = requestAnimationFrame(draw); }
+    else if (!e.isIntersecting && visible) { visible = false; cancelAnimationFrame(raf); }
+  }), { threshold: 0 });
+  io.observe(container);
 })();
 
 /* elastic volume slider — rubber-bands when dragged past the ends */
