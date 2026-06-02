@@ -6044,18 +6044,52 @@ function openExternalURL(url) {
   + '.acct-pop.full .ap-reset{color:#e98c7a;font-weight:600}'
   + '.acct-pop .ap-acts{display:flex;gap:6px;width:100%}'
   + '.acct-pop .ap-btn{flex:1 1 0;min-width:0;margin:0;position:static;box-shadow:none;text-align:center;font:600 12px system-ui;border:0;border-radius:8px;padding:.62em;cursor:pointer;background:#232329;color:#fafafa}'
-  + '.acct-pop .ap-btn:hover{background:#2c2c33}.acct-pop .ap-btn.ap-primary{background:#E2885F;color:#15110d}.acct-pop .ap-btn.ap-primary:hover{filter:brightness(1.06)}.acct-pop .ap-btn.ap-ghost{background:transparent;border:1px solid rgba(255,255,255,.14)}';
+  + '.acct-pop .ap-btn:hover{background:#2c2c33}.acct-pop .ap-btn.ap-primary{background:#E2885F;color:#15110d}.acct-pop .ap-btn.ap-primary:hover{filter:brightness(1.06)}.acct-pop .ap-btn.ap-ghost{background:transparent;border:1px solid rgba(255,255,255,.14)}'
+  // ── Login wall: blocks the whole panel until the user signs in ──
+  + '#loginWall{position:fixed;inset:0;z-index:100000;display:none;place-items:center;padding:22px;background:rgba(9,9,11,.86);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}'
+  + '#loginWall.show{display:grid}'
+  + '#loginWall .lw-card{width:100%;max-width:300px;text-align:center;background:#161619;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:26px 22px;box-shadow:0 30px 80px -50px #000;animation:lwin .35s cubic-bezier(.22,1,.36,1)}'
+  + '@keyframes lwin{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}'
+  + '#loginWall .lw-ic{width:46px;height:46px;border-radius:13px;margin:0 auto 14px;display:grid;place-items:center;background:rgba(226,136,95,.14);color:#E2885F}#loginWall .lw-ic svg{width:23px;height:23px}'
+  + '#loginWall .lw-h{font-weight:700;font-size:17px;letter-spacing:-.01em;margin-bottom:6px}'
+  + '#loginWall .lw-sub{color:#9a9aa1;font-size:12.5px;line-height:1.5;margin-bottom:18px}'
+  + '#loginWall .lw-btn{width:100%;font:600 14px system-ui;color:#15110d;background:#E2885F;border:0;border-radius:11px;padding:.82em;cursor:pointer}#loginWall .lw-btn:hover{filter:brightness(1.06)}'
+  + '#loginWall .lw-link{width:100%;margin-top:10px;background:0;border:0;color:#9a9aa1;font:500 12px system-ui;text-decoration:underline;text-underline-offset:2px;cursor:pointer;padding:6px}#loginWall .lw-link:hover{color:#fafafa}';
   document.head.appendChild(style);
 
-  let pop = null, status = null, pollTimer = null;
+  let pop = null, status = null, pollTimer = null, wall = null;
   const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+
+  // Login wall — when auth is on and the user isn't signed in, cover the whole
+  // panel with an untouchable overlay that forces sign-in first.
+  function ensureWall() {
+    if (wall) return wall;
+    wall = document.createElement('div');
+    wall.id = 'loginWall';
+    wall.innerHTML =
+      '<div class="lw-card">'
+      + '<div class="lw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>'
+      + '<div class="lw-h">Log in first</div>'
+      + '<p class="lw-sub">Sign in to use Claude in Premiere. Free plan includes 5 renders a month.</p>'
+      + '<button class="lw-btn" id="lwSignin">Sign in</button>'
+      + '<button class="lw-link" id="lwSite">New here? Create an account &#8599;</button>'
+      + '</div>';
+    document.body.appendChild(wall);
+    wall.querySelector('#lwSignin').onclick = startSignin;
+    wall.querySelector('#lwSite').onclick = () => openExternalURL(SITE_URL + '/login.html');
+    return wall;
+  }
+  function setLoginWall(on) { ensureWall().classList.toggle('show', !!on); }
 
   async function refresh() {
     try { status = await fetch(BRIDGE + '/auth/status', { cache: 'no-store' }).then(r => r.json()); }
     catch { status = { enabled: false }; }
-    if (!status || !status.enabled) { btn.hidden = true; try { applyPlan(status); } catch (e) {} return status; }
+    // Bridge offline / auth off → no wall (the offline UI handles that; never
+    // block the panel when we can't even confirm auth is required).
+    if (!status || !status.enabled) { btn.hidden = true; setLoginWall(false); try { applyPlan(status); } catch (e) {} return status; }
     btn.hidden = false;
     btn.classList.toggle('signed-in', !!status.signedIn);
+    setLoginWall(!status.signedIn);                 // auth on + not signed in → wall up
     try { applyPlan(status); } catch (e) {}
     if (pop && pop.classList.contains('open')) renderPop();
     return status;
