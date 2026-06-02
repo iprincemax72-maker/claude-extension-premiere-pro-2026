@@ -1003,7 +1003,44 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
     next.textContent = s === total - 1 ? 'Done ✓' : 'Continue →';
     prog.textContent = 'Step ' + (s + 1) + ' of ' + total;
   }
-  next.addEventListener('click', () => { if (cur === total - 1) { const f = document.getElementById('faq'); if (f) f.scrollIntoView({ behavior: 'smooth' }); return; } go(cur + 1); });
+  /* confetti burst from an element — vanilla canvas, no deps */
+  function confetti(originEl) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const rect = originEl.getBoundingClientRect();
+    const ox = rect.left + rect.width / 2, oy = rect.top + rect.height / 2;
+    const cv = document.createElement('canvas');
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9999';
+    cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+    document.body.appendChild(cv);
+    const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+    const colors = ['#E2885F', '#F4F4F5', '#f0b38f', '#6cbf7a', '#caa46a', '#cf6f4a'];
+    const N = 150, parts = [];
+    for (let i = 0; i < N; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * (Math.PI * 1.15);  // fan upward
+      const speed = 6 + Math.random() * 11;
+      parts.push({ x: ox, y: oy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        w: 5 + Math.random() * 6, h: 8 + Math.random() * 7, rot: Math.random() * Math.PI,
+        vr: (Math.random() - 0.5) * 0.4, color: colors[i % colors.length], alpha: 1 });
+    }
+    let frame = 0;
+    (function tick() {
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+      frame++; let alive = false;
+      for (const p of parts) {
+        p.vy += 0.32; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+        if (frame > 55) p.alpha -= 0.013;
+        if (p.alpha <= 0 || p.y > innerHeight + 40) continue;
+        alive = true;
+        ctx.save(); ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.fillStyle = p.color; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      }
+      if (alive) requestAnimationFrame(tick); else cv.remove();
+    })();
+  }
+  next.addEventListener('click', () => { if (cur === total - 1) { confetti(next); return; } go(cur + 1); });
   back.addEventListener('click', () => go(cur - 1));
   dots.forEach((d, i) => d.addEventListener('click', () => { if (i <= reached) go(i); }));
   /* OS toggle inside a step */
