@@ -112,13 +112,38 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 .nav-toggle { display: none; background: none; border: none; cursor: pointer; padding: 8px; color: var(--text); }
 .nav-toggle svg { width: 24px; height: 24px; }
 
-/* ── Atmosphere — animated background blooms (the one indulgence) ── */
-.atmos { position: fixed; inset: 0; z-index: -2; pointer-events: none; overflow: hidden; }
-.atmos b { position: absolute; border-radius: 50%; filter: blur(10px); opacity: 0.5; }
-.atmos .b1 { top: -16%; left: 50%; width: 75vw; height: 55vw; max-width: 1000px; max-height: 720px; transform: translateX(-50%); background: radial-gradient(circle, rgba(226,136,95,0.20), transparent 60%); animation: drift1 20s ease-in-out infinite alternate; }
-.atmos .b2 { top: 24%; right: -10%; width: 50vw; height: 50vw; max-width: 620px; background: radial-gradient(circle, rgba(109,106,224,0.10), transparent 62%); animation: drift2 26s ease-in-out infinite alternate; }
-@keyframes drift1 { from { transform: translateX(-50%) translateY(0) scale(1); } to { transform: translateX(-54%) translateY(36px) scale(1.12); } }
-@keyframes drift2 { from { transform: translateY(0) scale(1); opacity: 0.1; } to { transform: translateY(-50px) scale(1.18); opacity: 0.16; } }
+/* ── Atmosphere — a living aurora gradient (drifting, screen-blended orbs) ── */
+.atmos { position: fixed; inset: -12%; z-index: -2; pointer-events: none; overflow: hidden; }
+.atmos b { position: absolute; border-radius: 50%; filter: blur(74px); mix-blend-mode: screen; will-change: transform; }
+.atmos .b1 { top: -6%; left: 4%; width: 48vw; height: 48vw; max-width: 700px; background: radial-gradient(circle, rgba(226,136,95,0.38), transparent 62%); animation: orb1 23s ease-in-out infinite alternate; }
+.atmos .b2 { top: -2%; right: -2%; width: 45vw; height: 45vw; max-width: 660px; background: radial-gradient(circle, rgba(126,98,232,0.32), transparent 62%); animation: orb2 29s ease-in-out infinite alternate; }
+.atmos .b3 { top: 32%; left: 38%; width: 44vw; height: 44vw; max-width: 620px; background: radial-gradient(circle, rgba(226,136,95,0.22), transparent 64%); animation: orb3 35s ease-in-out infinite alternate; }
+@keyframes orb1 { from { transform: translate(0,0) scale(1); } to { transform: translate(16%, 22%) scale(1.24); } }
+@keyframes orb2 { from { transform: translate(0,0) scale(1.05); } to { transform: translate(-18%, 16%) scale(1.2); } }
+@keyframes orb3 { from { transform: translate(0,0) scale(1); } to { transform: translate(14%, -16%) scale(1.3); } }
+
+/* ── Cursor — a soft light that follows you + a trailing dot/ring ── */
+.cursor-glow { position: fixed; top: 0; left: 0; width: 640px; height: 640px; border-radius: 50%; pointer-events: none; z-index: -1; background: radial-gradient(circle, rgba(226,136,95,0.11), transparent 60%); opacity: 0; transition: opacity 0.6s ease; will-change: transform; }
+.cursor-dot { position: fixed; top: 0; left: 0; width: 11px; height: 11px; border-radius: 50%; pointer-events: none; z-index: 10000; background: var(--coral); box-shadow: 0 0 14px 2px rgba(226,136,95,0.75); opacity: 0; mix-blend-mode: screen; will-change: transform; transition: opacity 0.4s ease, width 0.22s var(--ease), height 0.22s var(--ease), background 0.22s var(--ease), border-color 0.22s var(--ease); border: 0 solid var(--coral); }
+.cursor-dot.hovering { width: 40px; height: 40px; background: rgba(226,136,95,0); border-width: 1.5px; box-shadow: 0 0 22px rgba(226,136,95,0.35); }
+.cursor-dot.down { width: 8px; height: 8px; }
+@media (hover: none), (pointer: coarse) { .cursor-glow, .cursor-dot { display: none !important; } }
+
+/* ── React Bits-style rotating text (coral pill, per-character slide) ── */
+.rotate { display: inline-flex; align-items: center; justify-content: center; overflow: hidden; vertical-align: -0.2em; height: 1.5em; width: 7.4em; padding: 0 0.4em; border-radius: 0.5em; background: linear-gradient(180deg, var(--coral-2), var(--coral-press)); color: #1a1109; font-weight: 700; letter-spacing: -0.01em; box-shadow: 0 8px 24px -8px var(--coral); }
+.rotate .ch { display: inline-block; white-space: pre; animation: rtIn 0.5s var(--ease) both; }
+@keyframes rtIn { from { transform: translateY(118%); opacity: 0; } to { transform: none; opacity: 1; } }
+.rotate.out .ch { animation: rtOut 0.42s var(--ease) both; }
+@keyframes rtOut { from { transform: none; opacity: 1; } to { transform: translateY(-118%); opacity: 0; } }
+
+/* ── React Bits-style gradual blur — content dissolves into the bottom edge ── */
+.gblur { position: fixed; left: 0; right: 0; bottom: 0; height: 88px; z-index: 95; pointer-events: none; }
+.gblur > div { position: absolute; inset: 0; }
+.gblur > div:nth-child(1){ -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); -webkit-mask: linear-gradient(to top, #000 0%, #000 14%, transparent 34%); mask: linear-gradient(to top, #000 0%, #000 14%, transparent 34%); }
+.gblur > div:nth-child(2){ -webkit-backdrop-filter: blur(3.5px); backdrop-filter: blur(3.5px); -webkit-mask: linear-gradient(to top, transparent 10%, #000 30%, #000 44%, transparent 62%); mask: linear-gradient(to top, transparent 10%, #000 30%, #000 44%, transparent 62%); }
+.gblur > div:nth-child(3){ -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); -webkit-mask: linear-gradient(to top, transparent 34%, #000 54%, #000 66%, transparent 82%); mask: linear-gradient(to top, transparent 34%, #000 54%, #000 66%, transparent 82%); }
+.gblur > div:nth-child(4){ -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px); -webkit-mask: linear-gradient(to top, transparent 60%, #000 80%, transparent 100%); mask: linear-gradient(to top, transparent 60%, #000 80%, transparent 100%); }
+.gblur > div:nth-child(5){ -webkit-backdrop-filter: blur(0.5px); backdrop-filter: blur(0.5px); -webkit-mask: linear-gradient(to top, transparent 80%, #000 100%); mask: linear-gradient(to top, transparent 80%, #000 100%); }
 
 /* grain */
 body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none; opacity: 0.025; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
@@ -367,6 +392,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   .viz-render .vr-bar i { width: 72%; }
   .viz-tl .clip.b, .gen-frame .lt, .ae .ae-track .m { opacity: 1; transform: none; }
   html.js .flow-rail { transform: none; transition: none; }
+  .rotate .ch { animation: none !important; opacity: 1; transform: none; }
 }
 
 /* ── Aceternity-style grid backdrop (fades from top) ── */
@@ -444,8 +470,11 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <body>
 
 <div class="progress" id="progress"></div>
+<div class="cursor-glow" id="cursorGlow"></div>
+<div class="cursor-dot" id="cursorDot"></div>
 <div class="grid-bg"></div>
-<div class="atmos"><b class="b1"></b><b class="b2"></b></div>
+<div class="atmos"><b class="b1"></b><b class="b2"></b><b class="b3"></b></div>
+<div class="gblur" aria-hidden="true"><div></div><div></div><div></div><div></div><div></div></div>
 
 <!-- NAV -->
 <header class="nav" id="nav">
@@ -483,7 +512,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
       <span class="w coral" style="animation-delay:.42s">just</span>
       <span class="w coral" style="animation-delay:.52s">asking.</span>
     </h1>
-    <p class="lede load-up l3">Describe it. Claude builds it. It's on your timeline.</p>
+    <p class="lede load-up l3">Make the <span class="rotate" id="rotate" aria-label="title, lower third, caption, countdown and more">title</span> — just describe it.</p>
     <div class="hero-cta load-up l4">
       <a href="#pricing" class="btn btn-primary btn-lg magnetic" data-buy>Get it — <span data-price-inline>$19</span></a>
       <a href="#demo" class="link-arrow">Watch the 60-sec demo <span class="a">→</span></a>
@@ -783,6 +812,55 @@ document.querySelectorAll('.tool').forEach(card => card.addEventListener('pointe
     cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { panel.style.transform = 'rotateX(' + (-dy*4) + 'deg) rotateY(' + (dx*4) + 'deg)'; });
   });
   hero.addEventListener('pointerleave', () => { panel.style.transform = ''; });
+})();
+
+/* cursor — a soft light that follows you + a trailing ring dot */
+(function () {
+  if (window.matchMedia('(hover: none)').matches || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const glow = document.getElementById('cursorGlow'), dot = document.getElementById('cursorDot');
+  if (!glow || !dot) return;
+  let mx = innerWidth / 2, my = innerHeight / 2, gx = mx, gy = my, dx = mx, dy = my, shown = false;
+  addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch') return;
+    mx = e.clientX; my = e.clientY;
+    if (!shown) { shown = true; glow.style.opacity = '1'; dot.style.opacity = '1'; }
+  }, { passive: true });
+  addEventListener('pointerdown', () => dot.classList.add('down'));
+  addEventListener('pointerup', () => dot.classList.remove('down'));
+  document.querySelectorAll('a, button, .tool, .tier, .qa, [data-buy], .sw').forEach(el => {
+    el.addEventListener('pointerenter', () => dot.classList.add('hovering'));
+    el.addEventListener('pointerleave', () => dot.classList.remove('hovering'));
+  });
+  (function loop() {
+    gx += (mx - gx) * 0.12; gy += (my - gy) * 0.12;
+    dx += (mx - dx) * 0.35; dy += (my - dy) * 0.35;
+    glow.style.transform = 'translate3d(' + gx + 'px,' + gy + 'px,0) translate(-50%,-50%)';
+    dot.style.transform = 'translate3d(' + dx + 'px,' + dy + 'px,0) translate(-50%,-50%)';
+    requestAnimationFrame(loop);
+  })();
+})();
+
+/* rotating text — cycles through what the panel makes */
+(function () {
+  const el = document.getElementById('rotate'); if (!el) return;
+  const words = ['title', 'lower third', 'callout', 'caption', 'countdown', 'intro', 'end card'];
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let i = 0;
+  function render(w) {
+    el.innerHTML = '';
+    [].forEach.call(w, (c, k) => {
+      const s = document.createElement('span'); s.className = 'ch'; s.textContent = c;
+      s.style.animationDelay = (k * 0.028) + 's';
+      el.appendChild(s);
+    });
+    el.setAttribute('aria-label', w);
+  }
+  render(words[0]);
+  setInterval(() => {
+    if (reduce) { i = (i + 1) % words.length; render(words[i]); return; }
+    el.classList.add('out');
+    setTimeout(() => { i = (i + 1) % words.length; render(words[i]); el.classList.remove('out'); }, 420);
+  }, 2400);
 })();
 
 </script>
