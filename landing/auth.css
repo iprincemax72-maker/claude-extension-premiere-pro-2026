@@ -106,8 +106,8 @@ body.dash-body{display:block}
 .ring .track{stroke:var(--s3)}
 .ring .prog{stroke-linecap:round;transition:stroke-dashoffset .9s var(--ease)}
 .ring .rc{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
-.ring .rc b{font-size:1.8rem;font-weight:700;display:block;line-height:1}
-.ring .rc span{font-size:.66rem;color:var(--text-3);font-family:var(--mono);letter-spacing:.05em;margin-top:3px}
+.ring .rc b{font-size:1.85rem;font-weight:700;line-height:1}
+.ring .rc span{position:absolute;left:0;right:0;top:61%;font-size:.6rem;color:var(--text-3);font-family:var(--mono);letter-spacing:.06em}
 .usage-info{flex:1;min-width:190px}
 .usage-info .big{font-size:1.4rem;font-weight:700}
 .usage-info .big span{color:var(--text-3);font-weight:500;font-size:.98rem}

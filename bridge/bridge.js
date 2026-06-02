@@ -2343,22 +2343,36 @@ function saveSession(s) { _session = s; try { fs.writeFileSync(SESSION_FILE, JSO
 function clearSession() { _session = null; try { fs.unlinkSync(SESSION_FILE); } catch {} }
 
 // Return a non-expired access token, refreshing via the refresh_token if needed.
+// Refreshes are SERIALIZED: concurrent callers share one in-flight request, so we
+// never use the same refresh token twice (which trips Supabase's reuse detection
+// and revokes the whole session). A definitive auth failure clears the session so
+// the panel shows "Sign in" instead of pretending to be signed in.
+let _refreshing = null;
 async function freshToken() {
   const s = loadSession();
   if (!s || !s.access_token) return null;
   const now = Math.floor(Date.now() / 1000);
   if (s.expires_at && (s.expires_at - now) > 60) return s.access_token;
   if (!s.refresh_token) return s.access_token;
-  try {
-    const r = await fetch(AUTH.url + '/auth/v1/token?grant_type=refresh_token', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: AUTH.anon },
-      body: JSON.stringify({ refresh_token: s.refresh_token }),
-    });
-    if (!r.ok) { alog('token refresh http ' + r.status); return s.access_token; }
-    const j = await r.json();
-    saveSession({ access_token: j.access_token, refresh_token: j.refresh_token || s.refresh_token, expires_at: j.expires_at || (now + (j.expires_in || 3600)), user: j.user || s.user });
-    return _session.access_token;
-  } catch (e) { alog('token refresh failed: ' + e.message); return s.access_token; }
+  if (_refreshing) return _refreshing;          // coalesce concurrent refreshes
+  _refreshing = (async () => {
+    try {
+      const r = await fetch(AUTH.url + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', apikey: AUTH.anon },
+        body: JSON.stringify({ refresh_token: s.refresh_token }),
+      });
+      if (!r.ok) {
+        alog('token refresh http ' + r.status);
+        if (r.status === 400 || r.status === 401) { clearSession(); return null; }  // dead refresh token → sign out
+        return (loadSession() || {}).access_token || null;
+      }
+      const j = await r.json();
+      saveSession({ access_token: j.access_token, refresh_token: j.refresh_token || s.refresh_token, expires_at: j.expires_at || (now + (j.expires_in || 3600)), user: j.user || s.user });
+      return j.access_token;
+    } catch (e) { alog('token refresh failed: ' + e.message); return (loadSession() || {}).access_token || null; }
+    finally { _refreshing = null; }
+  })();
+  return _refreshing;
 }
 
 // Call a Postgres RPC as the signed-in user. Returns parsed JSON (scalar/array) or null on error.
@@ -2378,6 +2392,7 @@ async function authStatus() {
   const s = loadSession();
   if (!s || !s.access_token) return { enabled: true, signedIn: false };
   const token = await freshToken();
+  if (!token) return { enabled: true, signedIn: false };   // session expired & couldn't refresh → re-connect
   const usage = await supaRPC('my_usage', token);
   const u = Array.isArray(usage) ? usage[0] : usage;
   const meta = (s.user && (s.user.user_metadata || {})) || {};
@@ -2386,6 +2401,7 @@ async function authStatus() {
     email: (s.user && s.user.email) || '',
     name: meta.full_name || meta.name || (s.user && s.user.email) || 'Account',
     avatar: meta.avatar_url || '',
+    usageKnown: !!u,                                        // false when the lookup failed — panel shows "—" not a fake 0
     plan: (u && u.plan) || 'free',
     renders_used: (u && u.renders_used != null) ? u.renders_used : 0,
     renders_limit: (u && u.renders_limit != null) ? u.renders_limit : 5,
@@ -2399,6 +2415,7 @@ async function gateRender() {
   const s = loadSession();
   if (!s || !s.access_token) return { allowed: false, reason: 'signin' };
   const token = await freshToken();
+  if (!token) return { allowed: false, reason: 'signin' };   // session died → must re-connect
   const remaining = await supaRPC('consume_render', token);
   if (remaining === null) return { allowed: true };
   if (remaining === -1) return { allowed: false, reason: 'limit' };
