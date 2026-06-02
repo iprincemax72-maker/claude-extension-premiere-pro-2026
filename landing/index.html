@@ -111,10 +111,14 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 /* simple underline that draws in on hover */
 .nav-links a::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; border-radius: 2px; background: var(--coral); transform: scaleX(0); transform-origin: left; transition: transform 0.28s var(--ease); }
 .nav-links a:hover::after { transform: scaleX(1); }
-.nav-acct .acct-chip { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 5px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--s2); font-size: 0.84rem; font-weight: 600; color: var(--text); transition: background 0.15s var(--ease); }
-.nav-acct .acct-chip:hover { background: var(--s3); }
-.nav-acct .acct-chip img, .nav-acct .acct-chip .acct-i { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; }
-.nav-acct .acct-chip .acct-i { display: grid; place-items: center; background: var(--coral); color: #15110d; font-size: 0.8rem; font-weight: 700; }
+.nav-acct .acct-chip { display: inline-flex; padding: 0; border: 0; background: none; border-radius: 50%; line-height: 0; }
+.nav-acct .acct-chip img, .nav-acct .acct-chip .acct-i { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; border: 2px solid var(--line-2); transition: border-color 0.15s var(--ease), transform 0.15s var(--ease); }
+.nav-acct .acct-chip:hover img, .nav-acct .acct-chip:hover .acct-i { border-color: var(--coral); transform: translateY(-1px); }
+.nav-acct .acct-chip .acct-i { display: grid; place-items: center; background: var(--coral); color: #15110d; font-size: 0.92rem; font-weight: 700; }
+/* Board — pill button shown only when logged in */
+.nav-links a.nav-board { color: var(--coral); font-weight: 600; padding: 6px 14px; border: 1px solid color-mix(in srgb, var(--coral) 42%, transparent); border-radius: 999px; }
+.nav-links a.nav-board::after { display: none; }
+.nav-links a.nav-board:hover { background: color-mix(in srgb, var(--coral) 13%, transparent); color: var(--coral-2); }
 .nav-cta { display: flex; align-items: center; gap: 0.8rem; }
 .nav-builder { display: inline-flex; align-items: center; gap: 0.4em; font-size: 0.84rem; font-weight: 600; color: var(--text); border: 1px solid var(--line-2); border-radius: 99px; padding: 7px 13px; transition: color 0.15s, border-color 0.15s; }
 .nav-builder svg { color: var(--coral); }
@@ -266,6 +270,9 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .video-frame .vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; background: #000; display: block; }
 .video-frame.playing .play, .video-frame.playing .cap { opacity: 0; pointer-events: none; }
 .video-frame.playing .vid { cursor: default; }
+.video-frame .unmute { position: absolute; top: 15px; right: 16px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; font-family: var(--sans); font-size: 0.74rem; font-weight: 600; color: var(--text); background: rgba(0,0,0,0.55); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 12px 6px 10px; cursor: pointer; backdrop-filter: blur(6px); box-shadow: 0 6px 18px -8px rgba(0,0,0,0.7); transition: background 0.15s var(--ease), transform 0.15s var(--ease); }
+.video-frame .unmute:hover { background: rgba(0,0,0,0.72); transform: translateY(-1px); }
+.video-frame .unmute svg { width: 14px; height: 14px; }
 .vplayer { position: absolute; left: 16px; right: 16px; bottom: 15px; z-index: 2; display: flex; align-items: center; gap: 12px; }
 .vplayer .vscrub { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.16); position: relative; }
 .vplayer .vscrub i { position: absolute; left: 0; top: 0; bottom: 0; width: 22%; background: linear-gradient(90deg, var(--coral), var(--coral-2)); border-radius: 2px; }
@@ -544,12 +551,12 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   <div class="nav-in">
     <a href="#top" class="brand"><span class="glyph">C</span><span>Claude <small>for Premiere Pro</small></span></a>
     <nav class="nav-links">
-      <a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a>
+      <a href="account.html" id="navBoard" class="nav-board" hidden>Board</a><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a>
     </nav>
     <div class="nav-cta">
       <a href="login.html" class="btn btn-ghost nav-signin" id="navSignin">Sign in</a>
-      <div class="nav-acct" id="navAcct" hidden></div>
       <a href="#pricing" class="btn btn-primary magnetic" data-buy>Get it</a>
+      <div class="nav-acct" id="navAcct" hidden></div>
       <button class="nav-toggle" id="navToggle" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
     </div>
   </div>
@@ -559,7 +566,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   <div class="mm-top"><span class="brand"><span class="glyph">C</span> Claude</span>
     <button class="nav-toggle" id="navClose" aria-label="Close menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
-  <nav><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a><a href="login.html" id="mmSignin">Sign in</a></nav>
+  <nav><a href="account.html" id="mmBoard" hidden>Board</a><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a><a href="login.html" id="mmSignin">Sign in</a></nav>
   <a href="#pricing" class="btn btn-primary btn-block btn-lg" data-buy>Get it</a>
 </div>
 
@@ -682,6 +689,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
       </video>
       <button class="play magnetic" id="playDemo" aria-label="Play demo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
       <span class="cap">38-second walkthrough</span>
+      <button class="unmute" id="demoUnmute" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg> Tap for sound</button>
     </div>
   </div>
 </section>
@@ -890,16 +898,37 @@ billToggle.addEventListener('click', () => {
   document.querySelectorAll('.tier .per').forEach(el => { el.textContent = annual ? '/ mo, billed yearly' : '/ mo'; });
 });
 
-/* demo video — click the poster/play button to start (with sound) */
+/* demo video — autoplays MUTED when scrolled into view (browsers block sound-on
+   autoplay); a "Tap for sound" pill unmutes. Click the poster to play with sound. */
 (function () {
   const frame = document.getElementById('demoFrame');
   const v = document.getElementById('demoVideo');
   const play = document.getElementById('playDemo');
+  const unmute = document.getElementById('demoUnmute');
   if (!frame || !v) return;
-  const start = () => { frame.classList.add('playing'); v.controls = true; v.play().catch(() => {}); };
-  play.addEventListener('click', start);
-  v.addEventListener('click', () => { if (!frame.classList.contains('playing')) start(); });
-  v.addEventListener('ended', () => { frame.classList.remove('playing'); v.controls = false; v.currentTime = 0; });
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const syncUnmute = () => { if (unmute) unmute.hidden = !(v.muted && !v.paused && !v.ended); };
+  const reveal = () => { frame.classList.add('playing'); v.controls = true; };
+  const playLoud = () => { v.muted = false; reveal(); v.play().catch(() => {}); syncUnmute(); };
+
+  if (play) play.addEventListener('click', playLoud);
+  v.addEventListener('click', () => { if (!frame.classList.contains('playing')) playLoud(); });
+  if (unmute) unmute.addEventListener('click', e => { e.stopPropagation(); v.muted = false; v.play().catch(() => {}); });
+  v.addEventListener('volumechange', syncUnmute);
+  v.addEventListener('pause', syncUnmute);
+  v.addEventListener('ended', () => { frame.classList.remove('playing'); v.controls = false; v.currentTime = 0; if (unmute) unmute.hidden = true; });
+
+  if (!reduce && 'IntersectionObserver' in window) {
+    let started = false;
+    const io = new IntersectionObserver(es => es.forEach(e => {
+      if (e.isIntersecting && e.intersectionRatio >= 0.4) {
+        if (v.paused && !v.ended) { v.muted = true; v.play().then(() => { reveal(); syncUnmute(); }).catch(() => {}); started = true; }
+      } else if (started && !e.isIntersecting && !v.paused && !v.ended) {
+        v.pause();
+      }
+    }), { threshold: [0, 0.4, 0.75, 1] });
+    io.observe(frame);
+  }
 })();
 
 /* elastic volume slider — rubber-bands when dragged past the ends */
@@ -1087,12 +1116,14 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
 <!-- Supabase auth: reflect signed-in state in the nav -->
 <script src="config.js"></script>
 <script type="module">
-  import { paintNav, supabase } from "./auth.js";
+  import { paintNav, supabase, sessionUser } from "./auth.js";
   const mm = document.getElementById("mmSignin");
+  const mmBoard = document.getElementById("mmBoard");
   async function sync() {
     await paintNav();
-    const { data } = await supabase.auth.getUser();
-    if (mm) { if (data?.user) { mm.textContent = "Your account"; mm.setAttribute("href", "account.html"); } else { mm.textContent = "Sign in"; mm.setAttribute("href", "login.html"); } }
+    const u = await sessionUser();
+    if (mm) { if (u) { mm.textContent = "Your account"; mm.setAttribute("href", "account.html"); } else { mm.textContent = "Sign in"; mm.setAttribute("href", "login.html"); } }
+    if (mmBoard) mmBoard.hidden = !u;
   }
   sync();
   supabase.auth.onAuthStateChange(() => sync());

@@ -102,7 +102,7 @@ body.dash-body{display:block}
 .dcard-actions .b{flex:1;min-width:120px}
 .usage-wrap{display:flex;align-items:center;gap:28px;margin-top:18px;flex-wrap:wrap}
 .ring{position:relative;width:130px;height:130px;flex:0 0 auto}
-.ring svg{transform:rotate(-90deg)}
+.ring svg{transform:rotate(-90deg);display:block}
 .ring .track{stroke:var(--s3)}
 .ring .prog{stroke-linecap:round;transition:stroke-dashoffset .9s var(--ease)}
 .ring .rc{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
