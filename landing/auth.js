@@ -36,6 +36,8 @@ export async function sessionUser() {
   return data?.session?.user ?? null;
 }
 
+let _acctMenuWired = false;
+
 /* Synchronously paint the nav for a given user (or null). Safe to call from
    inside onAuthStateChange — it does NOT call any supabase method (which would
    risk a deadlock and leave the nav stuck on "Sign in"). */
@@ -52,13 +54,31 @@ export function renderNav(u) {
     const initial = (name.trim()[0] || "U").toUpperCase();
     setVis(signin, false);
     if (acct) {
+      const av = avatar
+        ? '<img src="' + avatar + '" alt="" referrerpolicy="no-referrer">'
+        : '<span class="acct-i">' + initial + "</span>";
+      const dashIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>';
+      const outIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>';
       acct.innerHTML =
-        '<a href="account.html" class="acct-chip" title="' + name + ' · Dashboard" aria-label="' + name + ' — open dashboard">' +
-        (avatar
-          ? '<img src="' + avatar + '" alt="" referrerpolicy="no-referrer">'
-          : '<span class="acct-i">' + initial + "</span>") +
-        "</a>";
+        '<button class="acct-chip" id="acctBtn" type="button" aria-haspopup="true" aria-expanded="false" title="' + name + '">' + av + '</button>' +
+        '<div class="acct-menu" id="acctMenu" hidden role="menu">' +
+          '<div class="acct-who"><b>' + name + '</b><span>' + (u.email || "") + '</span></div>' +
+          '<a href="account.html" role="menuitem">' + dashIcon + 'Dashboard</a>' +
+          '<button type="button" id="acctSignout" role="menuitem">' + outIcon + 'Sign out</button>' +
+        '</div>';
       setVis(acct, true);
+      const btn = acct.querySelector("#acctBtn");
+      const menu = acct.querySelector("#acctMenu");
+      btn.addEventListener("click", e => { e.stopPropagation(); const open = menu.hidden; menu.hidden = !open; btn.setAttribute("aria-expanded", String(open)); });
+      acct.querySelector("#acctSignout").addEventListener("click", () => signOut());
+      if (!_acctMenuWired) {
+        _acctMenuWired = true;
+        document.addEventListener("click", e => {
+          const m = document.getElementById("acctMenu"), b = document.getElementById("acctBtn");
+          if (m && !m.hidden && b && !b.contains(e.target) && !m.contains(e.target)) { m.hidden = true; b.setAttribute("aria-expanded", "false"); }
+        });
+        document.addEventListener("keydown", e => { if (e.key === "Escape") { const m = document.getElementById("acctMenu"); if (m) m.hidden = true; } });
+      }
     }
   } else {
     setVis(signin, true);
