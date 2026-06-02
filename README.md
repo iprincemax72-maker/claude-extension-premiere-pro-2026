@@ -4,7 +4,7 @@ A CEP panel that brings **Claude** straight into Premiere Pro. Chat, generate mo
 
 > Uses your existing **Claude Code subscription**. No API key required.
 
-![status](https://img.shields.io/badge/Premiere_Pro-2024%2B-9999ff) ![status](https://img.shields.io/badge/macOS-supported-success) ![status](https://img.shields.io/badge/Windows-supported-success) ![status](https://img.shields.io/badge/license-MIT-green)
+![status](https://img.shields.io/badge/Premiere_Pro-2024%2B-9999ff) ![status](https://img.shields.io/badge/macOS-supported-success) ![status](https://img.shields.io/badge/Windows-supported-success) ![status](https://img.shields.io/badge/license-Proprietary-red)
 
 ---
 
@@ -227,6 +227,6 @@ After install, your runtime locations:
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+**Proprietary — All Rights Reserved.** Not open source. You may install and run an officially distributed copy; you may **not** copy, redistribute, modify, sell, or create derivative works without written permission. See [LICENSE](LICENSE).
 
 This project is not affiliated with Anthropic or Adobe. "Claude" is a trademark of Anthropic; "Adobe Premiere Pro" is a trademark of Adobe.

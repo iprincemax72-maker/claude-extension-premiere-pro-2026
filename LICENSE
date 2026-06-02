@@ -1,21 +1,36 @@
-MIT License
+Copyright (c) 2026 Ansh Dhakad. All Rights Reserved.
 
-Copyright (c) 2026 Ansh Dhakad
+Claude for Premiere Pro (the "Software") — including its source code, design,
+panel, bridge, website, and all associated assets — is proprietary and
+confidential. It is NOT open source.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+NO LICENSE OR RIGHT IS GRANTED to you except the limited right to install and
+run an officially distributed copy of the Software for your own personal or
+internal business use.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Without the prior written permission of the copyright holder, you may NOT:
+  - copy, reproduce, republish, mirror, or redistribute the Software or its
+    source code, in whole or in part;
+  - sell, rent, lease, sublicense, or otherwise commercialize it;
+  - modify, adapt, translate, or create derivative or competing works from it;
+  - reverse engineer, decompile, or disassemble it except to the limited
+    extent that applicable law expressly permits despite this restriction;
+  - remove or alter any copyright, trademark, or proprietary notices.
+
+The Software runs on your machine, so portions of its code are necessarily
+visible to you. Being able to read the code does NOT grant you any license to
+use, copy, or exploit it beyond the limited right stated above. All rights not
+expressly granted are reserved by the copyright holder.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+AUTHOR OR COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+This product is not affiliated with, endorsed by, or sponsored by Anthropic or
+Adobe. "Claude" is a trademark of Anthropic; "Adobe Premiere Pro" is a
+trademark of Adobe Inc.
+
+For licensing inquiries, contact the copyright holder.

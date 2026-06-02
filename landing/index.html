@@ -524,9 +524,9 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 .see-output:hover { background: color-mix(in srgb, var(--coral) 18%, transparent); }
 .see-output .ar { transition: transform 0.18s var(--ease); }
 .see-output:hover .ar { transform: translateX(3px); }
-.preview { position: fixed; inset: 0; z-index: 600; display: none; place-items: center; padding: 24px; background: rgba(5,5,7,0.86); backdrop-filter: blur(10px); }
-.preview.open { display: grid; }
-.preview-x { position: absolute; top: 22px; right: 24px; width: 38px; height: 38px; border-radius: 50%; background: var(--s2); border: 1px solid var(--line-2); color: var(--text); display: grid; place-items: center; cursor: pointer; font-size: 1.05rem; z-index: 2; }
+.preview { display: none; position: relative; }
+.preview.open { display: block; }
+.preview-x { position: absolute; top: -10px; right: 2px; width: 34px; height: 34px; border-radius: 50%; background: var(--s2); border: 1px solid var(--line-2); color: var(--text); display: grid; place-items: center; cursor: pointer; font-size: 1rem; z-index: 3; }
 .preview-x:hover { background: var(--s3); }
 .preview-stage { display: flex; align-items: center; justify-content: center; gap: clamp(6px, 2.4vw, 26px); perspective: 1700px; width: 100%; max-width: 980px; }
 .pv-card { background: var(--s1s); border: 1px solid var(--line-2); border-radius: 16px; box-shadow: 0 1px 0 var(--hi) inset, 0 50px 110px -50px rgba(0,0,0,0.9); overflow: hidden; transition: transform 0.7s var(--ease), opacity 0.55s var(--ease); }
@@ -695,6 +695,21 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
         </div>
         <div class="mock-composer"><span class="field">Ask Claude…</span><span class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
         <div class="shine" aria-hidden="true"></div>
+      </div>
+      <!-- Output preview (inline, in place of the mockup) — prompt → real render, 3D-tilted -->
+      <div class="preview" id="outBox">
+        <button class="preview-x" id="outClose" aria-label="Back to chat">✕</button>
+        <div class="preview-stage">
+          <div class="pv-card pv-ask">
+            <div class="pv-bar"><i></i><i></i><i></i><span>Claude — Premiere Pro</span></div>
+            <div class="pv-ask-body">
+              <p class="pv-you">“Make a glassy subscribe button, vertical, 4s — calm, not flashy.”</p>
+              <div class="pv-file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg> SubscribePill_v3.mov</div>
+            </div>
+          </div>
+          <div class="pv-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+          <div class="pv-card pv-out"><video id="outVideo" src="output-preview.mp4" controls playsinline preload="none"></video></div>
+        </div>
       </div>
     </div>
 
@@ -1192,17 +1207,23 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
 (function () {
   const btn = document.getElementById('seeOutput');
   if (!btn) return;
-  const close = () => { const box = document.getElementById('outBox'), vid = document.getElementById('outVideo'); if (box) box.classList.remove('open'); if (vid) try { vid.pause(); } catch {} };
+  const hero = document.getElementById('heroPanel');
+  const close = () => {
+    const box = document.getElementById('outBox'), vid = document.getElementById('outVideo');
+    if (box) box.classList.remove('open');
+    if (hero) hero.style.display = '';
+    if (vid) try { vid.pause(); } catch {}
+  };
   btn.addEventListener('click', () => {
     const box = document.getElementById('outBox'), vid = document.getElementById('outVideo');
     if (!box) return;
+    if (hero) hero.style.display = 'none';   // swap the mockup out, in place
     box.classList.add('open');
     if (vid) { vid.currentTime = 0; vid.play().catch(() => {}); }
   });
   document.addEventListener('click', e => {
     const box = document.getElementById('outBox');
-    if (!box || !box.classList.contains('open')) return;
-    if (e.target === box || (e.target.closest && e.target.closest('#outClose'))) close();
+    if (box && box.classList.contains('open') && e.target.closest && e.target.closest('#outClose')) close();
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 })();
@@ -1311,22 +1332,6 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
 
 
 </script>
-
-<!-- Output preview — prompt (left) → real render (right), 3D-tilted -->
-<div class="preview" id="outBox">
-  <button class="preview-x" id="outClose" aria-label="Close">✕</button>
-  <div class="preview-stage">
-    <div class="pv-card pv-ask">
-      <div class="pv-bar"><i></i><i></i><i></i><span>Claude — Premiere Pro</span></div>
-      <div class="pv-ask-body">
-        <p class="pv-you">“Make a glassy subscribe button, vertical, 4s — calm, not flashy.”</p>
-        <div class="pv-file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg> SubscribePill_v3.mov</div>
-      </div>
-    </div>
-    <div class="pv-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
-    <div class="pv-card pv-out"><video id="outVideo" src="output-preview.mp4" controls playsinline preload="none"></video></div>
-  </div>
-</div>
 
 <!-- Supabase auth: reflect signed-in state in the nav -->
 <script src="config.js"></script>
