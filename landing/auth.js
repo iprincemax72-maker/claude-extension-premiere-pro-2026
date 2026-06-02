@@ -48,7 +48,7 @@ export async function paintNav() {
         (avatar
           ? '<img src="' + avatar + '" alt="" referrerpolicy="no-referrer">'
           : '<span class="acct-i">' + initial + "</span>") +
-        "<span>Account</span></a>";
+        "<span>Dashboard</span></a>";
     }
   } else {
     if (signin) signin.hidden = false;

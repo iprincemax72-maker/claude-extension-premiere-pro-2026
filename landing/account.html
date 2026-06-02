@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Your account · Claude for Premiere Pro</title>
+<title>Dashboard · Claude for Premiere Pro</title>
 <meta name="robots" content="noindex" />
 <meta name="theme-color" content="#09090b" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23E2885F'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='19' font-style='italic' fill='%23111' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E" />
@@ -12,92 +12,142 @@
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="auth.css" />
 </head>
-<body>
+<body class="dash-body">
 <div class="auth-bg"></div>
-<div class="auth-wrap">
-  <div class="card account">
-    <div class="acct-head">
-      <a href="index.html" class="brand"><span class="glyph">C</span><span>Claude <small>for Premiere Pro</small></span></a>
-      <button class="btn-text" id="signOut">Sign out</button>
-    </div>
 
-    <div class="who">
-      <div class="ava" id="ava">·</div>
-      <div>
-        <h2 id="name" class="skel">Loading…</h2>
-        <p id="email"></p>
-      </div>
-    </div>
-
-    <div class="usage" id="usage">
-      <div class="row">
-        <span class="lbl">Renders this month</span>
-        <span class="badge" id="plan">—</span>
-      </div>
-      <div class="row"><b id="count"><span>—</span></b></div>
-      <div class="bar"><i id="barFill"></i></div>
-      <p class="reset" id="reset"></p>
-    </div>
-
-    <div class="act">
-      <a class="b primary" id="upgrade" href="index.html#pricing">Upgrade plan</a>
-      <button class="b ghost" id="billing">Manage billing</button>
-      <a class="b ghost" href="index.html#install">Download the extension</a>
-    </div>
-    <p class="muted" id="note"></p>
+<header class="dash-top">
+  <a href="index.html" class="brand"><span class="glyph">C</span><span>Claude <small>for Premiere Pro</small></span></a>
+  <div class="dash-top-right">
+    <span class="dash-chip"><span class="ci" id="chipAva">·</span><span id="chipName">…</span></span>
+    <button class="btn-text" id="signOut">Sign out</button>
   </div>
-</div>
+</header>
+
+<main class="dash">
+  <div class="dash-head">
+    <h1 id="hello"><span class="skel">Loading…</span></h1>
+    <p class="sub">Your renders, plan, and extension — all in one place.</p>
+  </div>
+
+  <div class="dash-grid">
+
+    <!-- Usage -->
+    <section class="dcard usage-card span2" id="usageCard">
+      <div class="dcard-h"><span class="dcard-eyebrow">Renders this month</span><span class="badge" id="plan">—</span></div>
+      <div class="usage-wrap">
+        <div class="ring">
+          <svg width="130" height="130" viewBox="0 0 130 130">
+            <defs><linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E2885F"/><stop offset="1" stop-color="#F0A87E"/></linearGradient></defs>
+            <circle class="track" cx="65" cy="65" r="56" fill="none" stroke-width="11"/>
+            <circle class="prog" id="ringProg" cx="65" cy="65" r="56" fill="none" stroke="url(#cg)" stroke-width="11" stroke-dasharray="351.86" stroke-dashoffset="351.86"/>
+          </svg>
+          <div class="rc"><b id="ringNum">0</b><span>used</span></div>
+        </div>
+        <div class="usage-info">
+          <div class="big"><b id="used">0</b> <span id="limit">/ 5 renders</span></div>
+          <div class="bar"><i id="barFill"></i></div>
+          <p class="reset" id="reset"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Plan -->
+    <section class="dcard">
+      <div class="dcard-h"><span class="dcard-eyebrow">Plan</span></div>
+      <h3 id="planName">Free</h3>
+      <ul class="feat" id="planFeat"></ul>
+      <div class="dcard-actions">
+        <a class="b primary" id="upgrade" href="index.html#pricing">Upgrade plan</a>
+        <button class="b ghost" id="billing">Manage billing</button>
+      </div>
+    </section>
+
+    <!-- Extension status -->
+    <section class="dcard">
+      <span class="dcard-eyebrow">Your extension</span>
+      <div class="status-line" id="extStatus"><span class="led"></span> <span id="extLabel">Checking this device…</span></div>
+      <p class="dcard-sub" id="extHint">Looking for the Claude Bridge on this computer.</p>
+      <div class="dcard-actions">
+        <a class="b ghost" href="index.html#install">Install guide</a>
+        <a class="b ghost" href="index.html#demo">Watch demo</a>
+      </div>
+    </section>
+
+    <!-- Getting started -->
+    <section class="dcard span2">
+      <span class="dcard-eyebrow">Getting started</span>
+      <ol class="steps">
+        <li><span><b>Install the extension</b> — download for your OS and run the one-step installer. <a href="index.html#install" style="color:var(--coral);text-decoration:underline;text-underline-offset:2px">Install guide →</a></span></li>
+        <li><span><b>Sign in inside Premiere</b> — open the panel, click the account icon → <b>Sign in with Google</b> (same account as here).</span></li>
+        <li><span><b>Start rendering</b> — type something like <code>a 3-second logo intro</code> and hit ↵. Each render counts against your monthly quota above.</span></li>
+      </ol>
+    </section>
+
+  </div>
+  <p class="muted" id="note"></p>
+</main>
 
 <script src="config.js"></script>
 <script type="module">
-  import { supabase, getUser, getProfile, signOut } from "./auth.js";
-
+  import { getUser, getProfile, signOut } from "./auth.js";
   const $ = id => document.getElementById(id);
-  $("signOut").addEventListener("click", signOut);
-
+  const RING_C = 351.86;                       // 2π·56
   const PLAN_LABEL = { free: "Free", creator: "Creator", studio: "Studio" };
+  $("signOut").addEventListener("click", signOut);
 
   (async () => {
     const u = await getUser();
     if (!u) { location.replace("login.html"); return; }
 
-    const name   = u.user_metadata?.full_name || u.user_metadata?.name || u.email.split("@")[0];
+    const name = u.user_metadata?.full_name || u.user_metadata?.name || u.email.split("@")[0];
+    const first = name.split(" ")[0];
     const avatar = u.user_metadata?.avatar_url;
-    $("name").textContent = "Hey, " + name.split(" ")[0];
-    $("name").classList.remove("skel");
-    $("email").textContent = u.email;
-    if (avatar) {
-      $("ava").outerHTML = '<img class="ava" id="ava" referrerpolicy="no-referrer" src="' + avatar + '" alt="">';
-    } else {
-      $("ava").textContent = (name.trim()[0] || "U").toUpperCase();
-    }
+    $("hello").textContent = "Welcome back, " + first;
+    $("chipName").textContent = first;
+    if (avatar) { $("chipAva").outerHTML = '<img class="ci" id="chipAva" referrerpolicy="no-referrer" src="' + avatar + '" alt="">'; }
+    else { $("chipAva").textContent = (name.trim()[0] || "U").toUpperCase(); }
 
-    // Render usage. If the profile row isn't there yet (trigger race), fall back to Free defaults.
+    // ── usage ──
     let p = await getProfile();
-    if (!p) p = { plan: "free", renders_used: 0, renders_limit: 5, current_period_end: null };
-
+    if (!p) p = { plan: "free", renders_used: 0, renders_limit: 5 };
     const used = p.renders_used ?? 0, limit = p.renders_limit ?? 5;
     const paid = p.plan && p.plan !== "free";
+    const pct = limit > 0 ? Math.min(1, used / limit) : 0;
     $("plan").textContent = PLAN_LABEL[p.plan] || "Free";
     $("plan").classList.toggle("paid", !!paid);
-    $("count").innerHTML = used + ' <span>/ ' + limit + ' renders</span>';
-    const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
-    $("barFill").style.width = pct + "%";
-    if (used >= limit) $("usage").classList.add("full");
+    $("used").textContent = used; $("ringNum").textContent = used;
+    $("limit").textContent = "/ " + limit + " renders";
+    $("barFill").style.width = Math.round(pct * 100) + "%";
+    requestAnimationFrame(() => { $("ringProg").style.strokeDashoffset = (RING_C * (1 - pct)).toFixed(1); });
+    if (used >= limit) $("usageCard").classList.add("full");
+    const next = new Date(); const reset = new Date(next.getFullYear(), next.getMonth() + 1, 1);
+    const resetStr = reset.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+    $("reset").textContent = used >= limit ? "Out of renders — resets " + resetStr + "." : (limit - used) + " left · resets " + resetStr + ".";
 
-    // Monthly reset date = first of next month.
-    const now = new Date();
-    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    $("reset").textContent = used >= limit
-      ? "You're out of renders — resets " + next.toLocaleDateString(undefined, { month: "long", day: "numeric" }) + ". Upgrade for more."
-      : "Resets " + next.toLocaleDateString(undefined, { month: "long", day: "numeric" }) + ".";
+    // ── plan card ──
+    const tick = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+    const feats = [limit + " renders / month", "Generate + Auto-Edit tools", "Reference images & video", "Runs on your own Claude plan"];
+    $("planName").textContent = (PLAN_LABEL[p.plan] || "Free") + " plan";
+    $("planFeat").innerHTML = feats.map(f => "<li>" + tick + "<span>" + f + "</span></li>").join("");
+    if (paid) $("upgrade").textContent = "Change plan";
+    $("billing").addEventListener("click", () => { $("note").textContent = "Billing portal connects once Stripe is set up (Phase 2)."; });
 
-    if (paid) { $("upgrade").textContent = "Change plan"; }
-
-    // Billing portal — wired in Phase 2 (Stripe). Placeholder for now.
-    $("billing").addEventListener("click", () => {
-      $("note").textContent = "Billing portal connects once Stripe is set up (Phase 2).";
-    });
+    // ── live extension status (optional; localhost bridge, fails gracefully) ──
+    (async () => {
+      try {
+        const c = new AbortController(); const t = setTimeout(() => c.abort(), 1600);
+        const r = await fetch("http://127.0.0.1:3737/auth/status", { signal: c.signal, cache: "no-store" });
+        clearTimeout(t);
+        const st = await r.json();
+        $("extStatus").classList.add("on");
+        if (st.signedIn) { $("extLabel").textContent = "Connected on this device"; $("extHint").textContent = "Signed in as " + (st.email || "this account") + ". You're ready to render in Premiere."; }
+        else { $("extLabel").textContent = "Bridge running — not signed in"; $("extHint").textContent = "Open the panel in Premiere → account icon → Sign in with Google."; }
+      } catch {
+        $("extStatus").classList.remove("on");
+        $("extLabel").textContent = "Not detected on this device";
+        $("extHint").textContent = "Start the Claude Bridge, or install the extension to get going.";
+      }
+    })();
   })();
 </script>
 </body>

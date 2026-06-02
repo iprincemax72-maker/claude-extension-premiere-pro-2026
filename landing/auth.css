@@ -78,3 +78,52 @@ h1{font-size:1.7rem;font-weight:700;letter-spacing:-.03em;margin:26px 0 8px}
 .b.ghost:hover{background:var(--s3)}
 .muted{color:var(--text-3);font-size:.8rem;text-align:center;margin-top:16px}
 .skel{color:var(--text-3)}
+
+/* ── Dashboard ── */
+body.dash-body{display:block}
+.dash-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px clamp(18px,4vw,40px);border-bottom:1px solid var(--line);position:sticky;top:0;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:saturate(1.3) blur(12px);z-index:20}
+.dash-top-right{display:flex;align-items:center;gap:16px}
+.dash-chip{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:.9rem}
+.dash-chip img,.dash-chip .ci{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:0 0 auto}
+.dash-chip .ci{display:grid;place-items:center;background:var(--coral);color:#15110d;font-weight:700;font-size:.85rem}
+.dash{max-width:1000px;margin:0 auto;padding:clamp(26px,5vw,48px) clamp(18px,4vw,40px) 80px;width:100%}
+.dash-head{margin-bottom:26px}
+.dash-head h1{font-size:clamp(1.6rem,4vw,2.1rem);font-weight:700;letter-spacing:-.03em}
+.dash-head h1 .skel{color:var(--text-3)}
+.dash-head .sub{color:var(--text-2);margin-top:5px}
+.dash-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.dcard{background:var(--s1s);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 1px 0 var(--hi) inset;display:flex;flex-direction:column}
+.dcard.span2{grid-column:1 / -1}
+.dcard-eyebrow{font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)}
+.dcard h3{font-size:1.3rem;font-weight:700;letter-spacing:-.02em;margin:6px 0 0}
+.dcard-h{display:flex;align-items:center;justify-content:space-between}
+.dcard-sub{color:var(--text-2);font-size:.9rem;margin-top:7px;line-height:1.5}
+.dcard-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:18px}
+.dcard-actions .b{flex:1;min-width:120px}
+.usage-wrap{display:flex;align-items:center;gap:28px;margin-top:18px;flex-wrap:wrap}
+.ring{position:relative;width:130px;height:130px;flex:0 0 auto}
+.ring svg{transform:rotate(-90deg)}
+.ring .track{stroke:var(--s3)}
+.ring .prog{stroke-linecap:round;transition:stroke-dashoffset .9s var(--ease)}
+.ring .rc{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.ring .rc b{font-size:1.8rem;font-weight:700;display:block;line-height:1}
+.ring .rc span{font-size:.66rem;color:var(--text-3);font-family:var(--mono);letter-spacing:.05em;margin-top:3px}
+.usage-info{flex:1;min-width:190px}
+.usage-info .big{font-size:1.4rem;font-weight:700}
+.usage-info .big span{color:var(--text-3);font-weight:500;font-size:.98rem}
+.usage-info .bar{height:8px;margin:13px 0 9px}
+.usage-info .reset{color:var(--text-3);font-size:.84rem}
+.usage-card.full .ring .prog{stroke:#e98c7a!important}
+.usage-card.full .bar i{background:linear-gradient(90deg,#cf6f4a,#e98c7a)}
+.feat{list-style:none;display:flex;flex-direction:column;gap:9px;margin:14px 0 0}
+.feat li{display:flex;gap:9px;color:var(--text-2);font-size:.92rem}
+.feat li svg{width:16px;height:16px;color:var(--coral);flex:0 0 auto;margin-top:3px}
+.status-line{display:flex;align-items:center;gap:9px;font-weight:600;margin-top:13px}
+.status-line .led{width:9px;height:9px;border-radius:50%;background:var(--text-3);flex:0 0 auto;transition:.3s}
+.status-line.on .led{background:var(--ok);box-shadow:0 0 0 4px rgba(108,191,122,.16)}
+.steps{margin:15px 0 0;padding:0;list-style:none;counter-reset:s;display:flex;flex-direction:column;gap:13px}
+.steps li{display:flex;gap:11px;align-items:flex-start;color:var(--text-2);font-size:.92rem;counter-increment:s;line-height:1.45}
+.steps li::before{content:counter(s);flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:var(--s2);border:1px solid var(--line-2);display:grid;place-items:center;font-size:.72rem;font-weight:700;color:var(--text);margin-top:1px}
+.steps li b{color:var(--text);font-weight:600}
+.steps li code{font-family:var(--mono);font-size:.82em;background:var(--s2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--coral-2)}
+@media(max-width:680px){.dash-grid{grid-template-columns:1fr}.dcard.span2{grid-column:auto}}
