@@ -520,6 +520,17 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 .rendercard .file svg { width: 16px; height: 16px; color: var(--coral); flex: 0 0 auto; }
 .rendercard .file .meta { margin-left: auto; color: var(--text-3); font-size: 0.62rem; letter-spacing: 0.02em; }
 .rendercard .acts { display: flex; gap: 8px; padding: 12px 14px; flex-wrap: wrap; }
+.see-output { display: inline-flex; align-items: center; gap: 7px; margin-top: 13px; font-family: var(--sans); font-size: 0.8rem; font-weight: 600; color: var(--coral); background: color-mix(in srgb, var(--coral) 10%, transparent); border: 1px solid color-mix(in srgb, var(--coral) 38%, transparent); border-radius: 999px; padding: 7px 14px; cursor: pointer; transition: background 0.15s var(--ease); }
+.see-output:hover { background: color-mix(in srgb, var(--coral) 18%, transparent); }
+.see-output .ar { transition: transform 0.18s var(--ease); }
+.see-output:hover .ar { transform: translateX(3px); }
+.outbox { position: fixed; inset: 0; z-index: 600; display: none; place-items: center; padding: 24px; background: rgba(5,5,7,0.82); backdrop-filter: blur(8px); }
+.outbox.open { display: grid; }
+.outbox-inner { position: relative; width: 100%; max-width: min(92vw, 620px); }
+.outbox video { width: 100%; border-radius: 14px; border: 1px solid var(--line-2); box-shadow: 0 40px 90px -40px #000; display: block; background: #000; }
+.outbox-cap { text-align: center; color: var(--text-3); font-family: var(--mono); font-size: 0.72rem; margin-top: 13px; }
+.outbox-x { position: absolute; top: -13px; right: -13px; width: 34px; height: 34px; border-radius: 50%; background: var(--s2); border: 1px solid var(--line-2); color: var(--text); display: grid; place-items: center; cursor: pointer; font-size: 1rem; }
+.outbox-x:hover { background: var(--s3); }
 .chip { font-family: var(--sans); font-size: 0.76rem; font-weight: 600; padding: 7px 12px; border-radius: 8px; cursor: default; transition: filter 0.15s var(--ease); }
 .chip.solid { background: var(--btn); color: var(--btn-ink); box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset; }
 .chip.outline { background: var(--s2); color: var(--text); border: 1px solid var(--line-2); }
@@ -659,6 +670,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
               <div class="file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg> SubscribePill_v3.mov <span class="meta">imported · V2 @ 0:14</span></div>
               <div class="acts"><span class="chip solid">Import to timeline</span><span class="chip outline">Preview</span><span class="chip outline">Changes</span></div>
             </div>
+            <button class="see-output" id="seeOutput" type="button">See what it actually built <span class="ar">→</span></button>
           </div></div>
         </div>
         <div class="mock-composer"><span class="field">Ask Claude…</span><span class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
@@ -1155,6 +1167,26 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
 })();
 
 
+/* output preview lightbox — the real render behind the hero mockup.
+   (lookups are lazy: the #outBox markup is parsed after this script runs) */
+(function () {
+  const btn = document.getElementById('seeOutput');
+  if (!btn) return;
+  const close = () => { const box = document.getElementById('outBox'), vid = document.getElementById('outVideo'); if (box) box.classList.remove('open'); if (vid) try { vid.pause(); } catch {} };
+  btn.addEventListener('click', () => {
+    const box = document.getElementById('outBox'), vid = document.getElementById('outVideo');
+    if (!box) return;
+    box.classList.add('open');
+    if (vid) { vid.currentTime = 0; vid.play().catch(() => {}); }
+  });
+  document.addEventListener('click', e => {
+    const box = document.getElementById('outBox');
+    if (!box || !box.classList.contains('open')) return;
+    if (e.target === box || (e.target.closest && e.target.closest('#outClose'))) close();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+})();
+
 /* rotating text — cycles through what the panel makes */
 (function () {
   const el = document.getElementById('rotate'); if (!el) return;
@@ -1259,6 +1291,15 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
 
 
 </script>
+
+<!-- Output preview lightbox (the real render behind the hero mockup) -->
+<div class="outbox" id="outBox">
+  <div class="outbox-inner">
+    <button class="outbox-x" id="outClose" aria-label="Close">✕</button>
+    <video id="outVideo" src="output-preview.mp4" controls playsinline preload="none"></video>
+    <p class="outbox-cap">SubscribePill_v3 — the actual render</p>
+  </div>
+</div>
 
 <!-- Supabase auth: reflect signed-in state in the nav -->
 <script src="config.js"></script>

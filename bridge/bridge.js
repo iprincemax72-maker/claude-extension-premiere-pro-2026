@@ -2464,6 +2464,38 @@ const CONNECT_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"
 const PLAN_FEATURES = { free: { autoedit: false }, creator: { autoedit: false }, studio: { autoedit: true } };
 let _planCache = { plan: null, at: 0 };
 
+// ── Parallel multi-version helpers ──────────────────────────────────────────
+// Isolated copy of the Remotion project for one parallel version, so concurrent
+// builds don't collide on Root.tsx / src. node_modules is SYMLINKED (shared,
+// ~0 cost); only the tiny src/config is copied. Returns the workspace path.
+function setupVersionWorkspace(tag, idx) {
+  const base = path.join(WORK_DIR, 'remotion-intro');
+  const ws = path.join(WORK_DIR, '.versions', String(tag).slice(0, 8) + '-v' + idx);
+  try { fs.rmSync(ws, { recursive: true, force: true }); } catch {}
+  fs.mkdirSync(ws, { recursive: true });
+  try { fs.symlinkSync(path.join(base, 'node_modules'), path.join(ws, 'node_modules'), 'dir'); } catch {}
+  for (const f of ['package.json', 'remotion.config.ts', 'tsconfig.json']) {
+    const s = path.join(base, f);
+    if (fs.existsSync(s)) { try { fs.copyFileSync(s, path.join(ws, f)); } catch {} }
+  }
+  fs.cpSync(path.join(base, 'src'), path.join(ws, 'src'), { recursive: true });
+  return ws;
+}
+// Run async thunks with a concurrency cap; results returned in order.
+async function runWithConcurrency(thunks, limit) {
+  const results = new Array(thunks.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < thunks.length) {
+      const i = next++;
+      try { results[i] = await thunks[i](); } catch { results[i] = null; }
+    }
+  };
+  const n = Math.max(1, Math.min(limit || 1, thunks.length));
+  await Promise.all(Array.from({ length: n }, worker));
+  return results;
+}
+
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
