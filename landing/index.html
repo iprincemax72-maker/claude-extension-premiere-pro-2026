@@ -951,10 +951,10 @@ billToggle.addEventListener('click', () => {
   if (!ctx) return;
 
   const color = (getComputedStyle(document.documentElement).getPropertyValue('--coral') || '#E2885F').trim();
-  const speed = 1, chaos = 0.06, borderRadius = 16;
+  const speed = 1, chaos = 0.03, borderRadius = 16;
   const octaves = 10, lacunarity = 1.6, gain = 0.7, frequency = 10, baseFlatness = 0, displacement = 60, borderOffset = 60;
 
-  const random = x => (Math.sin(x * 12.9898) * 43758.5453) % 1;
+  const random = x => { const v = Math.sin(x * 12.9898) * 43758.5453; return v - Math.floor(v); };
   const noise2D = (x, y) => {
     const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
     const a = random(i + j * 57), b = random(i + 1 + j * 57), c = random(i + (j + 1) * 57), d = random(i + 1 + (j + 1) * 57);
