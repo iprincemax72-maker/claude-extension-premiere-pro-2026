@@ -2416,7 +2416,7 @@ const CONNECT_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"
 + '.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;font:600 1rem system-ui;color:#0a0a0b;background:#F4F4F5;border:0;border-radius:12px;padding:.9em;cursor:pointer}.gbtn:hover{filter:brightness(1.05)}.gbtn svg{width:18px;height:18px}b{color:#fafafa}</style></head>'
 + '<body><div class="card"><div class="brand"><span class="glyph">C</span><span>Claude <small style="color:#7c7d87">for Premiere Pro</small></span></div><div id="view"><p class="sub">Loading…</p></div></div>'
 + '<script type="module">'
-+ 'import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";'
++ 'import { createClient } from "https://esm.sh/@supabase/supabase-js@2";'
 + 'var SB_URL="' + AUTH.url + '",SB_ANON="' + AUTH.anon + '";'
 + 'var supabase=createClient(SB_URL,SB_ANON,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:"pkce"}});'
 + 'var view=document.getElementById("view");function show(h){view.innerHTML=h;}'
