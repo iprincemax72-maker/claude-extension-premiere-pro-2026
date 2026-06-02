@@ -99,6 +99,13 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
 .loading .ring{width:46px;height:46px;border:3px solid var(--line-2);border-top-color:var(--coral);border-radius:50%;animation:spin .8s linear infinite}
 .loading .lt{font-family:var(--mono);font-size:.74rem;color:var(--text-2);letter-spacing:.04em}
 
+.bstat{font-size:.82rem;display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--s1s);color:var(--text-2);line-height:1.4}
+.bstat::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--text-3);flex:0 0 auto;margin-top:5px}
+.bstat.up{color:var(--text);border-color:rgba(108,191,122,.4)} .bstat.up::before{background:var(--green);box-shadow:0 0 8px var(--green)}
+.bstat.down::before{background:var(--coral)}
+.bstat b{color:var(--text);font-weight:600}
+.bvideo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:none;z-index:2}
+.bvideo.show{display:block}
 @media (max-width:880px){
   body{overflow:auto}
   .main{grid-template-columns:1fr}
@@ -113,15 +120,16 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
   <header class="bar">
     <a href="index.html" class="brand"><span class="glyph">C</span><span>Claude <small>Motion Builder</small></span></a>
     <div class="right">
-      <span class="badge">Bring your own key</span>
+      <span class="badge">Bring your own Claude</span>
       <a href="index.html" class="linkback"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Home</a>
     </div>
   </header>
 
   <div class="main">
     <aside class="controls">
-      <div class="field">
-        <label>Anthropic API key <span class="req">*</span></label>
+      <div class="bstat" id="bstat">Looking for your local Claude bridge…</div>
+      <div class="field" id="keyField">
+        <label>Anthropic API key <span class="req" id="keyReq">*</span></label>
         <div class="key-row">
           <input id="key" class="inp" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
           <button class="icon-btn" id="eye" title="Show / hide" aria-label="Show or hide key"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
@@ -165,12 +173,13 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
         <button class="act" id="download" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Get .jsx</button>
       </div>
       <div class="stage">
+        <video id="bvideo" class="bvideo" controls loop playsinline></video>
         <div class="player" id="player"></div>
         <div class="codewrap" id="codewrap"><pre id="code"></pre></div>
         <div class="empty" id="empty">
           <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg></div>
           <h2>Describe it, Claude animates it.</h2>
-          <p>Paste your API key and describe a motion graphic. Claude writes a Remotion composition and it plays right here. Then grab the code for your timeline.</p>
+          <p>Describe a motion graphic and Claude builds it with Remotion, right here. Then download it or grab it for your timeline.</p>
         </div>
         <div class="loading" id="loading">
           <div class="ring"></div>
@@ -188,6 +197,52 @@ const key=$('#key'), model=$('#model'), prompt=$('#prompt'), go=$('#go'), goTxt=
   loading=$('#loading'), loadingTxt=$('#loadingTxt'), meta=$('#meta'),
   download=$('#download'), playerMount=$('#player');
 let lastCode='', playerRoot=null;
+
+/* ── bridge auto-detect: use the user's local Claude bridge, no API key ── */
+const BRIDGE = 'http://localhost:3737';
+let bridgeUp = false, progressES = null, lastBridgeURL = '', lastBridgeFile = '';
+(async function detectBridge(){
+  const el = document.getElementById('bstat');
+  try { const r = await fetch(BRIDGE + '/ping', { cache:'no-store' }); const j = await r.json(); if (r.ok && j && j.ok) bridgeUp = true; } catch(_){}
+  if (bridgeUp){
+    el.className = 'bstat up';
+    el.innerHTML = '<span><b>Connected to your Claude bridge.</b> Runs on your own Claude plan. No API key needed.</span>';
+    document.getElementById('keyField').style.display = 'none';
+  } else {
+    el.className = 'bstat down';
+    el.innerHTML = '<span>No local bridge found. Install the Premiere panel to use your own Claude, or paste an API key below.</span>';
+  }
+})();
+
+async function generateViaBridge(){
+  clearErr();
+  const p = prompt.value.trim(); if (!p){ showErr('Describe the motion graphic you want.'); prompt.focus(); return; }
+  setLoading(true, 'Sending to your bridge…');
+  try {
+    try { progressES = new EventSource(BRIDGE + '/progress-stream'); progressES.onmessage = e => { try { const d = JSON.parse(e.data); if (d && d.text) loadingTxt.textContent = d.text; } catch(_){} }; } catch(_){}
+    const res = await fetch(BRIDGE + '/chat', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ message: p, context: {} }) });
+    if (progressES){ progressES.close(); progressES = null; }
+    if (!res.ok) throw new Error('Bridge returned ' + res.status);
+    const data = await res.json();
+    const imports = data.imports || [];
+    if (imports.length){
+      const file = imports[0].split(/[\\/]/).pop();
+      const url = BRIDGE + '/preview/' + encodeURIComponent(file);
+      const v = document.getElementById('bvideo');
+      v.src = url; v.classList.add('show'); v.play().catch(()=>{});
+      document.getElementById('player').style.display = 'none';
+      empty.style.display = 'none';
+      lastBridgeURL = url; lastBridgeFile = file; download.disabled = false;
+      code.textContent = data.reply || ''; meta.textContent = file;
+    } else {
+      showErr(data.reply ? ('Claude replied but produced no video:\n\n' + String(data.reply).slice(0,500)) : 'No video was returned by the bridge.');
+    }
+  } catch(e){
+    if (progressES){ progressES.close(); progressES = null; }
+    showErr(/Failed to fetch/i.test(e.message) ? 'Lost connection to your bridge at localhost:3737. Make sure it is running.' : e.message);
+  }
+  setLoading(false);
+}
 
 key.value = localStorage.getItem('anthropic_key') || '';
 model.value = localStorage.getItem('builder_model') || 'claude-sonnet-4-6';
@@ -268,6 +323,7 @@ async function buildAndPlay(cfg){
 const SYS = "You are a Remotion motion-graphics expert. Respond with ONLY a single JSON object (no markdown fences, no prose) shaped exactly: {\"durationInFrames\": <int>, \"fps\": <int>, \"width\": <int>, \"height\": <int>, \"code\": <string>}. The \"code\" string is the body of a module that defines ONE React function component named MyComposition. Inside the code you have two globals available: React, and Remotion (the remotion package, exposing AbsoluteFill, Sequence, Series, useCurrentFrame, useVideoConfig, interpolate, spring, Easing, random, Img). Do NOT write import or export statements. You MUST use JSX (it is transpiled). Use inline style objects only. No external assets, fonts, or network requests (use system font stacks). Animate using useCurrentFrame(), interpolate(), and spring() with the provided fps. Prefer a transparent or solid background as fits the request. Pick width/height to match the ask (1080x1920 vertical, 1920x1080 wide, or 1080x1080 square) and a 2 to 6 second duration. Make it smooth, modern, and broadcast-clean. Example: {\"durationInFrames\":120,\"fps\":30,\"width\":1080,\"height\":1920,\"code\":\"const {AbsoluteFill,useCurrentFrame,interpolate,spring,useVideoConfig}=Remotion;\\nfunction MyComposition(){const frame=useCurrentFrame();const {fps}=useVideoConfig();const s=spring({frame,fps,config:{damping:14}});const o=interpolate(frame,[0,15],[0,1],{extrapolateRight:'clamp'});return (<AbsoluteFill style={{justifyContent:'center',alignItems:'center',background:'transparent'}}><div style={{transform:`scale(${s})`,opacity:o,color:'#fff',fontSize:96,fontWeight:800,fontFamily:'system-ui'}}>Subscribe</div></AbsoluteFill>);}\"}";
 
 async function generate(){
+  if (bridgeUp) return generateViaBridge();
   clearErr();
   const k = key.value.trim(); if (!k){ showErr('Paste your Anthropic API key first.'); key.focus(); return; }
   const p = prompt.value.trim(); if (!p){ showErr('Describe the motion graphic you want.'); prompt.focus(); return; }
@@ -304,6 +360,7 @@ async function generate(){
 go.addEventListener('click', generate);
 prompt.addEventListener('keydown', e => { if ((e.metaKey||e.ctrlKey) && e.key==='Enter') generate(); });
 download.addEventListener('click', () => {
+  if (bridgeUp && lastBridgeURL){ const a=document.createElement('a'); a.href=lastBridgeURL; a.download=lastBridgeFile||'motion.mp4'; a.click(); return; }
   const blob = new Blob([lastCode], { type:'text/plain' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='MyComposition.jsx'; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
