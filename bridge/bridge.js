@@ -135,6 +135,58 @@ function resolveFFmpeg() {
 const FFMPEG_BIN = resolveFFmpeg();
 console.log('ffmpeg bin: ' + FFMPEG_BIN);
 
+// Resolve how to launch the Claude Code CLI as a child process.
+//   macOS / Linux: `claude` is a normal executable on PATH → spawn it directly
+//     (unchanged behaviour — { cmd:'claude', prefixArgs:[] }).
+//   Windows: npm installs it as `claude.cmd` (a batch shim). Node's spawn can't
+//     exec a .cmd directly, and routing our multi-KB --append-system-prompt arg
+//     through a shell would mangle it. So we find the CLI's JS entry and run it
+//     with the SAME node running this bridge — clean args, no shell, no console.
+// Returns { cmd, prefixArgs, shell? }.
+let _claudeTarget = null;
+function resolveClaude() {
+  if (_claudeTarget) return _claudeTarget;
+  if (process.platform !== 'win32') { _claudeTarget = { cmd: 'claude', prefixArgs: [] }; return _claudeTarget; }
+  // 1) a real claude.exe on PATH (native installer) — spawn it directly
+  try {
+    const dirs = (process.env.PATH || process.env.Path || '').split(';');
+    for (const d of dirs) {
+      if (!d) continue;
+      const exe = path.join(d, 'claude.exe');
+      try { if (fs.existsSync(exe)) { _claudeTarget = { cmd: exe, prefixArgs: [] }; return _claudeTarget; } } catch {}
+    }
+  } catch {}
+  // 2) npm global install → run the package's bin .js with node directly
+  const roots = [];
+  if (process.env.APPDATA) roots.push(path.join(process.env.APPDATA, 'npm', 'node_modules', '@anthropic-ai', 'claude-code'));
+  roots.push(path.join(os.homedir(), 'AppData', 'Roaming', 'npm', 'node_modules', '@anthropic-ai', 'claude-code'));
+  if (process.env.ProgramFiles) roots.push(path.join(process.env.ProgramFiles, 'nodejs', 'node_modules', '@anthropic-ai', 'claude-code'));
+  for (const root of roots) {
+    try {
+      const pj = path.join(root, 'package.json');
+      if (!fs.existsSync(pj)) continue;
+      const bin = (JSON.parse(fs.readFileSync(pj, 'utf8')) || {}).bin;
+      let rel = (typeof bin === 'string') ? bin : (bin && (bin.claude || Object.values(bin)[0]));
+      if (!rel) rel = 'cli.js';
+      const js = path.join(root, rel);
+      if (fs.existsSync(js)) { _claudeTarget = { cmd: process.execPath, prefixArgs: [js] }; return _claudeTarget; }
+    } catch {}
+  }
+  // 3) last resort — claude.cmd via a shell (large args may suffer, but better
+  //    than a hard ENOENT that breaks every request)
+  _claudeTarget = { cmd: 'claude', prefixArgs: [], shell: true };
+  return _claudeTarget;
+}
+// Drop-in replacement for the old spawn('claude', args, opts) — uses the
+// resolved launcher and hides the console window on Windows.
+function spawnClaude(args, opts) {
+  const t = resolveClaude();
+  const o = Object.assign({}, opts);
+  if (t.shell) o.shell = true;
+  if (process.platform === 'win32') o.windowsHide = true;
+  return spawn(t.cmd, t.prefixArgs.concat(args || []), o);
+}
+
 // Run ffmpeg silencedetect and return parsed pause ranges.
 // `onProgress(0..1)` fires as ffmpeg's "time=" reports advance through the clip.
 function detectSilences(clipPath, clipDuration, onProgress) {
@@ -392,7 +444,7 @@ function analyseTranscriptWithClaude(transcript, opts) {
     const t0 = Date.now();
     const el = () => '+' + ((Date.now() - t0) / 1000).toFixed(1) + 's';
     log(`analyseClaude: spawning claude, msgLen=${userMsg.length}, args=${JSON.stringify(args.slice(0, -1))}`);
-    const proc = spawn('claude', args, {
+    const proc = spawnClaude(args, {
       cwd: os.tmpdir(),
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -1474,7 +1526,7 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
         buildPrompt(task),
       ];
       // stdin 'ignore' — otherwise the claude CLI blocks waiting for stdin.
-      const proc = spawn('claude', args, {
+      const proc = spawnClaude(args, {
         cwd: WORK_DIR, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
       });
       if (_activeAutoedit) _activeAutoedit.children.add(proc);
@@ -2774,7 +2826,7 @@ const server = http.createServer((req, res) => {
       // stdin 'ignore' — otherwise the claude CLI emits a stderr warning
       // ("Warning: no stdin data received in 3s, proceeding without it.")
       // which the panel surfaces as if it were a fatal error.
-      const proc = spawn('claude', args, {
+      const proc = spawnClaude(args, {
         cwd: WORK_DIR, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
       });
       let stdout = '', stderr = '', done = false;
@@ -2829,7 +2881,7 @@ const server = http.createServer((req, res) => {
 
       const args = COMPLETION_ARGS.concat([prefix]);
       // stdin 'ignore' — kill the "no stdin data received in 3s" warning.
-      const proc = spawn('claude', args, {
+      const proc = spawnClaude(args, {
         cwd: WORK_DIR, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
       });
       let stdout = '', stderr = '', done = false;
@@ -3267,7 +3319,7 @@ const server = http.createServer((req, res) => {
           // warning ("Warning: no stdin data received in 3s") that the panel
           // surfaces as an error mid-animation. This is the main /chat path,
           // so it was the most visible offender.
-          const proc = spawn('claude', args, {
+          const proc = spawnClaude(args, {
             cwd: useCwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
           });
           if (opts.procs) opts.procs.push(proc);
@@ -3618,9 +3670,9 @@ const server = http.createServer((req, res) => {
         if (v.useFile) {
           outFile = path.join(os.tmpdir(), 'testclaude-' + Date.now() + '.out');
           const fd = fs.openSync(outFile, 'w');
-          proc = spawn('claude', [...baseArgs, prompt], { ...v.opts, stdio: ['ignore', fd, fd] });
+          proc = spawnClaude([...baseArgs, prompt], { ...v.opts, stdio: ['ignore', fd, fd] });
         } else {
-          proc = spawn('claude', [...baseArgs, prompt], v.opts);
+          proc = spawnClaude([...baseArgs, prompt], v.opts);
         }
       } catch (e) {
         return resolve({ name: v.name, result: 'spawn threw: ' + e.message });

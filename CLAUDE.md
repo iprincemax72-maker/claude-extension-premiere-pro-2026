@@ -253,13 +253,15 @@ Every function returns a JSON string. Every operation wrapped in try/catch — P
 **The user never sees a terminal.** When the panel mounts:
 1. Pings `localhost:3737`
 2. If alive → status pill goes green
-3. If dead → spawns `node ~/PremiereClaude/bridge.js` detached, logs to `~/PremiereClaude/bridge.log`. Tries `/usr/local/bin/node`, `/opt/homebrew/bin/node`, then PATH `node`.
+3. If dead → spawns `node ~/PremiereClaude/bridge.js` detached, logs to `~/PremiereClaude/bridge.log`. **Cross-platform node resolution:** macOS tries `/usr/local/bin/node`, `/opt/homebrew/bin/node`, then PATH `node`; Windows tries `%ProgramFiles%\nodejs\node.exe`, `%ProgramFiles(x86)%\…`, `%LOCALAPPDATA%\Programs\nodejs\node.exe`, scoop, then PATH `node`. PATH is rebuilt with the OS-correct separator (`;` on Windows, `:` on Unix) by prepending to the real `Path`/`PATH` key, and the bridge is spawned with `windowsHide:true` so no console window flashes.
 4. Polls `/ping` every 500ms for up to 10s
-5. Goes green when ping succeeds; falls back to "run Claude Bridge.command" hint if 10s passes
+5. Goes green when ping succeeds; falls back to "run Claude Bridge" hint if 10s passes
 
 Bridge stays alive across panel opens/closes — only dies on reboot or manual kill.
 
 The Desktop launcher (`Claude Bridge.command` / `Claude Bridge.bat`) is now a **fallback**, not the primary entry.
+
+**Windows runtime note (`spawnClaude`)** — the bridge spawns the Claude CLI through `spawnClaude(args, opts)` (not raw `spawn('claude', …)`). On macOS/Linux that's a transparent passthrough to `claude` on PATH. On Windows, npm installs the CLI as `claude.cmd` (a batch shim) which Node's `spawn` can't exec directly, and which would mangle the multi-KB `--append-system-prompt` arg if routed through a shell — so `resolveClaude()` finds the package's JS entry (`%APPDATA%\npm\node_modules\@anthropic-ai\claude-code` → its `bin`) and runs it with the same `node` (`process.execPath`), falling back to a real `claude.exe` on PATH, then to `claude.cmd` via shell as a last resort.
 
 ### Auto-update
 

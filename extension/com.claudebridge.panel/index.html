@@ -8441,24 +8441,42 @@ async function tryAutoStartBridge(force) {
     // Open the log file for append, redirect stdout/stderr there
     const out = _fs.openSync(logPath, 'a');
     const err = _fs.openSync(logPath, 'a');
-    // Find a Node — prefer absolute paths since CEP's PATH may be sparse
-    const nodeCandidates = ['/usr/local/bin/node', '/opt/homebrew/bin/node', 'node'];
+    // Find a Node — prefer absolute paths since CEP's PATH may be sparse.
+    const isWin = (process.platform === 'win32');
+    const nodeCandidates = isWin
+      ? [
+          _path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs', 'node.exe'),
+          _path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'nodejs', 'node.exe'),
+          _path.join(process.env.LOCALAPPDATA || '', 'Programs', 'nodejs', 'node.exe'),
+          _path.join(home, 'scoop', 'apps', 'nodejs', 'current', 'node.exe'),
+          'node',
+        ]
+      : ['/usr/local/bin/node', '/opt/homebrew/bin/node', 'node'];
     let nodeBin = null;
     for (const p of nodeCandidates) {
       try { if (p === 'node' || _fs.existsSync(p)) { nodeBin = p; break; } } catch {}
     }
     if (!nodeBin) return false;
-    // Extend PATH so the bridge can find ffmpeg / node / claude even when CEP
-    // hands it a minimal PATH. GUI-launched Mac apps usually only have
-    // /usr/bin:/bin:/usr/sbin:/sbin; brew lives in /opt/homebrew/bin and
-    // /usr/local/bin.
-    const extraPaths = [
-      _path.join(home, '.local', 'bin'),       // common location for user-installed claude
-      '/opt/homebrew/bin', '/usr/local/bin', '/opt/local/bin',
-    ];
+    // Extend PATH so the bridge can find node / claude / ffmpeg even when CEP
+    // hands it a minimal PATH. GUI-launched apps often get a sparse PATH.
+    const extraPaths = isWin
+      ? [
+          _path.join(process.env.APPDATA || '', 'npm'),                              // npm global bin (claude.cmd)
+          _path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs'),
+          _path.join(home, 'scoop', 'shims'),
+          'C:\\ffmpeg\\bin',
+        ].filter(Boolean)
+      : [
+          _path.join(home, '.local', 'bin'),       // common location for user-installed claude
+          '/opt/homebrew/bin', '/usr/local/bin', '/opt/local/bin',
+        ];
+    const sep = isWin ? ';' : ':';
     const envCopy = Object.assign({}, process.env || {});
-    const existingPath = envCopy.PATH || envCopy.Path || '';
-    envCopy.PATH = extraPaths.concat(existingPath ? [existingPath] : []).join(':');
+    // Use the REAL path key (Windows is 'Path') and PREPEND our extras to it —
+    // overwriting with a ':'-joined Unix list would corrupt PATH on Windows.
+    const pathKey = Object.keys(envCopy).find(k => k.toLowerCase() === 'path') || (isWin ? 'Path' : 'PATH');
+    const existingPath = envCopy[pathKey] || '';
+    envCopy[pathKey] = extraPaths.concat(existingPath ? [existingPath] : []).join(sep);
     // DO NOT force CLAUDE_BRIDGE_NO_UPDATE=1 here. Earlier this was hardcoded
     // as a "dev safety" so the panel couldn't accidentally clobber local
     // edits — but the side effect was that every auto-spawned bridge had
@@ -8470,6 +8488,7 @@ async function tryAutoStartBridge(force) {
       detached: true,
       stdio: ['ignore', out, err],
       env: envCopy,
+      windowsHide: true,   // run the bridge with no console window on Windows
     });
     child.unref();
     return true;

@@ -178,13 +178,32 @@ if (Test-Path (Join-Path $remotionDir 'node_modules')) {
     }
 }
 
-# ---------- 9. Place launcher on Desktop ----------
-Step "Placing launcher on Desktop"
+# ---------- 9. Place launcher on Desktop (fallback — the panel auto-starts
+#               the bridge on its own; this is only for manual restarts) ----------
+Step "Placing launcher on Desktop (fallback)"
 $desktop = [Environment]::GetFolderPath('Desktop')
 $launcherSrc = "bridge\start.bat"
 $launcherDst = Join-Path $desktop 'Claude Bridge.bat'
 Copy-Item -Force $launcherSrc $launcherDst
 Ok "$launcherDst"
+
+# ---------- 9b. Make sure the npm global bin is on the user PATH ----------
+# claude.cmd lives in %APPDATA%\npm. npm usually adds it, but if a shell was
+# already open before Node was installed it can be missing — ensure it so the
+# bridge (and `claude /login`) can always find the CLI.
+Step "Ensuring npm global bin is on PATH"
+$npmBin = Join-Path $env:APPDATA 'npm'
+if (Test-Path $npmBin) {
+    $userPath = [Environment]::GetEnvironmentVariable('Path','User')
+    if (($userPath -split ';') -notcontains $npmBin) {
+        [Environment]::SetEnvironmentVariable('Path', ($userPath.TrimEnd(';') + ';' + $npmBin), 'User')
+        Ok "added $npmBin to your PATH (restart shells to pick it up)"
+    } else {
+        Ok "$npmBin already on PATH"
+    }
+} else {
+    Warn "npm global bin ($npmBin) not found yet — it appears after the Claude CLI installs"
+}
 
 # ---------- 10. Premiere Pro detection (informational) ----------
 Step "Detecting Adobe Premiere Pro"
@@ -206,9 +225,12 @@ Write-Host ""
 Write-Host " Next steps:"
 Write-Host "  1. If Claude isn't logged in yet, open a NEW PowerShell window and run:" -NoNewline
 Write-Host "  claude /login" -ForegroundColor Cyan
-Write-Host "  2. Double-click " -NoNewline; Write-Host "Claude Bridge.bat" -ForegroundColor Cyan -NoNewline; Write-Host " on your Desktop."
-Write-Host "  3. Open Premiere Pro -> Window -> Extensions -> Claude."
-Write-Host "  4. Status pill turns green; you're ready."
+Write-Host "  2. Open Premiere Pro -> Window -> Extensions -> Claude."
+Write-Host "     The panel starts the bridge for you automatically (no terminal needed)."
+Write-Host "  3. Status pill turns green; type a prompt and hit Enter. You're ready."
 Write-Host ""
-Write-Host " To stop the bridge: close its terminal window."
+Write-Host " If the pill ever stays red, double-click " -NoNewline
+Write-Host "Claude Bridge.bat" -ForegroundColor Cyan -NoNewline
+Write-Host " on your Desktop to start it manually."
+Write-Host " To stop a manually-started bridge: close its terminal window."
 Write-Host ""
