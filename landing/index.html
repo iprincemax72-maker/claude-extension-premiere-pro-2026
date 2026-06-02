@@ -353,24 +353,6 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .tier li svg { width: 17px; height: 17px; color: var(--coral); flex: 0 0 auto; margin-top: 2px; }
 .pay-note { text-align: center; margin-top: 24px; font-family: var(--mono); font-size: 0.72rem; color: var(--text-3); }
 .pay-note .nokey { color: var(--coral); font-weight: 600; }
-.tier li.locked { color: var(--text-3); cursor: pointer; transition: color 0.15s var(--ease); }
-.tier li.locked:hover { color: var(--text-2); }
-.tier li.locked svg { color: var(--text-3); }
-.tier li.locked .lk { margin-left: auto; align-self: center; font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--coral); border: 1px solid color-mix(in srgb, var(--coral) 35%, transparent); border-radius: 999px; padding: 2px 7px; white-space: nowrap; }
-/* Upsell modal */
-.lockmodal { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; padding: 22px; background: rgba(5,5,7,0.72); backdrop-filter: blur(6px); animation: lmFade 0.2s var(--ease); }
-.lockmodal[hidden] { display: none; }
-@keyframes lmFade { from { opacity: 0; } to { opacity: 1; } }
-.lockmodal-card { width: 100%; max-width: 380px; background: var(--s1s); border: 1px solid var(--line-2); border-radius: 20px; padding: 32px 28px; text-align: center; box-shadow: 0 1px 0 var(--hi) inset, 0 40px 80px -40px rgba(0,0,0,0.9); animation: lmIn 0.24s var(--ease); }
-@keyframes lmIn { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: none; } }
-.lm-icon { width: 52px; height: 52px; margin: 0 auto 16px; border-radius: 14px; background: color-mix(in srgb, var(--coral) 16%, var(--s2)); border: 1px solid color-mix(in srgb, var(--coral) 34%, transparent); display: grid; place-items: center; color: var(--coral); }
-.lm-icon svg { width: 24px; height: 24px; }
-.lockmodal-card h3 { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.02em; }
-.lockmodal-card p { color: var(--text-2); font-size: 0.95rem; line-height: 1.55; margin: 10px 0 18px; }
-.lm-price { font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 18px; }
-.lm-price span { font-size: 0.9rem; font-weight: 500; color: var(--text-3); }
-.lm-close { display: block; width: 100%; margin-top: 12px; background: none; border: 0; color: var(--text-3); font-family: var(--sans); font-size: 0.9rem; cursor: pointer; padding: 8px; }
-.lm-close:hover { color: var(--text-2); }
 
 /* ── FAQ ── */
 .faq { max-width: 760px; margin-inline: auto; }
@@ -795,10 +777,10 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
     </div>
     <div class="tiers">
       <div class="tier reveal"><div class="name">Trial</div><div class="price"><span class="cur">$</span><span>0</span></div><div class="desc">5 renders. No card.</div>
-        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 5 renders</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Mac &amp; Windows</li><li class="locked" data-lock="reference"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Reference images &amp; video <span class="lk">Creator</span></li><li class="locked" data-lock="auto-edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Auto-Edit <span class="lk">Studio</span></li></ul>
+        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 5 renders</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Mac &amp; Windows</li></ul>
         <a href="#install" class="btn btn-ghost btn-block">Try it free</a></div>
       <div class="tier featured reveal d1"><div class="name">Creator</div><div class="price"><span class="cur">$</span><span data-amt-m="19" data-amt-a="15">19</span><span class="per">/ mo</span></div><div class="desc">For working editors.</div>
-        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 50 renders / month</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Up to 2 versions per prompt</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Reference images &amp; video</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> All updates</li><li class="locked" data-lock="auto-edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Auto-Edit <span class="lk">Studio</span></li></ul>
+        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 50 renders / month</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Up to 2 versions per prompt</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Reference images &amp; video</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> All updates</li></ul>
         <a href="#" class="btn btn-primary btn-block magnetic" data-buy>Get Creator</a></div>
       <div class="tier reveal d2"><div class="name">Studio</div><div class="price"><span class="cur">$</span><span data-amt-m="49" data-amt-a="39">49</span><span class="per">/ mo</span></div><div class="desc">For teams.</div>
         <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 250 renders / month</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Up to 10 versions per prompt</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Up to 5 seats</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Priority support</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Auto-Edit feature</li></ul>
@@ -806,17 +788,6 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
     </div>
     <!-- Wire your real checkout in the CONFIG block at the very bottom (checkoutUrl). -->
     <p class="pay-note"><span class="nokey">No API key needed — every plan runs on your own Claude plan</span> · Secure checkout · Cancel anytime · 14-day money-back</p>
-  </div>
-
-  <div class="lockmodal" id="lockModal" hidden>
-    <div class="lockmodal-card">
-      <div class="lm-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-      <h3 id="lmTitle">Auto-Edit is a Studio feature</h3>
-      <p id="lmDesc">It reads your footage, finds the key moments, and builds matching graphics across the whole clip. Unlock it with the Studio plan.</p>
-      <div class="lm-price" id="lmPrice">$49<span> / mo</span></div>
-      <a href="#pricing" class="btn btn-primary btn-block btn-lg" id="lmBuy" data-buy>Get Studio</a>
-      <button class="lm-close" id="lmClose">Maybe later</button>
-    </div>
   </div>
 </section>
 
@@ -981,30 +952,6 @@ billToggle.addEventListener('click', () => {
   document.querySelectorAll('.tier .per').forEach(el => { el.textContent = annual ? '/ mo, billed yearly' : '/ mo'; });
 });
 
-/* locked-feature upsell modal — click a 🔒 feature to see which plan unlocks it */
-(function () {
-  const modal = document.getElementById('lockModal');
-  if (!modal) return;
-  const LOCKS = {
-    'auto-edit': { title: 'Auto-Edit is a Studio feature', desc: 'It reads your footage, finds the key moments, and builds matching graphics across the whole clip.', price: '$49', plan: 'Studio' },
-    'reference': { title: 'Reference matching is a Creator feature', desc: 'Drop in an image or video and Claude matches its style, colors, and motion in what it builds.', price: '$19', plan: 'Creator' },
-  };
-  const titleEl = document.getElementById('lmTitle'), descEl = document.getElementById('lmDesc'), priceEl = document.getElementById('lmPrice'), buyEl = document.getElementById('lmBuy');
-  const open = key => {
-    const c = LOCKS[key] || LOCKS['auto-edit'];
-    titleEl.textContent = c.title;
-    descEl.textContent = c.desc + ' Unlock it with the ' + c.plan + ' plan.';
-    priceEl.innerHTML = c.price + '<span> / mo</span>';
-    buyEl.textContent = 'Get ' + c.plan;
-    modal.hidden = false; document.documentElement.style.overflow = 'hidden';
-  };
-  const close = () => { modal.hidden = true; document.documentElement.style.overflow = ''; };
-  document.querySelectorAll('.tier li.locked').forEach(li => li.addEventListener('click', () => open(li.getAttribute('data-lock'))));
-  document.getElementById('lmClose').addEventListener('click', close);
-  buyEl.addEventListener('click', close);
-  modal.addEventListener('click', e => { if (e.target === modal) close(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) close(); });
-})();
 
 /* demo video — autoplays MUTED when scrolled into view (browsers block sound-on
    autoplay); the pill toggles sound on/off. Click the poster to play with sound. */
