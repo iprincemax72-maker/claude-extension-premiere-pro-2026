@@ -352,6 +352,7 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .tier li { display: flex; gap: 10px; font-size: 0.92rem; color: var(--text); align-items: flex-start; }
 .tier li svg { width: 17px; height: 17px; color: var(--coral); flex: 0 0 auto; margin-top: 2px; }
 .pay-note { text-align: center; margin-top: 24px; font-family: var(--mono); font-size: 0.72rem; color: var(--text-3); }
+.pay-note .nokey { color: var(--coral); font-weight: 600; }
 
 /* ── FAQ ── */
 .faq { max-width: 760px; margin-inline: auto; }
@@ -776,17 +777,17 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
     </div>
     <div class="tiers">
       <div class="tier reveal"><div class="name">Trial</div><div class="price"><span class="cur">$</span><span>0</span></div><div class="desc">5 renders. No card.</div>
-        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 5 renders</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> No API key needed</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Mac &amp; Windows</li></ul>
+        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 5 renders</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Mac &amp; Windows</li></ul>
         <a href="#install" class="btn btn-ghost btn-block">Try it free</a></div>
       <div class="tier featured reveal d1"><div class="name">Creator</div><div class="price"><span class="cur">$</span><span data-amt-m="19" data-amt-a="15">19</span><span class="per">/ mo</span></div><div class="desc">For working editors.</div>
-        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Unlimited renders</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Both tools</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Reference images &amp; video</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> All updates</li></ul>
+        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 50 renders / month</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Both tools</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Reference images &amp; video</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> All updates</li></ul>
         <a href="#" class="btn btn-primary btn-block magnetic" data-buy>Get Creator</a></div>
       <div class="tier reveal d2"><div class="name">Studio</div><div class="price"><span class="cur">$</span><span data-amt-m="49" data-amt-a="39">49</span><span class="per">/ mo</span></div><div class="desc">For teams.</div>
-        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Everything in Creator</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Up to 5 seats</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Priority support</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Shared presets</li></ul>
+        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 250 renders / month</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Up to 5 seats</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Priority support</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Shared presets</li></ul>
         <a href="#" class="btn btn-ghost btn-block" data-buy>Get Studio</a></div>
     </div>
     <!-- Wire your real checkout in the CONFIG block at the very bottom (checkoutUrl). -->
-    <p class="pay-note">Secure checkout · Cancel anytime · 14-day money-back guarantee</p>
+    <p class="pay-note"><span class="nokey">No API key needed — every plan runs on your own Claude plan</span> · Secure checkout · Cancel anytime · 14-day money-back</p>
   </div>
 </section>
 
