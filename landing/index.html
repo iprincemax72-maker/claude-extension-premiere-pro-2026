@@ -524,13 +524,33 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 .see-output:hover { background: color-mix(in srgb, var(--coral) 18%, transparent); }
 .see-output .ar { transition: transform 0.18s var(--ease); }
 .see-output:hover .ar { transform: translateX(3px); }
-.outbox { position: fixed; inset: 0; z-index: 600; display: none; place-items: center; padding: 24px; background: rgba(5,5,7,0.82); backdrop-filter: blur(8px); }
-.outbox.open { display: grid; }
-.outbox-inner { position: relative; width: 100%; max-width: min(92vw, 620px); }
-.outbox video { width: 100%; border-radius: 14px; border: 1px solid var(--line-2); box-shadow: 0 40px 90px -40px #000; display: block; background: #000; }
-.outbox-cap { text-align: center; color: var(--text-3); font-family: var(--mono); font-size: 0.72rem; margin-top: 13px; }
-.outbox-x { position: absolute; top: -13px; right: -13px; width: 34px; height: 34px; border-radius: 50%; background: var(--s2); border: 1px solid var(--line-2); color: var(--text); display: grid; place-items: center; cursor: pointer; font-size: 1rem; }
-.outbox-x:hover { background: var(--s3); }
+.preview { position: fixed; inset: 0; z-index: 600; display: none; place-items: center; padding: 24px; background: rgba(5,5,7,0.86); backdrop-filter: blur(10px); }
+.preview.open { display: grid; }
+.preview-x { position: absolute; top: 22px; right: 24px; width: 38px; height: 38px; border-radius: 50%; background: var(--s2); border: 1px solid var(--line-2); color: var(--text); display: grid; place-items: center; cursor: pointer; font-size: 1.05rem; z-index: 2; }
+.preview-x:hover { background: var(--s3); }
+.preview-stage { display: flex; align-items: center; justify-content: center; gap: clamp(6px, 2.4vw, 26px); perspective: 1700px; width: 100%; max-width: 980px; }
+.pv-card { background: var(--s1s); border: 1px solid var(--line-2); border-radius: 16px; box-shadow: 0 1px 0 var(--hi) inset, 0 50px 110px -50px rgba(0,0,0,0.9); overflow: hidden; transition: transform 0.7s var(--ease), opacity 0.55s var(--ease); }
+.pv-ask { width: clamp(270px, 33vw, 358px); flex: 0 0 auto; transform: rotateY(15deg) translateX(-80px); opacity: 0; }
+.pv-out { width: clamp(300px, 39vw, 430px); flex: 0 0 auto; background: #000; transform: rotateY(-15deg) translateX(80px); opacity: 0; }
+.preview.open .pv-ask { transform: rotateY(10deg); opacity: 1; }
+.preview.open .pv-out { transform: rotateY(-10deg); opacity: 1; }
+.pv-out video { width: 100%; display: block; }
+.pv-bar { display: flex; align-items: center; gap: 7px; padding: 11px 14px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.02); }
+.pv-bar i { width: 10px; height: 10px; border-radius: 50%; }
+.pv-bar i:nth-child(1){ background:#e1664f; } .pv-bar i:nth-child(2){ background:#e0b04a; } .pv-bar i:nth-child(3){ background:#6cbf7a; }
+.pv-bar span { margin-left: 5px; font-family: var(--mono); font-size: 0.66rem; color: var(--text-3); }
+.pv-ask-body { padding: 20px 17px; }
+.pv-you { font-size: 0.92rem; color: var(--text-2); line-height: 1.55; margin-bottom: 15px; }
+.pv-file { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 0.72rem; color: var(--text); border: 1px solid var(--line-2); border-radius: 9px; padding: 9px 12px; background: var(--bg-soft); }
+.pv-file svg { width: 15px; height: 15px; color: var(--coral); flex: 0 0 auto; }
+.pv-arrow { flex: 0 0 auto; color: var(--coral); opacity: 0; transition: opacity 0.5s var(--ease) 0.25s; }
+.pv-arrow svg { width: 26px; height: 26px; }
+.preview.open .pv-arrow { opacity: 1; }
+@media (max-width: 720px) {
+  .preview-stage { flex-direction: column; gap: 14px; perspective: none; }
+  .pv-ask, .pv-out, .preview.open .pv-ask, .preview.open .pv-out { transform: none; width: min(86vw, 380px); }
+  .pv-arrow { transform: rotate(90deg); }
+}
 .chip { font-family: var(--sans); font-size: 0.76rem; font-weight: 600; padding: 7px 12px; border-radius: 8px; cursor: default; transition: filter 0.15s var(--ease); }
 .chip.solid { background: var(--btn); color: var(--btn-ink); box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset; }
 .chip.outline { background: var(--s2); color: var(--text); border: 1px solid var(--line-2); }
@@ -1292,12 +1312,19 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
 
 </script>
 
-<!-- Output preview lightbox (the real render behind the hero mockup) -->
-<div class="outbox" id="outBox">
-  <div class="outbox-inner">
-    <button class="outbox-x" id="outClose" aria-label="Close">✕</button>
-    <video id="outVideo" src="output-preview.mp4" controls playsinline preload="none"></video>
-    <p class="outbox-cap">SubscribePill_v3 — the actual render</p>
+<!-- Output preview — prompt (left) → real render (right), 3D-tilted -->
+<div class="preview" id="outBox">
+  <button class="preview-x" id="outClose" aria-label="Close">✕</button>
+  <div class="preview-stage">
+    <div class="pv-card pv-ask">
+      <div class="pv-bar"><i></i><i></i><i></i><span>Claude — Premiere Pro</span></div>
+      <div class="pv-ask-body">
+        <p class="pv-you">“Make a glassy subscribe button, vertical, 4s — calm, not flashy.”</p>
+        <div class="pv-file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg> SubscribePill_v3.mov</div>
+      </div>
+    </div>
+    <div class="pv-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+    <div class="pv-card pv-out"><video id="outVideo" src="output-preview.mp4" controls playsinline preload="none"></video></div>
   </div>
 </div>
 
