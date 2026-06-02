@@ -2371,6 +2371,15 @@ function buildBestPracticesBlock(renderMode) {
 //  so existing installs are unaffected until the owner opts in.
 // ════════════════════════════════════════════════════════════════════════════
 const alog = (m) => { try { clog('auth', /fail|error/i.test(String(m)) ? 'error' : 'info', String(m)); } catch {} };
+// Public Supabase config baked in as the DEFAULT so sign-in + render metering
+// work out of the box on every install — no account, no renders. This is the
+// PUBLIC url + publishable (anon) key, the same pair shipped in the website's
+// config.js and guarded by Row Level Security; safe to embed. Env vars or
+// <WORK_DIR>/bridge-auth.json still override it. Set CLAUDE_BRIDGE_NO_AUTH=1
+// to turn the gate off (dev only).
+const DEFAULT_SUPABASE_URL  = 'https://hwsyaqmkwitxprtnrzkj.supabase.co';
+const DEFAULT_SUPABASE_ANON = 'sb_publishable_k7tsIqZia0WXf4eGQwcY2w_jFjAkDEK';
+const _authDisabled = process.env.CLAUDE_BRIDGE_NO_AUTH === '1';
 let AUTH = { url: process.env.SUPABASE_URL || '', anon: process.env.SUPABASE_ANON_KEY || '' };
 try {
   const cfgFile = path.join(WORK_DIR, 'bridge-auth.json');
@@ -2380,9 +2389,13 @@ try {
     AUTH.anon = AUTH.anon || j.SUPABASE_ANON_KEY || j.anon || '';
   }
 } catch (e) { alog('config read failed: ' + e.message); }
+if (!_authDisabled) {
+  AUTH.url  = AUTH.url  || DEFAULT_SUPABASE_URL;
+  AUTH.anon = AUTH.anon || DEFAULT_SUPABASE_ANON;
+}
 AUTH.url = String(AUTH.url).replace(/\/+$/, '');
-const AUTH_ENABLED = !!(AUTH.url && AUTH.anon);
-if (AUTH_ENABLED) alog('auth enabled for ' + AUTH.url); else alog('auth disabled (no Supabase config) — renders are ungated');
+const AUTH_ENABLED = !_authDisabled && !!(AUTH.url && AUTH.anon);
+if (AUTH_ENABLED) alog('auth enabled for ' + AUTH.url); else alog('auth disabled (CLAUDE_BRIDGE_NO_AUTH) — renders are ungated');
 
 const SESSION_FILE = path.join(WORK_DIR, 'session.json');
 let _session = null;
@@ -2495,7 +2508,8 @@ const CONNECT_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"
 + '.card{width:100%;max-width:420px;background:#121215;border:1px solid rgba(255,255,255,.09);border-radius:20px;padding:34px;box-shadow:0 30px 80px -50px #000}'
 + '.brand{display:flex;align-items:center;gap:9px;font-weight:600;margin-bottom:22px}.glyph{width:30px;height:30px;border-radius:8px;background:#E2885F;color:#15110d;display:grid;place-items:center;font-family:Georgia,serif;font-style:italic;font-size:18px}'
 + '.big{font-size:1.5rem;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}.sub{color:#9a9aa1;font-size:.95rem;line-height:1.55;margin-bottom:22px}'
-+ '.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;font:600 1rem system-ui;color:#0a0a0b;background:#F4F4F5;border:0;border-radius:12px;padding:.9em;cursor:pointer}.gbtn:hover{filter:brightness(1.05)}.gbtn svg{width:18px;height:18px}b{color:#fafafa}</style></head>'
++ '.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;font:600 1rem system-ui;color:#0a0a0b;background:#F4F4F5;border:0;border-radius:12px;padding:.9em;cursor:pointer}.gbtn:hover{filter:brightness(1.05)}.gbtn svg{width:18px;height:18px}b{color:#fafafa}'
++ '.fld{margin-bottom:10px}.fld input{width:100%;font:1rem system-ui;color:#fafafa;background:#1a1a1e;border:1px solid rgba(255,255,255,.14);border-radius:11px;padding:.8em .9em}.fld input:focus{outline:none;border-color:#E2885F}.sbtn{width:100%;font:600 1rem system-ui;color:#15110d;background:#E2885F;border:0;border-radius:12px;padding:.85em;cursor:pointer;margin-top:2px}.sbtn:hover{filter:brightness(1.05)}.sbtn:disabled{opacity:.6}.orline{display:flex;align-items:center;gap:10px;color:#7c7d87;font-size:.76rem;margin:14px 0}.orline::before,.orline::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.09)}.lnk{background:0;border:0;color:#9a9aa1;font:inherit;font-size:.82rem;text-decoration:underline;cursor:pointer;padding:6px 0}.lnk:hover{color:#fafafa}.e{color:#e98c7a;font-size:.85rem;margin-top:10px}</style></head>'
 + '<body><div class="card"><div class="brand"><span class="glyph">C</span><span>Claude <small style="color:#7c7d87">for Premiere Pro</small></span></div><div id="view"><p class="sub">Loading…</p></div></div>'
 + '<script type="module">'
 + 'import { createClient } from "https://esm.sh/@supabase/supabase-js@2";'
@@ -2504,11 +2518,27 @@ const CONNECT_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"
 + 'var view=document.getElementById("view");function show(h){view.innerHTML=h;}'
 + 'var GSVG=\'<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.11a6.6 6.6 0 0 1 0-4.22V7.05H2.18a11 11 0 0 0 0 9.9z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.05l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z"/></svg>\';'
 + 'async function pushToBridge(s){var body=JSON.stringify({access_token:s.access_token,refresh_token:s.refresh_token,expires_at:s.expires_at,user:s.user});try{var r=await fetch("/auth/session",{method:"POST",headers:{"Content-Type":"application/json"},body:body});return r.ok;}catch(e){return false;}}'
++ 'function signinView(signup){'
++ 'show(\'<p class="big">\'+(signup?"Create your account":"Connect your extension")+\'</p>'
++ '<p class="sub">\'+(signup?"Free - 5 renders a month, no card.":"Sign in to link this device. Free plan includes 5 renders a month.")+\'</p>'
++ '<div class="fld"><input id="em" type="email" placeholder="you@example.com" autocomplete="email"></div>'
++ '<div class="fld"><input id="pw" type="password" placeholder="Password" autocomplete="\'+(signup?"new-password":"current-password")+\'"></div>'
++ '<button id="sb" class="sbtn">\'+(signup?"Create account":"Sign in")+\'</button>'
++ '<div id="er" class="e" style="display:none"></div>'
++ '<div class="orline">or</div>'
++ '<button id="g" class="gbtn">\'+GSVG+\' Continue with Google</button>'
++ '<div style="text-align:center;margin-top:12px"><button id="tg" class="lnk">\'+(signup?"Have an account? Sign in":"New here? Create an account")+\'</button></div>\');'
++ 'var er=document.getElementById("er");function ee(m){er.textContent=m;er.style.display="block";}'
++ 'document.getElementById("tg").onclick=function(){signinView(!signup);};'
++ 'document.getElementById("g").onclick=async function(){var r=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+"/connect",queryParams:{prompt:"select_account"}}});if(r.error)ee(r.error.message);};'
++ 'document.getElementById("sb").onclick=async function(){er.style.display="none";var em=document.getElementById("em").value.trim(),pw=document.getElementById("pw").value;if(!em||!/^\\S+@\\S+\\.\\S+$/.test(em))return ee("Enter a valid email.");if(pw.length<6)return ee("Password must be at least 6 characters.");var btn=this;btn.disabled=true;'
++ 'try{if(signup){var r=await supabase.auth.signUp({email:em,password:pw,options:{emailRedirectTo:location.origin+"/connect"}});if(r.error){btn.disabled=false;return ee(r.error.message);}if(r.data&&r.data.session){show(\'<p class="big">Connecting...</p>\');await pushToBridge(r.data.session);show(\'<p class="big">&#10003; Connected</p><p class="sub">Signed in as <b>\'+em+\'</b>. Close this tab and head back to Premiere.</p>\');}else{btn.disabled=false;ee("Check "+em+" for a verification link, then sign in.");}}'
++ 'else{var r2=await supabase.auth.signInWithPassword({email:em,password:pw});if(r2.error){btn.disabled=false;return ee(/invalid login/i.test(r2.error.message)?"Wrong email or password.":/not confirmed/i.test(r2.error.message)?"Confirm your email first - check your inbox.":r2.error.message);}var s=(await supabase.auth.getSession()).data.session;show(\'<p class="big">Connecting...</p>\');var ok=await pushToBridge(s);show(ok?\'<p class="big">&#10003; Connected</p><p class="sub">Signed in as <b>\'+em+\'</b>. Close this tab and head back to Premiere.</p>\':\'<p class="big">Almost there</p><p class="sub">Couldn&#39;t reach the bridge. Make sure it&#39;s running and reload.</p>\');}}catch(e){btn.disabled=false;ee(String(e&&e.message||e));}};'
++ '}'
 + '(async function(){var res=await supabase.auth.getSession();var session=res.data.session;'
 + 'if(session){show(\'<p class="big">Connecting…</p>\');var ok=await pushToBridge(session);'
 + 'show(ok?\'<p class="big">&#10003; Connected</p><p class="sub">Your extension is signed in as <b>\'+(session.user.email||"")+\'</b>. Close this tab and head back to Premiere.</p>\':\'<p class="big">Almost there</p><p class="sub">Couldn&#39;t reach the local bridge. Make sure the Claude Bridge app is running, then reload this page.</p>\');return;}'
-+ 'show(\'<p class="big">Connect your extension</p><p class="sub">Sign in with Google to link this device. Free plan includes 5 renders a month.</p><button id="g" class="gbtn">\'+GSVG+\' Continue with Google</button>\');'
-+ 'document.getElementById("g").onclick=async function(){var r=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+"/connect",queryParams:{prompt:"select_account"}}});if(r.error)show(\'<p class="big">Error</p><p class="sub">\'+r.error.message+\'</p>\');};'
++ 'signinView(false);'
 + '})();'
 + '<\/script></body></html>';
 

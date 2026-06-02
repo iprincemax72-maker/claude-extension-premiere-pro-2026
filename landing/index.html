@@ -864,12 +864,16 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
       <div class="spanel show" data-spanel="0">
         <div class="pn">Step 1</div>
         <h3>Download the extension</h3>
-        <p class="lead">Grab it for your computer. Windows is a one-click <code>.exe</code> installer; macOS is a zip.</p>
-        <div class="dlrow">
+        <p class="lead">It runs on your account — sign in, then grab it for your computer.</p>
+        <div class="dlrow" id="dlReal" style="display:none">
           <a class="dl mac" data-dlos="mac" href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/download/v1.0.1/claude-premiere-pro-macos.zip"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.5-.4 6.1 1 8.1.7 1 1.4 2.1 2.4 2 1-.04 1.3-.6 2.5-.6s1.5.6 2.6.6c1.1-.02 1.7-1 2.4-2 .8-1.2 1.1-2.3 1.1-2.3-.02-.01-2.1-.8-2.1-3.2zM14.5 6.1c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.5.9.07 1.8-.5 2.4-1.1z"/></svg> Download for macOS</a>
           <a class="dl win" data-dlos="win" href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/download/v1.0.1/ClaudeForPremiere-Setup.exe"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.5 10.5 4.4v7.1H3zM11.4 4.3 21 3v8.5h-9.6zM3 12.5h7.5v7.1L3 18.5zM11.4 12.5H21V21l-9.6-1.3z"/></svg> Download for Windows</a>
         </div>
-        <p style="color:var(--text-3);font-size:0.84rem;margin-top:2px">Same panel, cross-platform — each download bundles the right installer for your OS.</p>
+        <div id="dlGate" class="dlgate">
+          <a class="btn btn-primary" id="dlGateBtn" href="login.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Sign in to download</a>
+          <p style="color:var(--text-3);font-size:0.84rem;margin-top:8px">Creating an account is free. The download unlocks once you're signed in — and you sign in inside the panel too, to render.</p>
+        </div>
+        <p id="dlNote" style="color:var(--text-3);font-size:0.84rem;margin-top:8px;display:none">Same panel, cross-platform — Windows is a one-click <code>.exe</code> installer; macOS is a zip.</p>
       </div>
 
       <div class="spanel" data-spanel="1">
@@ -1407,6 +1411,14 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
     renderNav(u);
     if (navCta) navCta.textContent = u ? "Upgrade" : "Get it";   // logged in → Upgrade
     if (mm) { if (u) { mm.textContent = "Your account"; mm.setAttribute("href", "account.html"); } else { mm.textContent = "Sign in"; mm.setAttribute("href", "login.html"); } }
+    // Download gate — only signed-in accounts see the download buttons.
+    const on = !!u;
+    const dlReal = document.getElementById("dlReal");
+    const dlGate = document.getElementById("dlGate");
+    const dlNote = document.getElementById("dlNote");
+    if (dlReal) dlReal.style.display = on ? "flex" : "none";
+    if (dlGate) dlGate.style.display = on ? "none" : "block";
+    if (dlNote) dlNote.style.display = on ? "block" : "none";
   }
   sessionUser().then(apply);                                                    // fast first paint
   supabase.auth.onAuthStateChange((_event, session) => apply(session?.user ?? null));  // authoritative — uses the event's own session (no nested call = no deadlock)

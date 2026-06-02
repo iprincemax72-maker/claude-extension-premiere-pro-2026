@@ -17,6 +17,39 @@ export function signInWithGoogle() {
   });
 }
 
+/* Email + password — Supabase only authenticates REAL, existing accounts with
+   the correct password (and, when email confirmation is on, only confirmed
+   ones). We never create or fake an account on a login attempt. */
+export function signInWithEmail(email, password) {
+  return supabase.auth.signInWithPassword({ email: String(email).trim(), password });
+}
+
+/* Create a real account. Supabase validates the email format + password and
+   (when confirmation is enabled) emails a verify link before the account can be
+   used — so only valid, owned emails become usable accounts. The profiles row
+   is created by the DB trigger, same as Google sign-ups. */
+export function signUpWithEmail(email, password, fullName) {
+  return supabase.auth.signUp({
+    email: String(email).trim(),
+    password,
+    options: {
+      data: fullName ? { full_name: String(fullName).trim() } : undefined,
+      emailRedirectTo: window.APP_REDIRECT,
+    },
+  });
+}
+
+/* Send a password-reset link. redirectTo lands back on the login page, which
+   detects the recovery token and shows a "set new password" form. */
+export function sendPasswordReset(email, redirectTo) {
+  return supabase.auth.resetPasswordForEmail(String(email).trim(), { redirectTo });
+}
+
+/* Set a new password for the current (recovery) session. */
+export function updatePassword(password) {
+  return supabase.auth.updateUser({ password });
+}
+
 export async function signOut() {
   await supabase.auth.signOut();
   location.href = "index.html";
