@@ -105,9 +105,12 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 .brand { display: flex; align-items: center; gap: 0.6em; font-weight: 600; font-size: 1.04rem; letter-spacing: -0.02em; }
 .brand .glyph { width: 28px; height: 28px; border-radius: 7px; flex: 0 0 auto; background: var(--coral); color: #15110d; display: grid; place-items: center; font-style: italic; font-weight: 700; font-size: 0.95rem; box-shadow: 0 0 18px -4px var(--coral); font-family: Georgia, serif; }
 .brand small { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); display: block; margin-top: 1px; font-weight: 400; }
-.nav-links { display: flex; align-items: center; gap: 1.9rem; }
-.nav-links a { font-size: 0.9rem; font-weight: 500; color: var(--text-2); transition: color 0.15s; }
-.nav-links a:hover { color: var(--text); }
+.nav-links { display: flex; align-items: center; gap: 1.9rem; position: relative; }
+.nav-links a { font-size: 0.9rem; font-weight: 500; color: var(--text-2); transition: color 0.18s; position: relative; z-index: 2; }
+.nav-links a:hover, .nav-links a.active { color: var(--text); }
+/* gooey nav indicator */
+.goo-layer { position: absolute; left: 0; right: 0; bottom: -7px; height: 18px; z-index: 1; pointer-events: none; filter: url(#goo) drop-shadow(0 0 5px rgba(226,136,95,0.55)); }
+.nav-pill { position: absolute; bottom: 4px; left: 0; height: 7px; width: 40px; border-radius: 99px; background: var(--coral); opacity: 0; transition: transform 0.34s var(--ease), width 0.34s var(--ease), opacity 0.25s var(--ease); will-change: transform, width; }
 .nav-cta { display: flex; align-items: center; gap: 0.8rem; }
 .nav-toggle { display: none; background: none; border: none; cursor: pointer; padding: 8px; color: var(--text); }
 .nav-toggle svg { width: 24px; height: 24px; }
@@ -477,12 +480,14 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <div class="grid-bg"></div>
 <div class="atmos"><b class="b1"></b><b class="b2"></b><b class="b3"></b></div>
 <div class="gblur" aria-hidden="true"><div></div><div></div><div></div><div></div><div></div></div>
+<svg class="goo-def" aria-hidden="true" width="0" height="0"><defs><filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10" result="g"/><feComposite in="SourceGraphic" in2="g" operator="atop"/></filter></defs></svg>
 
 <!-- NAV -->
 <header class="nav" id="nav">
   <div class="wrap nav-in">
     <a href="#top" class="brand"><span class="glyph">C</span><span>Claude <small>for Premiere Pro</small></span></a>
-    <nav class="nav-links">
+    <nav class="nav-links" id="navLinks">
+      <span class="goo-layer"><span class="nav-pill" id="navPill"></span></span>
       <a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a>
     </nav>
     <div class="nav-cta">
@@ -869,6 +874,41 @@ document.querySelectorAll('.tool').forEach(card => card.addEventListener('pointe
     el.classList.add('out');
     setTimeout(() => { i = (i + 1) % words.length; render(words[i]); el.classList.remove('out'); }, 420);
   }, 2400);
+})();
+
+/* gooey nav — liquid coral indicator with scroll-spy */
+(function () {
+  const navLinks = document.getElementById('navLinks'), pill = document.getElementById('navPill');
+  if (!navLinks || !pill) return;
+  const links = [].slice.call(navLinks.querySelectorAll('a'));
+  const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  let active = 0, settle = 0;
+  function place(link, instant) {
+    const lr = link.getBoundingClientRect(), nr = navLinks.getBoundingClientRect();
+    const left = lr.left - nr.left, w = link.offsetWidth;
+    const curL = parseFloat(pill.dataset.l || left), curW = parseFloat(pill.dataset.w || w);
+    pill.style.opacity = '1';
+    if (instant) { pill.style.transform = 'translateX(' + left + 'px)'; pill.style.width = w + 'px'; }
+    else {
+      const sL = Math.min(curL, left), sR = Math.max(curL + curW, left + w);
+      pill.style.transform = 'translateX(' + sL + 'px)'; pill.style.width = (sR - sL) + 'px';
+      clearTimeout(settle);
+      settle = setTimeout(() => { pill.style.transform = 'translateX(' + left + 'px)'; pill.style.width = w + 'px'; }, 170);
+    }
+    pill.dataset.l = left; pill.dataset.w = w;
+  }
+  function setActive(i, instant) { active = i; links.forEach((l, k) => l.classList.toggle('active', k === i)); place(links[i], instant); }
+  links.forEach(l => l.addEventListener('pointerenter', () => place(l)));
+  navLinks.addEventListener('pointerleave', () => place(links[active]));
+  let raf2 = 0;
+  addEventListener('scroll', () => { cancelAnimationFrame(raf2); raf2 = requestAnimationFrame(() => {
+    const y = scrollY + 130; let idx = 0;
+    sections.forEach((s, i) => { if (s && s.offsetTop <= y) idx = i; });
+    if (idx !== active) setActive(idx);
+  }); }, { passive: true });
+  addEventListener('resize', () => place(links[active], true), { passive: true });
+  addEventListener('load', () => setActive(0, true));
+  setActive(0, true);
 })();
 
 </script>
