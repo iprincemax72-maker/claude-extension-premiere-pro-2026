@@ -117,6 +117,8 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 
 /* ── Atmosphere — a living aurora gradient (drifting, screen-blended orbs) ── */
 .atmos { position: fixed; inset: -12%; z-index: -2; pointer-events: none; overflow: hidden; }
+.atmos::before { content: ""; position: absolute; inset: -25%; background: conic-gradient(from 0deg at 50% 42%, transparent 0deg, rgba(226,136,95,0.10) 38deg, transparent 110deg, rgba(126,98,232,0.11) 188deg, transparent 250deg, rgba(226,136,95,0.07) 320deg, transparent 360deg); filter: blur(58px); animation: veilSpin 46s linear infinite; }
+@keyframes veilSpin { to { transform: rotate(360deg); } }
 .atmos b { position: absolute; border-radius: 50%; filter: blur(74px); mix-blend-mode: screen; will-change: transform; }
 .atmos .b1 { top: -6%; left: 4%; width: 48vw; height: 48vw; max-width: 700px; background: radial-gradient(circle, rgba(226,136,95,0.38), transparent 62%); animation: orb1 23s ease-in-out infinite alternate; }
 .atmos .b2 { top: -2%; right: -2%; width: 45vw; height: 45vw; max-width: 660px; background: radial-gradient(circle, rgba(126,98,232,0.32), transparent 62%); animation: orb2 29s ease-in-out infinite alternate; }
