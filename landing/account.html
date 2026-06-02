@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Your account · Claude for Premiere Pro</title>
+<meta name="robots" content="noindex" />
+<meta name="theme-color" content="#09090b" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23E2885F'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='19' font-style='italic' fill='%23111' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="auth.css" />
+</head>
+<body>
+<div class="auth-bg"></div>
+<div class="auth-wrap">
+  <div class="card account">
+    <div class="acct-head">
+      <a href="index.html" class="brand"><span class="glyph">C</span><span>Claude <small>for Premiere Pro</small></span></a>
+      <button class="btn-text" id="signOut">Sign out</button>
+    </div>
+
+    <div class="who">
+      <div class="ava" id="ava">·</div>
+      <div>
+        <h2 id="name" class="skel">Loading…</h2>
+        <p id="email"></p>
+      </div>
+    </div>
+
+    <div class="usage" id="usage">
+      <div class="row">
+        <span class="lbl">Renders this month</span>
+        <span class="badge" id="plan">—</span>
+      </div>
+      <div class="row"><b id="count"><span>—</span></b></div>
+      <div class="bar"><i id="barFill"></i></div>
+      <p class="reset" id="reset"></p>
+    </div>
+
+    <div class="act">
+      <a class="b primary" id="upgrade" href="index.html#pricing">Upgrade plan</a>
+      <button class="b ghost" id="billing">Manage billing</button>
+      <a class="b ghost" href="index.html#install">Download the extension</a>
+    </div>
+    <p class="muted" id="note"></p>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script type="module">
+  import { supabase, getUser, getProfile, signOut } from "./auth.js";
+
+  const $ = id => document.getElementById(id);
+  $("signOut").addEventListener("click", signOut);
+
+  const PLAN_LABEL = { free: "Free", creator: "Creator", studio: "Studio" };
+
+  (async () => {
+    const u = await getUser();
+    if (!u) { location.replace("login.html"); return; }
+
+    const name   = u.user_metadata?.full_name || u.user_metadata?.name || u.email.split("@")[0];
+    const avatar = u.user_metadata?.avatar_url;
+    $("name").textContent = "Hey, " + name.split(" ")[0];
+    $("name").classList.remove("skel");
+    $("email").textContent = u.email;
+    if (avatar) {
+      $("ava").outerHTML = '<img class="ava" id="ava" referrerpolicy="no-referrer" src="' + avatar + '" alt="">';
+    } else {
+      $("ava").textContent = (name.trim()[0] || "U").toUpperCase();
+    }
+
+    // Render usage. If the profile row isn't there yet (trigger race), fall back to Free defaults.
+    let p = await getProfile();
+    if (!p) p = { plan: "free", renders_used: 0, renders_limit: 5, current_period_end: null };
+
+    const used = p.renders_used ?? 0, limit = p.renders_limit ?? 5;
+    const paid = p.plan && p.plan !== "free";
+    $("plan").textContent = PLAN_LABEL[p.plan] || "Free";
+    $("plan").classList.toggle("paid", !!paid);
+    $("count").innerHTML = used + ' <span>/ ' + limit + ' renders</span>';
+    const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+    $("barFill").style.width = pct + "%";
+    if (used >= limit) $("usage").classList.add("full");
+
+    // Monthly reset date = first of next month.
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    $("reset").textContent = used >= limit
+      ? "You're out of renders — resets " + next.toLocaleDateString(undefined, { month: "long", day: "numeric" }) + ". Upgrade for more."
+      : "Resets " + next.toLocaleDateString(undefined, { month: "long", day: "numeric" }) + ".";
+
+    if (paid) { $("upgrade").textContent = "Change plan"; }
+
+    // Billing portal — wired in Phase 2 (Stripe). Placeholder for now.
+    $("billing").addEventListener("click", () => {
+      $("note").textContent = "Billing portal connects once Stripe is set up (Phase 2).";
+    });
+  })();
+</script>
+</body>
+</html>

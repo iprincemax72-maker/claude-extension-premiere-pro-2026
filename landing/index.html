@@ -111,6 +111,10 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 /* simple underline that draws in on hover */
 .nav-links a::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; border-radius: 2px; background: var(--coral); transform: scaleX(0); transform-origin: left; transition: transform 0.28s var(--ease); }
 .nav-links a:hover::after { transform: scaleX(1); }
+.nav-acct .acct-chip { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 5px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--s2); font-size: 0.84rem; font-weight: 600; color: var(--text); transition: background 0.15s var(--ease); }
+.nav-acct .acct-chip:hover { background: var(--s3); }
+.nav-acct .acct-chip img, .nav-acct .acct-chip .acct-i { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; }
+.nav-acct .acct-chip .acct-i { display: grid; place-items: center; background: var(--coral); color: #15110d; font-size: 0.8rem; font-weight: 700; }
 .nav-cta { display: flex; align-items: center; gap: 0.8rem; }
 .nav-builder { display: inline-flex; align-items: center; gap: 0.4em; font-size: 0.84rem; font-weight: 600; color: var(--text); border: 1px solid var(--line-2); border-radius: 99px; padding: 7px 13px; transition: color 0.15s, border-color 0.15s; }
 .nav-builder svg { color: var(--coral); }
@@ -540,7 +544,8 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
       <a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a>
     </nav>
     <div class="nav-cta">
-      <a href="#demo" class="btn btn-ghost">Watch demo</a>
+      <a href="login.html" class="btn btn-ghost nav-signin" id="navSignin">Sign in</a>
+      <div class="nav-acct" id="navAcct" hidden></div>
       <a href="#pricing" class="btn btn-primary magnetic" data-buy>Get it</a>
       <button class="nav-toggle" id="navToggle" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
     </div>
@@ -551,7 +556,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   <div class="mm-top"><span class="brand"><span class="glyph">C</span> Claude</span>
     <button class="nav-toggle" id="navClose" aria-label="Close menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
-  <nav><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a></nav>
+  <nav><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a><a href="login.html" id="mmSignin">Sign in</a></nav>
   <a href="#pricing" class="btn btn-primary btn-block btn-lg" data-buy>Get it</a>
 </div>
 
@@ -1063,6 +1068,20 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
 })();
 
 
+</script>
+
+<!-- Supabase auth: reflect signed-in state in the nav -->
+<script src="config.js"></script>
+<script type="module">
+  import { paintNav, supabase } from "./auth.js";
+  const mm = document.getElementById("mmSignin");
+  async function sync() {
+    await paintNav();
+    const { data } = await supabase.auth.getUser();
+    if (mm) { if (data?.user) { mm.textContent = "Your account"; mm.setAttribute("href", "account.html"); } else { mm.textContent = "Sign in"; mm.setAttribute("href", "login.html"); } }
+  }
+  sync();
+  supabase.auth.onAuthStateChange(() => sync());
 </script>
 
 </body>
