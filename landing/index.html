@@ -139,14 +139,13 @@ body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-eve
 /* scroll progress bar */
 .progress { position: fixed; top: 0; left: 0; height: 2px; width: 0; z-index: 200; background: linear-gradient(90deg, var(--coral), var(--coral-2)); box-shadow: 0 0 12px var(--coral); transition: width 0.08s linear; }
 
-/* ── Stats ── */
+/* ── Stats — editorial spec line, not a boxed dashboard grid ── */
 .stats-wrap { margin-top: clamp(40px, 6vw, 72px); }
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 14px; background: var(--s1s); overflow: hidden; }
-.stat { padding: 26px; text-align: center; border-left: 1px solid var(--line); }
-.stat:first-child { border-left: none; }
-.stat .n { font-size: clamp(1.8rem, 2.6vw, 2.4rem); font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.stat .n .u { color: var(--coral); }
-.stat .l { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); margin-top: 8px; }
+.claimline { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px 24px; max-width: 900px; margin: 0 auto; }
+.claimline .cl { display: inline-flex; align-items: baseline; gap: 9px; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.01em; color: var(--text-3); text-transform: lowercase; }
+.claimline .cl b { font-family: var(--sans); font-weight: 700; font-size: clamp(1.7rem, 2.6vw, 2.3rem); line-height: 1; letter-spacing: -0.035em; color: var(--text); font-variant-numeric: tabular-nums; }
+.claimline .cl b .u { color: var(--coral); }
+.claimline .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--coral); opacity: 0.7; flex: 0 0 auto; align-self: center; }
 
 /* ── Sections ── */
 .section { padding: clamp(64px, 8vw, 112px) 0; position: relative; scroll-margin-top: 82px; }
@@ -422,9 +421,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 @media (max-width: 860px) {
   .nav-links, .nav-cta .btn-ghost { display: none; }
   .nav-toggle { display: inline-flex; }
-  .stats { grid-template-columns: repeat(2, 1fr); }
-  .stat:nth-child(3) { border-left: none; }
-  .stat { border-top: 1px solid var(--line); } .stat:nth-child(-n+2){ border-top: none; }
+  .claimline { gap: 16px 22px; } .claimline .dot { display: none; }
   .flow { grid-template-columns: 1fr; gap: 14px; } .flow-rail { display: none; }
   .fstep { padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--s1s); }
   .fstep .fviz { aspect-ratio: 16/7; }
@@ -433,7 +430,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   .tiers { grid-template-columns: 1fr; max-width: 420px; margin-inline: auto; } .tier.featured { order: -1; }
   .footer-grid { grid-template-columns: 1fr 1fr; gap: 34px 22px; } .footer-grid .footer-about { grid-column: 1 / -1; }
 }
-@media (max-width: 480px) { .stats { grid-template-columns: 1fr; } .stat { border-left: none; } .footer-grid { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .claimline { flex-direction: column; gap: 14px; } .footer-grid { grid-template-columns: 1fr; } }
 
 /* mobile menu */
 .mobile-menu { position: fixed; inset: 0; z-index: 200; background: var(--bg); padding: 22px var(--gutter); transform: translateY(-100%); transition: transform 0.32s var(--ease); display: flex; flex-direction: column; }
@@ -512,11 +509,14 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
     </div>
 
     <div class="stats-wrap reveal">
-      <div class="stats">
-        <div class="stat"><div class="n"><span class="cnt" data-to="90" data-prefix="~">~90</span><span class="u">s</span></div><div class="l">Avg. render</div></div>
-        <div class="stat"><div class="n">1–10</div><div class="l">Versions / prompt</div></div>
-        <div class="stat"><div class="n"><span class="cnt" data-to="3">3</span></div><div class="l">Tools in one panel</div></div>
-        <div class="stat"><div class="n"><span class="cnt" data-to="100">100</span><span class="u">%</span></div><div class="l">Runs on your machine</div></div>
+      <div class="claimline">
+        <span class="cl"><b><span class="cnt" data-to="90" data-prefix="~">~90</span><span class="u">s</span></b> a render</span>
+        <span class="dot"></span>
+        <span class="cl"><b>1–10</b> takes a prompt</span>
+        <span class="dot"></span>
+        <span class="cl"><b><span class="cnt" data-to="3">3</span></b> tools, one panel</span>
+        <span class="dot"></span>
+        <span class="cl"><b><span class="cnt" data-to="100">100</span><span class="u">%</span></b> on your machine</span>
       </div>
     </div>
   </div>
