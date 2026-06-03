@@ -168,8 +168,16 @@ function resolveClaude() {
       const bin = (JSON.parse(fs.readFileSync(pj, 'utf8')) || {}).bin;
       let rel = (typeof bin === 'string') ? bin : (bin && (bin.claude || Object.values(bin)[0]));
       if (!rel) rel = 'cli.js';
-      const js = path.join(root, rel);
-      if (fs.existsSync(js)) { _claudeTarget = { cmd: process.execPath, prefixArgs: [js] }; return _claudeTarget; }
+      const entry = path.join(root, rel);
+      if (!fs.existsSync(entry)) continue;
+      const ext = path.extname(entry).toLowerCase();
+      // Newer claude-code ships a NATIVE binary (bin/claude.exe). It must be
+      // spawned directly — `node claude.exe` throws ERR_UNKNOWN_FILE_EXTENSION.
+      // Only a real JS entry (.js/.mjs/.cjs, or an extensionless shebang script)
+      // is run through node; .cmd/.bat go via shell.
+      if (ext === '.exe') { _claudeTarget = { cmd: entry, prefixArgs: [] }; return _claudeTarget; }
+      if (ext === '.cmd' || ext === '.bat') { _claudeTarget = { cmd: entry, prefixArgs: [], shell: true }; return _claudeTarget; }
+      _claudeTarget = { cmd: process.execPath, prefixArgs: [entry] }; return _claudeTarget;
     } catch {}
   }
   // 3) last resort — claude.cmd via a shell (large args may suffer, but better
