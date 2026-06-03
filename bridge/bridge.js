@@ -3700,7 +3700,12 @@ const server = http.createServer((req, res) => {
       // file alone and just reloads node. Use the manual ↻ Update button if
       // you actually want auto-update to run.
       const childEnv = Object.assign({}, process.env);
-      childEnv.CLAUDE_BRIDGE_NO_UPDATE = '1';
+      // Skip ONLY the single post-restart launch sync (so a manual /restart does
+      // not immediately revert in-flight edits) — but do NOT set NO_UPDATE. That
+      // permanently disabled auto-update AND the ↻ button after every self-restart,
+      // leaving the bridge stuck on an old version forever.
+      delete childEnv.CLAUDE_BRIDGE_NO_UPDATE;
+      childEnv.CLAUDE_BRIDGE_SKIP_STARTUP_UPDATE = '1';
       const child = spawn(process.execPath, [__filename, ...process.argv.slice(2)], {
         cwd: process.cwd(),
         env: childEnv,
@@ -4807,9 +4812,13 @@ function _tryListen() {
       // needs a process restart.
       if (result.bridgeChanged) _autoRestartForBridgeUpdate(result);
     };
-    checkForUpdates()
-      .then((r) => _applyUpdateResult(r, 'launch update'))
-      .catch(e => { clog('bridge', 'error', 'update check threw', { error: e.message }); console.error('Update check error:', e.message); });
+    // Skip the launch sync once if we were just restarted via /restart (avoids an
+    // immediate revert of in-flight edits). The 3-min poll + manual ↻ still run.
+    if (process.env.CLAUDE_BRIDGE_SKIP_STARTUP_UPDATE !== '1') {
+      checkForUpdates()
+        .then((r) => _applyUpdateResult(r, 'launch update'))
+        .catch(e => { clog('bridge', 'error', 'update check threw', { error: e.message }); console.error('Update check error:', e.message); });
+    }
 
     // PERIODIC auto-update — re-check every 3 min so a long-running bridge
     // actually picks up new code without a manual restart. This is the piece
