@@ -2733,10 +2733,11 @@ const server = http.createServer((req, res) => {
       // Live probe: can we actually run the CLI? Catches node-vs-exe spawn bugs.
       const claudeProbe = await new Promise(resolve => {
         let out = '', err = '', done = false, proc, to;
-        const finish = v => { if (done) return; done = true; try { clearTimeout(to); } catch {} try { proc && proc.kill(); } catch {} resolve(v); };
+        const finish = v => { if (done) return; done = true; try { clearTimeout(to); } catch {} try { proc && proc.kill('SIGKILL'); } catch {} resolve(v); };
         try { proc = spawnClaude(['--version'], { stdio: ['ignore', 'pipe', 'pipe'] }); }
         catch (e) { return resolve({ ok: false, error: 'spawn threw: ' + String(e && e.message || e) }); }
         to = setTimeout(() => finish({ ok: false, error: 'timeout (5s)', stdout: out.slice(0, 300), stderr: err.slice(0, 1000) }), 5000);
+        if (to.unref) to.unref();
         if (proc.stdout) proc.stdout.on('data', d => { out += d.toString(); });
         if (proc.stderr) proc.stderr.on('data', d => { err += d.toString(); });
         proc.on('error', e => finish({ ok: false, error: String(e && e.message || e), stderr: err.slice(0, 1000) }));
@@ -3691,19 +3692,14 @@ const server = http.createServer((req, res) => {
       // Spawn the replacement BEFORE we respond — if spawning fails we want
       // to error out cleanly and stay alive.
       //
-      // CRITICAL: pass CLAUDE_BRIDGE_NO_UPDATE=1 to the replacement. /restart
-      // means "refresh the running node process so my code edits take effect",
-      // NOT "re-sync files from the source repo to disk". The user was
-      // clicking /restart and getting their install reverted to whatever was
-      // in the repo at the time (because the new bridge ran auto-update on
-      // launch and copied repo→install). Now /restart leaves the install
-      // file alone and just reloads node. Use the manual ↻ Update button if
-      // you actually want auto-update to run.
+      // /restart = "reload the node process so the new bridge.js takes effect".
+      // Skip ONLY the one post-restart launch sync (so the restart doesn't
+      // immediately re-pull and revert in-flight edits) via SKIP_STARTUP_UPDATE.
+      // Do NOT set CLAUDE_BRIDGE_NO_UPDATE here: it used to permanently disable
+      // auto-update AND the ↻ button after every self-restart, leaving the bridge
+      // stuck on an old version forever. The 3-min poll resumes normal syncing; a
+      // dev who wants zero syncing launches with CLAUDE_BRIDGE_NO_UPDATE=1.
       const childEnv = Object.assign({}, process.env);
-      // Skip ONLY the single post-restart launch sync (so a manual /restart does
-      // not immediately revert in-flight edits) — but do NOT set NO_UPDATE. That
-      // permanently disabled auto-update AND the ↻ button after every self-restart,
-      // leaving the bridge stuck on an old version forever.
       delete childEnv.CLAUDE_BRIDGE_NO_UPDATE;
       childEnv.CLAUDE_BRIDGE_SKIP_STARTUP_UPDATE = '1';
       const child = spawn(process.execPath, [__filename, ...process.argv.slice(2)], {
@@ -4813,8 +4809,12 @@ function _tryListen() {
       if (result.bridgeChanged) _autoRestartForBridgeUpdate(result);
     };
     // Skip the launch sync once if we were just restarted via /restart (avoids an
-    // immediate revert of in-flight edits). The 3-min poll + manual ↻ still run.
-    if (process.env.CLAUDE_BRIDGE_SKIP_STARTUP_UPDATE !== '1') {
+    // immediate revert of in-flight edits). ONE-TIME: clear the flag now so it
+    // can't persist into a later non-/restart respawn (which would skip the launch
+    // sync forever). The 3-min poll + manual ↻ are unaffected either way.
+    if (process.env.CLAUDE_BRIDGE_SKIP_STARTUP_UPDATE === '1') {
+      delete process.env.CLAUDE_BRIDGE_SKIP_STARTUP_UPDATE;
+    } else {
       checkForUpdates()
         .then((r) => _applyUpdateResult(r, 'launch update'))
         .catch(e => { clog('bridge', 'error', 'update check threw', { error: e.message }); console.error('Update check error:', e.message); });

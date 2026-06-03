@@ -6494,19 +6494,29 @@ function bindSettingsHandlers() {
     setTimeout(() => { clearHist.textContent = 'Clear render history'; }, 1500);
   });
   const copyDiag = document.getElementById('settingCopyDiag');
-  if (copyDiag) copyDiag.addEventListener('click', async () => {
-    const orig = copyDiag.textContent;
-    copyDiag.textContent = 'Collecting…'; copyDiag.disabled = true;
-    let txt = '';
-    try { txt = await fetch(BRIDGE + '/diagnostics').then(r => r.text()); }
-    catch (e) { copyDiag.textContent = 'Bridge offline?'; copyDiag.disabled = false; setTimeout(() => { copyDiag.textContent = orig; }, 2200); return; }
-    let ok = false;
-    try { ok = writeClipboardTextSync(txt); } catch {}
-    if (!ok) { try { await writeClipboardText(txt); ok = true; } catch {} }
-    copyDiag.textContent = ok ? 'Copied — paste to support' : 'Copy failed';
-    copyDiag.disabled = false;
-    setTimeout(() => { copyDiag.textContent = orig; }, 2400);
-  });
+  if (copyDiag) {
+    const diagLabel = copyDiag.textContent;   // captured ONCE — never a transient ('Collecting…' etc.)
+    copyDiag.addEventListener('click', async () => {
+      if (copyDiag.disabled) return;
+      copyDiag.textContent = 'Collecting…'; copyDiag.disabled = true;
+      const reset = msg => { copyDiag.textContent = msg; copyDiag.disabled = false; setTimeout(() => { copyDiag.textContent = diagLabel; }, 2300); };
+      let txt = '';
+      try {
+        // Timeout so a wedged bridge can't leave the button stuck on 'Collecting…'.
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 9000);
+        const r = await fetch(BRIDGE + '/diagnostics', { signal: ctrl.signal });
+        clearTimeout(t);
+        if (!r.ok) { reset('Bridge error ' + r.status); return; }   // don't copy a 500 body as "diagnostics"
+        txt = await r.text();
+      } catch (e) { reset('Bridge offline?'); return; }
+      if (!txt) { reset('Nothing to copy'); return; }
+      let ok = false;
+      try { ok = writeClipboardTextSync(txt); } catch {}
+      if (!ok) { try { await writeClipboardText(txt); ok = true; } catch {} }
+      reset(ok ? 'Copied — paste to support' : 'Copy failed');
+    });
+  }
   const factoryReset = document.getElementById('settingFactoryReset');
   if (factoryReset) factoryReset.addEventListener('click', async () => {
     const ok = await ccConfirm({ title: 'Reset all settings?', message: 'Restores every setting (theme, placement, defaults, accent) to its original value. Your render history is not affected.', okLabel: 'Reset settings', danger: true });

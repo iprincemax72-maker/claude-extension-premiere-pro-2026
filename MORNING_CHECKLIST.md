@@ -48,7 +48,7 @@ All four must report **0 critical / 0 minor**. If anything fails, the regression
 If the status pill stays red:
 - Check `~/PremiereClaude/bridge.log` for errors
 - Confirm `node` is on PATH from Premiere's environment
-- Worst case: double-click `Claude Bridge.command` on the Desktop
+- Worst case: double-click `Flimify Bridge.command` on the Desktop
 
 ## 5. Spot-check a few rendered compositions
 

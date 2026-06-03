@@ -146,7 +146,7 @@ First render finishes in ~60s (Remotion is pre-installed, so `npm install` doesn
 
 | Symptom | Fix |
 |---|---|
-| Status pill stays red after panel opens | Bridge auto-spawn failed. Open `~/PremiereClaude/bridge.log` and check. Worst case: double-click `Claude Bridge.command` on the Desktop. |
+| Status pill stays red after panel opens | Bridge auto-spawn failed. Open `~/PremiereClaude/bridge.log` and check. Worst case: double-click `Flimify Bridge.command` on the Desktop. |
 | `claude` not on PATH | Open a new shell, re-run installer. On Windows verify `npm config get prefix` is in PATH. |
 | Render fails with "ffmpeg not found" | `brew install ffmpeg` (Mac) or `winget install -e --id Gyan.FFmpeg` (Win) |
 | Panel doesn't appear in Window menu | `PlayerDebugMode` didn't apply or panel folder didn't copy. Re-run installer. |
@@ -255,11 +255,11 @@ Every function returns a JSON string. Every operation wrapped in try/catch — P
 2. If alive → status pill goes green
 3. If dead → spawns `node ~/PremiereClaude/bridge.js` detached, logs to `~/PremiereClaude/bridge.log`. **Cross-platform node resolution:** macOS tries `/usr/local/bin/node`, `/opt/homebrew/bin/node`, then PATH `node`; Windows tries `%ProgramFiles%\nodejs\node.exe`, `%ProgramFiles(x86)%\…`, `%LOCALAPPDATA%\Programs\nodejs\node.exe`, scoop, then PATH `node`. PATH is rebuilt with the OS-correct separator (`;` on Windows, `:` on Unix) by prepending to the real `Path`/`PATH` key, and the bridge is spawned with `windowsHide:true` so no console window flashes.
 4. Polls `/ping` every 500ms for up to 10s
-5. Goes green when ping succeeds; falls back to "run Claude Bridge" hint if 10s passes
+5. Goes green when ping succeeds; falls back to "run Flimify Bridge" hint if 10s passes
 
 Bridge stays alive across panel opens/closes — only dies on reboot or manual kill.
 
-The Desktop launcher (`Claude Bridge.command` / `Claude Bridge.bat`) is now a **fallback**, not the primary entry.
+The Desktop launcher (`Flimify Bridge.command` / `Flimify Bridge.bat`) is now a **fallback**, not the primary entry.
 
 **Windows runtime note (`spawnClaude`)** — the bridge spawns the Claude CLI through `spawnClaude(args, opts)` (not raw `spawn('claude', …)`). On macOS/Linux that's a transparent passthrough to `claude` on PATH. On Windows, npm installs the CLI as `claude.cmd` (a batch shim) which Node's `spawn` can't exec directly, and which would mangle the multi-KB `--append-system-prompt` arg if routed through a shell — so `resolveClaude()` finds the package's JS entry (`%APPDATA%\npm\node_modules\@anthropic-ai\claude-code` → its `bin`) and runs it with the same `node` (`process.execPath`), falling back to a real `claude.exe` on PATH, then to `claude.cmd` via shell as a last resort.
 
