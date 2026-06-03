@@ -11,7 +11,7 @@ Unicode true
   !define VERSION "1.0.1"
 !endif
 !define APPNAME   "Flimify for Premiere Pro"
-!define PUBLISHER "Ansh Dhakad"
+!define PUBLISHER "Flimify"
 !define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Flimify"
 
 Name "${APPNAME}"
