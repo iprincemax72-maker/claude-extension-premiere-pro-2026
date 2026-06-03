@@ -6148,36 +6148,6 @@ function openExternalURL(url) {
     else { renderPop(); pop.classList.add('open'); }
   }
 
-  // In-panel sign-in with an existing email + password. Posts the credentials to
-  // the local bridge, which exchanges them for a Supabase session and stores it.
-  async function submitLogin() {
-    if (!wall) return;
-    const emailEl = wall.querySelector('#lwEmail');
-    const passEl  = wall.querySelector('#lwPass');
-    const errEl   = wall.querySelector('#lwErr');
-    const btnEl   = wall.querySelector('#lwSubmit');
-    const email = (emailEl.value || '').trim();
-    const password = passEl.value || '';
-    errEl.classList.remove('show');
-    if (!email || !password) { errEl.textContent = 'Enter your email and password.'; errEl.classList.add('show'); return; }
-    btnEl.disabled = true; const lbl = btnEl.textContent; btnEl.textContent = 'Signing in…';
-    try {
-      const r = await fetch(BRIDGE + '/auth/login', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (r.ok && j.ok) { passEl.value = ''; await refresh(); try { renderPop(); } catch (e) {} return; }
-      errEl.textContent = (j && j.error) || 'Could not sign in. Try again.';
-      errEl.classList.add('show');
-    } catch (e) {
-      errEl.textContent = 'Could not reach the bridge. Make sure it is running.';
-      errEl.classList.add('show');
-    } finally {
-      btnEl.disabled = false; btnEl.textContent = lbl;
-    }
-  }
-
   function startSignin() {
     openExternalURL(BRIDGE + '/connect');
     if (pollTimer) clearInterval(pollTimer);

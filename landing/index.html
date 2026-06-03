@@ -1466,7 +1466,7 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
   });
   // Hitting Back from Polar restores the page from bfcache with the button still
   // frozen on "Starting checkout…". Reset it whenever the page is shown again.
-  window.addEventListener("pageshow", resetCheckoutButtons);
+  window.addEventListener("pageshow", e => { if (e.persisted) resetCheckoutButtons(); });
 </script>
 
 </body>

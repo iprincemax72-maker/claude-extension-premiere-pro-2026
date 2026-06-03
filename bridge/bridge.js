@@ -2407,17 +2407,6 @@ function loadSession() {
 function saveSession(s) { _session = s; try { fs.writeFileSync(SESSION_FILE, JSON.stringify(s), { mode: 0o600 }); } catch (e) { alog('session save failed: ' + e.message); } }
 function clearSession() { _session = null; try { fs.unlinkSync(SESSION_FILE); } catch {} }
 
-// Map a Supabase/GoTrue auth error payload to a short, human message for the panel.
-function friendlyAuthError(j, statusCode) {
-  const raw = String((j && (j.error_description || j.msg || j.message || j.error_code || j.error)) || '');
-  const m = raw.toLowerCase();
-  if (statusCode === 429 || m.includes('rate') || m.includes('too many')) return 'Too many attempts. Wait a minute and try again.';
-  if (m.includes('not confirmed') || m.includes('email_not_confirmed')) return 'Confirm your email first — check your inbox for the verification link.';
-  if (m.includes('invalid') && (m.includes('credential') || m.includes('grant') || m.includes('login') || m.includes('password'))) return 'Wrong email or password.';
-  if (m.includes('user not found') || m.includes('no user') || m.includes('does not exist')) return 'No account with that email yet. Create one first.';
-  return raw ? raw.slice(0, 160) : 'Could not sign in. Check your email and password.';
-}
-
 // Return a non-expired access token, refreshing via the refresh_token if needed.
 // Refreshes are SERIALIZED: concurrent callers share one in-flight request, so we
 // never use the same refresh token twice (which trips Supabase's reuse detection
@@ -2647,48 +2636,6 @@ const server = http.createServer((req, res) => {
         alog('signed in: ' + ((p.user && p.user.email) || '?'));
         res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}');
       } catch (e) { res.writeHead(400); res.end('{"error":"bad json"}'); }
-    });
-    return;
-  }
-  // POST /auth/login — sign in with an EXISTING email + password straight from the
-  // panel (no browser round-trip). We exchange the credentials for a Supabase
-  // session server-side and persist it exactly like the /connect flow does. The
-  // password is never stored — only the resulting session tokens.
-  if (req.method === 'POST' && req.url === '/auth/login') {
-    if (!AUTH_ENABLED) { res.writeHead(503, { 'Content-Type': 'application/json' }); res.end('{"error":"Sign-in is not configured on this bridge."}'); return; }
-    let body = '';
-    req.on('data', c => { body += c; if (body.length > 64 * 1024) req.destroy(); });
-    req.on('end', async () => {
-      let p; try { p = JSON.parse(body || '{}'); } catch { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end('{"error":"Bad request."}'); return; }
-      const email = String(p.email || '').trim();
-      const password = String(p.password || '');
-      if (!email || !password) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end('{"error":"Enter your email and password."}'); return; }
-      try {
-        const r = await fetch(AUTH.url + '/auth/v1/token?grant_type=password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', apikey: AUTH.anon, Authorization: 'Bearer ' + AUTH.anon },
-          body: JSON.stringify({ email, password }),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok || !j.access_token) {
-          res.writeHead(401, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: friendlyAuthError(j, r.status) }));
-          return;
-        }
-        const now = Math.floor(Date.now() / 1000);
-        saveSession({
-          access_token: j.access_token,
-          refresh_token: j.refresh_token || '',
-          expires_at: j.expires_at || (now + (j.expires_in || 3600)),
-          user: j.user || null,
-        });
-        alog('signed in (panel): ' + ((j.user && j.user.email) || email));
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, signedIn: true, email: (j.user && j.user.email) || email }));
-      } catch (e) {
-        res.writeHead(502, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Could not reach the sign-in server. Check your connection.' }));
-      }
     });
     return;
   }
