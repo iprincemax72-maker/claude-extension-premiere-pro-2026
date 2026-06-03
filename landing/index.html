@@ -1448,9 +1448,19 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
     }
     if (btn) { btn.textContent = label; btn.style.pointerEvents = ""; }
   }
-  document.querySelectorAll("[data-plan]").forEach(b =>
-    b.addEventListener("click", e => { e.preventDefault(); startCheckout(b.getAttribute("data-plan"), b); })
-  );
+  function resetCheckoutButtons() {
+    document.querySelectorAll("[data-plan]").forEach(b => {
+      if (b.dataset.origLabel != null) b.textContent = b.dataset.origLabel;
+      b.style.pointerEvents = "";
+    });
+  }
+  document.querySelectorAll("[data-plan]").forEach(b => {
+    b.dataset.origLabel = b.textContent;                 // remember "Get Creator" / "Get Studio"
+    b.addEventListener("click", e => { e.preventDefault(); startCheckout(b.getAttribute("data-plan"), b); });
+  });
+  // Hitting Back from Polar restores the page from bfcache with the button still
+  // frozen on "Starting checkout…". Reset it whenever the page is shown again.
+  window.addEventListener("pageshow", resetCheckoutButtons);
 </script>
 
 </body>
