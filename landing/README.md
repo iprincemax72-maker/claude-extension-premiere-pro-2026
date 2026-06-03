@@ -1,4 +1,4 @@
-# Landing page — Claude for Premiere Pro
+# Landing page — Flimify
 
 A single, self-contained `index.html`. No build step, no dependencies (fonts load
 from Google Fonts). Dark theme, Schibsted Grotesk + JetBrains Mono, coral accent.

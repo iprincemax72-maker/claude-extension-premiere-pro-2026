@@ -1,8 +1,8 @@
 @echo off
 setlocal EnableDelayedExpansion
-title Claude Bridge
+title Flimify Bridge
 
-REM Claude Bridge launcher for Windows - double-click to start the bridge.
+REM Flimify Bridge launcher for Windows - double-click to start the bridge.
 
 cd /d "%USERPROFILE%\PremiereClaude" 2>nul
 if errorlevel 1 (
@@ -36,7 +36,7 @@ exit /b 1
 
 :found_node
 echo --------------------------------------
-echo   Claude Bridge
+echo   Flimify Bridge
 echo --------------------------------------
 echo   Node:    !NODE_BIN!
 echo   Bridge:  %CD%\bridge.js

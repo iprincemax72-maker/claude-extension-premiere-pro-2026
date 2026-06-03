@@ -1,4 +1,4 @@
-# install.ps1 - Claude Extension Premiere Pro 2026 (Windows installer)
+# install.ps1 - Flimify for Premiere Pro (Windows installer)
 # ---------------------------------------------------------------------
 # Run from the repo root:
 #     powershell -ExecutionPolicy Bypass -File install.ps1
@@ -187,7 +187,7 @@ if (Test-Path (Join-Path $remotionDir 'node_modules')) {
 Step "Placing launcher on Desktop (fallback)"
 $desktop = [Environment]::GetFolderPath('Desktop')
 $launcherSrc = "bridge\start.bat"
-$launcherDst = Join-Path $desktop 'Claude Bridge.bat'
+$launcherDst = Join-Path $desktop 'Flimify Bridge.bat'
 Copy-Item -Force $launcherSrc $launcherDst
 Ok "$launcherDst"
 
@@ -223,18 +223,18 @@ else { Warn "Premiere Pro not detected in default locations - install it before 
 # ---------- 11. Done ----------
 Write-Host ""
 Write-Host "----------------------------------------" -ForegroundColor Green
-Write-Host " Claude Extension Premiere Pro 2026 installed."  -ForegroundColor Green
+Write-Host " Flimify for Premiere Pro installed."  -ForegroundColor Green
 Write-Host "----------------------------------------" -ForegroundColor Green
 Write-Host ""
 Write-Host " Next steps:"
 Write-Host "  1. If Claude isn't logged in yet, open a NEW PowerShell window and run:" -NoNewline
 Write-Host "  claude /login" -ForegroundColor Cyan
-Write-Host "  2. Open Premiere Pro -> Window -> Extensions -> Claude."
+Write-Host "  2. Open Premiere Pro -> Window -> Extensions -> Flimify."
 Write-Host "     The panel starts the bridge for you automatically (no terminal needed)."
 Write-Host "  3. Status pill turns green; type a prompt and hit Enter. You're ready."
 Write-Host ""
 Write-Host " If the pill ever stays red, double-click " -NoNewline
-Write-Host "Claude Bridge.bat" -ForegroundColor Cyan -NoNewline
+Write-Host "Flimify Bridge.bat" -ForegroundColor Cyan -NoNewline
 Write-Host " on your Desktop to start it manually."
 Write-Host " To stop a manually-started bridge: close its terminal window."
 Write-Host ""

@@ -1,5 +1,5 @@
 ; ============================================================================
-;  Claude for Premiere Pro - Windows setup.exe (NSIS / Modern UI 2)
+;  Flimify for Premiere Pro - Windows setup.exe (NSIS / Modern UI 2)
 ;  Build with:  makensis -DVERSION=1.0.1 setup.nsi   (see build-installer.sh)
 ;  Bundles the panel + bridge + install.ps1 into one setup.exe with a wizard,
 ;  runs the dependency/panel/bridge setup, and registers an uninstaller.
@@ -10,14 +10,14 @@ Unicode true
 !ifndef VERSION
   !define VERSION "1.0.1"
 !endif
-!define APPNAME   "Claude for Premiere Pro"
+!define APPNAME   "Flimify for Premiere Pro"
 !define PUBLISHER "Ansh Dhakad"
-!define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\ClaudeForPremierePro"
+!define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Flimify"
 
 Name "${APPNAME}"
-OutFile "ClaudeForPremiere-Setup.exe"
+OutFile "Flimify-Setup.exe"
 RequestExecutionLevel user
-InstallDir "$LOCALAPPDATA\Programs\ClaudeForPremierePro"
+InstallDir "$LOCALAPPDATA\Programs\Flimify"
 ShowInstDetails show
 ShowUninstDetails show
 BrandingText "${APPNAME} ${VERSION}"
@@ -32,13 +32,13 @@ VIAddVersionKey "LegalCopyright"  "Copyright (c) 2026 ${PUBLISHER}"
 
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "${APPNAME}"
-!define MUI_WELCOMEPAGE_TEXT "This installs the Claude panel for Adobe Premiere Pro, plus Node.js, the Claude CLI and ffmpeg if they are missing.$\r$\n$\r$\nClose Adobe Premiere Pro before continuing.$\r$\n$\r$\nThe first install runs npm install and can take a few minutes."
+!define MUI_WELCOMEPAGE_TEXT "This installs the Flimify panel for Adobe Premiere Pro, plus Node.js, the Claude CLI and ffmpeg if they are missing.$\r$\n$\r$\nClose Adobe Premiere Pro before continuing.$\r$\n$\r$\nThe first install runs npm install and can take a few minutes."
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "LICENSE"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_TITLE "Almost there"
-!define MUI_FINISHPAGE_TEXT "Installed.$\r$\n$\r$\n1. If you are not already logged in, run  claude /login  once (it opens a browser - click Allow).$\r$\n2. Open Premiere Pro -> Window -> Extensions -> Claude.$\r$\n$\r$\nThe panel starts the bridge for you automatically."
+!define MUI_FINISHPAGE_TEXT "Installed.$\r$\n$\r$\n1. If you are not already logged in, run  claude /login  once (it opens a browser - click Allow).$\r$\n2. Open Premiere Pro -> Window -> Extensions -> Flimify.$\r$\n$\r$\nThe panel starts the bridge for you automatically."
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_UNPAGE_CONFIRM

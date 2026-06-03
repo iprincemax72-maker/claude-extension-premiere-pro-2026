@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build ClaudeForPremiere-Setup.exe from the repo with NSIS (makensis).
+# Build Flimify-Setup.exe from the repo with NSIS (makensis).
 # Usage:  bash windows-installer/build-installer.sh [version]
 # Requires: makensis  (macOS: brew install makensis)
 set -e
@@ -29,5 +29,5 @@ cp "$HERE/setup.nsi" "$BUILD/setup.nsi"
 cd "$BUILD"
 makensis -DVERSION="$VERSION" setup.nsi
 echo ""
-echo "Built: $BUILD/ClaudeForPremiere-Setup.exe"
-ls -la "$BUILD/ClaudeForPremiere-Setup.exe"
+echo "Built: $BUILD/Flimify-Setup.exe"
+ls -la "$BUILD/Flimify-Setup.exe"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Claude Bridge launcher — double-click this from anywhere to start the bridge.
+# Flimify Bridge launcher — double-click this from anywhere to start the bridge.
 cd "$HOME/PremiereClaude" || { echo "ERROR: ~/PremiereClaude not found"; read; exit 1; }
 
 # Pick the right node binary (Apple Silicon vs Intel brew, or PATH fallback)
@@ -13,7 +13,7 @@ if [ -z "$NODE_BIN" ]; then
 fi
 
 echo "──────────────────────────────────────────"
-echo "  Claude Bridge"
+echo "  Flimify Bridge"
 echo "──────────────────────────────────────────"
 echo "  Node:    $NODE_BIN"
 echo "  Bridge:  $PWD/bridge.js"

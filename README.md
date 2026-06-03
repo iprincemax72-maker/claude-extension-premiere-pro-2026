@@ -1,6 +1,6 @@
-# Claude Extension Premiere Pro 2026
+# Flimify
 
-A CEP panel that brings **Claude** straight into Premiere Pro. Chat, generate motion graphics with [Remotion](https://remotion.dev), and drop them onto your timeline — all without leaving your edit.
+**Flimify** is a CEP panel that brings **Claude** straight into Premiere Pro. Chat, generate motion graphics with [Remotion](https://remotion.dev), and drop them onto your timeline — all without leaving your edit.
 
 > Uses your existing **Claude Code subscription**. No API key required.
 
@@ -62,7 +62,7 @@ bash install.sh
 
 ### Windows (double-click)
 
-1. Download **Claude for Premiere Pro for Windows** from the website (or the [latest release](https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/latest)).
+1. Download **Flimify for Windows** from the website (or the [latest release](https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/latest)).
 2. **Extract the zip** (right-click → Extract All).
 3. **Double-click `INSTALL.bat`** inside the extracted folder. That's it — no PowerShell, no commands. If Windows asks for permission, click **Yes**.
 
@@ -97,11 +97,11 @@ A browser tab opens; click **Allow**. You're set.
 ## Usage
 
 1. **Start the bridge** by double-clicking the launcher on your Desktop:
-   - macOS: `Claude Bridge.command`
-   - Windows: `Claude Bridge.bat`
+   - macOS: `Flimify Bridge.command`
+   - Windows: `Flimify Bridge.bat`
 
    A terminal window opens with the bridge running on `localhost:3737`.
-2. **Open Premiere Pro** → **Window** → **Extensions** → **Claude**
+2. **Open Premiere Pro** → **Window** → **Extensions** → **Flimify**
 3. Status pill turns green; type a prompt or click a suggestion chip and hit ↵
 4. After render, the panel shows a card with **Import to Timeline / Preview / Changes** — click whichever you want
 5. When you're done, **close the bridge terminal window** to stop the server
@@ -213,7 +213,7 @@ After install, your runtime locations:
 
 | Symptom | Fix |
 |---|---|
-| **"Bridge offline"** in panel | Start the bridge — double-click `Claude Bridge.command` (macOS) or `Claude Bridge.bat` (Windows) on your Desktop |
+| **"Bridge offline"** in panel | Start the bridge — double-click `Flimify Bridge.command` (macOS) or `Flimify Bridge.bat` (Windows) on your Desktop |
 | **Panel doesn't appear in Premiere** | Restart Premiere completely. If still missing, `PlayerDebugMode` didn't apply or the panel folder didn't copy — re-run the installer. |
 | **`claude` not found after install** | The npm global bin isn't on PATH yet. Open a fresh shell and re-run `install.sh` / `install.ps1`. On Windows you may need to add `$(npm config get prefix)` to PATH manually. |
 | **First render takes 5+ minutes** | The installer's `npm install` for Remotion may have failed. Check `~/PremiereClaude/remotion-intro/node_modules/remotion` exists. If not: `cd ~/PremiereClaude/remotion-intro && npm install`. |

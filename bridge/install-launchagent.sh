@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install (or uninstall) the Claude Bridge LaunchAgent so the bridge runs
+# Install (or uninstall) the Flimify Bridge LaunchAgent so the bridge runs
 # automatically at every login — no need to keep a terminal open, no need
 # to spawn from the panel.
 #

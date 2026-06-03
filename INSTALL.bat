@@ -1,14 +1,14 @@
 @echo off
 REM ============================================================
-REM  Claude for Premiere Pro - Windows installer (DOUBLE-CLICK)
+REM  Flimify for Premiere Pro - Windows installer (DOUBLE-CLICK)
 REM  Just double-click this file. It runs install.ps1 for you so
 REM  you never have to open PowerShell or type any commands.
 REM ============================================================
-title Claude for Premiere Pro - Installer
+title Flimify for Premiere Pro - Installer
 cd /d "%~dp0"
 
 echo ============================================================
-echo   Claude for Premiere Pro  -  Windows Installer
+echo   Flimify for Premiere Pro  -  Windows Installer
 echo ============================================================
 echo.
 echo This installs Node.js, the Claude CLI, ffmpeg and the
@@ -26,7 +26,7 @@ set "RC=%ERRORLEVEL%"
 echo.
 echo ============================================================
 if "%RC%"=="0" (
-  echo   Done. Open Premiere Pro -^> Window -^> Extensions -^> Claude.
+  echo   Done. Open Premiere Pro -^> Window -^> Extensions -^> Flimify.
   echo   The panel starts the bridge for you automatically.
 ) else (
   echo   The installer reported a problem ^(code %RC%^).

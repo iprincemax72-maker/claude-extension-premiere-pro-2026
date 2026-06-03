@@ -1,5 +1,5 @@
 #!/bin/bash
-# install.sh — Claude Extension Premiere Pro 2026 (macOS installer)
+# install.sh — Flimify for Premiere Pro (macOS installer)
 # -----------------------------------------------------------------
 # Run from the repo root:
 #     bash install.sh
@@ -155,7 +155,7 @@ fi
 # ---------- 9. Desktop launcher (fallback — auto-start LaunchAgent below makes this optional) ----------
 step "Placing launcher on Desktop (fallback)"
 DESKTOP="$HOME/Desktop"
-LAUNCHER="$DESKTOP/Claude Bridge.command"
+LAUNCHER="$DESKTOP/Flimify Bridge.command"
 cp "bridge/start.command" "$LAUNCHER"
 chmod +x "$LAUNCHER"
 ok "$LAUNCHER"
@@ -182,12 +182,12 @@ fi
 # ---------- 11. Done ----------
 echo ""
 printf "\033[32m----------------------------------------\033[0m\n"
-printf "\033[32m Claude Extension Premiere Pro 2026 installed.\033[0m\n"
+printf "\033[32m Flimify for Premiere Pro installed.\033[0m\n"
 printf "\033[32m----------------------------------------\033[0m\n"
 echo ""
 echo " Next steps:"
 echo "  1. If Claude isn't logged in yet, open a new Terminal and run:  claude /login"
-echo "  2. Open Premiere Pro -> Window -> Extensions -> Claude."
+echo "  2. Open Premiere Pro -> Window -> Extensions -> Flimify."
 echo "  3. Status pill turns green; you're ready. The bridge is already running"
 echo "     in the background (LaunchAgent we just installed). It restarts on"
 echo "     crash and starts again at every login automatically."
