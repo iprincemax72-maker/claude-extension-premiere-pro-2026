@@ -1438,7 +1438,8 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
       });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j.url) { location.href = j.url; return; }             // → Polar checkout
-      alert(j.error || "Couldn't start checkout. Please try again.");
+      const detail = j.detail ? ("\n\n" + (typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail)).slice(0, 400)) : "";
+      alert((j.error || "Couldn't start checkout. Please try again.") + detail);
     } catch {
       alert("Couldn't reach checkout. Check your connection and try again.");
     }

@@ -59,15 +59,15 @@ export default async function handler(req) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${POLAR_TOKEN}` },
       body: JSON.stringify({
         products: [productId],
-        customer_external_id: user.id,
+        external_customer_id: user.id,          // Polar's field name (ties checkout to our user)
         customer_email: user.email,
         success_url: `${SITE}/account.html?upgraded=true`,
         metadata: { supabase_user_id: user.id },
       }),
     });
-    checkout = await r.json();
+    checkout = await r.json().catch(() => ({}));
     if (!r.ok || !checkout.url) {
-      return json({ error: 'Could not start checkout.', detail: checkout }, 502);
+      return json({ error: 'Could not start checkout.', status: r.status, detail: checkout }, 502);
     }
   } catch (e) {
     return json({ error: 'Could not reach the payment provider.' }, 502);
