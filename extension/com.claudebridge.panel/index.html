@@ -1072,20 +1072,10 @@
     border: 1px solid var(--border);
   }
   .claude .avatar {
-    background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent) 55%, #b04d2f 100%);
-    color: #fff;
-    box-shadow:
-      0 0 14px rgba(217, 119, 87, 0.35),
-      0 0 0 1px rgba(255, 255, 255, 0.08) inset,
-      0 1px 0 rgba(255, 255, 255, 0.25) inset;
+    background: var(--flimify-mark) center/contain no-repeat;
+    filter: drop-shadow(0 0 6px rgba(226, 136, 95, 0.5));
   }
-  .claude .avatar::after {
-    content: '';
-    position: absolute; inset: 0;
-    border-radius: inherit;
-    background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.4), transparent 55%);
-    pointer-events: none;
-  }
+  .claude .avatar::after { content: none; }
   .msg-content {
     flex: 1;
     min-width: 0;
@@ -8052,7 +8042,7 @@ function makeMsg(role, html) {
   wrap.className = 'msg ' + role;
   const av = document.createElement('div');
   av.className = 'avatar';
-  av.textContent = role === 'you' ? 'Y' : 'C';
+  av.textContent = role === 'you' ? 'Y' : '';
   const content = document.createElement('div');
   content.className = 'msg-content';
   const author = document.createElement('div');
