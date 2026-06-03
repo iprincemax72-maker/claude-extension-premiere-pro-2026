@@ -6042,7 +6042,9 @@ function openExternalURL(url) {
   + '#loginWall .lw-in:focus{border-color:#E2885F}#loginWall .lw-in::placeholder{color:#6c6d77}'
   + '#loginWall .lw-err{display:none;color:#e98c7a;font:500 11.5px system-ui;background:rgba(233,140,122,.1);border:1px solid rgba(233,140,122,.28);border-radius:8px;padding:7px 9px;margin-bottom:9px;text-align:left;line-height:1.4}#loginWall .lw-err.show{display:block}'
   + '#loginWall .lw-btn:disabled{opacity:.6;cursor:default}'
-  + '#loginWall .lw-or{display:flex;align-items:center;gap:10px;color:#6c6d77;font:500 11px system-ui;margin:13px 2px 8px}#loginWall .lw-or::before,#loginWall .lw-or::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.1)}';
+  + '#loginWall .lw-or{display:flex;align-items:center;gap:10px;color:#6c6d77;font:500 11px system-ui;margin:14px 2px 12px}#loginWall .lw-or::before,#loginWall .lw-or::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.1)}'
+  + '#loginWall .lw-gbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f1f23;font:600 13.5px system-ui;border:0;border-radius:11px;padding:.8em;cursor:pointer;transition:filter .15s,transform .1s}#loginWall .lw-gbtn:hover{filter:brightness(.96)}#loginWall .lw-gbtn:active{transform:translateY(1px)}#loginWall .lw-gbtn svg{width:18px;height:18px;flex:0 0 auto}'
+  + '#loginWall .lw-foot{display:flex;align-items:center;justify-content:center;gap:9px;margin-top:15px}#loginWall .lw-foot .lw-link{width:auto;margin:0;font-size:11.5px}#loginWall .lw-dot{color:#46464e;font-size:11px;user-select:none}';
   document.head.appendChild(style);
 
   let pop = null, status = null, pollTimer = null, wall = null;
@@ -6058,17 +6060,19 @@ function openExternalURL(url) {
       '<div class="lw-card">'
       + '<div class="lw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>'
       + '<div class="lw-h">Log in first</div>'
-      + '<p class="lw-sub">Sign in with your Flimify account to render in Premiere.</p>'
+      + '<p class="lw-sub">Sign in to render with Flimify in Premiere.</p>'
+      + '<button class="lw-gbtn" id="lwGoogle">'
+      +   '<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.11a6.6 6.6 0 0 1 0-4.22V7.05H2.18a11 11 0 0 0 0 9.9l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.05l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z"/></svg>'
+      +   'Continue with Google'
+      + '</button>'
+      + '<div class="lw-or">or</div>'
       + '<form id="lwForm" autocomplete="on">'
       +   '<input id="lwEmail" class="lw-in" type="email" placeholder="you@example.com" autocomplete="email" required>'
       +   '<input id="lwPass" class="lw-in" type="password" placeholder="Password" autocomplete="current-password" required>'
       +   '<div class="lw-err" id="lwErr"></div>'
       +   '<button class="lw-btn" id="lwSubmit" type="submit">Sign in</button>'
       + '</form>'
-      + '<button class="lw-link" id="lwForgot">Forgot password?</button>'
-      + '<button class="lw-link" id="lwSite">New here? Create an account &#8599;</button>'
-      + '<div class="lw-or">or</div>'
-      + '<button class="lw-link" id="lwGoogle">Sign in with Google &#8599;</button>'
+      + '<div class="lw-foot"><button class="lw-link" id="lwForgot">Forgot password?</button><span class="lw-dot">&bull;</span><button class="lw-link" id="lwSite">Create account</button></div>'
       + '</div>';
     document.body.appendChild(wall);
     wall.querySelector('#lwForm').addEventListener('submit', e => { e.preventDefault(); submitLogin(); });
