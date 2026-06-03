@@ -7,6 +7,7 @@ const fs = require('fs');
 const os = require('os');
 
 const PORT = 3737;
+const PANEL_VERSION = '10.9';   // bump each release — drives the /check-update badge + /diagnostics
 const SESSION_ID = crypto.randomUUID();
 // WORK_DIR pins to wherever bridge.js itself lives, so the bridge always
 // finds the remotion-intro project sitting next to it — even if the user
@@ -187,8 +188,16 @@ function resolveClaude() {
 }
 // Drop-in replacement for the old spawn('claude', args, opts) — uses the
 // resolved launcher and hides the console window on Windows.
+let _claudeLogged = false;
 function spawnClaude(args, opts) {
   const t = resolveClaude();
+  // Log the resolved launcher once — this is the single most useful line for
+  // diagnosing spawn failures (e.g. node-vs-exe). Visible in the unified log
+  // and /diagnostics.
+  if (!_claudeLogged) {
+    _claudeLogged = true;
+    try { clog('bridge', 'info', 'claude launcher resolved', { platform: process.platform, cmd: t.cmd, prefixArgs: t.prefixArgs, shell: !!t.shell }); } catch {}
+  }
   const o = Object.assign({}, opts);
   if (t.shell) o.shell = true;
   if (process.platform === 'win32') o.windowsHide = true;
@@ -2711,6 +2720,50 @@ const server = http.createServer((req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: String(e && e.message || e) }));
     }
+    return;
+  }
+
+  // ── One-shot diagnostics bundle — environment + a LIVE `claude --version`
+  //    probe + recent errors, all in one JSON. Open http://127.0.0.1:3737/diagnostics
+  //    in a browser (or the panel's "Copy diagnostics" button), copy it, and paste
+  //    to support — it's everything needed to diagnose a spawn/render failure
+  //    without screenshots.
+  if (req.method === 'GET' && req.url.startsWith('/diagnostics')) {
+    (async () => {
+      // Live probe: can we actually run the CLI? Catches node-vs-exe spawn bugs.
+      const claudeProbe = await new Promise(resolve => {
+        let out = '', err = '', done = false, proc, to;
+        const finish = v => { if (done) return; done = true; try { clearTimeout(to); } catch {} try { proc && proc.kill(); } catch {} resolve(v); };
+        try { proc = spawnClaude(['--version'], { stdio: ['ignore', 'pipe', 'pipe'] }); }
+        catch (e) { return resolve({ ok: false, error: 'spawn threw: ' + String(e && e.message || e) }); }
+        to = setTimeout(() => finish({ ok: false, error: 'timeout (5s)', stdout: out.slice(0, 300), stderr: err.slice(0, 1000) }), 5000);
+        if (proc.stdout) proc.stdout.on('data', d => { out += d.toString(); });
+        if (proc.stderr) proc.stderr.on('data', d => { err += d.toString(); });
+        proc.on('error', e => finish({ ok: false, error: String(e && e.message || e), stderr: err.slice(0, 1000) }));
+        proc.on('close', code => finish({ ok: code === 0, exitCode: code, version: out.trim().slice(0, 120), stderr: err.slice(0, 1000) }));
+      });
+      let logLines = [];
+      try { logLines = fs.readFileSync(UNIFIED_LOG, 'utf8').trim().split('\n').slice(-150).map(l => { try { return JSON.parse(l); } catch { return { raw: l }; } }); } catch {}
+      const recentErrors = logLines.filter(r => r && (r.level === 'error' || r.level === 'warn')).slice(-60);
+      const bundle = {
+        generatedAt: new Date().toISOString(),
+        bridgeVersion: (typeof PANEL_VERSION !== 'undefined' ? PANEL_VERSION : '?'),
+        session: SESSION_ID.slice(0, 8),
+        env: { platform: process.platform, arch: process.arch, node: process.version, osRelease: os.release(), homedir: os.homedir() },
+        paths: {
+          workDir: WORK_DIR, outputDir: OUTPUT_DIR, logFile: UNIFIED_LOG,
+          remotionProject: fs.existsSync(path.join(WORK_DIR, 'remotion-intro')),
+          remotionInstalled: fs.existsSync(path.join(WORK_DIR, 'remotion-intro', 'node_modules', 'remotion')),
+        },
+        auth: { enabled: AUTH_ENABLED, signedIn: !!((loadSession() || {}).access_token) },
+        claudeLauncher: resolveClaude(),
+        claudeProbe,
+        recentErrors,
+        recentLog: logLines.slice(-40),
+      };
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(bundle, null, 2));
+    })().catch(e => { try { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: String(e && e.message || e) })); } catch {} });
     return;
   }
 

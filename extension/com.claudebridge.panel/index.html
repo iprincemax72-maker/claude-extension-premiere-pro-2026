@@ -3184,7 +3184,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot" role="img" aria-label="Flimify"></div>
     <span>Flimify</span>
-    <span class="version-tag" id="versionTag">10.82</span>
+    <span class="version-tag" id="versionTag">10.9</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -3522,9 +3522,10 @@
       <div class="settings-section-title">Data</div>
       <div class="settings-actions">
         <button class="settings-btn" id="settingClearHistory">Clear render history</button>
+        <button class="settings-btn" id="settingCopyDiag" title="Copies env + a live claude probe + recent errors — paste it to support">Copy diagnostics for support</button>
         <button class="settings-btn danger" id="settingFactoryReset">Reset all settings</button>
       </div>
-      <div class="settings-foot">v<span id="settingsVersion">10.8</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
+      <div class="settings-foot">v<span id="settingsVersion">10.9</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
       <div class="settings-credit">
         Made by <a href="https://github.com/iprincemax72-maker" target="_blank" class="credit-link">iprincemax72-maker</a> <span class="credit-heart">&#10084;</span> Premiere Pro
       </div>
@@ -6491,6 +6492,20 @@ function bindSettingsHandlers() {
     if (typeof history !== 'undefined') { history.length = 0; renderHistoryBadge(); if (typeof renderHistory === 'function') renderHistory(); }
     clearHist.textContent = 'Cleared';
     setTimeout(() => { clearHist.textContent = 'Clear render history'; }, 1500);
+  });
+  const copyDiag = document.getElementById('settingCopyDiag');
+  if (copyDiag) copyDiag.addEventListener('click', async () => {
+    const orig = copyDiag.textContent;
+    copyDiag.textContent = 'Collecting…'; copyDiag.disabled = true;
+    let txt = '';
+    try { txt = await fetch(BRIDGE + '/diagnostics').then(r => r.text()); }
+    catch (e) { copyDiag.textContent = 'Bridge offline?'; copyDiag.disabled = false; setTimeout(() => { copyDiag.textContent = orig; }, 2200); return; }
+    let ok = false;
+    try { ok = writeClipboardTextSync(txt); } catch {}
+    if (!ok) { try { await writeClipboardText(txt); ok = true; } catch {} }
+    copyDiag.textContent = ok ? 'Copied — paste to support' : 'Copy failed';
+    copyDiag.disabled = false;
+    setTimeout(() => { copyDiag.textContent = orig; }, 2400);
   });
   const factoryReset = document.getElementById('settingFactoryReset');
   if (factoryReset) factoryReset.addEventListener('click', async () => {
