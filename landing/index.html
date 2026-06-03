@@ -521,10 +521,16 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 .rendercard .file svg { width: 16px; height: 16px; color: var(--coral); flex: 0 0 auto; }
 .rendercard .file .meta { margin-left: auto; color: var(--text-3); font-size: 0.62rem; letter-spacing: 0.02em; }
 .rendercard .acts { display: flex; gap: 8px; padding: 12px 14px; flex-wrap: wrap; }
-.see-output { display: inline-flex; align-items: center; gap: 7px; margin-top: 13px; font-family: var(--sans); font-size: 0.8rem; font-weight: 600; color: var(--coral); background: color-mix(in srgb, var(--coral) 10%, transparent); border: 1px solid color-mix(in srgb, var(--coral) 38%, transparent); border-radius: 999px; padding: 7px 14px; cursor: pointer; transition: background 0.15s var(--ease); }
-.see-output:hover { background: color-mix(in srgb, var(--coral) 18%, transparent); }
-.see-output .ar { transition: transform 0.18s var(--ease); }
-.see-output:hover .ar { transform: translateX(3px); }
+.see-output { display: inline-flex; align-items: center; gap: 7px; margin-top: 13px; font-family: var(--sans); font-size: 0.8rem; font-weight: 600; color: var(--coral); background: color-mix(in srgb, var(--coral) 10%, transparent); border: 1px solid color-mix(in srgb, var(--coral) 38%, transparent); border-radius: 999px; padding: 7px 14px; cursor: pointer; transition: background 0.15s var(--ease), box-shadow 0.2s var(--ease); animation: seeOutputPulse 2.6s ease-in-out infinite; }
+.see-output:hover { background: color-mix(in srgb, var(--coral) 20%, transparent); animation: none; box-shadow: 0 0 22px -2px color-mix(in srgb, var(--coral) 50%, transparent); }
+.see-output .ar { transition: transform 0.18s var(--ease); animation: seeOutputArrow 2.6s ease-in-out infinite; }
+.see-output:hover .ar { transform: translateX(3px); animation: none; }
+@keyframes seeOutputPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--coral) 42%, transparent), 0 0 12px -2px color-mix(in srgb, var(--coral) 30%, transparent); }
+  60%      { box-shadow: 0 0 0 7px color-mix(in srgb, var(--coral) 0%, transparent), 0 0 22px 1px color-mix(in srgb, var(--coral) 34%, transparent); }
+}
+@keyframes seeOutputArrow { 0%, 100% { transform: translateX(0); } 55% { transform: translateX(3px); } }
+@media (prefers-reduced-motion: reduce) { .see-output, .see-output .ar { animation: none; } }
 /* ── Output preview: the mockup shrinks + slides left (JS), and the real render
       fades UP beside it as a GIF-like 3D card with the SAME spinning neon-corner
       glow as the mockup. Everything stays on the page, just movement. ── */
