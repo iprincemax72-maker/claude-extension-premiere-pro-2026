@@ -1,14 +1,19 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Flimify logo</title><style>
 body{margin:0;background:#0c0c0f;font-family:system-ui,sans-serif;color:#fafafa}
-.wrap{max-width:980px;margin:0 auto;padding:44px}h1{margin:0 0 4px}p{color:#9a9aa1;margin:0 0 28px}
+.wrap{max-width:1000px;margin:0 auto;padding:44px}h1{margin:0 0 4px}p{color:#9a9aa1;margin:0 0 28px}
 .row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
-.tile{border-radius:20px;display:grid;place-items:center;height:240px;border:1px solid rgba(255,255,255,.08)}
-.tile img{width:150px;height:auto}.lab{font:12px ui-monospace,monospace;color:#7c7d87;margin-top:8px;text-align:center}
-.dark{background:#141016}.light{background:#f4f1ec}.chip{background:#E2885F}
+.tile{border-radius:20px;display:grid;place-items:center;height:240px;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+.tile img{width:150px;height:auto}.tile.icn img{width:150px}
+.lab{font:12px ui-monospace,monospace;color:#7c7d87;margin-top:8px;text-align:center}
+.dark{background:#141016}.light{background:#f4f1ec}
+.fav{display:flex;gap:14px;align-items:center;margin-top:34px}
+.fav img{width:32px;height:32px}.fav .b{width:48px;height:48px}.fav span{color:#7c7d87;font:12px ui-monospace,monospace}
 </style></head><body><div class="wrap">
-<h1>Flimify logo — background removed</h1><p>Transparent PNG. Same mark on dark, light, and a coral chip.</p>
+<h1>Flimify logo — transparent</h1><p>Your mark, background removed. Left two are the raw PNG; the third wraps it in a light app-icon chip so the dark plug/tail stay visible on dark UI.</p>
 <div class="row">
-  <div><div class="tile dark"><img src="flimify-logo.png"></div><div class="lab">on dark (our site/panel)</div></div>
-  <div><div class="tile light"><img src="flimify-logo.png"></div><div class="lab">on light</div></div>
-  <div><div class="tile chip"><img src="flimify-logo.png" style="width:120px"></div><div class="lab">on coral chip</div></div>
-</div></div></body></html>
+  <div><div class="tile dark"><img src="flimify-logo.png"></div><div class="lab">raw on dark — plug/tail fade</div></div>
+  <div><div class="tile light"><img src="flimify-logo.png"></div><div class="lab">raw on light — perfect</div></div>
+  <div><div class="tile dark icn"><img src="flimify-icon.png"></div><div class="lab">chip on dark — recommended</div></div>
+</div>
+<div class="fav"><img src="flimify-icon.png"><img src="flimify-icon.png" class="b"><span>← favicon / nav size (chip)</span></div>
+</div></body></html>
