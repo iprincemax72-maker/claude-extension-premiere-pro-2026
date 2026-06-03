@@ -19,170 +19,40 @@
   <div class="card">
     <a href="index.html" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>for Premiere Pro</small></span></a>
     <h1 id="title">Sign in</h1>
-    <p class="sub" id="sub">Sign in to download the extension and render. Free plan includes 5 renders a month.</p>
+    <p class="sub">Sign in with Google to download the extension and render. Free plan includes 5 renders a month.</p>
 
-    <!-- Sign in / Create account toggle -->
-    <div class="authtabs" id="tabs">
-      <button type="button" data-mode="signin" class="on">Sign in</button>
-      <button type="button" data-mode="signup">Create account</button>
-    </div>
-
-    <form id="form" autocomplete="on" novalidate>
-      <div class="field" id="nameField" style="display:none">
-        <label for="name">Name</label>
-        <input id="name" type="text" autocomplete="name" placeholder="Your name" />
-      </div>
-      <div class="field">
-        <label for="email">Email</label>
-        <input id="email" type="email" autocomplete="email" required placeholder="you@example.com" />
-      </div>
-      <div class="field">
-        <label for="password">Password</label>
-        <input id="password" type="password" autocomplete="current-password" required placeholder="••••••••" minlength="6" />
-      </div>
-      <div class="linkrow" id="forgotRow"><button type="button" id="forgot">Forgot password?</button></div>
-      <button class="submit" id="submit" type="submit">Sign in</button>
-    </form>
-
-    <div class="divider" id="orDiv">or</div>
     <button class="gbtn" id="googleBtn">
       <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.11a6.6 6.6 0 0 1 0-4.22V7.05H2.18a11 11 0 0 0 0 9.9l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.05l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z"/></svg>
       Continue with Google
     </button>
 
     <p class="err" id="err" hidden></p>
-    <p class="notice" id="notice" hidden></p>
-    <p class="fine">By continuing you agree to the Terms &amp; Privacy Policy. We only read your name, email, and avatar.</p>
+    <p class="fine">One account per Google login. By continuing you agree to the Terms &amp; Privacy Policy. We only read your name, email, and avatar.</p>
     <a href="index.html" class="back">← Back to site</a>
   </div>
 </div>
 
 <script src="config.js"></script>
 <script type="module">
-  import { supabase, signInWithGoogle, signInWithEmail, signUpWithEmail,
-           sendPasswordReset, updatePassword, getUser } from "./auth.js";
+  import { signInWithGoogle, getUser } from "./auth.js";
 
   const $ = id => document.getElementById(id);
-  const title = $("title"), sub = $("sub"), tabs = $("tabs"), form = $("form");
-  const nameField = $("nameField"), nameI = $("name"), emailI = $("email"), pwI = $("password");
-  const forgotRow = $("forgotRow"), submit = $("submit"), orDiv = $("orDiv"), googleBtn = $("googleBtn");
-  const err = $("err"), notice = $("notice");
-
-  let mode = "signin";   // signin | signup | recovery
-  const showErr = m => { err.textContent = m; err.hidden = false; notice.hidden = true; };
-  const showOk  = m => { notice.textContent = m; notice.hidden = false; err.hidden = true; };
-  const clearMsg = () => { err.hidden = true; notice.hidden = true; };
-  const busy = on => { submit.disabled = on; submit.classList.toggle("loading", on); };
-
-  // Map Supabase errors to plain English (don't leak whether an email exists).
-  function nice(e) {
-    const m = (e && e.message || "").toLowerCase();
-    if (m.includes("invalid login")) return "Wrong email or password.";
-    if (m.includes("email not confirmed")) return "Please confirm your email first, check your inbox for the verification link.";
-    if (m.includes("already registered") || m.includes("already been registered")) return "That email already has an account, switch to Sign in.";
-    if (m.includes("password")) return e.message;            // e.g. too short / leaked
-    if (m.includes("rate limit") || m.includes("too many")) return "Too many attempts, wait a minute and try again.";
-    if (m.includes("redirect")) return "Sign-in redirect isn't allowed yet, add this site's URL in Supabase → Auth → URL Configuration.";
-    return (e && e.message) || "Something went wrong. Try again.";
-  }
-
-  function setMode(next) {
-    mode = next;
-    clearMsg();
-    [...tabs.children].forEach(b => b.classList.toggle("on", b.dataset.mode === mode));
-    const signup = mode === "signup";
-    title.textContent = signup ? "Create your account" : "Sign in";
-    sub.textContent = signup
-      ? "One free account, 5 renders a month, no card required."
-      : "Sign in to download the extension and render. Free plan includes 5 renders a month.";
-    nameField.style.display = signup ? "block" : "none";
-    forgotRow.style.display = signup ? "none" : "block";
-    submit.textContent = signup ? "Create account" : "Sign in";
-    pwI.setAttribute("autocomplete", signup ? "new-password" : "current-password");
-  }
-
-  // Password-recovery view (opened from the reset email's link).
-  function enterRecovery() {
-    mode = "recovery";
-    clearMsg();
-    tabs.style.display = "none"; orDiv.style.display = "none"; googleBtn.style.display = "none";
-    forgotRow.style.display = "none"; nameField.style.display = "none";
-    emailI.closest(".field").style.display = "none";
-    title.textContent = "Set a new password";
-    sub.textContent = "Choose a new password for your account.";
-    pwI.value = ""; pwI.setAttribute("autocomplete", "new-password"); pwI.placeholder = "New password";
-    submit.textContent = "Update password";
-    setTimeout(() => pwI.focus(), 50);
-  }
-
-  tabs.addEventListener("click", e => { const b = e.target.closest("button[data-mode]"); if (b) setMode(b.dataset.mode); });
-
-  form.addEventListener("submit", async e => {
-    e.preventDefault();
-    clearMsg();
-    const email = emailI.value.trim(), pw = pwI.value;
-
-    if (mode === "recovery") {
-      if (pw.length < 6) return showErr("Password must be at least 6 characters.");
-      busy(true);
-      const { error } = await updatePassword(pw);
-      busy(false);
-      if (error) return showErr(nice(error));
-      showOk("Password updated. Taking you to your dashboard…");
-      setTimeout(() => location.replace("account.html"), 900);
-      return;
-    }
-
-    if (!email || !/^\S+@\S+\.\S+$/.test(email)) return showErr("Enter a valid email address.");
-    if (pw.length < 6) return showErr("Password must be at least 6 characters.");
-
-    busy(true);
-    if (mode === "signin") {
-      const { error } = await signInWithEmail(email, pw);
-      busy(false);
-      if (error) return showErr(nice(error));
-      location.replace("account.html");                       // valid account → dashboard
-    } else {
-      const { data, error } = await signUpWithEmail(email, pw, nameI.value);
-      busy(false);
-      if (error) return showErr(nice(error));
-      if (data && data.session) {
-        location.replace("account.html");                     // confirmation off → straight in
-      } else {
-        showOk("Account created. Check " + email + " for a verification link, then sign in.");
-        setMode("signin");
-        emailI.value = email;
-      }
-    }
-  });
-
-  $("forgot").addEventListener("click", async () => {
-    clearMsg();
-    const email = emailI.value.trim();
-    if (!email || !/^\S+@\S+\.\S+$/.test(email)) { showErr("Enter your email above first, then tap Forgot password."); emailI.focus(); return; }
-    const redirectTo = location.origin + location.pathname;    // back to this login page
-    const { error } = await sendPasswordReset(email, redirectTo);
-    if (error) return showErr(nice(error));
-    showOk("If an account exists for " + email + ", a password-reset link is on its way.");
-  });
+  const err = $("err"), googleBtn = $("googleBtn");
+  const showErr = m => { err.textContent = m; err.hidden = false; };
 
   googleBtn.addEventListener("click", async () => {
-    clearMsg();
+    err.hidden = true;
     googleBtn.disabled = true; googleBtn.classList.add("loading");
     const { error } = await signInWithGoogle();
-    if (error) { showErr(nice(error)); googleBtn.disabled = false; googleBtn.classList.remove("loading"); }
-    // success → redirect to Google, back to APP_REDIRECT
+    if (error) {
+      showErr(error.message || "Couldn't start Google sign-in. Try again.");
+      googleBtn.disabled = false; googleBtn.classList.remove("loading");
+    }
+    // success → redirects to Google, returns to APP_REDIRECT (account.html)
   });
 
-  // Recovery links arrive with type=recovery in the URL; Supabase also fires the
-  // PASSWORD_RECOVERY event once it processes the token.
-  const isRecovery = /type=recovery/.test(location.hash) || /type=recovery/.test(location.search);
-  supabase.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") enterRecovery(); });
-  if (isRecovery) {
-    enterRecovery();
-  } else {
-    getUser().then(u => { if (u) location.replace("account.html"); });   // already signed in
-  }
+  // Already signed in → straight to the dashboard.
+  getUser().then(u => { if (u) location.replace("account.html"); });
 </script>
 </body>
 </html>
