@@ -7,7 +7,8 @@
 <meta name="description" content="Paste your Claude API key, describe a motion graphic, and Claude writes a Remotion composition that plays live in your browser. Your key never leaves your device." />
 <meta name="theme-color" content="#09090b" />
 <meta name="robots" content="noindex" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23E2885F'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='19' font-style='italic' fill='%23111' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E" />
+<link rel="icon" type="image/png" href="flimify-favicon.png" />
+<link rel="apple-touch-icon" href="flimify-icon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -32,7 +33,7 @@ a{color:inherit;text-decoration:none}
 .app{position:relative;z-index:1;height:100%;display:flex;flex-direction:column}
 header.bar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 clamp(14px,2.5vw,24px);height:58px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 72%,transparent);backdrop-filter:blur(14px);flex:0 0 auto;z-index:5}
 .brand{display:flex;align-items:center;gap:.6em;font-weight:600;letter-spacing:-0.02em}
-.brand .glyph{width:26px;height:26px;border-radius:7px;background:var(--coral);color:#15110d;display:grid;place-items:center;font-style:italic;font-weight:700;font-family:Georgia,serif;font-size:.9rem;box-shadow:0 0 16px -4px var(--coral)}
+.brand .glyph{width:26px;height:26px;object-fit:contain;display:inline-block;vertical-align:middle;filter:drop-shadow(0 0 8px rgba(226,136,95,.45))}
 .brand small{display:block;font-family:var(--mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);margin-top:1px;font-weight:400}
 .bar .right{display:flex;align-items:center;gap:12px}
 .badge{font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--coral);border:1px solid rgba(226,136,95,.3);border-radius:99px;padding:5px 10px}
@@ -118,7 +119,7 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
 <div class="bloom"></div><div class="bloom b2"></div>
 <div class="app">
   <header class="bar">
-    <a href="index.html" class="brand"><span class="glyph">C</span><span>Claude <small>Motion Builder</small></span></a>
+    <a href="index.html" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Motion Builder</small></span></a>
     <div class="right">
       <span class="badge">Bring your own Claude</span>
       <a href="index.html" class="linkback"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Home</a>

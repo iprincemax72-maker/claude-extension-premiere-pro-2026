@@ -10,7 +10,8 @@
 <meta property="og:description" content="Describe it. Flimify builds it. It's on your timeline. Runs on your Claude plan, no API key." />
 <meta property="og:type" content="website" />
 <meta property="og:image" content="og.png" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23E2885F'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='19' font-style='italic' fill='%23111' text-anchor='middle'%3EF%3C/text%3E%3C/svg%3E" />
+<link rel="icon" type="image/png" href="flimify-favicon.png" />
+<link rel="apple-touch-icon" href="flimify-icon.png" />
 <script>document.documentElement.classList.add('js');</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -103,7 +104,7 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 .nav-in { max-width: var(--maxw); margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 58px; padding: 0 10px 0 16px; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: saturate(1.4) blur(14px); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 1px 0 var(--hi) inset, 0 14px 34px -18px rgba(0,0,0,0.7); transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease); }
 .nav.scrolled .nav-in { border-color: var(--line-2); box-shadow: 0 1px 0 var(--hi) inset, 0 18px 40px -16px rgba(0,0,0,0.85); }
 .brand { display: flex; align-items: center; gap: 0.6em; font-weight: 600; font-size: 1.04rem; letter-spacing: -0.02em; }
-.brand .glyph { width: 28px; height: 28px; border-radius: 7px; flex: 0 0 auto; background: var(--coral); color: #15110d; display: grid; place-items: center; font-style: italic; font-weight: 700; font-size: 0.95rem; box-shadow: 0 0 18px -4px var(--coral); font-family: Georgia, serif; }
+.brand .glyph { width: 28px; height: 28px; flex: 0 0 auto; object-fit: contain; display: inline-block; vertical-align: middle; filter: drop-shadow(0 0 8px rgba(226,136,95,.45)); }
 .brand small { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); display: block; margin-top: 1px; font-weight: 400; }
 .nav-links { display: flex; align-items: center; gap: 1.9rem; }
 .nav-links a { font-size: 0.9rem; font-weight: 500; color: var(--text-2); transition: color 0.18s; position: relative; }
@@ -609,7 +610,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <!-- NAV -->
 <header class="nav" id="nav">
   <div class="nav-in">
-    <a href="#top" class="brand"><span class="glyph">F</span><span>Flimify <small>for Premiere Pro</small></span></a>
+    <a href="#top" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>for Premiere Pro</small></span></a>
     <nav class="nav-links">
       <a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a>
     </nav>
@@ -623,7 +624,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 </header>
 
 <div class="mobile-menu" id="mobileMenu">
-  <div class="mm-top"><span class="brand"><span class="glyph">F</span> Flimify</span>
+  <div class="mm-top"><span class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"> Flimify</span>
     <button class="nav-toggle" id="navClose" aria-label="Close menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <nav><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a><a href="login.html" id="mmSignin">Sign in</a></nav>
@@ -697,7 +698,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
         <div class="mock-bar"><span class="lights"><i></i><i></i><i></i></span><span class="title">Flimify — Adobe Premiere Pro</span><span class="ver">short 2 · 1 sel</span></div>
         <div class="mock-body">
           <div class="mrow"><div class="mav you">Y</div><div class="txt">Make a glassy subscribe button, vertical, 4s — calm, not flashy. Soft tap + ripple.</div></div>
-          <div class="mrow"><div class="mav cla">C</div><div style="flex:1">
+          <div class="mrow"><div class="mav cla">F</div><div style="flex:1">
             <div class="mname">FLIMIFY</div>
             <div class="txt"><b>Done.</b> A frosted-glass subscribe pill that springs in, with a cursor tap and a soft ripple. Rendered transparent so it drops over your footage — 1080×1920, 4s.</div>
             <div class="rendercard">
@@ -957,7 +958,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <footer class="footer">
   <div class="wrap">
     <div class="footer-grid">
-      <div class="footer-about"><a href="#top" class="brand"><span class="glyph">F</span><span>Flimify <small>for Premiere Pro</small></span></a><p class="blurb">An AI motion-graphics and editing copilot that lives inside Adobe Premiere Pro.</p></div>
+      <div class="footer-about"><a href="#top" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>for Premiere Pro</small></span></a><p class="blurb">An AI motion-graphics and editing copilot that lives inside Adobe Premiere Pro.</p></div>
       <div><h4>Product</h4><ul><li><a href="#how">How it works</a></li><li><a href="#features">Features</a></li><li><a href="#pricing">Pricing</a></li><li><a href="#install">Install</a></li></ul></div>
       <div><h4>Support</h4><ul><li><a href="#faq">FAQ</a></li><li><a href="#install">Install steps</a></li><li><a href="#">Contact</a></li><li><a href="#">Changelog</a></li></ul></div>
       <div><h4>Legal</h4><ul><li><a href="#">Terms</a></li><li><a href="#">Privacy</a></li><li><a href="#">Refunds</a></li><li><a href="#">License</a></li></ul></div>

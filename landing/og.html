@@ -35,9 +35,8 @@
   .og > * { position: relative; z-index: 1; }
 
   .top { display: flex; align-items: center; gap: 14px; }
-  .glyph { width: 50px; height: 50px; border-radius: 13px; background: var(--coral); color: #15110d;
-    display: grid; place-items: center; font-family: Georgia, serif; font-style: italic; font-weight: 700; font-size: 30px;
-    box-shadow: 0 0 26px -4px var(--coral); }
+  .glyph { width: 64px; height: 56px; object-fit: contain; display: inline-block;
+    filter: drop-shadow(0 0 22px rgba(226,136,95,.4)); }
   .brand { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
   .brand small { display: block; font-family: var(--mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); font-weight: 500; margin-top: 2px; }
 
@@ -59,14 +58,14 @@
     <div class="bloom b"></div>
 
     <div class="top">
-      <div class="glyph">C</div>
+      <img class="glyph" src="flimify-logo.png" alt="Flimify">
       <div class="brand">Flimify<small>for Adobe Premiere Pro</small></div>
     </div>
 
     <div class="mid">
       <div class="eyebrow">Premiere Pro extension</div>
       <h1>Motion graphics,<br>by <span class="c">just asking.</span></h1>
-      <div class="sub">Describe it. Claude builds it. It's on your timeline.</div>
+      <div class="sub">Describe it. Flimify builds it. It's on your timeline.</div>
       <div class="bottom">
         <span class="chip">Runs on your Claude plan</span><span class="dot"></span>
         <span class="chip">No API key</span><span class="dot"></span>

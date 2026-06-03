@@ -36,8 +36,18 @@ export default async function handler(req) {
   const url = new URL(req.url);
   const plan = (url.searchParams.get('plan') || '').toLowerCase();
   const cycle = url.searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly';
-  const productId = PRODUCTS[plan] && PRODUCTS[plan][cycle];
-  if (!productId) return json({ error: 'Unknown plan.' }, 400);
+  if (!PRODUCTS[plan]) return json({ error: 'Unknown plan.' }, 400);
+  const productId = PRODUCTS[plan][cycle];
+  // Guard: a missing/placeholder env var would send invalid input to Polar and
+  // surface a cryptic "invalid UUID" error. Fail clearly and say which var to fix.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!productId || !UUID_RE.test(productId)) {
+    const envName = 'POLAR_PRODUCT_' + plan.toUpperCase() + (cycle === 'yearly' ? '_YEARLY' : '');
+    return json({
+      error: "This plan isn't available yet — please try another or contact support.",
+      detail: `${envName} is not a valid Polar product UUID (got "${productId || 'unset'}"). Set it in Vercel → Settings → Environment Variables, then redeploy.`
+    }, 503);
+  }
 
   // Verify the caller's Supabase session token → trustworthy user id + email.
   const auth = req.headers.get('authorization') || '';
