@@ -6036,7 +6036,13 @@ function openExternalURL(url) {
   + '#loginWall .lw-h{font-weight:700;font-size:17px;letter-spacing:-.01em;margin-bottom:6px}'
   + '#loginWall .lw-sub{color:#9a9aa1;font-size:12.5px;line-height:1.5;margin-bottom:18px}'
   + '#loginWall .lw-btn{width:100%;font:600 14px system-ui;color:#15110d;background:#E2885F;border:0;border-radius:11px;padding:.82em;cursor:pointer}#loginWall .lw-btn:hover{filter:brightness(1.06)}'
-  + '#loginWall .lw-link{width:100%;margin-top:10px;background:0;border:0;color:#9a9aa1;font:500 12px system-ui;text-decoration:underline;text-underline-offset:2px;cursor:pointer;padding:6px}#loginWall .lw-link:hover{color:#fafafa}';
+  + '#loginWall .lw-link{width:100%;margin-top:10px;background:0;border:0;color:#9a9aa1;font:500 12px system-ui;text-decoration:underline;text-underline-offset:2px;cursor:pointer;padding:6px}#loginWall .lw-link:hover{color:#fafafa}'
+  + '#loginWall.show{overflow:auto}#loginWall form{margin:0}'
+  + '#loginWall .lw-in{width:100%;font:500 13px system-ui;color:#fafafa;background:#1f1f24;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:.72em .8em;margin-bottom:9px;outline:none;-webkit-appearance:none}'
+  + '#loginWall .lw-in:focus{border-color:#E2885F}#loginWall .lw-in::placeholder{color:#6c6d77}'
+  + '#loginWall .lw-err{display:none;color:#e98c7a;font:500 11.5px system-ui;background:rgba(233,140,122,.1);border:1px solid rgba(233,140,122,.28);border-radius:8px;padding:7px 9px;margin-bottom:9px;text-align:left;line-height:1.4}#loginWall .lw-err.show{display:block}'
+  + '#loginWall .lw-btn:disabled{opacity:.6;cursor:default}'
+  + '#loginWall .lw-or{display:flex;align-items:center;gap:10px;color:#6c6d77;font:500 11px system-ui;margin:13px 2px 8px}#loginWall .lw-or::before,#loginWall .lw-or::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.1)}';
   document.head.appendChild(style);
 
   let pop = null, status = null, pollTimer = null, wall = null;
@@ -6052,13 +6058,23 @@ function openExternalURL(url) {
       '<div class="lw-card">'
       + '<div class="lw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>'
       + '<div class="lw-h">Log in first</div>'
-      + '<p class="lw-sub">Sign in to use Flimify in Premiere. Free plan includes 5 renders a month.</p>'
-      + '<button class="lw-btn" id="lwSignin">Sign in</button>'
+      + '<p class="lw-sub">Sign in with your Flimify account to render in Premiere.</p>'
+      + '<form id="lwForm" autocomplete="on">'
+      +   '<input id="lwEmail" class="lw-in" type="email" placeholder="you@example.com" autocomplete="email" required>'
+      +   '<input id="lwPass" class="lw-in" type="password" placeholder="Password" autocomplete="current-password" required>'
+      +   '<div class="lw-err" id="lwErr"></div>'
+      +   '<button class="lw-btn" id="lwSubmit" type="submit">Sign in</button>'
+      + '</form>'
+      + '<button class="lw-link" id="lwForgot">Forgot password?</button>'
       + '<button class="lw-link" id="lwSite">New here? Create an account &#8599;</button>'
+      + '<div class="lw-or">or</div>'
+      + '<button class="lw-link" id="lwGoogle">Sign in with Google &#8599;</button>'
       + '</div>';
     document.body.appendChild(wall);
-    wall.querySelector('#lwSignin').onclick = startSignin;
+    wall.querySelector('#lwForm').addEventListener('submit', e => { e.preventDefault(); submitLogin(); });
+    wall.querySelector('#lwForgot').onclick = () => openExternalURL(SITE_URL + '/login.html');
     wall.querySelector('#lwSite').onclick = () => openExternalURL(SITE_URL + '/login.html');
+    wall.querySelector('#lwGoogle').onclick = startSignin;
     return wall;
   }
   function setLoginWall(on) { ensureWall().classList.toggle('show', !!on); }
@@ -6135,6 +6151,36 @@ function openExternalURL(url) {
     ensurePop();
     if (pop.classList.contains('open')) pop.classList.remove('open');
     else { renderPop(); pop.classList.add('open'); }
+  }
+
+  // In-panel sign-in with an existing email + password. Posts the credentials to
+  // the local bridge, which exchanges them for a Supabase session and stores it.
+  async function submitLogin() {
+    if (!wall) return;
+    const emailEl = wall.querySelector('#lwEmail');
+    const passEl  = wall.querySelector('#lwPass');
+    const errEl   = wall.querySelector('#lwErr');
+    const btnEl   = wall.querySelector('#lwSubmit');
+    const email = (emailEl.value || '').trim();
+    const password = passEl.value || '';
+    errEl.classList.remove('show');
+    if (!email || !password) { errEl.textContent = 'Enter your email and password.'; errEl.classList.add('show'); return; }
+    btnEl.disabled = true; const lbl = btnEl.textContent; btnEl.textContent = 'Signing in…';
+    try {
+      const r = await fetch(BRIDGE + '/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) { passEl.value = ''; await refresh(); try { renderPop(); } catch (e) {} return; }
+      errEl.textContent = (j && j.error) || 'Could not sign in. Try again.';
+      errEl.classList.add('show');
+    } catch (e) {
+      errEl.textContent = 'Could not reach the bridge. Make sure it is running.';
+      errEl.classList.add('show');
+    } finally {
+      btnEl.disabled = false; btnEl.textContent = lbl;
+    }
   }
 
   function startSignin() {
