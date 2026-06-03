@@ -76,7 +76,9 @@ export default async function handler(req) {
   const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const WEBHOOK_SECRET = process.env.POLAR_WEBHOOK_SECRET;
   const PROD_CREATOR = process.env.POLAR_PRODUCT_CREATOR;
+  const PROD_CREATOR_Y = process.env.POLAR_PRODUCT_CREATOR_YEARLY;
   const PROD_STUDIO = process.env.POLAR_PRODUCT_STUDIO;
+  const PROD_STUDIO_Y = process.env.POLAR_PRODUCT_STUDIO_YEARLY;
 
   const raw = await req.text();
 
@@ -116,7 +118,9 @@ export default async function handler(req) {
       (data.product && data.product.id) ||
       (Array.isArray(data.products) && data.products[0] && data.products[0].id) ||
       null;
-    plan = productId === PROD_STUDIO ? 'studio' : (productId === PROD_CREATOR ? 'creator' : null);
+    plan = (productId === PROD_STUDIO || productId === PROD_STUDIO_Y) ? 'studio'
+         : (productId === PROD_CREATOR || productId === PROD_CREATOR_Y) ? 'creator'
+         : null;
     if (!plan) return new Response('unknown product; skipped', { status: 200 });
     limit = PLAN_LIMITS[plan]; status = 'active';
   }

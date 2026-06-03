@@ -23,15 +23,20 @@ export default async function handler(req) {
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const ANON = process.env.SUPABASE_ANON_KEY;
   const POLAR_TOKEN = process.env.POLAR_ACCESS_TOKEN;
-  const PROD_CREATOR = process.env.POLAR_PRODUCT_CREATOR;
-  const PROD_STUDIO = process.env.POLAR_PRODUCT_STUDIO;
   const apiBase = (process.env.POLAR_SERVER === 'sandbox')
     ? 'https://sandbox-api.polar.sh'
     : 'https://api.polar.sh';
 
+  // product id per plan + billing cycle
+  const PRODUCTS = {
+    creator: { monthly: process.env.POLAR_PRODUCT_CREATOR, yearly: process.env.POLAR_PRODUCT_CREATOR_YEARLY },
+    studio:  { monthly: process.env.POLAR_PRODUCT_STUDIO,  yearly: process.env.POLAR_PRODUCT_STUDIO_YEARLY },
+  };
+
   const url = new URL(req.url);
   const plan = (url.searchParams.get('plan') || '').toLowerCase();
-  const productId = plan === 'studio' ? PROD_STUDIO : (plan === 'creator' ? PROD_CREATOR : null);
+  const cycle = url.searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly';
+  const productId = PRODUCTS[plan] && PRODUCTS[plan][cycle];
   if (!productId) return json({ error: 'Unknown plan.' }, 400);
 
   // Verify the caller's Supabase session token → trustworthy user id + email.

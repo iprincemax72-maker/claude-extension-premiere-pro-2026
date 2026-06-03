@@ -1432,8 +1432,10 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
     if (!session) { location.href = "login.html"; return; }            // must be signed in
     const label = btn ? btn.textContent : "";
     if (btn) { btn.textContent = "Starting checkout…"; btn.style.pointerEvents = "none"; }
+    const annual = document.getElementById("billToggle")?.classList.contains("on");
+    const cycle = annual ? "yearly" : "monthly";
     try {
-      const r = await fetch("/api/checkout?plan=" + encodeURIComponent(plan), {
+      const r = await fetch("/api/checkout?plan=" + encodeURIComponent(plan) + "&cycle=" + cycle, {
         headers: { Authorization: "Bearer " + session.access_token },
       });
       const j = await r.json().catch(() => ({}));
