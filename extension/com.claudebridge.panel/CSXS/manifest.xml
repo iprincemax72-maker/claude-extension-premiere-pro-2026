@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Version="12.0" ExtensionBundleId="com.claudebridge.panel" ExtensionBundleVersion="10.8.0" ExtensionBundleName="Claude">
+<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Version="12.0" ExtensionBundleId="com.claudebridge.panel" ExtensionBundleVersion="10.8.0" ExtensionBundleName="Flimify">
     <ExtensionList>
         <Extension Id="com.claudebridge.panel" Version="10.8.0" />
     </ExtensionList>
@@ -30,7 +30,7 @@
                 </Lifecycle>
                 <UI>
                     <Type>Panel</Type>
-                    <Menu>Claude</Menu>
+                    <Menu>Flimify</Menu>
                     <Geometry>
                         <Size>
                             <Height>600</Height>

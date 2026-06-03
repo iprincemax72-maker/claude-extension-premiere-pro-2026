@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Claude</title>
+<title>Flimify</title>
 <style>
   :root {
     --bg-base:     #0d0d10;
@@ -3192,7 +3192,7 @@
 <div class="boot-intro" id="bootIntro">
   <div class="boot-stage">
     <div class="boot-logo">C</div>
-    <div class="boot-title"><span>Claude</span></div>
+    <div class="boot-title"><span>Flimify</span></div>
     <div class="boot-subtitle">for Premiere Pro</div>
     <div class="boot-bar"><div class="boot-bar-fill"></div></div>
   </div>
@@ -3200,8 +3200,8 @@
 
 <div class="header">
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
-    <div class="brand-dot">C</div>
-    <span>Claude</span>
+    <div class="brand-dot">F</div>
+    <span>Flimify</span>
     <span class="version-tag" id="versionTag">10.82</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3216,7 +3216,7 @@
   </div>
   <div style="display:flex;align-items:center">
     <button class="plan-toggle" id="planBtn" type="button" role="switch" aria-checked="false"
-            title="Ask Questions — when on, Claude asks a few smart multiple-choice questions about your request before building, so the result matches what you want">
+            title="Ask Questions — when on, Flimify asks a few smart multiple-choice questions about your request before building, so the result matches what you want">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M9.5 9a2.5 2.5 0 1 1 3 2.45c-.9.2-1.5 1-1.5 1.95v.6"/>
         <line x1="12" y1="17" x2="12" y2="17"/>
@@ -3544,7 +3544,7 @@
       </div>
       <div class="settings-foot">v<span id="settingsVersion">10.8</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
       <div class="settings-credit">
-        Made by <a href="https://github.com/iprincemax72-maker" target="_blank" class="credit-link">iprincemax72-maker</a> <span class="credit-heart">&#10084;</span> Claude
+        Made by <a href="https://github.com/iprincemax72-maker" target="_blank" class="credit-link">iprincemax72-maker</a> <span class="credit-heart">&#10084;</span> Premiere Pro
       </div>
     </div>
 
@@ -3569,7 +3569,7 @@
   <button class="new-tab-btn" id="newTabBtn" title="New animation tab — ⌘⇧T (Ctrl+Tab cycles)" type="button">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
   </button>
-  <button class="new-tab-btn new-chat-btn" id="newChatTabBtn" title="New free-chat tab — talk to Claude without the Remotion render pipeline. Useful for color advice, edit logic, debugging, anything." type="button">
+  <button class="new-tab-btn new-chat-btn" id="newChatTabBtn" title="New free-chat tab — talk to Flimify without the Remotion render pipeline. Useful for color advice, edit logic, debugging, anything." type="button">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
   </button>
 </div>
@@ -3594,10 +3594,10 @@
   <div class="input-wrap">
     <div class="ref-row">
       <div class="ref-bar" id="refBar"></div>
-      <div class="rmode-group" id="renderModeGroup" title="How hard Claude works on the animation — Fast: quick template-based, ~1 min. Default: a real custom-built animation, no templates (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
+      <div class="rmode-group" id="renderModeGroup" title="How hard Flimify works on the animation — Fast: quick template-based, ~1 min. Default: a real custom-built animation, no templates (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
         <button class="rmode-pill" data-rmode="fast" type="button" title="Fast — quick template-based animation, ~1 min">Fast</button>
         <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
-        <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Claude takes its time, ~3-5 min">Slow</button>
+        <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Flimify takes its time, ~3-5 min">Slow</button>
       </div>
       <div class="out-group" id="outputGroup" title="How many different versions to generate from one prompt. They render all at once (in parallel) so you can pick the best.">
         <button class="out-btn" id="outputBtn" type="button" aria-haspopup="true" aria-expanded="false">
@@ -3617,12 +3617,12 @@
     <div class="queue-strip" id="queueStrip" style="display:none;"></div>
     <div class="input-stack">
       <div class="ghost" id="ghost" aria-hidden="true"><span class="ghost-typed"></span><span class="ghost-suggest"></span></div>
-      <div class="input-ph" id="inputPh" aria-hidden="true">Ask Claude…</div>
-      <textarea id="input" placeholder="Ask Claude…" rows="1" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+      <div class="input-ph" id="inputPh" aria-hidden="true">Ask Flimify…</div>
+      <textarea id="input" placeholder="Ask Flimify…" rows="1" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
     </div>
     <div class="input-toolbar">
       <div class="tb-left">
-        <span class="hint-text" id="hint"><kbd class="k-tab" title="Press Tab to accept the grey ghost-text suggestion Claude shows ahead of your cursor">Tab</kbd> accept · <kbd title="Enter sends the message">Enter</kbd> send · <kbd>⌘V</kbd> paste · <kbd>⌘C</kbd> copy</span>
+        <span class="hint-text" id="hint"><kbd class="k-tab" title="Press Tab to accept the grey ghost-text suggestion Flimify shows ahead of your cursor">Tab</kbd> accept · <kbd title="Enter sends the message">Enter</kbd> send · <kbd>⌘V</kbd> paste · <kbd>⌘C</kbd> copy</span>
         <span class="esc-hint" id="escHint" title="Cancel the current request"><kbd>esc</kbd> cancel</span>
       </div>
       <div class="tb-right">
@@ -3663,7 +3663,7 @@
 <script>
 const BRIDGE = 'http://127.0.0.1:3737';
 // Public marketing/account site — where "Upgrade" / "Manage account" opens.
-const SITE_URL = 'https://claudexpremiere.vercel.app';
+const SITE_URL = 'https://flimify.com';
 
 /* ════════════════════════════════════════════════════════════════════════
    PLAN GATING — Auto-Edit = Studio, Reference = Creator+, versions/prompt cap.
@@ -3700,7 +3700,7 @@ function showUpsell(feature) {
   const free = (__plan === 'free');
   const MAP = {
     autoedit: { title: 'Auto-Edit is a Studio feature', desc: 'It reads your footage, finds the moments, and drops matching graphics across the whole clip.', plan: 'Studio', price: '$49' },
-    reference: { title: 'Reference matching is a Creator feature', desc: 'Drop in an image or video and Claude matches its style, colors, and motion.', plan: 'Creator', price: '$19' },
+    reference: { title: 'Reference matching is a Creator feature', desc: 'Drop in an image or video and Flimify matches its style, colors, and motion.', plan: 'Creator', price: '$19' },
     versions: { title: 'More versions per prompt', desc: 'Generate more takes from a single prompt and pick the best.', plan: free ? 'Creator' : 'Studio', price: free ? '$19' : '$49' },
   };
   const c = MAP[feature] || MAP.autoedit;
@@ -3849,13 +3849,13 @@ function newTab(opts) {
 
   if (type === 'chat') {
     // Free-chat tabs get a different empty state — no suggestion chips, no
-    // "rendered into your bin" pitch. Just a clear "you're talking to Claude
+    // "rendered into your bin" pitch. Just a clear "you're talking to Flimify
     // directly" hero so the user knows the mode is different.
     contentEl.innerHTML = `
       <div class="empty empty-chat">
         <div class="empty-logo">💬</div>
-        <h1>Free chat with Claude</h1>
-        <p class="empty-sub">No Remotion pipeline, no renders — just ask anything. Color advice, edit logic, fix-this-script, naming, whatever. Still gets Premiere context so Claude knows your project + selected clip.</p>
+        <h1>Free chat with Flimify</h1>
+        <p class="empty-sub">No Remotion pipeline, no renders — just ask anything. Color advice, edit logic, fix-this-script, naming, whatever. Still gets Premiere context so Flimify knows your project + selected clip.</p>
       </div>
     `;
   } else {
@@ -6070,7 +6070,7 @@ function openExternalURL(url) {
       '<div class="lw-card">'
       + '<div class="lw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>'
       + '<div class="lw-h">Log in first</div>'
-      + '<p class="lw-sub">Sign in to use Claude in Premiere. Free plan includes 5 renders a month.</p>'
+      + '<p class="lw-sub">Sign in to use Flimify in Premiere. Free plan includes 5 renders a month.</p>'
       + '<button class="lw-btn" id="lwSignin">Sign in</button>'
       + '<button class="lw-link" id="lwSite">New here? Create an account &#8599;</button>'
       + '</div>';
@@ -6111,7 +6111,7 @@ function openExternalURL(url) {
     pop.classList.remove('full');
     if (!status || !status.signedIn) {
       pop.innerHTML = '<div class="ap-h">Sign in</div>'
-        + '<p class="ap-sub">Link your Claude account to render. Free plan includes 5 renders a month.</p>'
+        + '<p class="ap-sub">Link your account to render. Free plan includes 5 renders a month.</p>'
         + '<button class="ap-btn ap-primary" id="apSignin">Sign in with Google</button>'
         + '<button class="ap-btn ap-ghost" id="apBrowser2" style="width:100%;margin-top:8px">Open in browser ↗</button>';
       pop.querySelector('#apSignin').onclick = startSignin;
@@ -6702,8 +6702,8 @@ if (planBtn) {
     saveSettings();
     syncPlanBtn();
     try { toast(next
-      ? 'Ask Questions ON for this tab — Claude asks a few smart questions before building.'
-      : 'Ask Questions OFF for this tab — Claude builds right away.'); } catch {}
+      ? 'Ask Questions ON for this tab — Flimify asks a few smart questions before building.'
+      : 'Ask Questions OFF for this tab — Flimify builds right away.'); } catch {}
   });
   syncPlanBtn();
 }
@@ -7308,7 +7308,7 @@ function setMode(m) {
 // Placement pills were removed from the composer — placement now lives only in
 // Settings (Default placement), which calls setMode() directly. No bar listener.
 
-// Render mode (Fast / Default / Slow) — how hard Claude works on each animation.
+// Render mode (Fast / Default / Slow) — how hard Flimify works on each animation.
 // PER-TAB: each tab keeps its own mode. userSettings.renderMode is just the
 // default new tabs start from. Sent with every /chat request from that tab.
 function setRenderMode(m) {
@@ -8065,7 +8065,7 @@ function makeMsg(role, html) {
   content.className = 'msg-content';
   const author = document.createElement('div');
   author.className = 'msg-author';
-  author.textContent = role === 'you' ? 'You' : 'Claude';
+  author.textContent = role === 'you' ? 'You' : 'Flimify';
   const body = document.createElement('div');
   body.className = 'msg-body';
   body.innerHTML = html;
@@ -8185,7 +8185,7 @@ function estimatePromptDuration(message, hasReference) {
   const isIteration = /^make a new version|previous file|previous render/i.test(message || '');
 
   if (isIteration) {
-    // Editing an existing component — Claude usually keeps changes minimal
+    // Editing an existing component — Flimify usually keeps changes minimal
     est = 35;
   } else if (isRender) {
     est = isComplex ? 110 : 55;
@@ -9403,7 +9403,7 @@ async function sendMessage(presetMsg, sendOpts) {
     progressUI.cleanup();
     if (err.name === 'AbortError') {
       _userCancelled = true;
-      // Cancelled — offer a Continue button. Tells Claude to resume from
+      // Cancelled — offer a Continue button. Tells Flimify to resume from
       // where it was when killed, using the original prompt + last status
       // as breadcrumbs. Partial work usually still lives on disk under
       // ~/PremiereClaude/remotion-intro/src/ so resuming is cheap.
@@ -10023,7 +10023,7 @@ async function expandPrompt(level, clickedBtn) {
   clickedBtn.classList.add('loading');
   syncExpandEnabled();
   updateEscHint();
-  // The expand call takes ~10-20s (Claude rewrites the prompt). Without a clear
+  // The expand call takes ~10-20s (Flimify rewrites the prompt). Without a clear
   // signal the tiny spinner reads as "nothing happened" — show a toast + a live
   // seconds counter on the button so it's obviously working.
   const _phName = (level === 'heavy') ? 'High' : (level === 'medium') ? 'Mid' : 'Low';
@@ -10060,7 +10060,7 @@ async function expandPrompt(level, clickedBtn) {
       input.setSelectionRange(input.value.length, input.value.length);
       try { toast('✨ Prompt expanded — review it and hit send'); } catch {}
     } else {
-      failureNote = 'Expand returned empty — bridge or Claude may be down';
+      failureNote = 'Expand returned empty — bridge or Flimify may be down';
     }
   } catch (err) {
     if (err.name !== 'AbortError') failureNote = 'Expand failed: ' + (err.message || 'unknown');
