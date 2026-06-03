@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Motion Builder — make motion graphics with Claude</title>
+<title>Motion Builder, make motion graphics with Claude</title>
 <meta name="description" content="Paste your Claude API key, describe a motion graphic, and Claude writes a Remotion composition that plays live in your browser. Your key never leaves your device." />
 <meta name="theme-color" content="#09090b" />
 <meta name="robots" content="noindex" />
@@ -339,7 +339,7 @@ async function generate(){
     if (!res.ok){
       let d=''; try { const j=await res.json(); d=j.error&&j.error.message?j.error.message:JSON.stringify(j); } catch(_){ d=await res.text(); }
       if (res.status===401) d='Invalid API key.'; if (res.status===429) d='Rate limit / quota reached on your account.';
-      throw new Error('Anthropic API ' + res.status + ' — ' + d);
+      throw new Error('Anthropic API ' + res.status + ', ' + d);
     }
     const data = await res.json();
     const text = (data.content||[]).map(b=>b.text||'').join('');

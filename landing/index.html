@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Flimify — motion graphics by just asking</title>
-<meta name="description" content="Flimify lives inside Adobe Premiere Pro. Describe a title, lower third, or full animation — it writes the code, renders it, and drops it on your timeline." />
+<title>Flimify: motion graphics by just asking</title>
+<meta name="description" content="Flimify lives inside Adobe Premiere Pro. Describe a title, lower third, or full animation, it writes the code, renders it, and drops it on your timeline." />
 <meta name="theme-color" content="#09090b" />
-<meta property="og:title" content="Flimify — motion graphics by just asking" />
+<meta property="og:title" content="Flimify: motion graphics by just asking" />
 <meta property="og:description" content="Describe it. Flimify builds it. It's on your timeline. Runs on your Claude plan, no API key." />
 <meta property="og:type" content="website" />
 <meta property="og:image" content="og.png" />
@@ -19,10 +19,10 @@
 
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
-   Flimify — landing
+   Flimify, landing
    Style: precise dark (Ramp's flat layered surfaces) + one Raycast-style
    atmospheric glow, white CTAs, coral as the lone accent. Schibsted Grotesk +
-   JetBrains Mono. Dark only. Single self-contained file — set CONFIG at bottom.
+   JetBrains Mono. Dark only. Single self-contained file, set CONFIG at bottom.
 ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -135,7 +135,7 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 .nav-toggle { display: none; background: none; border: none; cursor: pointer; padding: 8px; color: var(--text); }
 .nav-toggle svg { width: 24px; height: 24px; }
 
-/* ── Atmosphere — a living aurora gradient (drifting, screen-blended orbs) ── */
+/* ── Atmosphere, a living aurora gradient (drifting, screen-blended orbs) ── */
 .atmos { position: fixed; inset: 0; z-index: -2; pointer-events: none; overflow: hidden; }
 .atmos b { position: absolute; border-radius: 50%; filter: blur(10px); opacity: 0.5; }
 .atmos .b1 { top: -16%; left: 50%; width: 75vw; height: 55vw; max-width: 1000px; max-height: 720px; transform: translateX(-50%); background: radial-gradient(circle, rgba(226,136,95,0.20), transparent 60%); animation: drift1 20s ease-in-out infinite alternate; }
@@ -143,7 +143,7 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 @keyframes drift1 { from { transform: translateX(-50%) translateY(0) scale(1); } to { transform: translateX(-54%) translateY(36px) scale(1.12); } }
 @keyframes drift2 { from { transform: translateY(0) scale(1); opacity: 0.1; } to { transform: translateY(-50px) scale(1.18); opacity: 0.16; } }
 
-/* ── Cursor — a soft light that follows you + a trailing dot/ring ── */
+/* ── Cursor, a soft light that follows you + a trailing dot/ring ── */
 
 /* ── React Bits-style rotating text (coral pill, per-character slide) ── */
 .rotate { display: inline-flex; align-items: center; justify-content: center; overflow: hidden; vertical-align: -0.2em; height: 1.5em; width: 7.4em; padding: 0 0.4em; border-radius: 0.5em; background: linear-gradient(180deg, var(--coral-2), var(--coral-press)); color: #1a1109; font-weight: 700; letter-spacing: -0.01em; box-shadow: 0 8px 24px -8px var(--coral); }
@@ -152,7 +152,7 @@ h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
 .rotate.out .ch { animation: rtOut 0.42s var(--ease) both; }
 @keyframes rtOut { from { transform: none; opacity: 1; } to { transform: translateY(-118%); opacity: 0; } }
 
-/* ── React Bits-style gradual blur — content dissolves into the bottom edge ── */
+/* ── React Bits-style gradual blur, content dissolves into the bottom edge ── */
 
 /* grain */
 body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none; opacity: 0.025; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
@@ -173,7 +173,7 @@ body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-eve
 /* scroll progress bar */
 .progress { position: fixed; top: 0; left: 0; height: 2px; width: 0; z-index: 200; background: linear-gradient(90deg, var(--coral), var(--coral-2)); box-shadow: 0 0 12px var(--coral); transition: width 0.08s linear; }
 
-/* ── Stats — editorial spec line, not a boxed dashboard grid ── */
+/* ── Stats, editorial spec line, not a boxed dashboard grid ── */
 .stats-wrap { margin-top: clamp(26px, 4vw, 46px); }
 .claimline { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px 24px; max-width: 900px; margin: 0 auto; }
 .claimline .cl { display: inline-flex; align-items: baseline; gap: 9px; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.01em; color: var(--text-3); text-transform: lowercase; }
@@ -190,7 +190,7 @@ body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-eve
 .section-head .lede { margin-top: 1rem; }
 .section-head.center .lede { margin-inline: auto; }
 
-/* ── How it works — a timeline-thread flow (on-theme for an editor) ── */
+/* ── How it works, a timeline-thread flow (on-theme for an editor) ── */
 .flow { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
 .flow-rail { position: absolute; top: 15px; left: 16.6%; right: 16.6%; height: 2px; background: linear-gradient(90deg, transparent, var(--coral) 14%, var(--coral) 86%, transparent); opacity: 0.35; pointer-events: none; }
 .flow-rail::after { content: ""; position: absolute; top: -2.5px; left: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--coral); box-shadow: 0 0 12px 2px var(--coral); animation: rail 4.8s var(--ease) infinite; }
@@ -202,11 +202,11 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .fstep h3 { margin: 20px 0 0; }
 .fstep > p { color: var(--text-2); font-size: 0.95rem; margin: 8px 0 0; }
 .fviz { margin-top: 22px; aspect-ratio: 16/10; border-radius: 13px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--s1s), var(--bg-soft)); display: grid; place-items: center; overflow: hidden; box-shadow: 0 1px 0 var(--hi) inset, 0 24px 50px -34px rgba(0,0,0,0.8); }
-/* viz 1 — prompt bar */
+/* viz 1, prompt bar */
 .viz-prompt { width: 80%; font-family: var(--mono); font-size: 0.78rem; color: var(--text); background: var(--bg); border: 1px solid var(--line-2); border-radius: 9px; padding: 11px 13px; display: flex; align-items: center; gap: 8px; box-shadow: 0 8px 20px -12px rgba(0,0,0,0.8); }
 .viz-prompt .vp-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--coral); flex: 0 0 auto; box-shadow: 0 0 8px var(--coral); }
 .viz-prompt .vp-caret { width: 2px; height: 1em; background: var(--coral); margin-left: 1px; animation: caret 1.1s steps(1) infinite; }
-/* viz 2 — render progress */
+/* viz 2, render progress */
 .viz-render { width: 76%; }
 .viz-render .vr-line { height: 7px; border-radius: 4px; background: var(--s3); margin-bottom: 7px; }
 .viz-render .vr-line.s { width: 58%; }
@@ -214,7 +214,7 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .viz-render .vr-bar i { display: block; height: 100%; width: 8%; background: linear-gradient(90deg, var(--coral), var(--coral-2)); border-radius: 4px; animation: fill 2.8s var(--ease) infinite; }
 @keyframes fill { 0% { width: 8%; } 65%, 100% { width: 94%; } }
 .viz-render .vr-label { font-family: var(--mono); font-size: 0.62rem; color: var(--coral); margin-top: 10px; }
-/* viz 3 — timeline */
+/* viz 3, timeline */
 .viz-tl { width: 82%; position: relative; }
 .viz-tl .vt-track { height: 16px; border-radius: 4px; background: var(--s2); border: 1px solid var(--line); position: relative; margin-bottom: 7px; }
 .viz-tl .clip { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; }
@@ -224,7 +224,7 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .viz-tl .vt-play { position: absolute; top: -5px; bottom: -5px; left: 48%; width: 2px; background: var(--coral); box-shadow: 0 0 10px var(--coral); }
 .viz-tl .vt-play::before { content: ""; position: absolute; top: -1px; left: -3px; width: 8px; height: 6px; border-radius: 2px; background: var(--coral); }
 
-/* ── Features — three tools, each with a real mini-visual ── */
+/* ── Features, three tools, each with a real mini-visual ── */
 .tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 820px; margin-inline: auto; }
 .tool { background: var(--s1s); border: 1px solid var(--line); border-radius: 18px; padding: 24px; box-shadow: 0 1px 0 var(--hi) inset; position: relative; overflow: hidden; transition: transform 0.25s var(--ease), border-color 0.25s var(--ease); }
 .tool > * { position: relative; z-index: 1; }
@@ -236,7 +236,7 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .tool h3 svg { width: 19px; height: 19px; color: var(--coral); flex: 0 0 auto; }
 .tool p { color: var(--text-2); font-size: 0.9rem; }
 .tviz { margin-top: 20px; aspect-ratio: 16/9; border-radius: 12px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--bg-soft), var(--bg)); overflow: hidden; position: relative; display: grid; place-items: center; box-shadow: 0 1px 0 var(--hi) inset; }
-/* tool 01 — generate: a lower-third rendering in */
+/* tool 01, generate: a lower-third rendering in */
 .gen-frame { position: absolute; inset: 0; }
 .gen-frame::after { content: "1080×1920"; position: absolute; top: 8px; right: 10px; font-family: var(--mono); font-size: 0.52rem; color: var(--text-3); }
 .gen-frame .lt { position: absolute; left: 13%; bottom: 24%; display: flex; flex-direction: column; gap: 5px; animation: ltin 3.6s var(--ease) infinite; }
@@ -244,7 +244,7 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .gen-frame .lt-bar { width: 26px; height: 4px; border-radius: 2px; background: var(--coral); box-shadow: 0 0 10px var(--coral); }
 .gen-frame .lt-t1 { width: 84px; height: 9px; border-radius: 3px; background: var(--text); opacity: 0.92; }
 .gen-frame .lt-t2 { width: 56px; height: 7px; border-radius: 3px; background: var(--text-3); }
-/* tool 02 — auto-edit: transcript drives graphic markers onto a track */
+/* tool 02, auto-edit: transcript drives graphic markers onto a track */
 .ae { width: 78%; }
 .ae .ae-line { height: 6px; border-radius: 3px; background: var(--s3); margin-bottom: 6px; }
 .ae .ae-line.s { width: 60%; }
@@ -275,7 +275,7 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .video-frame .unmute { position: absolute; top: 15px; right: 16px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; font-family: var(--sans); font-size: 0.74rem; font-weight: 600; color: var(--text); background: rgba(0,0,0,0.55); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 12px 6px 10px; cursor: pointer; backdrop-filter: blur(6px); box-shadow: 0 6px 18px -8px rgba(0,0,0,0.7); transition: background 0.15s var(--ease), transform 0.15s var(--ease); }
 .video-frame .unmute:hover { background: rgba(0,0,0,0.72); transform: translateY(-1px); }
 .video-frame .unmute svg { width: 14px; height: 14px; }
-/* Electric border — vanilla port of React Bits ElectricBorder, coral to match */
+/* Electric border, vanilla port of React Bits ElectricBorder, coral to match */
 .electric-border { --eb-color: var(--coral); position: relative; margin-top: clamp(32px, 5vw, 50px); border-radius: 16px; isolation: isolate; }
 .electric-border .video-frame { margin-top: 0; }
 .eb-canvas-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; }
@@ -332,7 +332,7 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .tier { border: 1px solid var(--line); border-radius: 18px; padding: 30px; background: var(--s1s); position: relative; box-shadow: 0 1px 0 var(--hi) inset; }
 .tier.featured { border-color: transparent; box-shadow: 0 0 55px -24px var(--coral), 0 1px 0 var(--hi) inset; }
 .tier.featured > * { position: relative; z-index: 1; }
-/* Aceternity-style moving border — a coral beam travelling the card edge */
+/* Aceternity-style moving border, a coral beam travelling the card edge */
 @property --beam { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 .tier.featured::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 0; pointer-events: none; padding: 1.5px;
@@ -421,7 +421,7 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 /* ── Final CTA ── */
 .cta-panel { position: relative; border: 1px solid var(--line-2); border-radius: 22px; background: linear-gradient(180deg, var(--s2), #0d0d10); padding: clamp(44px, 6vw, 78px) var(--gutter); text-align: center; overflow: hidden; box-shadow: 0 1px 0 var(--hi) inset; }
 .cta-panel::before { content: ""; position: absolute; left: 50%; top: -30%; width: 70%; height: 120%; transform: translateX(-50%); background: radial-gradient(ellipse, rgba(226,136,95,0.12), transparent 62%); filter: blur(10px); pointer-events: none; }
-/* lamp beam (Aceternity-style) — a crisp glowing line that lamp-lights the heading */
+/* lamp beam (Aceternity-style), a crisp glowing line that lamp-lights the heading */
 .cta-panel .lamp { position: absolute; top: 0; left: 0; right: 0; height: 1px; pointer-events: none; }
 .cta-panel .lamp::before { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 58%; height: 2px; background: linear-gradient(90deg, transparent, var(--coral) 22%, var(--coral-2) 50%, var(--coral) 78%, transparent); box-shadow: 0 0 24px 4px rgba(226,136,95,0.55); border-radius: 99px; }
 .cta-panel .lamp::after { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 56%; height: 230px; background: radial-gradient(ellipse 50% 100% at 50% 0%, rgba(226,136,95,0.30), transparent 72%); filter: blur(7px); }
@@ -494,7 +494,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 /* gradient accent on the hero words */
 .hero-h1 .coral { background: linear-gradient(180deg, var(--coral-2), var(--coral-press)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; padding-bottom: 0.16em; }
 
-/* ── Hero chat-output mockup — the panel showing what Claude returns ── */
+/* ── Hero chat-output mockup, the panel showing what Claude returns ── */
 .glass {
   max-width: 600px; margin: 0 auto; text-align: left;
   border: 1px solid var(--line-2); border-radius: 18px; overflow: hidden;
@@ -527,14 +527,14 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 .see-output:hover .ar { transform: translateX(3px); }
 /* ── Output preview: the mockup shrinks + slides left (JS), and the real render
       fades UP beside it as a GIF-like 3D card with the SAME spinning neon-corner
-      glow as the mockup. Everything stays on the page — just movement. ── */
+      glow as the mockup. Everything stays on the page, just movement. ── */
 .hero-stage { position: relative; }
 .preview {
   position: absolute; top: 50%; right: clamp(-16px, 0.5vw, 18px);
   width: clamp(232px, 29vw, 350px);
   transform: translateY(calc(-50% + 48px)) scale(0.95);
   opacity: 0; visibility: hidden;
-  /* this (base) transition is the OUT animation — keep it SNAPPY, no delay */
+  /* this (base) transition is the OUT animation, keep it SNAPPY, no delay */
   transition: transform 0.32s var(--ease), opacity 0.28s var(--ease), visibility 0s 0.32s;
   perspective: 1100px; z-index: 4;   /* gives the 3D card its depth */
 }
@@ -543,7 +543,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   opacity: 1; visibility: visible;
   transition: transform 0.7s var(--ease) 0.34s, opacity 0.6s var(--ease) 0.34s, visibility 0s;
 }
-/* coral arrow in the gap — flows from the prompt into the render */
+/* coral arrow in the gap, flows from the prompt into the render */
 .pv-arrow { position: absolute; top: 50%; left: -52px; color: var(--coral); display: grid; place-items: center; pointer-events: none; animation: pvArrowNudge 1.6s var(--ease) infinite; }
 .pv-arrow svg { width: 34px; height: 34px; filter: drop-shadow(0 0 7px rgba(226,136,95,0.55)); }
 @keyframes pvArrowNudge { 0%, 100% { transform: translateY(-50%) translateX(0); } 50% { transform: translateY(-50%) translateX(6px); } }
@@ -560,7 +560,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 .preview-x { position: absolute; top: 8px; right: 8px; z-index: 6; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.5); border: 1px solid var(--line-2); color: var(--text); display: grid; place-items: center; cursor: pointer; font-size: 0.85rem; backdrop-filter: blur(4px); }
 .preview-x:hover { background: rgba(0,0,0,0.78); }
 @media (max-width: 860px) {
-  /* no room beside the mockup — stack the render under it, flat (no 3D angle) */
+  /* no room beside the mockup, stack the render under it, flat (no 3D angle) */
   .preview { position: relative; top: auto; right: auto; width: min(86vw, 380px); margin: 26px auto 0; transform: translateY(28px) scale(0.98); perspective: none; }
   .hero-stage.previewing .preview { transform: translateY(0) scale(1); }
   .pv-card { transform: none; }
@@ -575,7 +575,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 @keyframes caret { 50% { opacity: 0; } }
 .mock-composer .send { width: 34px; height: 34px; border-radius: 8px; background: var(--coral); color: #15110d; display: grid; place-items: center; flex: 0 0 auto; box-shadow: 0 0 18px -6px var(--coral); }
 .mock-composer .send svg { width: 16px; height: 16px; }
-/* tilted-card glare (React Bits) — a highlight that tracks the cursor */
+/* tilted-card glare (React Bits), a highlight that tracks the cursor */
 .glass .shine { position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: inherit; opacity: 0; transition: opacity 0.3s var(--ease); background: radial-gradient(380px circle at var(--gx,50%) var(--gy,50%), rgba(255,255,255,0.16), transparent 45%); mix-blend-mode: overlay; }
 
 /* ── Responsive ── */
@@ -688,19 +688,19 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
     </h1>
     <p class="lede load-up l3">Make the <span class="rotate" id="rotate" aria-label="title, lower third, caption, countdown and more">title</span>. Just describe it.</p>
     <div class="hero-cta load-up l4">
-      <a href="#pricing" class="btn btn-primary btn-lg magnetic" data-buy>Get it — <span data-price-inline>$19</span></a>
+      <a href="#pricing" class="btn btn-primary btn-lg magnetic" data-buy>Get it, <span data-price-inline>$19</span></a>
       <a href="#demo" class="link-arrow">Watch the 60-sec demo <span class="a">→</span></a>
     </div>
     <p class="trust load-up l5"><span>Runs on your Claude plan</span><span class="dot"></span><span>No API key</span><span class="dot"></span><span>macOS &amp; Windows</span></p>
 
     <div class="hero-stage load-up l6">
       <div class="glass glow" id="heroPanel">
-        <div class="mock-bar"><span class="lights"><i></i><i></i><i></i></span><span class="title">Flimify — Adobe Premiere Pro</span><span class="ver">short 2 · 1 sel</span></div>
+        <div class="mock-bar"><span class="lights"><i></i><i></i><i></i></span><span class="title">Flimify, Adobe Premiere Pro</span><span class="ver">short 2 · 1 sel</span></div>
         <div class="mock-body">
-          <div class="mrow"><div class="mav you">Y</div><div class="txt">Make a glassy subscribe button, vertical, 4s — calm, not flashy. Soft tap + ripple.</div></div>
+          <div class="mrow"><div class="mav you">Y</div><div class="txt">Make a glassy subscribe button, vertical, 4s, calm, not flashy. Soft tap + ripple.</div></div>
           <div class="mrow"><div class="mav cla">F</div><div style="flex:1">
             <div class="mname">FLIMIFY</div>
-            <div class="txt"><b>Done.</b> A frosted-glass subscribe pill that springs in, with a cursor tap and a soft ripple. Rendered transparent so it drops over your footage — 1080×1920, 4s.</div>
+            <div class="txt"><b>Done.</b> A frosted-glass subscribe pill that springs in, with a cursor tap and a soft ripple. Rendered transparent so it drops over your footage, 1080×1920, 4s.</div>
             <div class="rendercard">
               <div class="file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg> SubscribePill_v3.mov <span class="meta">imported · V2 @ 0:14</span></div>
               <div class="acts"><span class="chip solid">Import to timeline</span><span class="chip outline">Preview</span><span class="chip outline">Changes</span></div>
@@ -711,7 +711,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
         <div class="mock-composer"><span class="field">Ask Claude…</span><span class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
         <div class="shine" aria-hidden="true"></div>
       </div>
-      <!-- Output preview — the real render as a GIF-like 3D card with the same
+      <!-- Output preview, the real render as a GIF-like 3D card with the same
            neon-corner glow as the mockup; fades up on the right -->
       <div class="preview" id="outBox">
         <span class="pv-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg></span>
@@ -770,13 +770,13 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
     <div class="section-head center reveal"><p class="eyebrow">What's inside</p><h2>One panel. Two tools.</h2></div>
     <div class="tools">
       <div class="tool reveal">
-        <div class="tlabel">TOOL 01 — GENERATE</div>
+        <div class="tlabel">TOOL 01, GENERATE</div>
         <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 6.3L21 11l-6.6 1.7L12 19l-2.4-6.3L3 11l6.6-1.7z"/></svg>Prompt → graphics</h3>
-        <p>Titles, lower thirds, callouts, kinetic type — built fresh in code, never a template with the text swapped.</p>
+        <p>Titles, lower thirds, callouts, kinetic type, built fresh in code, never a template with the text swapped.</p>
         <div class="tviz glow"><div class="gen-frame"><div class="lt"><span class="lt-bar"></span><span class="lt-t1"></span><span class="lt-t2"></span></div></div></div>
       </div>
       <div class="tool reveal d1">
-        <div class="tlabel">TOOL 02 — AUTO-EDIT</div>
+        <div class="tlabel">TOOL 02, AUTO-EDIT</div>
         <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h16"/><circle cx="19" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>Reads your speech</h3>
         <p>Transcribes the cut and drops matching graphics across the whole video.</p>
         <div class="tviz glow"><div class="ae"><div class="ae-line"></div><div class="ae-line s"></div><div class="ae-line"></div><div class="ae-track"><span class="m" style="left:18%"></span><span class="m" style="left:46%"></span><span class="m" style="left:73%"></span></div></div></div>
@@ -829,7 +829,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <section class="section" id="pricing">
   <div class="wrap">
     <div class="section-head center reveal"><p class="eyebrow">Pricing</p><h2>Start free.</h2>
-      <div class="toggle"><span data-bill><b>Monthly</b></span><button class="sw" id="billToggle" aria-label="Toggle annual"><i></i></button><span>Annual <span class="save">— 2 months free</span></span></div>
+      <div class="toggle"><span data-bill><b>Monthly</b></span><button class="sw" id="billToggle" aria-label="Toggle annual"><i></i></button><span>Annual <span class="save">- 2 months free</span></span></div>
     </div>
     <div class="tiers">
       <div class="tier reveal"><div class="name">Trial</div><div class="price"><span class="cur">$</span><span>0</span></div><div class="desc">5 renders. No card.</div>
@@ -843,7 +843,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
         <a href="#" class="btn btn-ghost btn-block" data-plan="studio">Get Studio</a></div>
     </div>
     <!-- Wire your real checkout in the CONFIG block at the very bottom (checkoutUrl). -->
-    <p class="pay-note"><span class="nokey">No API key needed — every plan runs on your own Claude plan</span> · Secure checkout · Cancel anytime · 14-day money-back</p>
+    <p class="pay-note"><span class="nokey">No API key needed, every plan runs on your own Claude plan</span> · Secure checkout · Cancel anytime · 14-day money-back</p>
   </div>
 </section>
 
@@ -865,16 +865,16 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
       <div class="spanel show" data-spanel="0">
         <div class="pn">Step 1</div>
         <h3>Download the extension</h3>
-        <p class="lead">It runs on your account — sign in, then grab it for your computer.</p>
+        <p class="lead">It runs on your account, sign in, then grab it for your computer.</p>
         <div class="dlrow" id="dlReal" style="display:none">
           <a class="dl mac" data-dlos="mac" href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/download/v1.0.1/claude-premiere-pro-macos.zip"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.5-.4 6.1 1 8.1.7 1 1.4 2.1 2.4 2 1-.04 1.3-.6 2.5-.6s1.5.6 2.6.6c1.1-.02 1.7-1 2.4-2 .8-1.2 1.1-2.3 1.1-2.3-.02-.01-2.1-.8-2.1-3.2zM14.5 6.1c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.5.9.07 1.8-.5 2.4-1.1z"/></svg> Download for macOS</a>
           <a class="dl win" data-dlos="win" href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/download/v1.0.1/ClaudeForPremiere-Setup.exe"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.5 10.5 4.4v7.1H3zM11.4 4.3 21 3v8.5h-9.6zM3 12.5h7.5v7.1L3 18.5zM11.4 12.5H21V21l-9.6-1.3z"/></svg> Download for Windows</a>
         </div>
         <div id="dlGate" class="dlgate">
           <a class="btn btn-primary" id="dlGateBtn" href="login.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Sign in to download</a>
-          <p style="color:var(--text-3);font-size:0.84rem;margin-top:8px">Creating an account is free. The download unlocks once you're signed in — and you sign in inside the panel too, to render.</p>
+          <p style="color:var(--text-3);font-size:0.84rem;margin-top:8px">Creating an account is free. The download unlocks once you're signed in, and you sign in inside the panel too, to render.</p>
         </div>
-        <p id="dlNote" style="color:var(--text-3);font-size:0.84rem;margin-top:8px;display:none">Same panel, cross-platform — Windows is a one-click <code>.exe</code> installer; macOS is a zip.</p>
+        <p id="dlNote" style="color:var(--text-3);font-size:0.84rem;margin-top:8px;display:none">Same panel, cross-platform, Windows is a one-click <code>.exe</code> installer; macOS is a zip.</p>
       </div>
 
       <div class="spanel" data-spanel="1">
@@ -885,10 +885,10 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
           <button class="on" data-os="mac">macOS</button>
           <button data-os="win">Windows</button>
         </div>
-        <div class="os-pane on" data-os="mac"><div class="scode"><div class="scode-bar"><i></i><i></i><i></i><span class="lab">Terminal — macOS</span><button class="copy">Copy</button></div><pre><code>bash install.sh</code></pre></div></div>
+        <div class="os-pane on" data-os="mac"><div class="scode"><div class="scode-bar"><i></i><i></i><i></i><span class="lab">Terminal, macOS</span><button class="copy">Copy</button></div><pre><code>bash install.sh</code></pre></div></div>
         <div class="os-pane" data-os="win">
           <div class="icallout" style="margin-top:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 4H8zM7 7h10l-1 12.5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 8 19.5z"/></svg><p>Just <b>double-click <code>ClaudeForPremiere-Setup.exe</code></b> and follow the wizard. No terminal, no commands.<br><span style="color:var(--text-3)">It's not code-signed yet, so if you see a blue <b>"Windows protected your PC"</b> screen, click <b>More info → Run anyway</b>.</span></p></div>
-          <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--text-3);font-size:0.84rem">Prefer the zip / a command?</summary><div style="margin-top:8px;color:var(--text-2);font-size:0.86rem">Grab <code>claude-premiere-pro-windows.zip</code> from the <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/latest" target="_blank" style="color:var(--coral)">releases page</a>, extract it, then double-click <code>INSTALL.bat</code> — or run <code>powershell -ExecutionPolicy Bypass -File install.ps1</code>.</div></details>
+          <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--text-3);font-size:0.84rem">Prefer the zip / a command?</summary><div style="margin-top:8px;color:var(--text-2);font-size:0.86rem">Grab <code>claude-premiere-pro-windows.zip</code> from the <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/latest" target="_blank" style="color:var(--coral)">releases page</a>, extract it, then double-click <code>INSTALL.bat</code>, or run <code>powershell -ExecutionPolicy Bypass -File install.ps1</code>.</div></details>
         </div>
         <div class="icallout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><p><b>Close Premiere Pro first</b> so it picks up the panel when you reopen it.</p></div>
       </div>
@@ -898,7 +898,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
         <h3>Connect your Claude</h3>
         <p class="lead">Log in once. It runs on your own Claude plan, so there's no API key to paste.</p>
         <div class="scode"><div class="scode-bar"><i></i><i></i><i></i><span class="lab">Terminal</span><button class="copy">Copy</button></div><pre><code>claude /login</code></pre></div>
-        <div class="icallout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><p>A browser tab opens — click <b>Allow</b>. <span style="color:var(--text-3)">(Skip if you're already logged into Claude Code.)</span></p></div>
+        <div class="icallout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><p>A browser tab opens, click <b>Allow</b>. <span style="color:var(--text-3)">(Skip if you're already logged into Claude Code.)</span></p></div>
       </div>
 
       <div class="spanel" data-spanel="3">
@@ -929,12 +929,12 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
     <div class="section-head center reveal"><p class="eyebrow">Questions</p><h2>Good to know.</h2></div>
     <div class="faq reveal d1">
       <div class="qa"><button>What do I need?<span class="pm"></span></button><div class="ans"><p>Premiere Pro 2024+, a Claude Pro or Max plan, and Mac or Windows. <a href="#install">See the install steps →</a></p></div></div>
-      <div class="qa"><button>Do I need an API key?<span class="pm"></span></button><div class="ans"><p>No — it runs on your existing Claude subscription. Nothing to configure.</p></div></div>
+      <div class="qa"><button>Do I need an API key?<span class="pm"></span></button><div class="ans"><p>No, it runs on your existing Claude subscription. Nothing to configure.</p></div></div>
       <div class="qa"><button>Is my footage uploaded?<span class="pm"></span></button><div class="ans"><p>No. Everything runs locally. Your media never leaves your machine.</p></div></div>
       <div class="qa"><button>How fast is a render?<span class="pm"></span></button><div class="ans"><p>Around 90 seconds, once it's warmed up.</p></div></div>
-      <div class="qa"><button>Can I edit what it makes?<span class="pm"></span></button><div class="ans"><p>Yes — it's a real clip. Hit Changes to adjust it.</p></div></div>
-      <div class="qa"><button>How does billing work?<span class="pm"></span></button><div class="ans"><p>Monthly or annual, cancel anytime — secure checkout, no lock-in. You pay for the extension; the AI itself runs on your own Claude plan, so there's no usage metering on top.</p></div></div>
-      <div class="qa"><button>Made by Adobe or Anthropic?<span class="pm"></span></button><div class="ans"><p>No — independent extension, not affiliated with either.</p></div></div>
+      <div class="qa"><button>Can I edit what it makes?<span class="pm"></span></button><div class="ans"><p>Yes, it's a real clip. Hit Changes to adjust it.</p></div></div>
+      <div class="qa"><button>How does billing work?<span class="pm"></span></button><div class="ans"><p>Monthly or annual, cancel anytime, secure checkout, no lock-in. You pay for the extension; the AI itself runs on your own Claude plan, so there's no usage metering on top.</p></div></div>
+      <div class="qa"><button>Made by Adobe or Anthropic?<span class="pm"></span></button><div class="ans"><p>No, independent extension, not affiliated with either.</p></div></div>
     </div>
   </div>
 </section>
@@ -946,7 +946,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
       <span class="lamp"></span>
       <p class="eyebrow">Ready when you are</p>
       <h2>Stop leaving Premiere to make graphics.</h2>
-      <a href="#pricing" class="btn btn-primary btn-lg magnetic" data-buy>Get it — <span data-price-inline>$19</span></a>
+      <a href="#pricing" class="btn btn-primary btn-lg magnetic" data-buy>Get it, <span data-price-inline>$19</span></a>
       <p class="small">5 free renders · No API key · Mac &amp; Windows</p>
     </div>
   </div>
@@ -969,7 +969,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 </footer>
 
 <script>
-/* ═══════════════ CONFIG — edit these ═══════════════ */
+/* ═══════════════ CONFIG, edit these ═══════════════ */
 const CONFIG = {
   checkoutUrl: "#",          // your Stripe / Gumroad / LemonSqueezy / Paddle link
   headlinePrice: "$19",      // price shown in hero + CTA buttons
@@ -1016,7 +1016,7 @@ billToggle.addEventListener('click', () => {
 });
 
 
-/* demo video — autoplays MUTED when scrolled into view (browsers block sound-on
+/* demo video, autoplays MUTED when scrolled into view (browsers block sound-on
    autoplay); the pill toggles sound on/off. Click the poster to play with sound. */
 (function () {
   const frame = document.getElementById('demoFrame');
@@ -1058,7 +1058,7 @@ billToggle.addEventListener('click', () => {
 })();
 
 
-/* Electric border around the demo — vanilla port of React Bits ElectricBorder.
+/* Electric border around the demo, vanilla port of React Bits ElectricBorder.
    Animates only while on-screen; respects prefers-reduced-motion. */
 (function () {
   const canvas = document.getElementById('ebCanvas');
@@ -1141,7 +1141,7 @@ billToggle.addEventListener('click', () => {
   io.observe(container);
 })();
 
-/* elastic volume slider — rubber-bands when dragged past the ends */
+/* elastic volume slider, rubber-bands when dragged past the ends */
 (function () {
   const s = document.getElementById('evol'); if (!s) return;
   const track = s.querySelector('.etrack'), fill = s.querySelector('.efill'), handle = s.querySelector('.ehandle');
@@ -1199,7 +1199,7 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
   card.style.setProperty('--mx', (e.clientX - r.left) + 'px'); card.style.setProperty('--my', (e.clientY - r.top) + 'px');
 }));
 
-/* hero panel — tilted card (3D tilt toward cursor + tracking glare).
+/* hero panel, tilted card (3D tilt toward cursor + tracking glare).
    Stays LIVE during preview too: tilts the shrunk mockup AND the render card
    together, so the whole scene reacts to the cursor in 3D. */
 (function () {
@@ -1210,7 +1210,7 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
   let raf = 0;
   hero.addEventListener('pointermove', e => {
     const previewing = window.__previewOn;
-    if (previewing && !window.__pvTilt) return;   // sliding-in or closing — let the animation run
+    if (previewing && !window.__pvTilt) return;   // sliding-in or closing, let the animation run
     const r = (previewing ? stage : panel).getBoundingClientRect();
     const px = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
     const py = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
@@ -1241,7 +1241,7 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
 })();
 
 
-/* output preview — keep the hero mockup, nudge it LEFT, fade the real render
+/* output preview, keep the hero mockup, nudge it LEFT, fade the real render
    UP on the right beside it. (#outBox markup is parsed after this script runs) */
 (function () {
   const btn = document.getElementById('seeOutput');
@@ -1251,7 +1251,7 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
   if (!stage) return;
   let open = false, _playTimer = null, _settleTimer = null;
   // shrink the mockup AND slide it left, smoothly, to free space (+ an arrow)
-  // for the render — origin pinned left so it shrinks toward its own left edge.
+  // for the render, origin pinned left so it shrinks toward its own left edge.
   const SHIFT = 'translateX(-17%) scale(0.8)';
   window.__pvShift = SHIFT;                   // shared with the cursor-tilt handler
 
@@ -1280,7 +1280,7 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
     window.__pvTilt = false;                   // stop tilt at once so it can't fight the quick return
     if (_playTimer) { clearTimeout(_playTimer); _playTimer = null; }
     if (_settleTimer) { clearTimeout(_settleTimer); _settleTimer = null; }
-    stage.classList.remove('previewing');      // render fades back down — fast (base transition)
+    stage.classList.remove('previewing');      // render fades back down, fast (base transition)
     const card = window.__pvCard; if (card) card.style.transform = '';
     window.__pvCard = null;
     panel.style.transition = 'transform 0.36s var(--ease)';   // quick glide back to full size
@@ -1297,7 +1297,7 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && open) close(); });
 })();
 
-/* rotating text — cycles through what the panel makes */
+/* rotating text, cycles through what the panel makes */
 (function () {
   const el = document.getElementById('rotate'); if (!el) return;
   const words = ['title', 'lower third', 'callout', 'caption', 'countdown', 'intro', 'end card'];
@@ -1340,7 +1340,7 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
     next.textContent = s === total - 1 ? 'Done ✓' : 'Continue →';
     prog.textContent = 'Step ' + (s + 1) + ' of ' + total;
   }
-  /* confetti burst from an element — vanilla canvas, no deps */
+  /* confetti burst from an element, vanilla canvas, no deps */
   function confetti(originEl) {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const rect = originEl.getBoundingClientRect();
@@ -1412,7 +1412,7 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
     renderNav(u);
     if (navCta) navCta.textContent = u ? "Upgrade" : "Get it";   // logged in → Upgrade
     if (mm) { if (u) { mm.textContent = "Your account"; mm.setAttribute("href", "account.html"); } else { mm.textContent = "Sign in"; mm.setAttribute("href", "login.html"); } }
-    // Download gate — only signed-in accounts see the download buttons.
+    // Download gate, only signed-in accounts see the download buttons.
     const on = !!u;
     const dlReal = document.getElementById("dlReal");
     const dlGate = document.getElementById("dlGate");
@@ -1422,7 +1422,7 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
     if (dlNote) dlNote.style.display = on ? "block" : "none";
   }
   sessionUser().then(apply);                                                    // fast first paint
-  supabase.auth.onAuthStateChange((_event, session) => apply(session?.user ?? null));  // authoritative — uses the event's own session (no nested call = no deadlock)
+  supabase.auth.onAuthStateChange((_event, session) => apply(session?.user ?? null));  // authoritative, uses the event's own session (no nested call = no deadlock)
 
   // ── Checkout: "Get Creator" / "Get Studio" → Polar, via our server endpoint ──
   // The plan is determined server-side from the verified session; the purchase is

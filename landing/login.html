@@ -78,11 +78,11 @@
   function nice(e) {
     const m = (e && e.message || "").toLowerCase();
     if (m.includes("invalid login")) return "Wrong email or password.";
-    if (m.includes("email not confirmed")) return "Please confirm your email first — check your inbox for the verification link.";
-    if (m.includes("already registered") || m.includes("already been registered")) return "That email already has an account — switch to Sign in.";
+    if (m.includes("email not confirmed")) return "Please confirm your email first, check your inbox for the verification link.";
+    if (m.includes("already registered") || m.includes("already been registered")) return "That email already has an account, switch to Sign in.";
     if (m.includes("password")) return e.message;            // e.g. too short / leaked
-    if (m.includes("rate limit") || m.includes("too many")) return "Too many attempts — wait a minute and try again.";
-    if (m.includes("redirect")) return "Sign-in redirect isn't allowed yet — add this site's URL in Supabase → Auth → URL Configuration.";
+    if (m.includes("rate limit") || m.includes("too many")) return "Too many attempts, wait a minute and try again.";
+    if (m.includes("redirect")) return "Sign-in redirect isn't allowed yet, add this site's URL in Supabase → Auth → URL Configuration.";
     return (e && e.message) || "Something went wrong. Try again.";
   }
 
@@ -93,7 +93,7 @@
     const signup = mode === "signup";
     title.textContent = signup ? "Create your account" : "Sign in";
     sub.textContent = signup
-      ? "One free account — 5 renders a month, no card required."
+      ? "One free account, 5 renders a month, no card required."
       : "Sign in to download the extension and render. Free plan includes 5 renders a month.";
     nameField.style.display = signup ? "block" : "none";
     forgotRow.style.display = signup ? "none" : "block";
