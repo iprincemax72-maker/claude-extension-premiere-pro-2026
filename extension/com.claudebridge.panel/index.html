@@ -2444,14 +2444,14 @@
     position: absolute; top: 9px; left: 10px; z-index: 3;
     font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700;
     color: rgba(255,255,255,.55); padding: 3px 7px; border-radius: 6px;
-    background: rgba(0,0,0,.35); backdrop-filter: blur(2px);
+    background: rgba(0,0,0,.5);
   }
   .cap-replay {
     position: absolute; bottom: 9px; right: 10px; z-index: 3;
     display: flex; align-items: center; gap: 5px; cursor: pointer;
     font-size: 11px; color: rgba(255,255,255,.8); padding: 4px 9px; border-radius: 18px;
-    background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.14);
-    transition: background .14s, transform .12s; backdrop-filter: blur(2px);
+    background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.14);
+    transition: background .14s, transform .12s;
   }
   .cap-replay:hover { background: rgba(0,0,0,.62); transform: scale(1.05); }
   .cap-replay svg { width: 12px; height: 12px; }
@@ -2528,7 +2528,7 @@
   /* draggable caption affordance */
   .cap-cap.draggable { cursor: grab; }
   .cap-cap.dragging { cursor: grabbing; }
-  .cap-drag-hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: 9px; z-index: 3; font-size: 10px; color: rgba(255,255,255,.6); background: rgba(0,0,0,.4); padding: 3px 9px; border-radius: 14px; pointer-events: none; opacity: 0; transition: opacity .2s; backdrop-filter: blur(2px); }
+  .cap-drag-hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: 9px; z-index: 3; font-size: 10px; color: rgba(255,255,255,.6); background: rgba(0,0,0,.55); padding: 3px 9px; border-radius: 14px; pointer-events: none; opacity: 0; transition: opacity .2s; }
   .cap-stage-inner:hover .cap-drag-hint { opacity: 1; }
 
   /* footer — sticky generate bar */
@@ -2544,8 +2544,11 @@
   .cap-gen:disabled { opacity: .6; cursor: default; transform: none; }
 
   /* working overlay */
-  .cap-working { position: absolute; inset: 0; z-index: 5; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: rgba(11,10,13,.95); backdrop-filter: blur(7px); padding: 30px; text-align: center; }
+  .cap-working { position: absolute; inset: 0; z-index: 5; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: #0d0c10; padding: 30px; text-align: center; }
   .cap-full-card.working .cap-working { display: flex; }
+  /* the shared cancel button has flex:1 (for the horizontal actions row); in this
+     vertical column that makes it grow to fill all the height — pin it to content */
+  .cap-working .autocut-modal-cancel { flex: 0 0 auto; width: auto; min-width: 130px; }
   .cap-working-title { font-size: 16px; font-weight: 680; color: var(--text); }
   .cap-working-sub { font-size: 12px; color: var(--text-dim); max-width: 280px; line-height: 1.5; }
   .cap-progress { width: 100%; max-width: 300px; }
@@ -3966,13 +3969,17 @@ const PLAN_FEATURES = {
   creator: { autoedit: false, reference: true,  maxVersions: 2,  label: 'Creator' },
   studio:  { autoedit: true,  reference: true,  maxVersions: 10, label: 'Studio' },
 };
-let __authEnabled = false, __planSignedIn = false, __plan = 'studio';
+let __authEnabled = false, __planSignedIn = false, __plan = 'studio', __owner = false;
 function planFeats() { return PLAN_FEATURES[__plan] || PLAN_FEATURES.free; }
 function planAllows(f) { return !__authEnabled || !!planFeats()[f]; }
 function planMaxVersions() { return __authEnabled ? planFeats().maxVersions : 10; }
+// Captions are in early access — owner-only for now. (When auth is off entirely,
+// e.g. local dev, treat as unlocked.)
+function captionsAllowed() { return !__authEnabled || __owner; }
 function applyPlan(status) {
   __authEnabled = !!(status && status.enabled);
   __planSignedIn = !!(status && status.signedIn);
+  __owner = !!(status && status.owner);
   __plan = (__planSignedIn && status.plan) ? status.plan : (__authEnabled ? 'free' : 'studio');
   try { syncPlanLocks(); } catch (e) {}
 }
@@ -3980,6 +3987,8 @@ function syncPlanLocks() {
   const f = planFeats();
   const ae = document.getElementById('autoeditBtn');
   if (ae) ae.classList.toggle('plan-locked', __authEnabled && !f.autoedit);
+  const cap = document.getElementById('captionsBtn');
+  if (cap) cap.classList.toggle('plan-locked', !captionsAllowed());
   const refAdd = document.getElementById('refAdd');
   if (refAdd) refAdd.classList.toggle('plan-locked', __authEnabled && !f.reference);
   const max = planMaxVersions();
@@ -8167,7 +8176,16 @@ function capAdjustStageAspect() {
   inner.style.width = Math.min(w, 520) + 'px';
 }
 
+function capNotice(msg) {
+  const t = document.createElement('div');
+  t.className = 'update-toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 3200);
+}
 async function openCaptionsModal() {
+  if (!captionsAllowed()) { capNotice('Captions are in early access — not available on your account yet.'); return; }
   capCleanup();
   capState.abort = null; capState.reqId = null;
   if (capCard) capCard.classList.remove('working');
@@ -8299,7 +8317,10 @@ function addCaptionsResultCard(data) {
     +   '<button class="render-import-btn" type="button">Add captions to timeline</button>'
     +   '<button class="render-discard-btn" type="button" data-act="preview">Preview</button>'
     + '</div>';
-  m.body.querySelector('.msg-content').appendChild(card);
+  // makeMsg returns {wrap, body} where body IS the .msg-body element; the card
+  // appends directly onto it (querying '.msg-content' here returns null — that's
+  // the .msg-body's PARENT — and threw, so successful renders showed no card).
+  m.body.appendChild(card);
 
   const importBtn = card.querySelector('.render-import-btn');
   const previewBtn = card.querySelector('[data-act="preview"]');

@@ -4284,6 +4284,19 @@ const server = http.createServer((req, res) => {
       try {
         if (!segments.length) return fail('No clip selected. Select the clip whose speech you want captioned.');
 
+        // Captions are in early access — owner-only for now. Refuse non-owners
+        // here too (the panel hides the button, but never trust the client).
+        if (AUTH_ENABLED) {
+          const sess = loadSession();
+          const ownerEmail = (sess && sess.user && sess.user.email) || '';
+          if (!isOwnerEmail(ownerEmail)) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, planBlock: true, reqId,
+              error: 'Captions are in early access — not available on your account yet.' }));
+            return;
+          }
+        }
+
         // Meter like a render: owner-exempt, fail-open on RPC/config error.
         const gate = await gateRender();
         if (!gate.allowed) {
