@@ -8,8 +8,9 @@
  *
  * Driven entirely by props the bridge builds from a word-level transcript:
  *   props.lines:  CaptionLine[]   (pre-grouped in bridge.js groupWordsIntoLines)
- *   props.style:  one of the 5 styles
- *   props.options: look/behaviour knobs
+ *   props.style:  one of the styles
+ *   props.options: look/behaviour knobs (color, font, shadow, stroke, position,
+ *                  per-line variety, …)
  *   props.fps / props.width / props.height  (used by Root.tsx calculateMetadata)
  *
  * Timing is REAL: every word carries startMs/endMs from the ASR, so captions
@@ -21,20 +22,28 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Eas
 
 export type CaptionWord = { text: string; startMs: number; endMs: number };
 export type CaptionLine = { words: CaptionWord[]; startMs: number; endMs: number };
-export type CaptionStyle = 'classic' | 'karaoke' | 'reels' | 'tiktok' | 'minimal';
+export type CaptionStyle = 'classic' | 'karaoke' | 'reels' | 'tiktok' | 'minimal' | 'hormozi';
 
 export type CaptionOptions = {
   accent?: string;          // base text color
   highlight?: string;       // active-word highlight color
   fontSize?: number;        // px override (else a per-style default)
-  fontScale?: number;       // multiplier on the per-style default size (0.7–1.4)
+  fontScale?: number;       // multiplier on the per-style default size (0.7–1.5)
+  fontFamily?: string;
+  fontWeight?: number;      // 400–900
+  align?: 'left' | 'center' | 'right';
+  letterSpacing?: number;   // em
+  lineHeight?: number;
   position?: 'top' | 'middle' | 'bottom' | 'custom';
   customX?: number;         // 0..1 — caption block CENTER x (only when position==='custom')
-  customY?: number;         // 0..1 — caption block CENTER y (only when position==='custom')
+  customY?: number;         // 0..1 — caption block CENTER y
   uppercase?: boolean;
-  fontFamily?: string;
   animateIn?: boolean;      // entrance motion on/off
   box?: boolean;            // semi-opaque pill behind the line for readability
+  shadow?: number;          // 0..1 drop-shadow strength (0 = off)
+  stroke?: number;          // px text outline width (0 = off; per-style default otherwise)
+  strokeColor?: string;
+  varyPerLine?: boolean;    // each line a different color + entrance animation
 };
 
 export type CaptionsProps = {
@@ -46,19 +55,27 @@ export type CaptionsProps = {
   height?: number;
 };
 
-const DEFAULTS: Required<Omit<CaptionOptions, 'fontSize'>> & { fontSize: number | null } = {
+const DEFAULTS = {
   accent: '#FFFFFF',
   highlight: '#E2885F',
-  fontSize: null,
+  fontSize: null as number | null,
   fontScale: 1,
-  position: 'bottom',
+  fontFamily:
+    '"Schibsted Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+  fontWeight: 800,
+  align: 'center' as 'left' | 'center' | 'right',
+  letterSpacing: null as number | null,
+  lineHeight: 1.12,
+  position: 'bottom' as 'top' | 'middle' | 'bottom' | 'custom',
   customX: 0.5,
   customY: 0.85,
   uppercase: false,
-  fontFamily:
-    '"Schibsted Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
   animateIn: true,
   box: false,
+  shadow: 0.55,
+  stroke: null as number | null,
+  strokeColor: 'rgba(0,0,0,0.92)',
+  varyPerLine: false,
 };
 
 // per-style default font size as a fraction of comp height
@@ -68,7 +85,11 @@ const SIZE_FRACTION: Record<CaptionStyle, number> = {
   reels: 0.082,
   tiktok: 0.072,
   minimal: 0.04,
+  hormozi: 0.078,
 };
+
+// colors cycled across lines when varyPerLine is on
+const LINE_PALETTE = ['#E2885F', '#5AA9FF', '#4ECB71', '#F5C542', '#FF5D8F', '#B98CFF'];
 
 function withDefaults(o: CaptionOptions | undefined, style: CaptionStyle, height: number) {
   const m = { ...DEFAULTS, ...(o || {}) };
@@ -79,14 +100,25 @@ function withDefaults(o: CaptionOptions | undefined, style: CaptionStyle, height
 }
 
 const easeOut = Easing.bezier(0.22, 1, 0.36, 1);
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
-// The line that should be on screen at `ms`. We keep a small lead-in so the
-// line appears a hair before the first word is spoken (feels snappier).
-function activeLine(lines: CaptionLine[], ms: number, leadMs = 80): CaptionLine | null {
-  for (const l of lines) {
-    if (ms >= l.startMs - leadMs && ms <= l.endMs + 120) return l;
+// Per-line entrance animations (cycled by line index when varyPerLine is on).
+// Each takes eased progress p (0..1) and returns a transform + opacity.
+const ENTRANCES: Array<(p: number) => { transform: string; opacity: number }> = [
+  (p) => ({ transform: `scale(${(0.62 + 0.38 * p).toFixed(3)})`, opacity: clamp01(p * 1.6) }),            // pop
+  (p) => ({ transform: `translateY(${((1 - p) * 64).toFixed(1)}px)`, opacity: clamp01(p * 1.6) }),         // slide-up
+  (p) => ({ transform: `translateX(${((1 - p) * -76).toFixed(1)}px)`, opacity: clamp01(p * 1.6) }),        // slide-in
+  (p) => ({ transform: `scale(${(1.28 - 0.28 * p).toFixed(3)})`, opacity: clamp01(p * 1.6) }),             // zoom
+  (p) => ({ transform: `translateY(${((1 - p) * -48).toFixed(1)}px)`, opacity: clamp01(p * 1.6) }),        // drop
+];
+
+// The line that should be on screen at `ms` (and its index). Small lead-in so
+// the line appears a hair before the first word is spoken (feels snappier).
+function activeLineIndex(lines: CaptionLine[], ms: number, leadMs = 80): number {
+  for (let i = 0; i < lines.length; i++) {
+    if (ms >= lines[i].startMs - leadMs && ms <= lines[i].endMs + 120) return i;
   }
-  return null;
+  return -1;
 }
 
 function isWordActive(w: CaptionWord, ms: number): boolean {
@@ -98,39 +130,59 @@ export const Captions: React.FC<CaptionsProps> = ({ lines, style, options }) => 
   const { fps, height } = useVideoConfig();
   const ms = (frame / fps) * 1000;
   const opt = withDefaults(options, style, height);
+  const all = lines || [];
 
-  const line = activeLine(lines || [], ms);
+  const lineIdx = activeLineIndex(all, ms);
+  const line = lineIdx >= 0 ? all[lineIdx] : null;
 
   const isCustom = opt.position === 'custom';
   const justify =
     opt.position === 'top' ? 'flex-start' : opt.position === 'middle' ? 'center' : 'flex-end';
-  const pad =
-    opt.position === 'middle' ? 0 : Math.round(height * 0.11);
-  const cx = Math.max(0, Math.min(1, typeof opt.customX === 'number' ? opt.customX : 0.5));
-  const cy = Math.max(0, Math.min(1, typeof opt.customY === 'number' ? opt.customY : 0.85));
+  const pad = opt.position === 'middle' ? 0 : Math.round(height * 0.11);
+  const cx = clamp01(typeof opt.customX === 'number' ? opt.customX : 0.5);
+  const cy = clamp01(typeof opt.customY === 'number' ? opt.customY : 0.85);
+
+  // shadow + stroke (explicit options, else sensible per-style defaults)
+  const shadowAmt = typeof opt.shadow === 'number' ? opt.shadow : 0.55;
+  const strokeW = typeof opt.stroke === 'number'
+    ? opt.stroke
+    : (style === 'reels' || style === 'tiktok' || style === 'hormozi' ? 2 : 0);
+  const textShadow = shadowAmt > 0
+    ? `0 ${(2.5 * shadowAmt).toFixed(1)}px ${Math.round(12 * shadowAmt)}px rgba(0,0,0,${(0.7 * shadowAmt).toFixed(2)}), 0 0 2px rgba(0,0,0,${(0.5 * shadowAmt).toFixed(2)})`
+    : 'none';
+  const ls = typeof opt.letterSpacing === 'number'
+    ? `${opt.letterSpacing}em`
+    : (opt.uppercase ? '0.01em' : 0);
 
   const baseTextStyle: CSSProperties = {
     fontFamily: opt.fontFamily,
-    fontWeight: 800,
+    fontWeight: opt.fontWeight,
     fontSize: opt.fontSize,
-    lineHeight: 1.1,
+    lineHeight: opt.lineHeight,
     color: opt.accent,
-    textAlign: 'center',
+    textAlign: opt.align,
     textTransform: opt.uppercase ? 'uppercase' : 'none',
-    letterSpacing: opt.uppercase ? '0.01em' : 0,
-    // readability over any footage
-    textShadow: '0 2px 10px rgba(0,0,0,0.55), 0 0 2px rgba(0,0,0,0.5)',
-    WebkitTextStroke: style === 'reels' || style === 'tiktok' ? '2px rgba(0,0,0,0.35)' : undefined,
+    letterSpacing: ls,
+    textShadow,
+    WebkitTextStroke: strokeW > 0 ? `${strokeW}px ${opt.strokeColor}` : undefined,
+    paintOrder: 'stroke fill' as any,
     padding: '0 6%',
     maxWidth: '92%',
   };
 
   const lineNode = line ? (
-    <LineView line={line} ms={ms} fps={fps} style={style} opt={opt} textStyle={baseTextStyle} />
+    <LineView
+      line={line}
+      lineIndex={lineIdx}
+      ms={ms}
+      fps={fps}
+      style={style}
+      opt={opt}
+      textStyle={baseTextStyle}
+    />
   ) : null;
 
   if (isCustom) {
-    // Free placement: anchor the caption block's CENTER at (cx, cy).
     return (
       <AbsoluteFill style={{ background: 'transparent' }}>
         {lineNode ? (
@@ -169,38 +221,42 @@ export const Captions: React.FC<CaptionsProps> = ({ lines, style, options }) => 
 
 const LineView: React.FC<{
   line: CaptionLine;
+  lineIndex: number;
   ms: number;
   fps: number;
   style: CaptionStyle;
   opt: ReturnType<typeof withDefaults>;
   textStyle: CSSProperties;
-}> = ({ line, ms, fps, style, opt, textStyle }) => {
+}> = ({ line, lineIndex, ms, fps, style, opt, textStyle }) => {
   const frame = useCurrentFrame();
-  // line-level entrance: how long has THIS line been on screen (ms since its start)
   const sinceStart = ms - line.startMs;
   const lineInProgress = Math.max(0, sinceStart);
 
-  // container pop for reels/tiktok
+  // per-line variety: a rotating color + a rotating entrance animation
+  const vary = !!opt.varyPerLine;
+  const hlColor = vary ? LINE_PALETTE[lineIndex % LINE_PALETTE.length] : opt.highlight;
+
+  // line entrance (used by reels/tiktok always; by every style when varyPerLine)
   const lineSpring = opt.animateIn
     ? spring({ frame: Math.max(0, frame - msToFrames(line.startMs, fps)), fps, config: { damping: 14, mass: 0.6 } })
     : 1;
+  const entranceP = clamp01(interpolate(lineInProgress, [0, 300], [0, 1], { extrapolateRight: 'clamp', easing: easeOut }));
+  const varyEntrance = vary ? ENTRANCES[lineIndex % ENTRANCES.length](entranceP) : null;
 
   const wrapStyle: CSSProperties = {
     ...textStyle,
     display: 'flex',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: style === 'reels' ? '0.12em 0.28em' : '0.1em 0.26em',
-    transform: style === 'reels' || style === 'tiktok' ? `scale(${0.86 + 0.14 * lineSpring})` : undefined,
+    justifyContent: opt.align === 'left' ? 'flex-start' : opt.align === 'right' ? 'flex-end' : 'center',
+    gap: style === 'reels' || style === 'hormozi' ? '0.12em 0.28em' : '0.1em 0.26em',
+    transform: varyEntrance
+      ? varyEntrance.transform
+      : (style === 'reels' || style === 'tiktok' ? `scale(${0.86 + 0.14 * lineSpring})` : undefined),
+    opacity: varyEntrance ? varyEntrance.opacity : 1,
   };
 
   const box = opt.box
-    ? {
-        background: 'rgba(0,0,0,0.42)',
-        borderRadius: 14,
-        padding: '0.28em 0.6em',
-        backdropFilter: 'blur(2px)' as any,
-      }
+    ? { background: 'rgba(0,0,0,0.42)', borderRadius: 14, padding: '0.28em 0.6em' }
     : null;
 
   return (
@@ -215,6 +271,8 @@ const LineView: React.FC<{
             idx={i}
             style={style}
             opt={opt}
+            hlColor={hlColor}
+            vary={vary}
             lineInProgress={lineInProgress}
           />
         ))}
@@ -230,8 +288,10 @@ const WordView: React.FC<{
   idx: number;
   style: CaptionStyle;
   opt: ReturnType<typeof withDefaults>;
+  hlColor: string;
+  vary: boolean;
   lineInProgress: number;
-}> = ({ word, ms, fps, idx, style, opt, lineInProgress }) => {
+}> = ({ word, ms, fps, idx, style, opt, hlColor, vary, lineInProgress }) => {
   const frame = useCurrentFrame();
   const active = isWordActive(word, ms);
   const spoken = ms >= word.startMs;
@@ -242,47 +302,65 @@ const WordView: React.FC<{
   let color = opt.accent;
   let transform = '';
   let opacity = 1;
+  let background: string | undefined;
+  let padding: string | undefined;
+  let borderRadius: number | undefined;
 
-  if (style === 'classic') {
-    // words fade + rise in at their own start; whole line stays
+  if (style === 'hormozi') {
+    // big bold, all words visible; the active word gets a solid highlight BOX
+    // behind it (the viral subtitle look). Stroke comes from baseTextStyle.
+    if (active) {
+      color = '#15110d';
+      background = hlColor;
+      padding = '0.02em 0.12em';
+      borderRadius = 8;
+      transform = `scale(${(1 + 0.06 * Math.sin(clamp01((ms - word.startMs) / Math.max(1, word.endMs - word.startMs)) * Math.PI)).toFixed(3)})`;
+    } else {
+      color = '#FFFFFF';
+    }
+  } else if (style === 'classic') {
     opacity = interpolate(lineInProgress, [0, 160], [0, 1], { extrapolateRight: 'clamp', easing: easeOut });
-    if (active) color = lighten(opt.accent);
+    if (vary) color = hlColor;
+    else if (active) color = opt.accent;
   } else if (style === 'minimal') {
     opacity = interpolate(lineInProgress, [0, 130], [0, 1], { extrapolateRight: 'clamp', easing: easeOut });
+    if (vary) color = hlColor;
   } else if (style === 'karaoke') {
-    // every word visible; active word colored + small bounce
     if (active) {
-      color = opt.highlight;
+      color = hlColor;
       transform = `scale(${1 + 0.08 * Math.sin(Math.min(1, (ms - word.startMs) / Math.max(1, word.endMs - word.startMs)) * Math.PI)})`;
     } else if (!spoken) {
       color = dim(opt.accent);
     }
   } else if (style === 'tiktok') {
-    // typed-on: only words up to now are shown; active word colored + wobble
     if (!spoken) return null;
     opacity = interpolate(wordFrame, [0, 4], [0, 1], { extrapolateRight: 'clamp' });
     transform = `scale(${0.7 + 0.3 * pop})`;
     if (active) {
-      color = opt.highlight;
+      color = hlColor;
       transform += ` rotate(${interpolate(Math.sin(frame / 2), [-1, 1], [-2, 2])}deg)`;
     }
   } else if (style === 'reels') {
-    // big bold; whole short line pops together, active word highlighted
     transform = `scale(${0.6 + 0.4 * pop}) translateY(${interpolate(pop, [0, 1], [10, 0])}px)`;
     opacity = interpolate(pop, [0, 0.4], [0, 1], { extrapolateRight: 'clamp' });
-    if (active) color = opt.highlight;
+    if (active) color = hlColor;
   }
 
   return (
     <span
       style={{
         color,
+        background,
+        padding,
+        borderRadius,
         display: 'inline-block',
         opacity,
         transform: transform || undefined,
         transformOrigin: 'center bottom',
         transition: 'color 90ms linear',
         willChange: 'transform, opacity',
+        // when there's a highlight box, drop the per-letter stroke so the box reads clean
+        WebkitTextStroke: background ? '0' : undefined,
       }}
     >
       {word.text}
@@ -294,13 +372,10 @@ const WordView: React.FC<{
 function msToFrames(ms: number, fps: number): number {
   return (ms / 1000) * fps;
 }
-function lighten(hex: string): string {
-  return hex; // classic keeps the base color; placeholder for future brightening
-}
 function dim(hex: string): string {
-  // render un-spoken karaoke words at ~55% so the highlight pops
-  const c = hex.replace('#', '');
-  if (c.length !== 6) return 'rgba(255,255,255,0.55)';
+  // render un-spoken karaoke words at ~50% so the highlight pops
+  const c = (hex || '').replace('#', '');
+  if (c.length !== 6) return 'rgba(255,255,255,0.5)';
   const r = parseInt(c.slice(0, 2), 16);
   const g = parseInt(c.slice(2, 4), 16);
   const b = parseInt(c.slice(4, 6), 16);
