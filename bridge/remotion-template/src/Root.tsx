@@ -158,10 +158,43 @@ import { DoYouGuysRemember_1336_v3 } from "./DoYouGuysRemember_1336_v3";
 import { BratHook0513t1628 } from "./BratHook0513t1628";
 import { QCardThreeQuickTips0513t1631 } from "./QCardThreeQuickTips0513t1631";
 import { SmashSlam0513t1640 } from "./SmashSlam0513t1640";
+import { Captions, type CaptionsProps } from "./Captions";
 
 export const Root = () => {
   return (
     <>
+      <Composition
+        id="Captions"
+        component={Captions}
+        defaultProps={{
+          style: 'karaoke' as const,
+          options: {},
+          lines: [
+            { startMs: 0, endMs: 1200, words: [
+              { text: 'Flimify', startMs: 0, endMs: 500 },
+              { text: 'makes', startMs: 500, endMs: 800 },
+              { text: 'captions', startMs: 800, endMs: 1200 },
+            ] },
+            { startMs: 1300, endMs: 2400, words: [
+              { text: 'in', startMs: 1300, endMs: 1450 },
+              { text: 'one', startMs: 1450, endMs: 1700 },
+              { text: 'click', startMs: 1700, endMs: 2400 },
+            ] },
+          ],
+          fps: 30, width: 1080, height: 1920,
+        }}
+        calculateMetadata={({ props }: { props: CaptionsProps }) => {
+          const fps = props.fps ?? 30;
+          const ends = (props.lines || []).map((l) => l.endMs);
+          const maxMs = ends.length ? Math.max(...ends) : 1000;
+          return {
+            durationInFrames: Math.max(1, Math.ceil((maxMs / 1000 + 0.3) * fps)),
+            width: props.width ?? 1080,
+            height: props.height ?? 1920,
+            fps,
+          };
+        }}
+      />
       <Composition
         id="SmashSlam0513t1640"
         component={SmashSlam0513t1640}
