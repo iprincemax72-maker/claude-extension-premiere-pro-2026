@@ -361,6 +361,247 @@ async function runTranscribe(wavPath, audioDuration) {
   return runParakeet(wavPath, audioDuration);
 }
 
+// ── CAPTIONS: word-level transcription + line grouping ───────────────────────
+// The autocut/autoedit paths only need sentence-level segments, but captions
+// need WORD-level timing. parakeet emits sentencepiece sub-word tokens with
+// per-token start/end; we reconstruct real words from them. Verified shape:
+//   sentences[].tokens[] = [{text:" F",start,end},{text:"li",...},...]
+// where a leading-space token marks a new word boundary.
+
+// Reconstruct word-level [{text,startMs,endMs}] from parakeet subword tokens.
+function tokensToWords(sentences) {
+  const words = [];
+  let cur = null;
+  for (const s of (sentences || [])) {
+    for (const t of (s.tokens || [])) {
+      const raw = t && t.text != null ? String(t.text) : '';
+      if (!raw) continue;
+      const startsWord = /^\s/.test(raw) || cur === null;
+      const piece = raw.replace(/^\s+/, '');
+      const startMs = Math.round((Number(t.start) || 0) * 1000);
+      const endMs = Math.round((Number(t.end) || 0) * 1000);
+      if (startsWord) {
+        if (cur && cur.text) words.push(cur);
+        cur = { text: piece, startMs, endMs };
+      } else if (cur) {
+        cur.text += piece;
+        cur.endMs = endMs;
+      }
+    }
+  }
+  if (cur && cur.text) words.push(cur);
+  const out = [];
+  for (const w of words) {
+    const text = w.text.trim();
+    if (!text) continue;
+    let startMs = Math.max(0, Math.round(w.startMs));
+    let endMs = Math.max(startMs + 1, Math.round(w.endMs));
+    const prev = out[out.length - 1];
+    if (prev && startMs < prev.endMs) startMs = prev.endMs; // no overlap
+    if (endMs <= startMs) endMs = startMs + 1;
+    out.push({ text, startMs, endMs });
+  }
+  return out;
+}
+
+// Group a flat word list into caption lines (a line breaks on word count, a
+// silent gap, total on-screen time, or character width — whichever hits first).
+function groupWordsIntoLines(words, opts) {
+  opts = opts || {};
+  const maxWordsPerLine = Math.max(1, opts.maxWordsPerLine || 4);
+  const maxGapMs = opts.maxGapMs != null ? opts.maxGapMs : 600;
+  const maxLineMs = opts.maxLineMs != null ? opts.maxLineMs : 2600;
+  const maxCharsPerLine = opts.maxCharsPerLine != null ? opts.maxCharsPerLine : 24;
+  const holdMs = opts.holdMs != null ? opts.holdMs : 250;
+
+  const clean = (words || [])
+    .filter(w => w && String(w.text || '').trim() && Number.isFinite(w.startMs) && Number.isFinite(w.endMs))
+    .map(w => ({ text: String(w.text).trim(), startMs: Math.max(0, w.startMs), endMs: Math.max(w.startMs + 1, w.endMs) }))
+    .sort((a, b) => a.startMs - b.startMs);
+
+  const lines = [];
+  let cur = [];
+  let curChars = 0;
+  const flush = () => {
+    if (!cur.length) return;
+    lines.push({ words: cur.slice(), startMs: cur[0].startMs, endMs: cur[cur.length - 1].endMs + holdMs });
+    cur = [];
+    curChars = 0;
+  };
+  for (const w of clean) {
+    if (cur.length) {
+      const prev = cur[cur.length - 1];
+      const gap = w.startMs - prev.endMs;
+      const lineDur = w.endMs - cur[0].startMs;
+      const wouldChars = curChars + 1 + w.text.length;
+      if (cur.length >= maxWordsPerLine || gap > maxGapMs || lineDur > maxLineMs || wouldChars > maxCharsPerLine) flush();
+    }
+    cur.push(w);
+    curChars += (curChars ? 1 : 0) + w.text.length;
+  }
+  flush();
+  return lines;
+}
+
+// Like runParakeet, but keeps the sub-word tokens and returns reconstructed
+// words alongside the sentence segments. Cleans up its temp files.
+function runParakeetWords(wavPath, audioDuration) {
+  return new Promise((resolve, reject) => {
+    const bin = resolveParakeet();
+    const outDir = path.dirname(wavPath);
+    const baseName = path.basename(wavPath, path.extname(wavPath));
+    const jsonOut = path.join(outDir, baseName + '.json');
+    try { fs.unlinkSync(jsonOut); } catch {}
+    const args = ['--output-format', 'json', '--output-dir', outDir, wavPath];
+    const proc = spawn(bin, args, { env: process.env });
+    let stderr = '';
+    proc.stderr.on('data', d => stderr += d.toString().slice(-2000));
+    proc.stdout.on('data', () => {});
+    const cap = Math.min(15 * 60 * 1000, Math.max(120000, audioDuration * 800 + 60000));
+    const killer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} reject(new Error('parakeet timeout after ' + Math.round(cap / 1000) + 's')); }, cap);
+    proc.on('error', e => { clearTimeout(killer); reject(e); });
+    proc.on('close', code => {
+      clearTimeout(killer);
+      if (code !== 0 || !fs.existsSync(jsonOut)) { reject(new Error('parakeet exit ' + code + ': ' + stderr.slice(-300))); return; }
+      try {
+        const j = JSON.parse(fs.readFileSync(jsonOut, 'utf8'));
+        const sentences = (j.sentences || []).map(s => ({
+          start: typeof s.start === 'number' ? s.start : 0,
+          end: typeof s.end === 'number' ? s.end : 0,
+          text: (s.text || '').trim(),
+          tokens: s.tokens || [],
+        }));
+        const words = tokensToWords(sentences);
+        try { fs.unlinkSync(jsonOut); } catch {}
+        try { fs.unlinkSync(wavPath); } catch {}
+        resolve({ words, sentences: sentences.map(s => ({ start: s.start, end: s.end, text: s.text })) });
+      } catch (e) {
+        reject(new Error('parakeet json parse: ' + e.message));
+      }
+    });
+  });
+}
+
+// Make sure the render project has the canonical Captions.tsx. The installed
+// remotion-intro is NOT touched by auto-update (which only syncs 4 top-level
+// files), so we copy the component from the same source the updater uses:
+// the local repo when present, else GitHub raw. Idempotent (writes only on diff).
+async function ensureCaptionsComponent(projDir) {
+  const dest = path.join(projDir, 'src', 'Captions.tsx');
+  let srcText = null;
+  if (LOCAL_SOURCE_DIR) {
+    try { srcText = fs.readFileSync(path.join(LOCAL_SOURCE_DIR, 'bridge', 'remotion-template', 'src', 'Captions.tsx'), 'utf8'); } catch {}
+  }
+  if (srcText == null && typeof fetch === 'function') {
+    try {
+      const r = await fetch(GITHUB_RAW + '/bridge/remotion-template/src/Captions.tsx');
+      if (r.ok) srcText = await r.text();
+    } catch {}
+  }
+  if (srcText == null) {
+    if (fs.existsSync(dest)) return dest;   // previously installed copy — good enough
+    throw new Error('captions component source unavailable (no local repo, no network, not previously installed)');
+  }
+  let cur = null;
+  try { cur = fs.readFileSync(dest, 'utf8'); } catch {}
+  if (cur !== srcText) {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    const tmp = dest + '.tmp' + process.pid;
+    fs.writeFileSync(tmp, srcText);
+    fs.renameSync(tmp, dest);
+  }
+  return dest;
+}
+
+// Resolve the remotion CLI JS entry so we can spawn it with `node` directly
+// (more reliable than relying on npx being on PATH under launchd).
+function resolveRemotionCli(projDir) {
+  const binLink = path.join(projDir, 'node_modules', '.bin', 'remotion');
+  try {
+    const target = fs.readlinkSync(binLink);
+    const resolved = path.resolve(path.dirname(binLink), target);
+    if (fs.existsSync(resolved)) return resolved;
+  } catch {}
+  const cands = [
+    path.join(projDir, 'node_modules', '@remotion', 'cli', 'remotion-cli.js'),
+    binLink,
+  ];
+  for (const c of cands) { try { if (fs.existsSync(c)) return c; } catch {} }
+  return binLink;
+}
+
+// Render the Captions composition to a transparent ProRes 4444 .mov overlay.
+// Driven entirely by `lines` (word-level) + style + options. Writes a unique
+// one-off entry file so concurrent caption/chat renders never collide on
+// Root.tsx, and feeds props via a --props JSON file. Returns the output path.
+async function renderCaptions(opts) {
+  const { lines, style, options, reqId, log } = opts;
+  const projDir = path.join(WORK_DIR, 'remotion-intro');
+  if (!fs.existsSync(path.join(projDir, 'node_modules', 'remotion'))) {
+    throw new Error('Remotion project not installed at ' + projDir);
+  }
+  await ensureCaptionsComponent(projDir);
+
+  const W = Math.max(2, Math.round(opts.width || 1080));
+  const H = Math.max(2, Math.round(opts.height || 1920));
+  const FPS = Math.max(1, Math.round(opts.fps || 30));
+  const id = String(reqId || Date.now()).replace(/[^a-zA-Z0-9]/g, '').slice(0, 10) + '_' + Date.now();
+  const entryRel = path.join('src', '_cap_' + id + '.tsx');
+  const entryAbs = path.join(projDir, entryRel);
+  const propsFile = path.join(OUTPUT_DIR, '_capprops_' + id + '.json');
+  const outFile = path.join(OUTPUT_DIR, 'captions_' + id + '.mov');
+
+  const entrySrc =
+    "import { registerRoot, Composition } from 'remotion';\n" +
+    "import { Captions } from './Captions';\n" +
+    "const Root = () => (\n" +
+    "  <Composition\n" +
+    "    id=\"Captions\"\n" +
+    "    component={Captions}\n" +
+    "    defaultProps={{ lines: [], style: 'karaoke', options: {}, fps: " + FPS + ", width: " + W + ", height: " + H + " }}\n" +
+    "    calculateMetadata={({ props }) => {\n" +
+    "      const f = props.fps || " + FPS + ";\n" +
+    "      const ends = (props.lines || []).map((l) => l.endMs);\n" +
+    "      const maxMs = ends.length ? Math.max(...ends) : 1000;\n" +
+    "      return { durationInFrames: Math.max(1, Math.ceil((maxMs / 1000 + 0.3) * f)), width: props.width || " + W + ", height: props.height || " + H + ", fps: f };\n" +
+    "    }}\n" +
+    "  />\n" +
+    ");\n" +
+    "registerRoot(Root);\n";
+
+  fs.writeFileSync(entryAbs, entrySrc);
+  fs.writeFileSync(propsFile, JSON.stringify({ lines, style, options: options || {}, fps: FPS, width: W, height: H }));
+
+  const cli = resolveRemotionCli(projDir);
+  const nodeBin = process.execPath;
+  // Transparent overlay = ProRes 4444 WITH alpha. Both --image-format=png AND
+  // --pixel-format=yuva444p10le are REQUIRED — without them Remotion emits an
+  // opaque yuv422 stream (no alpha plane) that would cover the footage.
+  const args = [cli, 'render', entryRel, 'Captions', outFile,
+    '--codec', 'prores', '--prores-profile', '4444',
+    '--image-format', 'png', '--pixel-format', 'yuva444p10le',
+    '--props=' + propsFile, '--log', 'error'];
+  const env = { ...process.env };
+  env.PATH = path.dirname(nodeBin) + path.delimiter + (env.PATH || '');
+
+  await new Promise((resolve, reject) => {
+    const proc = spawn(nodeBin, args, { cwd: projDir, env });
+    let stderr = '';
+    proc.stdout.on('data', d => { const s = d.toString(); if (/Rendered|Encoding|Bundl/.test(s)) log && log('render ' + s.trim().split('\n').pop().slice(0, 80)); });
+    proc.stderr.on('data', d => stderr += d.toString().slice(-4000));
+    const killer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} reject(new Error('caption render timeout (8m)')); }, 8 * 60 * 1000);
+    proc.on('error', e => { clearTimeout(killer); reject(e); });
+    proc.on('close', code => {
+      clearTimeout(killer);
+      try { fs.unlinkSync(entryAbs); } catch {}
+      try { fs.unlinkSync(propsFile); } catch {}
+      if (code === 0 && fs.existsSync(outFile)) resolve();
+      else reject(new Error('caption render exit ' + code + ': ' + stderr.slice(-400)));
+    });
+  });
+  return outFile;
+}
+
 // Ask Claude (small, fast call) to scan the transcript for fillers + false
 // starts. Claude doesn't need any tools — just reads text, returns JSON. So
 // no hanging on tool I/O. 60s hard cap. Used only when useTranscript is true.
@@ -2592,7 +2833,7 @@ const server = http.createServer((req, res) => {
 
   // Track in-flight heavy requests so the periodic auto-update never restarts
   // the bridge mid-render. res 'close' fires on normal finish OR client abort.
-  if (req.method === 'POST' && (req.url === '/chat' || req.url === '/autoedit' || req.url === '/autoedit/run' || req.url === '/autoedit/analyze' || req.url === '/autocut' || req.url === '/plan/questions')) {
+  if (req.method === 'POST' && (req.url === '/chat' || req.url === '/autoedit' || req.url === '/autoedit/run' || req.url === '/autoedit/analyze' || req.url === '/autocut' || req.url === '/captions' || req.url === '/plan/questions')) {
     _heavyInflight++;
     res.on('close', () => { _heavyInflight = Math.max(0, _heavyInflight - 1); });
   }
@@ -4011,6 +4252,91 @@ const server = http.createServer((req, res) => {
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, killed }));
+    return;
+  }
+
+  // ── CAPTIONS — word-level animated caption overlay ─────────────────────────
+  // Body: { segments:[{path,inSec,outSec,timelineStart}], style, options,
+  //         width, height, fps, grouping?, reqId? }. Transcribes the selected
+  //         clip's audio word-by-word, groups into lines, renders the styled
+  //         transparent Captions overlay, returns [[IMPORT]] + placement.
+  if (req.method === 'POST' && req.url === '/captions') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      let payload;
+      try { payload = JSON.parse(body); }
+      catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+      const reqId = payload.reqId || crypto.randomUUID();
+      const segments = Array.isArray(payload.segments) ? payload.segments : [];
+      const STYLES = ['classic', 'karaoke', 'reels', 'tiktok', 'minimal'];
+      const style = STYLES.includes(payload.style) ? payload.style : 'karaoke';
+      const options = (payload.options && typeof payload.options === 'object') ? payload.options : {};
+      const grouping = (payload.grouping && typeof payload.grouping === 'object') ? payload.grouping : {};
+      const width = payload.width, height = payload.height, fps = payload.fps || 30;
+      const log = (m) => { try { clog('autoedit', 'info', '[captions] ' + m, { reqId }, reqId); } catch {} };
+      const fail = (msg, code) => {
+        try { clog('autoedit', 'error', '[captions] ' + msg, { reqId }, reqId); } catch {}
+        try { broadcastProgressDone(reqId); } catch {}
+        res.writeHead(code || 200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: msg, reqId }));
+      };
+      try {
+        if (!segments.length) return fail('No clip selected. Select the clip whose speech you want captioned.');
+
+        // Meter like a render: owner-exempt, fail-open on RPC/config error.
+        const gate = await gateRender();
+        if (!gate.allowed) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: false, meterBlock: true, reason: gate.reason, reqId,
+            error: gate.reason === 'signin'
+              ? 'Sign in from the account menu to generate captions.'
+              : "You've used all your renders for this month. Upgrade your plan or wait for the monthly reset.",
+          }));
+          return;
+        }
+
+        broadcastProgress('Extracting audio', 6, reqId);
+        const { wavPath, totalDur } = await extractConcatAudio(segments, reqId, log);
+
+        broadcastProgress('Transcribing word-by-word', 22, reqId);
+        const { words } = await runParakeetWords(wavPath, totalDur);
+        log(`parakeet: ${words.length} words over ${totalDur.toFixed(1)}s`);
+        if (!words.length) return fail('No speech found to caption in the selected clip.');
+
+        // words[].startMs/endMs are ms from the selection's in-point, which sits
+        // at segments[0].timelineStart on the timeline — so the overlay drops at
+        // timelineStart and every word lands on its real moment with no re-basing.
+        const lines = groupWordsIntoLines(words, {
+          maxWordsPerLine: grouping.maxWordsPerLine || (style === 'reels' || style === 'tiktok' ? 3 : 4),
+          maxGapMs: grouping.maxGapMs,
+          maxLineMs: grouping.maxLineMs,
+          maxCharsPerLine: grouping.maxCharsPerLine,
+        });
+        log(`grouped into ${lines.length} caption lines`);
+
+        broadcastProgress('Rendering captions overlay', 45, reqId);
+        const outFile = await renderCaptions({ lines, style, options, width, height, fps, reqId, log });
+        log('rendered ' + path.basename(outFile));
+
+        broadcastProgress('Done', 100, reqId);
+        broadcastProgressDone(reqId);
+        const durationSec = lines.length ? lines[lines.length - 1].endMs / 1000 : totalDur;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true, reqId,
+          import: outFile,
+          imports: [outFile],
+          reply: `Captions ready (${words.length} words, ${lines.length} lines, ${style} style).\n[[IMPORT:${outFile}]]`,
+          style, wordCount: words.length, lineCount: lines.length,
+          timelineStart: Number(segments[0].timelineStart) || 0,
+          durationSec,
+        }));
+      } catch (e) {
+        fail(e && e.message ? e.message : String(e));
+      }
+    });
     return;
   }
 
