@@ -7943,28 +7943,26 @@ const capCard = document.getElementById('capCard');
 let capState = {
   style: 'karaoke', position: 'bottom', highlight: '#E2885F',
   uppercase: false, box: false, maxWords: 4, fontPct: 100,
+  fontWeight: 800, align: 'center', trackingPct: 0, lineHtPct: 112,
+  shadowPct: 55, strokePx: 2, strokeColor: '#000000', vary: false, fontFamily: '',
   customX: 0.5, customY: 0.85,
   selection: null, width: 1080, height: 1920, fps: 30,
   abort: null, reqId: null, es: null,
 };
+const CAP_SAVE_KEYS = ['style','position','highlight','uppercase','box','maxWords','fontPct',
+  'fontWeight','align','trackingPct','lineHtPct','shadowPct','strokePx','strokeColor','vary','fontFamily',
+  'customX','customY'];
 try {
   const saved = JSON.parse(localStorage.getItem('claudeBridge.captions.opts') || 'null');
-  if (saved && typeof saved === 'object') capState = Object.assign(capState, {
-    style: saved.style || 'karaoke', position: saved.position || 'bottom',
-    highlight: saved.highlight || '#E2885F', uppercase: !!saved.uppercase,
-    box: !!saved.box, maxWords: saved.maxWords || 4, fontPct: saved.fontPct || 100,
-    customX: typeof saved.customX === 'number' ? saved.customX : 0.5,
-    customY: typeof saved.customY === 'number' ? saved.customY : 0.85,
-  });
+  if (saved && typeof saved === 'object') {
+    for (const k of CAP_SAVE_KEYS) if (saved[k] !== undefined) capState[k] = saved[k];
+  }
 } catch {}
 
 function capSaveOpts() {
   try {
-    localStorage.setItem('claudeBridge.captions.opts', JSON.stringify({
-      style: capState.style, position: capState.position, highlight: capState.highlight,
-      uppercase: capState.uppercase, box: capState.box, maxWords: capState.maxWords,
-      fontPct: capState.fontPct, customX: capState.customX, customY: capState.customY,
-    }));
+    const o = {}; for (const k of CAP_SAVE_KEYS) o[k] = capState[k];
+    localStorage.setItem('claudeBridge.captions.opts', JSON.stringify(o));
   } catch {}
 }
 
@@ -7996,7 +7994,16 @@ const CAP_SAMPLE = [
   { text: 'today',    s: 1980, e: 2500 },
 ];
 const CAP_HOLD = 700;
-let capPreview = { raf: 0, start: 0, lines: [], curLine: -1 };
+const CAP_PALETTE = ['#E2885F', '#5AA9FF', '#4ECB71', '#F5C542', '#FF5D8F', '#B98CFF'];
+const CAP_ENTRANCES = [
+  (p) => 'scale(' + (0.62 + 0.38 * p).toFixed(3) + ')',
+  (p) => 'translateY(' + ((1 - p) * 44).toFixed(1) + 'px)',
+  (p) => 'translateX(' + ((1 - p) * -52).toFixed(1) + 'px)',
+  (p) => 'scale(' + (1.26 - 0.26 * p).toFixed(3) + ')',
+  (p) => 'translateY(' + ((1 - p) * -34).toFixed(1) + 'px)',
+];
+// cached refs + current-line state so the rAF loop doesn't re-query the DOM
+let capPreview = { raf: 0, start: 0, lines: [], curLine: -1, capEl: null, stage: null, lineEl: null, words: null, lineColor: '#E2885F', entrance: null, lineStart: 0 };
 
 function capGroupSample(maxWords) {
   const lines = []; let cur = [];
@@ -8031,14 +8038,31 @@ function capApplyPos(capEl) {
   }
 }
 
-function capBuildLine(capEl, line) {
-  const stage = document.getElementById('capStage');
+function capBuildLine(capEl, line, idx) {
+  const stage = capPreview.stage || document.getElementById('capStage');
   const stageH = (stage && stage.clientHeight) || 300;
-  const frac = { classic: 0.072, karaoke: 0.078, reels: 0.115, tiktok: 0.10, minimal: 0.066 }[capState.style] || 0.08;
+  const frac = { classic: 0.072, karaoke: 0.078, reels: 0.115, tiktok: 0.10, minimal: 0.066, hormozi: 0.108 }[capState.style] || 0.08;
   const fontPx = Math.max(11, Math.round(stageH * frac * (capState.fontPct / 100)));
+  // per-line color + entrance when "vary per line" is on
+  capPreview.lineColor = capState.vary ? CAP_PALETTE[idx % CAP_PALETTE.length] : capState.highlight;
+  capPreview.entrance = capState.vary ? CAP_ENTRANCES[idx % CAP_ENTRANCES.length] : null;
+  capPreview.lineStart = line.s;
+
   const lineEl = document.createElement('div');
   lineEl.className = 'cap-cap-line';
   lineEl.style.fontSize = fontPx + 'px';
+  lineEl.style.fontWeight = String(capState.fontWeight || 800);
+  if (capState.fontFamily) lineEl.style.fontFamily = capState.fontFamily;
+  lineEl.style.letterSpacing = (capState.trackingPct / 100) + 'em';
+  lineEl.style.lineHeight = String(capState.lineHtPct / 100);
+  lineEl.style.justifyContent = capState.align === 'left' ? 'flex-start' : capState.align === 'right' ? 'flex-end' : 'center';
+  lineEl.style.textAlign = capState.align;
+  // shadow + stroke
+  const sh = capState.shadowPct / 100;
+  lineEl.style.textShadow = sh > 0 ? ('0 ' + (2.5 * sh).toFixed(1) + 'px ' + Math.round(12 * sh) + 'px rgba(0,0,0,' + (0.7 * sh).toFixed(2) + ')') : 'none';
+  const strokePreview = Math.max(0, capState.strokePx * (fontPx / 90)); // scale stroke to preview font
+  lineEl.style.webkitTextStroke = strokePreview > 0 ? (strokePreview.toFixed(2) + 'px ' + capState.strokeColor) : '';
+
   for (const w of line.words) {
     const sp = document.createElement('span');
     sp.className = 'cap-cap-word';
@@ -8048,26 +8072,34 @@ function capBuildLine(capEl, line) {
   }
   capEl.innerHTML = '';
   capEl.appendChild(lineEl);
+  capPreview.lineEl = lineEl;
+  capPreview.words = lineEl.querySelectorAll('.cap-cap-word');
 }
 
-function capStyleWord(sp, ms, lineStart) {
+function capStyleWord(sp, ms) {
   const s = +sp.dataset.s, e = +sp.dataset.e;
   const active = ms >= s && ms < e;
   const spoken = ms >= s;
-  const hl = capState.highlight;
+  const hl = capPreview.lineColor;
+  const lineStart = capPreview.lineStart;
   const sinceWord = ms - s;
   const pop = Math.max(0, Math.min(1, sinceWord / 240));
   const ease = pop < 1 ? (1 - Math.pow(1 - pop, 3)) : 1;
-  let color = '#fff', opacity = 1, transform = '';
+  const vary = capState.vary;
+  let color = '#fff', opacity = 1, transform = '', background = '', padding = '', radius = '', stroke = '';
   const st = capState.style;
-  if (st === 'karaoke') {
+  if (st === 'hormozi') {
+    if (active) { color = '#15110d'; background = hl; padding = '0.02em 0.12em'; radius = '6px'; stroke = '0'; transform = 'scale(' + (1 + 0.05 * Math.sin(Math.min(1, sinceWord / Math.max(1, e - s)) * Math.PI)).toFixed(3) + ')'; }
+    else color = '#fff';
+  } else if (st === 'karaoke') {
     if (active) { color = hl; const k = Math.sin(Math.min(1, sinceWord / Math.max(1, e - s)) * Math.PI); transform = 'scale(' + (1 + 0.09 * k).toFixed(3) + ')'; }
     else if (!spoken) color = 'rgba(255,255,255,.45)';
   } else if (st === 'minimal') {
     opacity = Math.max(0, Math.min(1, (ms - lineStart) / 150));
+    if (vary) color = hl;
   } else if (st === 'classic') {
     opacity = Math.max(0, Math.min(1, (ms - lineStart) / 180));
-    if (active) color = hl;
+    if (vary) color = hl; else if (active) color = hl;
   } else if (st === 'tiktok') {
     if (!spoken) { sp.style.display = 'none'; return; }
     sp.style.display = '';
@@ -8082,10 +8114,14 @@ function capStyleWord(sp, ms, lineStart) {
   sp.style.color = color;
   sp.style.opacity = String(opacity);
   sp.style.transform = transform;
+  sp.style.background = background;
+  sp.style.padding = padding;
+  sp.style.borderRadius = radius;
+  sp.style.webkitTextStroke = stroke;
 }
 
 function capPreviewTick(now) {
-  const capEl = document.getElementById('capCap');
+  const capEl = capPreview.capEl || document.getElementById('capCap');
   if (!capEl || !captionsModal.classList.contains('show')) { capPreview.raf = 0; return; }
   if (!capPreview.start) capPreview.start = now;
   const cycle = CAP_SAMPLE[CAP_SAMPLE.length - 1].e + CAP_HOLD;
@@ -8093,10 +8129,22 @@ function capPreviewTick(now) {
   const lines = capPreview.lines;
   if (lines.length) {
     const idx = capActiveLineIdx(lines, ms);
-    if (idx !== capPreview.curLine) { capPreview.curLine = idx; capBuildLine(capEl, lines[idx]); }
+    if (idx !== capPreview.curLine) { capPreview.curLine = idx; capBuildLine(capEl, lines[idx], idx); }
     capApplyPos(capEl);
-    const line = lines[idx];
-    capEl.querySelectorAll('.cap-cap-word').forEach(sp => capStyleWord(sp, ms, line.s));
+    const words = capPreview.words || capEl.querySelectorAll('.cap-cap-word');
+    for (let i = 0; i < words.length; i++) capStyleWord(words[i], ms);
+    // per-line entrance (vary): animate the line container in
+    if (capPreview.lineEl) {
+      if (capPreview.entrance) {
+        const p = Math.max(0, Math.min(1, (ms - capPreview.lineStart) / 300));
+        const eP = 1 - Math.pow(1 - p, 3);
+        capPreview.lineEl.style.transform = capPreview.entrance(eP);
+        capPreview.lineEl.style.opacity = String(Math.max(0, Math.min(1, eP * 1.6)));
+      } else {
+        capPreview.lineEl.style.transform = '';
+        capPreview.lineEl.style.opacity = '1';
+      }
+    }
   }
   capPreview.raf = requestAnimationFrame(capPreviewTick);
 }
@@ -8106,6 +8154,8 @@ function capRefreshPreview(restart) {
   capPreview.curLine = -1;
   if (restart) capPreview.start = 0;
   const capEl = document.getElementById('capCap');
+  capPreview.capEl = capEl;
+  capPreview.stage = document.getElementById('capStage');
   if (capEl) { capEl.className = 'cap-cap draggable' + (capState.box ? ' boxed' : ''); capApplyPos(capEl); }
   if (!capPreview.raf) capPreview.raf = requestAnimationFrame(capPreviewTick);
 }
@@ -8305,6 +8355,15 @@ async function generateCaptions() {
       highlight: capState.highlight, position: capState.position,
       uppercase: capState.uppercase, box: capState.box,
       fontScale: capState.fontPct / 100,
+      fontWeight: capState.fontWeight,
+      align: capState.align,
+      letterSpacing: capState.trackingPct / 100,
+      lineHeight: capState.lineHtPct / 100,
+      shadow: capState.shadowPct / 100,
+      stroke: capState.strokePx,
+      strokeColor: capState.strokeColor,
+      varyPerLine: capState.vary,
+      fontFamily: capState.fontFamily || undefined,
       customX: capState.customX, customY: capState.customY,
     },
     grouping: { maxWordsPerLine: capState.maxWords },
