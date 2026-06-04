@@ -8230,8 +8230,10 @@ function capCleanup() {
 }
 function closeCaptionsModal() { captionsModal.classList.remove('show'); capStopPreview(); }
 function capCancel() {
+  // capCleanup() aborts the in-flight /captions fetch; the bridge's req.on('aborted')
+  // handler then kills the parakeet + remotion child processes (no separate
+  // cancel endpoint needed — /autoedit-cancel was the wrong one anyway).
   capCleanup();
-  try { fetch(BRIDGE + '/autoedit-cancel', { method: 'POST' }).catch(() => {}); } catch {}
   updateEscHint && updateEscHint();
   closeCaptionsModal();
 }

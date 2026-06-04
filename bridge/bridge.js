@@ -445,24 +445,28 @@ function groupWordsIntoLines(words, opts) {
 
 // Like runParakeet, but keeps the sub-word tokens and returns reconstructed
 // words alongside the sentence segments. Cleans up its temp files.
-function runParakeetWords(wavPath, audioDuration) {
+function runParakeetWords(wavPath, audioDuration, onProc) {
   return new Promise((resolve, reject) => {
     const bin = resolveParakeet();
     const outDir = path.dirname(wavPath);
     const baseName = path.basename(wavPath, path.extname(wavPath));
     const jsonOut = path.join(outDir, baseName + '.json');
     try { fs.unlinkSync(jsonOut); } catch {}
+    // Clean up BOTH temp files on every exit path (the success path used to be
+    // the only one that unlinked the wav, leaking it on timeout/exit/parse-fail).
+    const cleanup = () => { try { fs.unlinkSync(jsonOut); } catch {} try { fs.unlinkSync(wavPath); } catch {} };
     const args = ['--output-format', 'json', '--output-dir', outDir, wavPath];
     const proc = spawn(bin, args, { env: process.env });
+    if (typeof onProc === 'function') onProc(proc);
     let stderr = '';
     proc.stderr.on('data', d => stderr += d.toString().slice(-2000));
     proc.stdout.on('data', () => {});
     const cap = Math.min(15 * 60 * 1000, Math.max(120000, audioDuration * 800 + 60000));
-    const killer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} reject(new Error('parakeet timeout after ' + Math.round(cap / 1000) + 's')); }, cap);
-    proc.on('error', e => { clearTimeout(killer); reject(e); });
+    const killer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} cleanup(); reject(new Error('parakeet timeout after ' + Math.round(cap / 1000) + 's')); }, cap);
+    proc.on('error', e => { clearTimeout(killer); cleanup(); reject(e); });
     proc.on('close', code => {
       clearTimeout(killer);
-      if (code !== 0 || !fs.existsSync(jsonOut)) { reject(new Error('parakeet exit ' + code + ': ' + stderr.slice(-300))); return; }
+      if (code !== 0 || !fs.existsSync(jsonOut)) { cleanup(); reject(new Error('parakeet exit ' + code + ': ' + stderr.slice(-300))); return; }
       try {
         const j = JSON.parse(fs.readFileSync(jsonOut, 'utf8'));
         const sentences = (j.sentences || []).map(s => ({
@@ -472,10 +476,10 @@ function runParakeetWords(wavPath, audioDuration) {
           tokens: s.tokens || [],
         }));
         const words = tokensToWords(sentences);
-        try { fs.unlinkSync(jsonOut); } catch {}
-        try { fs.unlinkSync(wavPath); } catch {}
+        cleanup();
         resolve({ words, sentences: sentences.map(s => ({ start: s.start, end: s.end, text: s.text })) });
       } catch (e) {
+        cleanup();
         reject(new Error('parakeet json parse: ' + e.message));
       }
     });
@@ -486,30 +490,44 @@ function runParakeetWords(wavPath, audioDuration) {
 // remotion-intro is NOT touched by auto-update (which only syncs 4 top-level
 // files), so we copy the component from the same source the updater uses:
 // the local repo when present, else GitHub raw. Idempotent (writes only on diff).
+let _captionsRawCache = null;   // GitHub-raw fetch cached for the bridge lifetime
+let _captionsWriteLock = Promise.resolve();   // serialize writes (avoid same-pid temp races)
+let _capTmpSeq = 0;
 async function ensureCaptionsComponent(projDir) {
   const dest = path.join(projDir, 'src', 'Captions.tsx');
   let srcText = null;
+  // Local repo (dev): read fresh each time — cheap, and picks up edits.
   if (LOCAL_SOURCE_DIR) {
     try { srcText = fs.readFileSync(path.join(LOCAL_SOURCE_DIR, 'bridge', 'remotion-template', 'src', 'Captions.tsx'), 'utf8'); } catch {}
   }
-  if (srcText == null && typeof fetch === 'function') {
-    try {
-      const r = await fetch(GITHUB_RAW + '/bridge/remotion-template/src/Captions.tsx');
-      if (r.ok) srcText = await r.text();
-    } catch {}
+  // GitHub raw: fetch once, then cache (the component only changes on app update,
+  // so re-fetching the whole file on every /captions call was wasted latency).
+  if (srcText == null) {
+    if (_captionsRawCache != null) srcText = _captionsRawCache;
+    else if (typeof fetch === 'function') {
+      try {
+        const r = await fetch(GITHUB_RAW + '/bridge/remotion-template/src/Captions.tsx');
+        if (r.ok) { srcText = await r.text(); _captionsRawCache = srcText; }
+      } catch {}
+    }
   }
   if (srcText == null) {
     if (fs.existsSync(dest)) return dest;   // previously installed copy — good enough
     throw new Error('captions component source unavailable (no local repo, no network, not previously installed)');
   }
-  let cur = null;
-  try { cur = fs.readFileSync(dest, 'utf8'); } catch {}
-  if (cur !== srcText) {
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    const tmp = dest + '.tmp' + process.pid;
-    fs.writeFileSync(tmp, srcText);
-    fs.renameSync(tmp, dest);
-  }
+  // Serialize the read-compare-write so two concurrent /captions calls can't
+  // race on the temp file (which was keyed only on pid — identical in-process).
+  _captionsWriteLock = _captionsWriteLock.then(() => {
+    let cur = null;
+    try { cur = fs.readFileSync(dest, 'utf8'); } catch {}
+    if (cur !== srcText) {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      const tmp = dest + '.tmp' + process.pid + '.' + (_capTmpSeq++);
+      fs.writeFileSync(tmp, srcText);
+      fs.renameSync(tmp, dest);
+    }
+  }).catch(() => {});
+  await _captionsWriteLock;
   return dest;
 }
 
@@ -584,19 +602,22 @@ async function renderCaptions(opts) {
   const env = { ...process.env };
   env.PATH = path.dirname(nodeBin) + path.delimiter + (env.PATH || '');
 
+  // Clean the one-off entry + props on EVERY exit (close, error, timeout) — the
+  // entry .tsx lives in the shared src/ and must not leak there.
+  const cleanupTemp = () => { try { fs.unlinkSync(entryAbs); } catch {} try { fs.unlinkSync(propsFile); } catch {} };
   await new Promise((resolve, reject) => {
     const proc = spawn(nodeBin, args, { cwd: projDir, env });
+    if (typeof opts.onProc === 'function') opts.onProc(proc);
     let stderr = '';
     proc.stdout.on('data', d => { const s = d.toString(); if (/Rendered|Encoding|Bundl/.test(s)) log && log('render ' + s.trim().split('\n').pop().slice(0, 80)); });
     proc.stderr.on('data', d => stderr += d.toString().slice(-4000));
-    const killer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} reject(new Error('caption render timeout (8m)')); }, 8 * 60 * 1000);
-    proc.on('error', e => { clearTimeout(killer); reject(e); });
+    const killer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} cleanupTemp(); try { fs.unlinkSync(outFile); } catch {} reject(new Error('caption render timeout (8m)')); }, 8 * 60 * 1000);
+    proc.on('error', e => { clearTimeout(killer); cleanupTemp(); reject(e); });
     proc.on('close', code => {
       clearTimeout(killer);
-      try { fs.unlinkSync(entryAbs); } catch {}
-      try { fs.unlinkSync(propsFile); } catch {}
+      cleanupTemp();
       if (code === 0 && fs.existsSync(outFile)) resolve();
-      else reject(new Error('caption render exit ' + code + ': ' + stderr.slice(-400)));
+      else { try { fs.unlinkSync(outFile); } catch {} reject(new Error('caption render exit ' + code + ': ' + stderr.slice(-400))); }
     });
   });
   return outFile;
@@ -4278,9 +4299,27 @@ const server = http.createServer((req, res) => {
       const fail = (msg, code) => {
         try { clog('autoedit', 'error', '[captions] ' + msg, { reqId }, reqId); } catch {}
         try { broadcastProgressDone(reqId); } catch {}
-        res.writeHead(code || 200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: msg, reqId }));
+        if (!res.writableEnded) {
+          res.writeHead(code || 200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: msg, reqId }));
+        }
       };
+      // Cancellation: track the child processes (parakeet + remotion) so that when
+      // the panel aborts the request (Cancel/Esc) we actually kill the work
+      // instead of leaving a multi-minute render running orphaned.
+      const childProcs = new Set();
+      let aborted = false;
+      const onProc = (p) => {
+        if (aborted) { try { p.kill('SIGKILL'); } catch {} return; }
+        childProcs.add(p);
+        p.on('close', () => childProcs.delete(p));
+      };
+      req.on('aborted', () => {
+        aborted = true;
+        for (const p of childProcs) { try { p.kill('SIGKILL'); } catch {} }
+        try { clog('autoedit', 'warn', '[captions] client aborted — killed ' + childProcs.size + ' procs', { reqId }, reqId); } catch {}
+        try { broadcastProgressDone(reqId); } catch {}
+      });
       try {
         if (!segments.length) return fail('No clip selected. Select the clip whose speech you want captioned.');
 
@@ -4313,8 +4352,10 @@ const server = http.createServer((req, res) => {
         broadcastProgress('Extracting audio', 6, reqId);
         const { wavPath, totalDur } = await extractConcatAudio(segments, reqId, log);
 
+        if (aborted) return;
         broadcastProgress('Transcribing word-by-word', 22, reqId);
-        const { words } = await runParakeetWords(wavPath, totalDur);
+        const { words } = await runParakeetWords(wavPath, totalDur, onProc);
+        if (aborted) return;
         log(`parakeet: ${words.length} words over ${totalDur.toFixed(1)}s`);
         if (!words.length) return fail('No speech found to caption in the selected clip.');
 
@@ -4329,8 +4370,10 @@ const server = http.createServer((req, res) => {
         });
         log(`grouped into ${lines.length} caption lines`);
 
+        if (aborted) return;
         broadcastProgress('Rendering captions overlay', 45, reqId);
-        const outFile = await renderCaptions({ lines, style, options, width, height, fps, reqId, log });
+        const outFile = await renderCaptions({ lines, style, options, width, height, fps, reqId, log, onProc });
+        if (aborted) { try { fs.unlinkSync(outFile); } catch {} return; }
         log('rendered ' + path.basename(outFile));
 
         broadcastProgress('Done', 100, reqId);
