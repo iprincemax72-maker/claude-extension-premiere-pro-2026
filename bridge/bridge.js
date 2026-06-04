@@ -623,6 +623,40 @@ async function renderCaptions(opts) {
   return outFile;
 }
 
+// Split the single rendered overlay into ONE clip per caption line, so each
+// caption lands on the timeline as its own movable element (not one baked file
+// with every caption in it). ProRes 4444 is all-intra, so ffmpeg -c copy cuts
+// are frame-accurate and fast (no re-encode, alpha preserved). Returns
+// [{ path, timelineSec, durationSec, text }] in timeline order.
+async function splitCaptionClips(srcMov, lines, baseTimelineSec, reqId, log) {
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const startSec = Math.max(0, l.startMs / 1000);
+    const dur = Math.max(0.1, (l.endMs - l.startMs) / 1000);
+    const dest = path.join(OUTPUT_DIR, 'caption_' + String(reqId).slice(0, 8) + '_' + i + '_' + Date.now() + '.mov');
+    const ok = await new Promise((res) => {
+      // -ss before -i = fast input seek; exact for all-intra ProRes. -c copy keeps alpha.
+      const ff = spawn(FFMPEG_BIN, ['-y', '-ss', String(startSec), '-i', srcMov, '-t', String(dur), '-c', 'copy', dest]);
+      let er = '';
+      ff.stderr.on('data', d => er += d.toString().slice(-600));
+      const k = setTimeout(() => { try { ff.kill('SIGKILL'); } catch {} res(false); }, 60000);
+      ff.on('error', () => { clearTimeout(k); res(false); });
+      ff.on('close', c => { clearTimeout(k); res(c === 0 && fs.existsSync(dest)); });
+    });
+    if (ok) {
+      out.push({
+        path: dest,
+        timelineSec: baseTimelineSec + startSec,
+        durationSec: dur,
+        text: (l.words || []).map(w => w.text).join(' '),
+      });
+    } else if (log) log('split clip ' + i + ' failed');
+  }
+  if (log) log('split into ' + out.length + ' caption clips');
+  return out;
+}
+
 // Ask Claude (small, fast call) to scan the transcript for fillers + false
 // starts. Claude doesn't need any tools — just reads text, returns JSON. So
 // no hanging on tool I/O. 60s hard cap. Used only when useTranscript is true.
@@ -4376,17 +4410,26 @@ const server = http.createServer((req, res) => {
         if (aborted) { try { fs.unlinkSync(outFile); } catch {} return; }
         log('rendered ' + path.basename(outFile));
 
+        // Split into ONE clip per caption line so each lands as its own movable
+        // timeline element (not one baked file with all the captions).
+        const baseTimeline = Number(segments[0].timelineStart) || 0;
+        broadcastProgress('Splitting into per-line clips', 82, reqId);
+        let clips = [];
+        try { clips = await splitCaptionClips(outFile, lines, baseTimeline, reqId, log); } catch (e) { log('split failed: ' + (e && e.message || e)); }
+        if (clips.length) { try { fs.unlinkSync(outFile); } catch {} }  // big file no longer needed
+        else clips = [{ path: outFile, timelineSec: baseTimeline, durationSec: (lines.length ? lines[lines.length - 1].endMs / 1000 : totalDur), text: '' }];  // fallback: whole file
+
         broadcastProgress('Done', 100, reqId);
         broadcastProgressDone(reqId);
         const durationSec = lines.length ? lines[lines.length - 1].endMs / 1000 : totalDur;
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           ok: true, reqId,
-          import: outFile,
-          imports: [outFile],
-          reply: `Captions ready (${words.length} words, ${lines.length} lines, ${style} style).\n[[IMPORT:${outFile}]]`,
-          style, wordCount: words.length, lineCount: lines.length,
-          timelineStart: Number(segments[0].timelineStart) || 0,
+          clips,
+          import: clips[0].path,   // back-compat (first clip)
+          reply: `Captions ready (${words.length} words, ${lines.length} lines, ${clips.length} clips, ${style} style).`,
+          style, wordCount: words.length, lineCount: lines.length, clipCount: clips.length,
+          timelineStart: baseTimeline,
           durationSec,
         }));
       } catch (e) {

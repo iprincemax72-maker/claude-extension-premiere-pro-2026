@@ -8624,27 +8624,25 @@ async function generateCaptions() {
 // Result bubble + import card. Captions go on the track ABOVE the footage, so
 // the import is forced to 'overlay' regardless of the global placement setting.
 function addCaptionsResultCard(data) {
-  const absPath = data.import || (data.imports && data.imports[0]);
-  if (!absPath) return;
-  const styleLabel = { karaoke: 'Karaoke', reels: 'Big Bold', tiktok: 'TikTok Pop', classic: 'Classic', minimal: 'Minimal' }[data.style] || data.style;
+  // Each caption line is its OWN clip -> place each as a separate timeline layer.
+  const clips = (data.clips && data.clips.length) ? data.clips
+    : (data.import ? [{ path: data.import, timelineSec: data.timelineStart || 0 }] : []);
+  if (!clips.length) return;
+  const styleLabel = { karaoke: 'Karaoke', reels: 'Big Bold', tiktok: 'TikTok Pop', classic: 'Classic', minimal: 'Minimal', hormozi: 'Hormozi' }[data.style] || data.style;
   const dur = typeof data.durationSec === 'number' ? data.durationSec.toFixed(1) + 's' : '';
-  // Place at the captioned clip's timeline position so the words sync to speech.
-  const atSec = (typeof data.timelineStart === 'number') ? data.timelineStart : undefined;
   const m = makeMsg('claude',
-    'Captions ready — <b>' + escapeHTML(styleLabel) + '</b> · ' + (data.wordCount || 0) + ' words · '
-    + (data.lineCount || 0) + ' lines' + (dur ? ' · ' + dur : '')
-    + '. Adding to the track above your clip…');
+    'Captions ready - <b>' + escapeHTML(styleLabel) + '</b> &middot; ' + (data.wordCount || 0) + ' words &middot; '
+    + clips.length + ' clip' + (clips.length === 1 ? '' : 's') + (dur ? ' &middot; ' + dur : '')
+    + '. Each caption drops as its own layer above your clip.');
 
   const card = document.createElement('div');
   card.className = 'render-preview';
-  const filename = (absPath || '').split('/').pop();
   card.innerHTML =
-      '<div class="render-preview-meta"><span class="render-preview-name">' + escapeHTML(filename) + '</span><span>adding…</span></div>'
+      '<div class="render-preview-meta"><span class="render-preview-name">' + clips.length + ' caption layer' + (clips.length === 1 ? '' : 's') + '</span><span>adding&hellip;</span></div>'
     + '<div class="render-preview-actions">'
     +   '<button class="render-import-btn" type="button">Re-add to timeline</button>'
-    +   '<button class="render-discard-btn" type="button" data-act="preview">Preview</button>'
+    +   '<button class="render-discard-btn" type="button" data-act="preview">Preview first</button>'
     + '</div>';
-  // makeMsg returns {wrap, body} where body IS the .msg-body element; append directly.
   m.body.appendChild(card);
 
   const importBtn = card.querySelector('.render-import-btn');
@@ -8654,15 +8652,13 @@ function addCaptionsResultCard(data) {
 
   async function doCaptionImport() {
     importBtn.disabled = true;
-    setStatus('adding…');
+    setStatus('adding ' + clips.length + ' layer' + (clips.length === 1 ? '' : 's') + '…');
     try {
-      const result = await importIntoPremiere(absPath, 'overlay', atSec);
-      if (result && result.ok) {
-        if (result.placed) {
-          const at = (typeof result.seconds === 'number') ? ' @ ' + result.seconds.toFixed(2) + 's' : '';
-          setStatus('added on ' + (result.track || 'overlay') + at);
-        } else setStatus('added · ' + (result.reason || 'to bin'));
-      } else setStatus('failed: ' + ((result && result.error) || 'import error'));
+      const arg = JSON.stringify(clips.map(c => ({ path: c.path, timelineSec: c.timelineSec })));
+      const raw = await evalES('ccImportCaptionClips(' + JSON.stringify(arg) + ')');
+      const r = raw ? JSON.parse(raw) : null;
+      if (r && r.ok) setStatus('added ' + r.placed + '/' + r.total + ' caption layer' + (r.total === 1 ? '' : 's'));
+      else setStatus('failed: ' + ((r && r.error) || 'import error'));
       refreshStatus && refreshStatus(false);
     } catch (e) {
       setStatus('import failed');
@@ -8675,12 +8671,11 @@ function addCaptionsResultCard(data) {
   previewBtn.addEventListener('click', async () => {
     const orig = previewBtn.textContent;
     previewBtn.disabled = true; previewBtn.textContent = 'Opening…';
-    try { await previewInSource(absPath); } catch {}
+    try { await previewInSource(clips[0].path); } catch {}
     previewBtn.disabled = false; previewBtn.textContent = orig;
   });
 
-  // Auto-import on generate (the user wants captions to land on the timeline
-  // immediately). The "Re-add to timeline" button retries if it didn't take.
+  // Auto-import on generate - each caption as its own layer. "Re-add" retries.
   doCaptionImport();
 }
 

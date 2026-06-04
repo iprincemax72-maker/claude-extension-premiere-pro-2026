@@ -274,6 +274,67 @@ function ccImportToTimeline(path, mode, atSec) {
     }
 }
 
+// Import a LIST of caption clips and place each as its own element on the
+// timeline (every caption is a separate, movable layer — not one baked file).
+// clipsJson = [{ path, timelineSec }]. Each is overwriteClip'd at its time on an
+// overlay track above the base video.
+function ccImportCaptionClips(clipsJson) {
+    var result = { ok: false, placed: 0, total: 0, errors: [] };
+    try {
+        if (typeof app === "undefined" || !app || !app.project) { result.error = "no project open"; return JSON.stringify(result); }
+        var clips;
+        try { clips = JSON.parse(clipsJson); } catch (e0) { result.error = "bad clips json"; return JSON.stringify(result); }
+        if (!clips || !clips.length) { result.error = "no clips"; return JSON.stringify(result); }
+        result.total = clips.length;
+
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) { result.error = "no active sequence"; return JSON.stringify(result); }
+        var vTracks = _ccSafe(function () { return seq.videoTracks; });
+        var nTracks = vTracks ? _ccSafe(function () { return vTracks.numTracks; }) : 0;
+        if (typeof nTracks !== "number" || nTracks <= 0) { result.error = "no video tracks"; return JSON.stringify(result); }
+        var overlayBase = nTracks > 1 ? 1 : 0;   // first track above the base video
+
+        for (var i = 0; i < clips.length; i++) {
+            var clip = clips[i];
+            var p = clip && clip.path;
+            if (!p) { result.errors.push("clip " + i + ": no path"); continue; }
+
+            var ok = _ccSafe(function () { return app.project.importFiles([p], true, app.project.rootItem, false); });
+            var item = _ccFindItemByPath(app.project.rootItem, p, 0);
+            if (!item) { result.errors.push("clip " + i + ": item not found"); continue; }
+            _ccSafe(function () { if (typeof item.setColorLabel === "function") item.setColorLabel(6); });
+
+            // move playhead to the clip's time, read the Time back (never new Time())
+            var atSec = Number(clip.timelineSec) || 0;
+            var ticks = String(Math.round(atSec * 254016000000));
+            _ccSafe(function () { if (seq.setPlayerPosition) seq.setPlayerPosition(ticks); });
+            var time = _ccSafe(function () { return seq.getPlayerPosition && seq.getPlayerPosition(); });
+            if (!time) { result.errors.push("clip " + i + ": no time"); continue; }
+
+            // pick the first overlay track that's free at this time
+            var track = null;
+            for (var t = overlayBase; t < nTracks; t++) {
+                var tk = _ccSafe((function (idx) { return function () { return vTracks[idx]; }; })(t));
+                if (tk && !_ccTrackHasClipAt(tk, atSec)) { track = tk; break; }
+            }
+            if (!track) track = _ccSafe(function () { return vTracks[overlayBase]; });
+            if (!track) { result.errors.push("clip " + i + ": no track"); continue; }
+
+            var placed = false;
+            try {
+                if (track.overwriteClip) { track.overwriteClip(item, time); placed = true; }
+                else if (track.insertClip) { track.insertClip(item, time); placed = true; }
+            } catch (e2) { result.errors.push("clip " + i + ": " + String(e2)); }
+            if (placed) result.placed++;
+        }
+        result.ok = true;
+        return JSON.stringify(result);
+    } catch (e) {
+        result.error = String(e);
+        return JSON.stringify(result);
+    }
+}
+
 function ccOpenInSource(path) {
     try {
         if (typeof app === "undefined" || !app || !app.project) {
