@@ -126,7 +126,7 @@ function _ccTrackHasClipAt(track, seconds) {
     return has;
 }
 
-function ccImportToTimeline(path, mode) {
+function ccImportToTimeline(path, mode, atSec) {
     var result = { ok: false, path: path, imported: false, placed: false };
     try {
         if (typeof app === "undefined" || !app || !app.project) {
@@ -172,7 +172,18 @@ function ccImportToTimeline(path, mode) {
             return JSON.stringify(result);
         }
 
-        // 4. Playhead — only use seq.getPlayerPosition's Time, never construct new Time()
+        // 4. Placement time. If atSec is given (captions sync to the clip's
+        //    timeline position), move the playhead there and read the Time back
+        //    (never construct new Time()). Otherwise use the current playhead.
+        var atSecNum = null;
+        if (typeof atSec === "number" && atSec >= 0) atSecNum = atSec;
+        else if (atSec !== null && atSec !== undefined && atSec !== "") {
+            var _p = parseFloat(atSec); if (!isNaN(_p) && _p >= 0) atSecNum = _p;
+        }
+        if (atSecNum !== null) {
+            var _ticks = String(Math.round(atSecNum * 254016000000));
+            _ccSafe(function () { if (seq.setPlayerPosition) seq.setPlayerPosition(_ticks); });
+        }
         var time = _ccSafe(function () { return seq.getPlayerPosition && seq.getPlayerPosition(); });
         if (!time || typeof time.seconds !== "number") {
             // Try sequence start as a fallback
@@ -226,7 +237,13 @@ function ccImportToTimeline(path, mode) {
         // 6. Place — wrap the actual write so a bad call cannot crash PPro
         var placeOk = false;
         try {
-            if (mode === "overwrite" && track.overwriteClip) {
+            // For a timed placement (atSec, e.g. captions) prefer overwriteClip —
+            // it drops the clip at the exact time on the empty overlay track
+            // without rippling later clips (which insertClip can do).
+            if (atSecNum !== null && track.overwriteClip) {
+                track.overwriteClip(item, time);
+                placeOk = true;
+            } else if (mode === "overwrite" && track.overwriteClip) {
                 track.overwriteClip(item, time);
                 placeOk = true;
             } else if (track.insertClip) {

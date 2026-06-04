@@ -4968,10 +4968,12 @@ async function getPremiereContext() {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
 }
-async function importIntoPremiere(absPath, mode) {
+async function importIntoPremiere(absPath, mode, atSec) {
   const escapedPath = absPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   const escapedMode = (mode || 'overlay').replace(/[^a-z]/gi, '');
-  const raw = await evalES('ccImportToTimeline("' + escapedPath + '","' + escapedMode + '")');
+  // optional 3rd arg: place at an absolute timeline second (captions sync to the clip)
+  const atArg = (typeof atSec === 'number' && isFinite(atSec) && atSec >= 0) ? (',' + atSec) : '';
+  const raw = await evalES('ccImportToTimeline("' + escapedPath + '","' + escapedMode + '"' + atArg + ')');
   try { return JSON.parse(raw); } catch { return { ok:false, error:'parse failed', path:absPath }; }
 }
 
@@ -8303,56 +8305,60 @@ function addCaptionsResultCard(data) {
   if (!absPath) return;
   const styleLabel = { karaoke: 'Karaoke', reels: 'Big Bold', tiktok: 'TikTok Pop', classic: 'Classic', minimal: 'Minimal' }[data.style] || data.style;
   const dur = typeof data.durationSec === 'number' ? data.durationSec.toFixed(1) + 's' : '';
+  // Place at the captioned clip's timeline position so the words sync to speech.
+  const atSec = (typeof data.timelineStart === 'number') ? data.timelineStart : undefined;
   const m = makeMsg('claude',
     'Captions ready — <b>' + escapeHTML(styleLabel) + '</b> · ' + (data.wordCount || 0) + ' words · '
     + (data.lineCount || 0) + ' lines' + (dur ? ' · ' + dur : '')
-    + '. Drops on the track above your clip.');
+    + '. Adding to the track above your clip…');
 
   const card = document.createElement('div');
   card.className = 'render-preview';
   const filename = (absPath || '').split('/').pop();
   card.innerHTML =
-      '<div class="render-preview-meta"><span class="render-preview-name">' + escapeHTML(filename) + '</span><span>ready</span></div>'
+      '<div class="render-preview-meta"><span class="render-preview-name">' + escapeHTML(filename) + '</span><span>adding…</span></div>'
     + '<div class="render-preview-actions">'
-    +   '<button class="render-import-btn" type="button">Add captions to timeline</button>'
+    +   '<button class="render-import-btn" type="button">Re-add to timeline</button>'
     +   '<button class="render-discard-btn" type="button" data-act="preview">Preview</button>'
     + '</div>';
-  // makeMsg returns {wrap, body} where body IS the .msg-body element; the card
-  // appends directly onto it (querying '.msg-content' here returns null — that's
-  // the .msg-body's PARENT — and threw, so successful renders showed no card).
+  // makeMsg returns {wrap, body} where body IS the .msg-body element; append directly.
   m.body.appendChild(card);
 
   const importBtn = card.querySelector('.render-import-btn');
   const previewBtn = card.querySelector('[data-act="preview"]');
   const meta = card.querySelector('.render-preview-meta');
+  const setStatus = (t) => { const s = meta && meta.querySelectorAll('span')[1]; if (s) s.textContent = t; };
 
-  importBtn.addEventListener('click', async () => {
-    importBtn.disabled = true; importBtn.textContent = 'Adding…';
+  async function doCaptionImport() {
+    importBtn.disabled = true;
+    setStatus('adding…');
     try {
-      const result = await importIntoPremiere(absPath, 'overlay');
-      let statusText = 'ready';
+      const result = await importIntoPremiere(absPath, 'overlay', atSec);
       if (result && result.ok) {
         if (result.placed) {
           const at = (typeof result.seconds === 'number') ? ' @ ' + result.seconds.toFixed(2) + 's' : '';
-          statusText = 'added · overlapped on ' + (result.track || '?') + at;
-        } else statusText = 'added · ' + (result.reason || 'to bin');
-      } else if (result && result.error) statusText = 'failed: ' + result.error;
-      const statusSpan = meta && meta.querySelectorAll('span')[1];
-      if (statusSpan) statusSpan.textContent = statusText;
+          setStatus('added on ' + (result.track || 'overlay') + at);
+        } else setStatus('added · ' + (result.reason || 'to bin'));
+      } else setStatus('failed: ' + ((result && result.error) || 'import error'));
       refreshStatus && refreshStatus(false);
     } catch (e) {
-      const statusSpan = meta && meta.querySelectorAll('span')[1];
-      if (statusSpan) statusSpan.textContent = 'import failed';
+      setStatus('import failed');
     } finally {
-      importBtn.disabled = false; importBtn.textContent = 'Add captions to timeline';
+      importBtn.disabled = false;
     }
-  });
+  }
+
+  importBtn.addEventListener('click', doCaptionImport);
   previewBtn.addEventListener('click', async () => {
     const orig = previewBtn.textContent;
     previewBtn.disabled = true; previewBtn.textContent = 'Opening…';
     try { await previewInSource(absPath); } catch {}
     previewBtn.disabled = false; previewBtn.textContent = orig;
   });
+
+  // Auto-import on generate (the user wants captions to land on the timeline
+  // immediately). The "Re-add to timeline" button retries if it didn't take.
+  doCaptionImport();
 }
 
 const _captionsBtn = document.getElementById('captionsBtn');
