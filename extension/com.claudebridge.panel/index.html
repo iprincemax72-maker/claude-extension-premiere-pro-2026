@@ -2383,61 +2383,175 @@
   }
   .ae-mini-cancel:hover { color: var(--accent); }
 
-  /* ── Captions modal ─────────────────────────────────────────────────── */
-  .cap-styles {
-    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
-    margin: 6px 0 4px;
+  /* ── Captions — full-screen studio ──────────────────────────────────── */
+  .cap-full.autocut-modal { align-items: stretch; justify-content: stretch; background: rgba(6,6,8,0.86); }
+  .cap-full .cap-full-card {
+    width: 100%; height: 100%; max-width: none; max-height: none;
+    border-radius: 0; border: none; padding: 0; overflow: hidden;
+    background: radial-gradient(120% 80% at 50% -10%, #17151b 0%, #100f13 55%, #0b0a0d 100%);
+    display: flex; flex-direction: column;
+    transform: translate3d(0,0,0) scale(0.995);
   }
+  .cap-full .cap-full-card::before { left: 0; right: 0; opacity: 0.5; }
+
+  /* header */
+  .cap-head { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 13px 15px 11px; }
+  .cap-head .cap-x {
+    width: 30px; height: 30px; border-radius: 9px; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.05); border: 1px solid var(--border); color: var(--text-dim);
+    cursor: pointer; transition: background .14s, color .14s, transform .12s;
+  }
+  .cap-head .cap-x:hover { background: rgba(255,255,255,.1); color: var(--text); transform: scale(1.06); }
+  .cap-head .cap-x svg { width: 15px; height: 15px; }
+  .cap-head-title { font-size: 15.5px; font-weight: 680; color: var(--text); letter-spacing: -0.01em; }
+  .cap-head-sub { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
+  .cap-head-spacer { flex: 1; }
+  .cap-selchip {
+    font-size: 11px; color: var(--text-dim); padding: 5px 10px; border-radius: 20px;
+    background: rgba(255,255,255,.04); border: 1px solid var(--border); white-space: nowrap;
+  }
+  .cap-selchip.warn { color: #e7b07f; border-color: rgba(217,119,87,.4); background: rgba(217,119,87,.08); }
+  .cap-selchip b { color: var(--text); }
+
+  /* scrollable body */
+  .cap-body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 15px 14px; }
+  .cap-body::-webkit-scrollbar { width: 9px; }
+  .cap-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 9px; }
+
+  /* preview stage — a faux video frame the caption sits over */
+  .cap-stage {
+    position: relative; width: 100%; border-radius: 16px; overflow: hidden;
+    background: #0a090c; border: 1px solid rgba(255,255,255,.07);
+    display: flex; align-items: center; justify-content: center;
+    min-height: 230px; margin-bottom: 4px;
+    box-shadow: 0 18px 50px -28px #000;
+  }
+  .cap-stage-inner {
+    position: relative; height: 300px; max-height: 46vh; border-radius: 12px; overflow: hidden;
+    /* faux footage: soft blurred "video" so caption legibility reads honestly */
+    background:
+      radial-gradient(60% 50% at 28% 22%, rgba(90,140,200,.45), transparent 70%),
+      radial-gradient(55% 60% at 78% 75%, rgba(217,119,87,.40), transparent 72%),
+      linear-gradient(145deg, #2b2f3a 0%, #1b1820 55%, #241a1c 100%);
+  }
+  .cap-stage-inner::after { /* subtle grain/vignette */
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(120% 120% at 50% 50%, transparent 55%, rgba(0,0,0,.45) 100%);
+    pointer-events: none;
+  }
+  .cap-stage-badge {
+    position: absolute; top: 9px; left: 10px; z-index: 3;
+    font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700;
+    color: rgba(255,255,255,.55); padding: 3px 7px; border-radius: 6px;
+    background: rgba(0,0,0,.35); backdrop-filter: blur(2px);
+  }
+  .cap-replay {
+    position: absolute; bottom: 9px; right: 10px; z-index: 3;
+    display: flex; align-items: center; gap: 5px; cursor: pointer;
+    font-size: 11px; color: rgba(255,255,255,.8); padding: 4px 9px; border-radius: 18px;
+    background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.14);
+    transition: background .14s, transform .12s; backdrop-filter: blur(2px);
+  }
+  .cap-replay:hover { background: rgba(0,0,0,.62); transform: scale(1.05); }
+  .cap-replay svg { width: 12px; height: 12px; }
+
+  /* the animated caption inside the stage (JS-driven, mirrors Captions.tsx) */
+  .cap-cap {
+    position: absolute; left: 0; right: 0; z-index: 2;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 0 7%;
+  }
+  .cap-cap.pos-top { top: 9%; }
+  .cap-cap.pos-middle { top: 50%; transform: translateY(-50%); }
+  .cap-cap.pos-bottom { bottom: 11%; }
+  .cap-cap-line { display: flex; flex-wrap: wrap; justify-content: center; gap: .12em .28em; line-height: 1.12; }
+  .cap-cap-word {
+    display: inline-block; font-weight: 800; color: #fff;
+    text-shadow: 0 2px 10px rgba(0,0,0,.55), 0 0 2px rgba(0,0,0,.5);
+    transform-origin: center bottom; will-change: transform, opacity;
+  }
+  .cap-cap.boxed .cap-cap-line { background: rgba(0,0,0,.42); border-radius: 12px; padding: .26em .6em; }
+
+  /* section labels */
+  .cap-sec-label { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-dim); font-weight: 650; margin: 14px 2px 8px; }
+
+  /* style chips — horizontal, hover-lift */
+  .cap-styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 9px; }
   .cap-style {
     position: relative; display: flex; flex-direction: column; gap: 3px;
-    padding: 10px 11px; cursor: pointer;
-    background: rgba(20,20,24,0.5);
-    border: 1px solid var(--border); border-radius: 11px;
-    transition: border-color .15s, background .15s, transform .12s;
+    padding: 11px 12px; cursor: pointer;
+    background: rgba(255,255,255,.035);
+    border: 1px solid var(--border); border-radius: 13px;
+    transition: border-color .16s, background .16s, transform .16s var(--ease-out), box-shadow .16s;
   }
-  .cap-style:hover { border-color: var(--accent-line); }
+  .cap-style:hover { border-color: var(--accent-line); background: rgba(255,255,255,.06); transform: translateY(-2px); box-shadow: 0 10px 24px -16px #000; }
   .cap-style input { position: absolute; opacity: 0; pointer-events: none; }
-  .cap-style.sel { border-color: var(--accent); background: var(--accent-soft); }
-  .cap-style-name { font-size: 12.5px; font-weight: 650; color: var(--text); }
+  .cap-style.sel { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent) inset, 0 12px 26px -18px var(--accent-glow); }
+  .cap-style-name { font-size: 13px; font-weight: 680; color: var(--text); }
   .cap-style.sel .cap-style-name { color: var(--accent-2); }
   .cap-style-desc { font-size: 10.5px; color: var(--text-dim); line-height: 1.35; }
-  .cap-style-prev {
-    margin-top: 4px; height: 18px; display: flex; align-items: center; gap: 4px;
-    font-size: 11px; font-weight: 800; letter-spacing: .01em;
-  }
-  .cap-style-prev span { color: rgba(255,255,255,.5); }
+  .cap-style-prev { margin-top: 5px; height: 17px; display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 800; letter-spacing: .01em; }
+  .cap-style-prev span { color: rgba(255,255,255,.45); }
   .cap-style-prev .hot { color: var(--accent-2); }
 
-  .cap-opts { margin: 10px 0 2px; display: flex; flex-direction: column; gap: 10px; }
-  .cap-opt-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .cap-opt-label { font-size: 11.5px; color: var(--text-dim); }
-  .cap-seg { display: inline-flex; background: rgba(20,20,24,0.6); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
-  .cap-seg button {
-    font: inherit; font-size: 11px; color: var(--text-dim); background: none; border: none;
-    padding: 5px 11px; cursor: pointer; transition: background .12s, color .12s;
-  }
+  /* options */
+  .cap-opts { margin: 2px 0 0; display: flex; flex-direction: column; gap: 11px; }
+  .cap-opt-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .cap-opt-label { font-size: 12px; color: var(--text); }
+  .cap-opt-label small { display: block; color: var(--text-dim); font-size: 10.5px; margin-top: 1px; }
+  .cap-seg { display: inline-flex; background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .cap-seg button { font: inherit; font-size: 11.5px; color: var(--text-dim); background: none; border: none; padding: 6px 13px; cursor: pointer; transition: background .14s, color .14s; }
+  .cap-seg button:hover { color: var(--text); }
   .cap-seg button.sel { background: var(--accent); color: #fff; }
-  .cap-swatches { display: inline-flex; gap: 6px; }
-  .cap-swatch {
-    width: 20px; height: 20px; border-radius: 50%; cursor: pointer;
-    border: 2px solid transparent; box-shadow: 0 0 0 1px rgba(255,255,255,.15) inset;
-  }
-  .cap-swatch.sel { border-color: #fff; }
-  .cap-toggle {
-    position: relative; width: 38px; height: 21px; border-radius: 21px;
-    background: rgba(120,120,130,.35); cursor: pointer; transition: background .15s; flex: 0 0 auto;
-  }
-  .cap-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 17px; height: 17px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  .cap-swatches { display: inline-flex; gap: 7px; }
+  .cap-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: 0 0 0 1px rgba(255,255,255,.15) inset; transition: transform .12s; }
+  .cap-swatch:hover { transform: scale(1.14); }
+  .cap-swatch.sel { border-color: #fff; transform: scale(1.1); }
+  .cap-toggle { position: relative; width: 40px; height: 22px; border-radius: 22px; background: rgba(120,120,130,.35); cursor: pointer; transition: background .16s; flex: 0 0 auto; }
+  .cap-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .18s var(--ease-out); }
   .cap-toggle.on { background: var(--accent); }
-  .cap-toggle.on::after { transform: translateX(17px); }
-  .cap-step { display: inline-flex; align-items: center; gap: 8px; }
-  .cap-step button { width: 24px; height: 24px; border-radius: 7px; border: 1px solid var(--border); background: rgba(20,20,24,0.6); color: var(--text); font: inherit; font-size: 15px; cursor: pointer; line-height: 1; }
-  .cap-step button:hover { border-color: var(--accent-line); }
-  .cap-step b { min-width: 14px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text); }
-  .cap-progress { margin: 10px 0 2px; }
-  .cap-progress-bar { height: 5px; border-radius: 5px; background: rgba(120,120,130,.25); overflow: hidden; }
-  .cap-progress-bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 5px; transition: width .35s ease; }
-  .cap-progress-text { margin-top: 7px; font-size: 11.5px; color: var(--text-dim); display: flex; align-items: center; gap: 7px; }
+  .cap-toggle.on::after { transform: translateX(18px); }
+  .cap-step { display: inline-flex; align-items: center; gap: 10px; }
+  .cap-step button { width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,.05); color: var(--text); font: inherit; font-size: 16px; cursor: pointer; line-height: 1; transition: border-color .14s, background .14s; }
+  .cap-step button:hover { border-color: var(--accent-line); background: rgba(255,255,255,.1); }
+  .cap-step b { min-width: 16px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text); font-size: 13px; }
+
+  /* sliders */
+  .cap-slider-wrap { display: inline-flex; align-items: center; gap: 11px; min-width: 168px; }
+  .cap-slider { -webkit-appearance: none; appearance: none; width: 132px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.16); outline: none; cursor: pointer; }
+  .cap-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: transparent; }
+  .cap-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px rgba(255,255,255,.25), 0 2px 6px rgba(0,0,0,.4); cursor: grab; transition: transform .12s; }
+  .cap-slider::-webkit-slider-thumb:active { transform: scale(1.18); cursor: grabbing; }
+  .cap-slider-val { min-width: 30px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--text); }
+
+  /* draggable caption affordance */
+  .cap-cap.draggable { cursor: grab; }
+  .cap-cap.dragging { cursor: grabbing; }
+  .cap-drag-hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: 9px; z-index: 3; font-size: 10px; color: rgba(255,255,255,.6); background: rgba(0,0,0,.4); padding: 3px 9px; border-radius: 14px; pointer-events: none; opacity: 0; transition: opacity .2s; backdrop-filter: blur(2px); }
+  .cap-stage-inner:hover .cap-drag-hint { opacity: 1; }
+
+  /* footer — sticky generate bar */
+  .cap-footer { flex: 0 0 auto; display: flex; gap: 10px; align-items: center; padding: 12px 15px; border-top: 1px solid var(--border); background: rgba(10,9,12,.7); }
+  .cap-footer .cap-err { flex: 1; font-size: 11.5px; color: #e7b07f; min-height: 14px; }
+  .cap-gen {
+    flex: 0 0 auto; min-width: 190px; font: inherit; font-size: 13.5px; font-weight: 700; color: #1a1208;
+    padding: 11px 22px; border: none; border-radius: 12px; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent) 100%);
+    box-shadow: 0 10px 26px -12px var(--accent-glow); transition: filter .14s, transform .12s;
+  }
+  .cap-gen:hover { filter: brightness(1.06); transform: translateY(-1px); }
+  .cap-gen:disabled { opacity: .6; cursor: default; transform: none; }
+
+  /* working overlay */
+  .cap-working { position: absolute; inset: 0; z-index: 5; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: rgba(11,10,13,.95); backdrop-filter: blur(7px); padding: 30px; text-align: center; }
+  .cap-full-card.working .cap-working { display: flex; }
+  .cap-working-title { font-size: 16px; font-weight: 680; color: var(--text); }
+  .cap-working-sub { font-size: 12px; color: var(--text-dim); max-width: 280px; line-height: 1.5; }
+  .cap-progress { width: 100%; max-width: 300px; }
+  .cap-progress-bar { height: 6px; border-radius: 6px; background: rgba(120,120,130,.25); overflow: hidden; }
+  .cap-progress-bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 6px; transition: width .35s ease; }
+  .cap-progress-text { margin-top: 9px; font-size: 12px; color: var(--text-dim); display: flex; align-items: center; justify-content: center; gap: 8px; }
 
   .autocut-card {
     margin-top: 10px;
@@ -3365,16 +3479,39 @@
   </div>
 </div>
 
-<!-- Captions modal — transcribe selected clip → animated caption overlay -->
-<div class="autocut-modal" id="captionsModal">
-  <div class="autocut-modal-card">
+<!-- Captions — full-screen studio: live preview, drag-to-place, style + options -->
+<div class="autocut-modal cap-full" id="captionsModal">
+  <div class="autocut-modal-card cap-full-card" id="capCard">
 
-    <!-- STEP — options -->
-    <div class="cap-step-pane" data-cap-step="options">
-      <div class="autocut-modal-title">Captions</div>
-      <div class="autocut-modal-subtitle">Transcribe the selected clip word-by-word and drop an animated caption overlay on the track above.</div>
-      <div class="ae-selinfo" id="capSelInfo">Reading selection…</div>
+    <!-- header -->
+    <div class="cap-head">
+      <div class="cap-x" id="capCloseBtn" title="Close (Esc)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </div>
+      <div>
+        <div class="cap-head-title">Captions</div>
+        <div class="cap-head-sub">Pick a style — preview plays live. Drag the text to place it anywhere.</div>
+      </div>
+      <div class="cap-head-spacer"></div>
+      <div class="cap-selchip" id="capSelInfo">Reading selection&hellip;</div>
+    </div>
 
+    <!-- body -->
+    <div class="cap-body">
+      <!-- live preview stage -->
+      <div class="cap-stage">
+        <div class="cap-stage-inner" id="capStage">
+          <div class="cap-stage-badge">Preview · over your footage</div>
+          <div class="cap-cap pos-bottom draggable" id="capCap"></div>
+          <div class="cap-drag-hint">Drag to place</div>
+          <div class="cap-replay" id="capReplay" title="Replay preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+            Replay
+          </div>
+        </div>
+      </div>
+
+      <div class="cap-sec-label">Style</div>
       <div class="cap-styles" id="capStyles">
         <label class="cap-style sel" data-style="karaoke">
           <input type="radio" name="capStyle" value="karaoke" checked>
@@ -3408,13 +3545,15 @@
         </label>
       </div>
 
+      <div class="cap-sec-label">Options</div>
       <div class="cap-opts">
         <div class="cap-opt-row">
-          <span class="cap-opt-label">Position</span>
+          <span class="cap-opt-label">Position<small>or just drag the caption above</small></span>
           <div class="cap-seg" id="capPosSeg">
             <button type="button" data-pos="top">Top</button>
-            <button type="button" data-pos="middle">Middle</button>
+            <button type="button" data-pos="middle">Mid</button>
             <button type="button" data-pos="bottom" class="sel">Bottom</button>
+            <button type="button" data-pos="custom">Custom</button>
           </div>
         </div>
         <div class="cap-opt-row">
@@ -3430,8 +3569,16 @@
         </div>
         <div class="cap-opt-row">
           <span class="cap-opt-label">Words per line</span>
-          <div class="cap-step" id="capWords">
-            <button type="button" data-d="-1">&minus;</button><b id="capWordsVal">4</b><button type="button" data-d="1">+</button>
+          <div class="cap-slider-wrap">
+            <input type="range" class="cap-slider" id="capWords" min="1" max="8" step="1" value="4">
+            <span class="cap-slider-val" id="capWordsVal">4</span>
+          </div>
+        </div>
+        <div class="cap-opt-row">
+          <span class="cap-opt-label">Font size</span>
+          <div class="cap-slider-wrap">
+            <input type="range" class="cap-slider" id="capFont" min="70" max="150" step="5" value="100">
+            <span class="cap-slider-val" id="capFontVal">100%</span>
           </div>
         </div>
         <div class="cap-opt-row">
@@ -3439,29 +3586,27 @@
           <div class="cap-toggle" id="capUpper" role="switch" tabindex="0"></div>
         </div>
         <div class="cap-opt-row">
-          <span class="cap-opt-label">Pill background</span>
+          <span class="cap-opt-label">Pill background<small>solid bar behind the words</small></span>
           <div class="cap-toggle" id="capBox" role="switch" tabindex="0"></div>
         </div>
       </div>
-
-      <div class="ae-err" id="capErr"></div>
-      <div class="autocut-modal-actions">
-        <button type="button" class="autocut-modal-cancel" data-cap-cancel>Cancel</button>
-        <button id="capGenerateBtn" type="button" class="autocut-modal-go">Generate &rarr;</button>
-      </div>
     </div>
 
-    <!-- STEP — working -->
-    <div class="cap-step-pane" data-cap-step="working" style="display:none">
-      <div class="autocut-modal-title">Making your captions&hellip;</div>
-      <div class="autocut-modal-subtitle">Transcribing word-by-word, then rendering the overlay. Hang tight.</div>
+    <!-- footer -->
+    <div class="cap-footer">
+      <div class="cap-err" id="capErr"></div>
+      <button id="capGenerateBtn" type="button" class="cap-gen">Generate captions</button>
+    </div>
+
+    <!-- working overlay -->
+    <div class="cap-working">
+      <div class="cap-working-title">Making your captions&hellip;</div>
+      <div class="cap-working-sub">Transcribing word-by-word, then rendering the overlay. Hang tight — this can take a minute.</div>
       <div class="cap-progress">
         <div class="cap-progress-bar"><i id="capProgFill"></i></div>
         <div class="cap-progress-text"><span class="ae-spinner" style="width:13px;height:13px"></span><span id="capProgText">Starting&hellip;</span></div>
       </div>
-      <div class="autocut-modal-actions">
-        <button type="button" class="autocut-modal-cancel" data-cap-cancel>Cancel</button>
-      </div>
+      <button type="button" class="autocut-modal-cancel" data-cap-cancel style="margin-top:4px">Cancel</button>
     </div>
 
   </div>
@@ -7783,9 +7928,11 @@ if (_autoeditBtn) _autoeditBtn.addEventListener('click', openAutoeditModal);
 
 /* ───── Captions ───── */
 const captionsModal = document.getElementById('captionsModal');
+const capCard = document.getElementById('capCard');
 let capState = {
   style: 'karaoke', position: 'bottom', highlight: '#E2885F',
-  uppercase: false, box: false, maxWords: 4,
+  uppercase: false, box: false, maxWords: 4, fontPct: 100,
+  customX: 0.5, customY: 0.85,
   selection: null, width: 1080, height: 1920, fps: 30,
   abort: null, reqId: null, es: null,
 };
@@ -7794,7 +7941,9 @@ try {
   if (saved && typeof saved === 'object') capState = Object.assign(capState, {
     style: saved.style || 'karaoke', position: saved.position || 'bottom',
     highlight: saved.highlight || '#E2885F', uppercase: !!saved.uppercase,
-    box: !!saved.box, maxWords: saved.maxWords || 4,
+    box: !!saved.box, maxWords: saved.maxWords || 4, fontPct: saved.fontPct || 100,
+    customX: typeof saved.customX === 'number' ? saved.customX : 0.5,
+    customY: typeof saved.customY === 'number' ? saved.customY : 0.85,
   });
 } catch {}
 
@@ -7803,98 +7952,254 @@ function capSaveOpts() {
     localStorage.setItem('claudeBridge.captions.opts', JSON.stringify({
       style: capState.style, position: capState.position, highlight: capState.highlight,
       uppercase: capState.uppercase, box: capState.box, maxWords: capState.maxWords,
+      fontPct: capState.fontPct, customX: capState.customX, customY: capState.customY,
     }));
   } catch {}
 }
 
-function capShowStep(step) {
-  captionsModal.querySelectorAll('.cap-step-pane').forEach(p => {
-    p.style.display = (p.getAttribute('data-cap-step') === step) ? '' : 'none';
-  });
-}
-
 function capSyncOptsUI() {
-  // style cards
   captionsModal.querySelectorAll('.cap-style').forEach(el => {
     const on = el.getAttribute('data-style') === capState.style;
     el.classList.toggle('sel', on);
     const r = el.querySelector('input'); if (r) r.checked = on;
   });
-  // position segmented
   captionsModal.querySelectorAll('#capPosSeg button').forEach(b =>
     b.classList.toggle('sel', b.getAttribute('data-pos') === capState.position));
-  // swatches
   captionsModal.querySelectorAll('#capSwatches .cap-swatch').forEach(s =>
     s.classList.toggle('sel', (s.getAttribute('data-color') || '').toUpperCase() === capState.highlight.toUpperCase()));
-  // toggles
   const up = document.getElementById('capUpper'); if (up) up.classList.toggle('on', capState.uppercase);
   const bx = document.getElementById('capBox'); if (bx) bx.classList.toggle('on', capState.box);
+  const ws = document.getElementById('capWords'); if (ws) ws.value = String(capState.maxWords);
   const wv = document.getElementById('capWordsVal'); if (wv) wv.textContent = String(capState.maxWords);
+  const fs = document.getElementById('capFont'); if (fs) fs.value = String(capState.fontPct);
+  const fv = document.getElementById('capFontVal'); if (fv) fv.textContent = capState.fontPct + '%';
 }
 
-// option event wiring (once)
+// ── Live preview engine — mirrors Captions.tsx animation in the DOM ──
+const CAP_SAMPLE = [
+  { text: 'Flimify',  s: 0,    e: 560  },
+  { text: 'makes',    s: 560,  e: 880  },
+  { text: 'captions', s: 880,  e: 1300 },
+  { text: 'super',    s: 1300, e: 1560 },
+  { text: 'simple',   s: 1560, e: 1980 },
+  { text: 'today',    s: 1980, e: 2500 },
+];
+const CAP_HOLD = 700;
+let capPreview = { raf: 0, start: 0, lines: [], curLine: -1 };
+
+function capGroupSample(maxWords) {
+  const lines = []; let cur = [];
+  for (const w of CAP_SAMPLE) {
+    cur.push(w);
+    if (cur.length >= maxWords) { lines.push(cur); cur = []; }
+  }
+  if (cur.length) lines.push(cur);
+  return lines.map(ws => ({ words: ws, s: ws[0].s, e: ws[ws.length - 1].e }));
+}
+
+function capActiveLineIdx(lines, ms) {
+  for (let i = 0; i < lines.length; i++) {
+    if (ms >= lines[i].s - 60 && ms <= lines[i].e + 240) return i;
+  }
+  for (let i = 0; i < lines.length; i++) if (ms < lines[i].s) return i;
+  return lines.length - 1;
+}
+
+function capApplyPos(capEl) {
+  capEl.classList.remove('pos-top', 'pos-middle', 'pos-bottom');
+  if (capState.position === 'custom') {
+    capEl.style.left = (capState.customX * 100) + '%';
+    capEl.style.top = (capState.customY * 100) + '%';
+    capEl.style.right = 'auto'; capEl.style.bottom = 'auto';
+    capEl.style.transform = 'translate(-50%, -50%)';
+    capEl.style.width = 'auto'; capEl.style.maxWidth = '86%';
+  } else {
+    capEl.classList.add('pos-' + capState.position);
+    capEl.style.left = ''; capEl.style.top = ''; capEl.style.right = '';
+    capEl.style.bottom = ''; capEl.style.transform = ''; capEl.style.width = ''; capEl.style.maxWidth = '';
+  }
+}
+
+function capBuildLine(capEl, line) {
+  const stage = document.getElementById('capStage');
+  const stageH = (stage && stage.clientHeight) || 300;
+  const frac = { classic: 0.072, karaoke: 0.078, reels: 0.115, tiktok: 0.10, minimal: 0.066 }[capState.style] || 0.08;
+  const fontPx = Math.max(11, Math.round(stageH * frac * (capState.fontPct / 100)));
+  const lineEl = document.createElement('div');
+  lineEl.className = 'cap-cap-line';
+  lineEl.style.fontSize = fontPx + 'px';
+  for (const w of line.words) {
+    const sp = document.createElement('span');
+    sp.className = 'cap-cap-word';
+    sp.textContent = capState.uppercase ? w.text.toUpperCase() : w.text;
+    sp.dataset.s = w.s; sp.dataset.e = w.e;
+    lineEl.appendChild(sp);
+  }
+  capEl.innerHTML = '';
+  capEl.appendChild(lineEl);
+}
+
+function capStyleWord(sp, ms, lineStart) {
+  const s = +sp.dataset.s, e = +sp.dataset.e;
+  const active = ms >= s && ms < e;
+  const spoken = ms >= s;
+  const hl = capState.highlight;
+  const sinceWord = ms - s;
+  const pop = Math.max(0, Math.min(1, sinceWord / 240));
+  const ease = pop < 1 ? (1 - Math.pow(1 - pop, 3)) : 1;
+  let color = '#fff', opacity = 1, transform = '';
+  const st = capState.style;
+  if (st === 'karaoke') {
+    if (active) { color = hl; const k = Math.sin(Math.min(1, sinceWord / Math.max(1, e - s)) * Math.PI); transform = 'scale(' + (1 + 0.09 * k).toFixed(3) + ')'; }
+    else if (!spoken) color = 'rgba(255,255,255,.45)';
+  } else if (st === 'minimal') {
+    opacity = Math.max(0, Math.min(1, (ms - lineStart) / 150));
+  } else if (st === 'classic') {
+    opacity = Math.max(0, Math.min(1, (ms - lineStart) / 180));
+    if (active) color = hl;
+  } else if (st === 'tiktok') {
+    if (!spoken) { sp.style.display = 'none'; return; }
+    sp.style.display = '';
+    opacity = Math.max(0, Math.min(1, sinceWord / 90));
+    transform = 'scale(' + (0.7 + 0.3 * ease).toFixed(3) + ')';
+    if (active) { color = hl; transform += ' rotate(' + (Math.sin(ms / 60) * 2).toFixed(2) + 'deg)'; }
+  } else if (st === 'reels') {
+    opacity = Math.max(0, Math.min(1, ease * 2));
+    transform = 'scale(' + (0.6 + 0.4 * ease).toFixed(3) + ') translateY(' + ((1 - ease) * 8).toFixed(1) + 'px)';
+    if (active) color = hl;
+  }
+  sp.style.color = color;
+  sp.style.opacity = String(opacity);
+  sp.style.transform = transform;
+}
+
+function capPreviewTick(now) {
+  const capEl = document.getElementById('capCap');
+  if (!capEl || !captionsModal.classList.contains('show')) { capPreview.raf = 0; return; }
+  if (!capPreview.start) capPreview.start = now;
+  const cycle = CAP_SAMPLE[CAP_SAMPLE.length - 1].e + CAP_HOLD;
+  const ms = (now - capPreview.start) % cycle;
+  const lines = capPreview.lines;
+  if (lines.length) {
+    const idx = capActiveLineIdx(lines, ms);
+    if (idx !== capPreview.curLine) { capPreview.curLine = idx; capBuildLine(capEl, lines[idx]); }
+    capApplyPos(capEl);
+    const line = lines[idx];
+    capEl.querySelectorAll('.cap-cap-word').forEach(sp => capStyleWord(sp, ms, line.s));
+  }
+  capPreview.raf = requestAnimationFrame(capPreviewTick);
+}
+
+function capRefreshPreview(restart) {
+  capPreview.lines = capGroupSample(capState.maxWords);
+  capPreview.curLine = -1;
+  if (restart) capPreview.start = 0;
+  const capEl = document.getElementById('capCap');
+  if (capEl) { capEl.className = 'cap-cap draggable' + (capState.box ? ' boxed' : ''); capApplyPos(capEl); }
+  if (!capPreview.raf) capPreview.raf = requestAnimationFrame(capPreviewTick);
+}
+function capStopPreview() { if (capPreview.raf) { cancelAnimationFrame(capPreview.raf); capPreview.raf = 0; } }
+
+// ── drag-to-place: move the preview caption anywhere → custom position ──
+(function wireCaptionDrag() {
+  const capEl = document.getElementById('capCap');
+  const stage = document.getElementById('capStage');
+  if (!capEl || !stage) return;
+  let dragging = false;
+  const onMove = (ev) => {
+    if (!dragging) return;
+    const r = stage.getBoundingClientRect();
+    capState.customX = Math.max(0.08, Math.min(0.92, (ev.clientX - r.left) / r.width));
+    capState.customY = Math.max(0.08, Math.min(0.92, (ev.clientY - r.top) / r.height));
+    capState.position = 'custom';
+    capApplyPos(capEl);
+    capSyncOptsUI();
+  };
+  const onUp = () => {
+    if (!dragging) return;
+    dragging = false; capEl.classList.remove('dragging'); capSaveOpts();
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+  };
+  capEl.addEventListener('pointerdown', (ev) => {
+    dragging = true; capEl.classList.add('dragging');
+    capState.position = 'custom';
+    onMove(ev);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    ev.preventDefault();
+  });
+})();
+
+// ── option wiring ──
 (function wireCaptionOpts() {
   if (!captionsModal) return;
   captionsModal.querySelectorAll('.cap-style').forEach(el => {
-    el.addEventListener('click', () => { capState.style = el.getAttribute('data-style'); capSyncOptsUI(); capSaveOpts(); });
+    el.addEventListener('click', () => { capState.style = el.getAttribute('data-style'); capSyncOptsUI(); capSaveOpts(); capRefreshPreview(true); });
   });
   captionsModal.querySelectorAll('#capPosSeg button').forEach(b => {
-    b.addEventListener('click', () => { capState.position = b.getAttribute('data-pos'); capSyncOptsUI(); capSaveOpts(); });
+    b.addEventListener('click', () => {
+      capState.position = b.getAttribute('data-pos');
+      capSyncOptsUI(); capSaveOpts();
+      const capEl = document.getElementById('capCap'); if (capEl) capApplyPos(capEl);
+    });
   });
   captionsModal.querySelectorAll('#capSwatches .cap-swatch').forEach(s => {
     s.addEventListener('click', () => { capState.highlight = s.getAttribute('data-color'); capSyncOptsUI(); capSaveOpts(); });
   });
   const up = document.getElementById('capUpper');
-  if (up) up.addEventListener('click', () => { capState.uppercase = !capState.uppercase; capSyncOptsUI(); capSaveOpts(); });
+  if (up) up.addEventListener('click', () => { capState.uppercase = !capState.uppercase; capSyncOptsUI(); capSaveOpts(); capPreview.curLine = -1; });
   const bx = document.getElementById('capBox');
-  if (bx) bx.addEventListener('click', () => { capState.box = !capState.box; capSyncOptsUI(); capSaveOpts(); });
-  captionsModal.querySelectorAll('#capWords button').forEach(b => {
-    b.addEventListener('click', () => {
-      const d = parseInt(b.getAttribute('data-d'), 10) || 0;
-      capState.maxWords = Math.max(1, Math.min(8, capState.maxWords + d));
-      capSyncOptsUI(); capSaveOpts();
-    });
-  });
+  if (bx) bx.addEventListener('click', () => { capState.box = !capState.box; capSyncOptsUI(); capSaveOpts(); const capEl = document.getElementById('capCap'); if (capEl) capEl.classList.toggle('boxed', capState.box); });
+  const ws = document.getElementById('capWords');
+  if (ws) ws.addEventListener('input', () => { capState.maxWords = parseInt(ws.value, 10) || 4; capSyncOptsUI(); capSaveOpts(); capRefreshPreview(false); });
+  const fs = document.getElementById('capFont');
+  if (fs) fs.addEventListener('input', () => { capState.fontPct = parseInt(fs.value, 10) || 100; capSyncOptsUI(); capSaveOpts(); capPreview.curLine = -1; });
+  const rp = document.getElementById('capReplay');
+  if (rp) rp.addEventListener('click', () => { capPreview.start = 0; });
 })();
+
+function capAdjustStageAspect() {
+  const inner = document.getElementById('capStage');
+  if (!inner) return;
+  const W = capState.width || 1080, H = capState.height || 1920;
+  const w = Math.round(300 * (W / H));
+  inner.style.width = Math.min(w, 520) + 'px';
+}
 
 async function openCaptionsModal() {
   capCleanup();
   capState.abort = null; capState.reqId = null;
+  if (capCard) capCard.classList.remove('working');
   const errEl = document.getElementById('capErr'); if (errEl) errEl.textContent = '';
   capSyncOptsUI();
-  capShowStep('options');
   captionsModal.classList.add('show');
+  capAdjustStageAspect();
+  capRefreshPreview(true);
 
-  // sequence dimensions (so the overlay matches the timeline aspect)
   try {
     const dims = JSON.parse(await evalES('ccGetSeqDims()'));
-    if (dims && dims.width) { capState.width = dims.width; capState.height = dims.height; capState.fps = dims.fps || 30; }
+    if (dims && dims.width) { capState.width = dims.width; capState.height = dims.height; capState.fps = dims.fps || 30; capAdjustStageAspect(); }
   } catch {}
 
   const info = document.getElementById('capSelInfo');
   if (info) {
-    info.className = 'ae-selinfo'; info.textContent = 'Reading selection…';
+    info.className = 'cap-selchip'; info.textContent = 'Reading selection…';
     try {
       const sel = JSON.parse(await evalES('ccGetSelectedClips()'));
       if (!sel.ok) {
-        info.className = 'ae-selinfo warn';
-        info.textContent = (sel.error === 'no clip selected')
-          ? 'No clip selected — highlight the clip whose speech you want captioned.'
-          : ('Selection: ' + (sel.error || 'unknown'));
+        info.className = 'cap-selchip warn';
+        info.textContent = (sel.error === 'no clip selected') ? 'No clip selected' : ('Selection: ' + (sel.error || 'unknown'));
         capState.selection = null;
       } else {
         capState.selection = sel;
         const total = sel.durationSec || 0;
         const mins = Math.floor(total / 60), secs = Math.round(total % 60);
-        info.className = 'ae-selinfo';
-        info.innerHTML = '<b>' + sel.count + '</b> clip' + (sel.count === 1 ? '' : 's')
-          + ' selected · <b>' + mins + ':' + String(secs).padStart(2, '0') + '</b>'
-          + ' · ' + capState.width + '×' + capState.height;
+        info.className = 'cap-selchip';
+        info.innerHTML = '<b>' + sel.count + '</b> clip' + (sel.count === 1 ? '' : 's') + ' · <b>' + mins + ':' + String(secs).padStart(2, '0') + '</b>';
       }
     } catch (e) {
-      info.className = 'ae-selinfo warn';
-      info.textContent = 'Could not read selection: ' + (e.message || e);
-      capState.selection = null;
+      info.className = 'cap-selchip warn'; info.textContent = 'No selection'; capState.selection = null;
     }
   }
 }
@@ -7903,7 +8208,7 @@ function capCleanup() {
   if (capState.es) { try { capState.es.close(); } catch {} capState.es = null; }
   if (capState.abort) { try { capState.abort.abort(); } catch {} capState.abort = null; }
 }
-function closeCaptionsModal() { captionsModal.classList.remove('show'); }
+function closeCaptionsModal() { captionsModal.classList.remove('show'); capStopPreview(); }
 function capCancel() {
   capCleanup();
   try { fetch(BRIDGE + '/autoedit-cancel', { method: 'POST' }).catch(() => {}); } catch {}
@@ -7926,69 +8231,49 @@ async function generateCaptions() {
     if (errEl) errEl.textContent = 'Select the clip whose speech you want captioned first.';
     return;
   }
-
   const reqId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
   const abort = new AbortController();
   capState.reqId = reqId; capState.abort = abort;
-  capShowStep('working');
+  if (capCard) capCard.classList.add('working');
   capSetProgress('Starting…', 4);
 
-  // live progress over SSE (filtered to our reqId)
   try {
     const es = new EventSource(BRIDGE + '/progress-stream');
     capState.es = es;
     es.addEventListener('progress', (ev) => {
-      try {
-        const p = JSON.parse(ev.data);
-        if (p.reqId && p.reqId !== reqId) return;
-        capSetProgress(p.text, typeof p.pct === 'number' ? p.pct : undefined);
-      } catch {}
+      try { const p = JSON.parse(ev.data); if (p.reqId && p.reqId !== reqId) return; capSetProgress(p.text, typeof p.pct === 'number' ? p.pct : undefined); } catch {}
     });
     es.addEventListener('done', () => { try { es.close(); } catch {} if (capState.es === es) capState.es = null; });
   } catch {}
 
   const body = {
-    reqId,
-    segments: sel.segments,
-    style: capState.style,
+    reqId, segments: sel.segments, style: capState.style,
     width: capState.width, height: capState.height, fps: capState.fps,
     options: {
-      highlight: capState.highlight,
-      position: capState.position,
-      uppercase: capState.uppercase,
-      box: capState.box,
+      highlight: capState.highlight, position: capState.position,
+      uppercase: capState.uppercase, box: capState.box,
+      fontScale: capState.fontPct / 100,
+      customX: capState.customX, customY: capState.customY,
     },
     grouping: { maxWordsPerLine: capState.maxWords },
   };
 
   let data = null;
   try {
-    const r = await fetch(BRIDGE + '/captions', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body), signal: abort.signal,
-    });
+    const r = await fetch(BRIDGE + '/captions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: abort.signal });
     data = await r.json();
   } catch (e) {
-    if (abort.signal.aborted) return;  // user cancelled
-    capCleanup();
+    if (abort.signal.aborted) return;
+    capCleanup(); if (capCard) capCard.classList.remove('working');
     if (errEl) errEl.textContent = 'Captions failed: ' + (e.message || e);
-    capShowStep('options');
     return;
   }
   capCleanup();
-
   if (!data || !data.ok) {
-    const msg = (data && data.error) || 'Captions failed.';
-    if (data && data.meterBlock && data.reason === 'limit') {
-      // surface the upgrade path like renders do
-      if (errEl) errEl.textContent = msg;
-    } else if (data && data.meterBlock && data.reason === 'signin') {
-      if (errEl) errEl.textContent = msg;
-    } else if (errEl) errEl.textContent = msg;
-    capShowStep('options');
+    if (capCard) capCard.classList.remove('working');
+    if (errEl) errEl.textContent = (data && data.error) || 'Captions failed.';
     return;
   }
-
   closeCaptionsModal();
   addCaptionsResultCard(data);
 }
@@ -8023,7 +8308,7 @@ function addCaptionsResultCard(data) {
   importBtn.addEventListener('click', async () => {
     importBtn.disabled = true; importBtn.textContent = 'Adding…';
     try {
-      const result = await importIntoPremiere(absPath, 'overlay');  // captions overlay on the next free track
+      const result = await importIntoPremiere(absPath, 'overlay');
       let statusText = 'ready';
       if (result && result.ok) {
         if (result.placed) {
@@ -8053,10 +8338,14 @@ const _captionsBtn = document.getElementById('captionsBtn');
 if (_captionsBtn) _captionsBtn.addEventListener('click', openCaptionsModal);
 const _capGenBtn = document.getElementById('capGenerateBtn');
 if (_capGenBtn) _capGenBtn.addEventListener('click', generateCaptions);
+const _capCloseBtn = document.getElementById('capCloseBtn');
+if (_capCloseBtn) _capCloseBtn.addEventListener('click', capCancel);
 if (captionsModal) captionsModal.addEventListener('click', (e) => {
-  if (e.target === captionsModal) { capCancel(); return; }
   if (e.target.closest && e.target.closest('[data-cap-cancel]')) capCancel();
 });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && captionsModal && captionsModal.classList.contains('show')) { capCancel(); e.stopPropagation(); }
+}, true);
 
 autoeditModal.addEventListener('click', (e) => {
   if (e.target === autoeditModal) { aeCancelWizard(); return; }

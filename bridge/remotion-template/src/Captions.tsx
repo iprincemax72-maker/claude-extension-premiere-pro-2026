@@ -27,7 +27,10 @@ export type CaptionOptions = {
   accent?: string;          // base text color
   highlight?: string;       // active-word highlight color
   fontSize?: number;        // px override (else a per-style default)
-  position?: 'top' | 'middle' | 'bottom';
+  fontScale?: number;       // multiplier on the per-style default size (0.7–1.4)
+  position?: 'top' | 'middle' | 'bottom' | 'custom';
+  customX?: number;         // 0..1 — caption block CENTER x (only when position==='custom')
+  customY?: number;         // 0..1 — caption block CENTER y (only when position==='custom')
   uppercase?: boolean;
   fontFamily?: string;
   animateIn?: boolean;      // entrance motion on/off
@@ -47,7 +50,10 @@ const DEFAULTS: Required<Omit<CaptionOptions, 'fontSize'>> & { fontSize: number 
   accent: '#FFFFFF',
   highlight: '#E2885F',
   fontSize: null,
+  fontScale: 1,
   position: 'bottom',
+  customX: 0.5,
+  customY: 0.85,
   uppercase: false,
   fontFamily:
     '"Schibsted Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
@@ -66,7 +72,9 @@ const SIZE_FRACTION: Record<CaptionStyle, number> = {
 
 function withDefaults(o: CaptionOptions | undefined, style: CaptionStyle, height: number) {
   const m = { ...DEFAULTS, ...(o || {}) };
-  const fontSize = m.fontSize ?? Math.round(height * SIZE_FRACTION[style]);
+  const base = m.fontSize ?? Math.round(height * SIZE_FRACTION[style]);
+  const scale = typeof m.fontScale === 'number' && m.fontScale > 0 ? m.fontScale : 1;
+  const fontSize = Math.round(base * scale);
   return { ...m, fontSize };
 }
 
@@ -93,10 +101,13 @@ export const Captions: React.FC<CaptionsProps> = ({ lines, style, options }) => 
 
   const line = activeLine(lines || [], ms);
 
+  const isCustom = opt.position === 'custom';
   const justify =
     opt.position === 'top' ? 'flex-start' : opt.position === 'middle' ? 'center' : 'flex-end';
   const pad =
     opt.position === 'middle' ? 0 : Math.round(height * 0.11);
+  const cx = Math.max(0, Math.min(1, typeof opt.customX === 'number' ? opt.customX : 0.5));
+  const cy = Math.max(0, Math.min(1, typeof opt.customY === 'number' ? opt.customY : 0.85));
 
   const baseTextStyle: CSSProperties = {
     fontFamily: opt.fontFamily,
@@ -114,6 +125,33 @@ export const Captions: React.FC<CaptionsProps> = ({ lines, style, options }) => 
     maxWidth: '92%',
   };
 
+  const lineNode = line ? (
+    <LineView line={line} ms={ms} fps={fps} style={style} opt={opt} textStyle={baseTextStyle} />
+  ) : null;
+
+  if (isCustom) {
+    // Free placement: anchor the caption block's CENTER at (cx, cy).
+    return (
+      <AbsoluteFill style={{ background: 'transparent' }}>
+        {lineNode ? (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${cx * 100}%`,
+              top: `${cy * 100}%`,
+              transform: 'translate(-50%, -50%)',
+              maxWidth: '86%',
+              display: 'flex',
+              justifyContent: 'center',
+            }}
+          >
+            {lineNode}
+          </div>
+        ) : null}
+      </AbsoluteFill>
+    );
+  }
+
   return (
     <AbsoluteFill
       style={{
@@ -124,9 +162,7 @@ export const Captions: React.FC<CaptionsProps> = ({ lines, style, options }) => 
         background: 'transparent',
       }}
     >
-      {line ? (
-        <LineView line={line} ms={ms} fps={fps} style={style} opt={opt} textStyle={baseTextStyle} />
-      ) : null}
+      {lineNode}
     </AbsoluteFill>
   );
 };

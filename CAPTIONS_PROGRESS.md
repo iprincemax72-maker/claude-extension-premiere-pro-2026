@@ -48,6 +48,20 @@ render a styled, animated, transparent caption overlay → drop on the timeline.
 - [x] Metering: /captions calls gateRender() (owner-exempt, fail-open); panel surfaces meterBlock
       (signin/limit) errors in the modal. Available to all signed-in tiers (metered per use, not Studio-gated). ✅
 
+- [x] **UI v2 — full-screen captions studio** (user asked: full-screen not a bar, live preview, drag-to-place,
+      sliders, hover, smooth/minimal):
+      - Full-screen modal (header + scrollable body + sticky footer + working overlay).
+      - **Live animated preview** engine (rAF) that mirrors Captions.tsx in the DOM — plays + loops,
+        reflects style/highlight/position/uppercase/pill/words/font instantly. Faux-footage backdrop.
+      - **Drag-to-place**: grab the preview caption → sets position='custom' + customX/customY (clamped).
+      - **Sliders** for words-per-line (1–8) and font size (70–150% → options.fontScale).
+      - Position seg gains **Custom**; hover-lift on cards, swatch/btn hover, smooth transitions.
+      - Captions.tsx extended: position:'custom' + customX/customY + fontScale. Component + the FULL
+        VIDEO render path verified (ProRes 4444 yuva444p12le, alpha present, custom pos + pill + blue
+        highlight + 1.3x font all correct). Panel screenshot-verified (style switch, drag→custom,
+        sliders, working overlay); all handlers wired, no JS syntax break, opts persist to localStorage.
+      - Bridge passes the new options straight through (no endpoint change needed). ✅
+
 ## Next
 - [ ] Real-clip verification in Premiere (live): selection → transcript quality → overlay placement at
       timelineStart on the track above. NEEDS the user + a real clip — can't be done headless.
