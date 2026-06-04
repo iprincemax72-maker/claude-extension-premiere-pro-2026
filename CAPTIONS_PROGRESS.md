@@ -35,11 +35,26 @@ render a styled, animated, transparent caption overlay → drop on the timeline.
       footage). Confirmed `pix_fmt=yuva444p12le` + alphaextract succeeds + composites cleanly over a
       dark bg. Word-sync verified (still @ frame30=1000ms → "makes" coral active). ✅
 
+- [x] Panel UI: "Captions" pill next to Auto-Edit (hidden in chat-mode like Auto-Edit) → modal with
+      5 style cards (live preview chips, Karaoke default), Position seg (top/mid/bottom), 6 highlight
+      swatches, words-per-line stepper, UPPERCASE + Pill-background toggles, Generate. Opens reading
+      `ccGetSelectedClips()` + new `ccGetSeqDims()` (host.jsx) so the overlay matches sequence
+      aspect/res/fps. Generate → POST /captions with live SSE progress bar (filtered by reqId) →
+      result bubble + import card that adds the overlay with **forced 'overlay' mode** (track above).
+      Opts persist to localStorage. **Screenshot-verified** in Playwright: modal renders on-brand,
+      all interactions update state (style/position/toggles), every handler wired, no JS syntax break. ✅
+- [x] `ccGetSeqDims()` in host.jsx → {ok,width,height,fps} from active sequence (frameSize* →
+      getSettings fallback → 1080x1920@30 default). ✅
+- [x] Metering: /captions calls gateRender() (owner-exempt, fail-open); panel surfaces meterBlock
+      (signin/limit) errors in the modal. Available to all signed-in tiers (metered per use, not Studio-gated). ✅
+
 ## Next
-- [ ] Panel UI: "Captions" button (mirror Auto-Edit pill) + style/options picker + progress + result card
-- [ ] Metering: confirm owner-exempt path end-to-end from panel; decide premium-style plan gating (or all-tiers)
-- [ ] Windows path (whisper word-level — parakeet-mlx is macOS-only)
-- [ ] Real-clip verification in Premiere (selection → overlay placement at timelineStart)
+- [ ] Real-clip verification in Premiere (live): selection → transcript quality → overlay placement at
+      timelineStart on the track above. NEEDS the user + a real clip — can't be done headless.
+- [ ] Windows path (whisper word-level — parakeet-mlx is macOS-only); resolveWhisper + word timestamps.
+- [ ] Optional polish: per-style font-size presets in options, max-chars-per-line control, ESC-to-close
+      already inherited via .autocut-modal busy/esc detection — confirm on real panel.
+- [ ] Add captions to the validation suite (tests/) once panel audits cover it.
 
 ## Open questions / needs user to verify in Premiere
 - Real transcription quality + word timing on a real clip (needs Premiere + a selected clip)

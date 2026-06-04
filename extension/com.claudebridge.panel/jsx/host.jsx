@@ -44,6 +44,38 @@ function ccGetContext() {
     return JSON.stringify(ctx);
 }
 
+// Active-sequence frame dimensions + fps. Used by Captions so the rendered
+// overlay matches the sequence aspect/resolution exactly. Falls back to a
+// vertical 1080x1920 @30 default if nothing can be read.
+function ccGetSeqDims() {
+    var out = { ok: false, width: 1080, height: 1920, fps: 30 };
+    try {
+        if (typeof app === "undefined" || !app || !app.project) return JSON.stringify(out);
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) return JSON.stringify(out);
+        var w = _ccSafe(function () { return seq.frameSizeHorizontal; });
+        var h = _ccSafe(function () { return seq.frameSizeVertical; });
+        if (!(typeof w === "number" && w > 0)) {
+            var s = _ccSafe(function () { return seq.getSettings && seq.getSettings(); });
+            if (s) {
+                w = _ccSafe(function () { return Number(s.videoFrameWidth); });
+                h = _ccSafe(function () { return Number(s.videoFrameHeight); });
+            }
+        }
+        if (typeof w === "number" && w > 0) out.width = Math.round(w);
+        if (typeof h === "number" && h > 0) out.height = Math.round(h);
+        var settings = _ccSafe(function () { return seq.getSettings && seq.getSettings(); });
+        if (settings && settings.videoFrameRate && settings.videoFrameRate.ticks) {
+            var fps = 254016000000 / Number(settings.videoFrameRate.ticks);
+            if (isFinite(fps) && fps > 0) out.fps = Math.round(fps * 1000) / 1000;
+        }
+        out.ok = true;
+    } catch (e) {
+        out.error = String(e);
+    }
+    return JSON.stringify(out);
+}
+
 function _ccFindItemByPath(parent, path, depth) {
     if (!parent || depth > 6) return null;
     var children = _ccSafe(function () { return parent.children; });
