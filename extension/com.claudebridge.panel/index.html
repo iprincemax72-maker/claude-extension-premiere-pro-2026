@@ -2477,6 +2477,24 @@
   .cap-sec-label { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-dim); font-weight: 650; margin: 14px 2px 8px; }
 
   /* style chips — horizontal, hover-lift */
+  /* Quick-looks gallery — one-click complete presets (visual, not a bar) */
+  .cap-looks { display: flex; gap: 10px; overflow-x: auto; padding: 2px 1px 8px; scrollbar-width: thin; }
+  .cap-looks::-webkit-scrollbar { height: 7px; }
+  .cap-looks::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 7px; }
+  .cap-look { flex: 0 0 auto; width: 104px; cursor: pointer; background: none; border: none; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+  .cap-look-prev { height: 60px; border-radius: 11px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; transition: border-color .15s, transform .15s var(--ease-out), box-shadow .15s; background: linear-gradient(145deg,#2b2f3a,#1b1820); }
+  .cap-look:hover .cap-look-prev { transform: translateY(-2px); border-color: var(--accent-line); box-shadow: 0 10px 22px -14px #000; }
+  .cap-look.sel .cap-look-prev { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .cap-look-prev b { font-size: 16px; font-weight: 900; letter-spacing: .01em; line-height: 1; }
+  .cap-look-name { font-size: 11px; color: var(--text-dim); text-align: center; font-weight: 600; }
+  .cap-look.sel .cap-look-name { color: var(--accent-2); }
+
+  /* toggle chips (replace several identical toggle bars) */
+  .cap-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cap-chip { font: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-dim); background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 20px; padding: 7px 14px; cursor: pointer; transition: all .14s; }
+  .cap-chip:hover { color: var(--text); border-color: var(--accent-line); }
+  .cap-chip.sel { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-2); }
+
   .cap-styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 9px; }
   .cap-style {
     position: relative; display: flex; flex-direction: column; gap: 3px;
@@ -3536,6 +3554,17 @@
         </div>
       </div>
 
+      <div class="cap-sec-label">Quick looks</div>
+      <div class="cap-looks" id="capLooks">
+        <button type="button" class="cap-look" data-look="beast"><span class="cap-look-prev"><b style="color:#15110d;background:#F5C542;padding:2px 6px;border-radius:5px">BEAST</b></span><span class="cap-look-name">Beast</span></button>
+        <button type="button" class="cap-look" data-look="pop"><span class="cap-look-prev"><b style="color:#FF5D8F;-webkit-text-stroke:1px #000">POP</b></span><span class="cap-look-name">Pop</span></button>
+        <button type="button" class="cap-look" data-look="karaoke"><span class="cap-look-prev"><b style="color:#fff">word <span style="color:#E2885F">pop</span></b></span><span class="cap-look-name">Karaoke</span></button>
+        <button type="button" class="cap-look" data-look="rainbow"><span class="cap-look-prev"><b><span style="color:#E2885F">a</span><span style="color:#5AA9FF">b</span><span style="color:#4ECB71">c</span></b></span><span class="cap-look-name">Rainbow</span></button>
+        <button type="button" class="cap-look" data-look="tiktok"><span class="cap-look-prev"><b style="color:#5AA9FF">type</b></span><span class="cap-look-name">TikTok</span></button>
+        <button type="button" class="cap-look" data-look="clean"><span class="cap-look-prev"><b style="color:#fff;font-weight:700;font-size:14px">clean</b></span><span class="cap-look-name">Clean</span></button>
+        <button type="button" class="cap-look" data-look="neon"><span class="cap-look-prev"><b style="color:#4ECB71;-webkit-text-stroke:1px #063">NEON</b></span><span class="cap-look-name">Neon</span></button>
+      </div>
+
       <div class="cap-sec-label">Style</div>
       <div class="cap-styles" id="capStyles">
         <label class="cap-style sel" data-style="karaoke">
@@ -3634,7 +3663,6 @@
         <div class="cap-opt-row"><span class="cap-opt-label">Letter spacing</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capTracking" min="-5" max="20" step="1" value="0"><span class="cap-slider-val" id="capTrackingVal">0</span></div></div>
         <div class="cap-opt-row"><span class="cap-opt-label">Line height</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capLineHt" min="90" max="170" step="2" value="112"><span class="cap-slider-val" id="capLineHtVal">1.12</span></div></div>
         <div class="cap-opt-row"><span class="cap-opt-label">Words per line</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capWords" min="1" max="8" step="1" value="4"><span class="cap-slider-val" id="capWordsVal">4</span></div></div>
-        <div class="cap-opt-row"><span class="cap-opt-label">UPPERCASE</span><div class="cap-toggle" id="capUpper" role="switch" tabindex="0"></div></div>
       </div>
 
       <div class="cap-sec-label">Effects</div>
@@ -3642,8 +3670,13 @@
         <div class="cap-opt-row"><span class="cap-opt-label">Shadow</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capShadow" min="0" max="100" step="5" value="55"><span class="cap-slider-val" id="capShadowVal">55%</span></div></div>
         <div class="cap-opt-row"><span class="cap-opt-label">Outline</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capStroke" min="0" max="12" step="1" value="2"><span class="cap-slider-val" id="capStrokeVal">2px</span></div></div>
         <div class="cap-opt-row"><span class="cap-opt-label">Outline color</span><div class="cap-swatches" id="capStrokeSwatches"><span class="cap-swatch sel" data-color="#000000" style="background:#000"></span><span class="cap-swatch" data-color="#FFFFFF" style="background:#fff"></span><span class="cap-swatch" data-color="#15110d" style="background:#15110d"></span><span class="cap-swatch" data-color="#3A2A1F" style="background:#3A2A1F"></span></div></div>
-        <div class="cap-opt-row"><span class="cap-opt-label">Vary per line<small>different color + motion each line</small></span><div class="cap-toggle" id="capVary" role="switch" tabindex="0"></div></div>
-        <div class="cap-opt-row"><span class="cap-opt-label">Pill background<small>solid bar behind the words</small></span><div class="cap-toggle" id="capBox" role="switch" tabindex="0"></div></div>
+        <div class="cap-opt-row" style="align-items:center"><span class="cap-opt-label">Options</span>
+          <div class="cap-chips" id="capChips">
+            <button type="button" class="cap-chip" data-chip="uppercase">UPPERCASE</button>
+            <button type="button" class="cap-chip" data-chip="vary">Vary per line</button>
+            <button type="button" class="cap-chip" data-chip="box">Pill background</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -8050,6 +8083,7 @@ function capSyncColorUI() {
 function capSetColor(hex, fromHsv) {
   hex = (hex || '').toUpperCase();
   capState.highlight = hex;
+  capState._look = '';
   if (!fromHsv) { const hsv = capHexToHsv(hex); if (hsv) capHSV = hsv; }
   capSyncColorUI();
   captionsModal.querySelectorAll('#capSwatches .cap-swatch').forEach(s =>
@@ -8065,6 +8099,26 @@ function capSyncZoneUI() {
   });
 }
 
+// Quick looks — one click applies a whole designed preset.
+const CAP_LOOKS = {
+  beast:   { style: 'hormozi', highlight: '#F5C542', uppercase: true,  fontWeight: 900, strokePx: 5, shadowPct: 55, vary: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
+  pop:     { style: 'reels',   highlight: '#FF5D8F', uppercase: true,  fontWeight: 900, strokePx: 3, shadowPct: 55, vary: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
+  karaoke: { style: 'karaoke', highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 2, shadowPct: 55, vary: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
+  rainbow: { style: 'karaoke', highlight: '#E2885F', uppercase: true,  fontWeight: 800, strokePx: 2, shadowPct: 55, vary: true,  box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
+  tiktok:  { style: 'tiktok',  highlight: '#5AA9FF', uppercase: false, fontWeight: 800, strokePx: 2, shadowPct: 55, vary: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
+  clean:   { style: 'minimal', highlight: '#FFFFFF', uppercase: false, fontWeight: 700, strokePx: 0, shadowPct: 40, vary: false, box: false, maxWords: 5, align: 'center', strokeColor: '#000000' },
+  neon:    { style: 'reels',   highlight: '#4ECB71', uppercase: true,  fontWeight: 900, strokePx: 3, shadowPct: 70, vary: false, box: false, maxWords: 3, align: 'center', strokeColor: '#063b1e' },
+};
+function capApplyLook(name) {
+  const o = CAP_LOOKS[name]; if (!o) return;
+  Object.assign(capState, o);
+  capState._look = name;
+  const hsv = capHexToHsv(capState.highlight); if (hsv) capHSV = hsv;
+  capSyncOptsUI(); capSaveOpts();
+  const capEl = document.getElementById('capCap'); if (capEl) { capEl.classList.toggle('boxed', capState.box); capApplyPos(capEl); }
+  capRefreshPreview(true);
+}
+
 function capSyncOptsUI() {
   captionsModal.querySelectorAll('.cap-style').forEach(el => {
     const on = el.getAttribute('data-style') === capState.style;
@@ -8078,9 +8132,8 @@ function capSyncOptsUI() {
   captionsModal.querySelectorAll('#capWeightSeg button').forEach(b => b.classList.toggle('sel', +b.getAttribute('data-w') === capState.fontWeight));
   captionsModal.querySelectorAll('#capAlignSeg button').forEach(b => b.classList.toggle('sel', b.getAttribute('data-a') === capState.align));
   const ff = document.getElementById('capFontFamily'); if (ff) ff.value = capState.fontFamily || '';
-  const up = document.getElementById('capUpper'); if (up) up.classList.toggle('on', capState.uppercase);
-  const bx = document.getElementById('capBox'); if (bx) bx.classList.toggle('on', capState.box);
-  const vy = document.getElementById('capVary'); if (vy) vy.classList.toggle('on', capState.vary);
+  captionsModal.querySelectorAll('#capChips .cap-chip').forEach(c => c.classList.toggle('sel', !!capState[c.getAttribute('data-chip')]));
+  captionsModal.querySelectorAll('#capLooks .cap-look').forEach(l => l.classList.toggle('sel', l.getAttribute('data-look') === capState._look));
   const setSlider = (id, valId, value, fmt) => { const s = document.getElementById(id); if (s) s.value = String(value); const v = document.getElementById(valId); if (v) v.textContent = fmt ? fmt(value) : String(value); };
   setSlider('capWords', 'capWordsVal', capState.maxWords);
   setSlider('capFont', 'capFontVal', capState.fontPct, v => v + '%');
@@ -8306,7 +8359,7 @@ function capStopPreview() { if (capPreview.raf) { cancelAnimationFrame(capPrevie
 
   // style cards
   captionsModal.querySelectorAll('.cap-style').forEach(el => {
-    el.addEventListener('click', () => { capState.style = el.getAttribute('data-style'); capSyncOptsUI(); capSaveOpts(); capRefreshPreview(true); });
+    el.addEventListener('click', () => { capState.style = el.getAttribute('data-style'); capState._look = ''; capSyncOptsUI(); capSaveOpts(); capRefreshPreview(true); });
   });
 
   // ── color picker: SV square + hue strip + hex + presets ──
@@ -8364,11 +8417,21 @@ function capStopPreview() { if (capPreview.raf) { cancelAnimationFrame(capPrevie
   const ff = document.getElementById('capFontFamily');
   if (ff) ff.addEventListener('change', () => { capState.fontFamily = ff.value; capSaveOpts(); capPreview.curLine = -1; });
 
-  // ── toggles ──
-  const tgl = (id, key, after) => { const el = document.getElementById(id); if (el) el.addEventListener('click', () => { capState[key] = !capState[key]; capSyncOptsUI(); capSaveOpts(); if (after) after(); }); };
-  tgl('capUpper', 'uppercase', () => { capPreview.curLine = -1; });
-  tgl('capBox', 'box', () => { const capEl = document.getElementById('capCap'); if (capEl) capEl.classList.toggle('boxed', capState.box); });
-  tgl('capVary', 'vary', () => { capPreview.curLine = -1; });
+  // ── toggle chips ──
+  captionsModal.querySelectorAll('#capChips .cap-chip').forEach(c => {
+    c.addEventListener('click', () => {
+      const key = c.getAttribute('data-chip');
+      capState[key] = !capState[key];
+      capState._look = '';   // a manual change means it's no longer a named look
+      capSyncOptsUI(); capSaveOpts();
+      if (key === 'box') { const capEl = document.getElementById('capCap'); if (capEl) capEl.classList.toggle('boxed', capState.box); }
+      else capPreview.curLine = -1;
+    });
+  });
+  // ── quick looks (one-click complete presets) ──
+  captionsModal.querySelectorAll('#capLooks .cap-look').forEach(l => {
+    l.addEventListener('click', () => capApplyLook(l.getAttribute('data-look')));
+  });
 
   // ── sliders ──
   const sl = (id, key, after) => { const el = document.getElementById(id); if (el) el.addEventListener('input', () => { capState[key] = parseInt(el.value, 10); capSyncOptsUI(); capSaveOpts(); if (after) after(); }); };
