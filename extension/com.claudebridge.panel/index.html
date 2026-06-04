@@ -2525,6 +2525,32 @@
   .cap-slider::-webkit-slider-thumb:active { transform: scale(1.18); cursor: grabbing; }
   .cap-slider-val { min-width: 30px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--text); }
 
+  /* color picker */
+  .cap-colorpick { display: grid; grid-template-columns: 200px 22px 1fr; gap: 12px; height: 150px; margin: 2px 0 4px; max-width: 560px; }
+  .cap-sv { position: relative; border-radius: 10px; cursor: crosshair; border: 1px solid var(--border); }
+  .cap-sv-cur { position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.55); transform: translate(-50%,-50%); pointer-events: none; }
+  .cap-hue { position: relative; border-radius: 8px; cursor: pointer; border: 1px solid var(--border);
+    background: linear-gradient(to bottom, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%); }
+  .cap-hue-cur { position: absolute; left: -2px; right: -2px; height: 5px; border-radius: 3px; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.55); transform: translateY(-50%); pointer-events: none; }
+  .cap-color-side { display: flex; flex-direction: column; gap: 9px; justify-content: center; }
+  .cap-hexrow { display: flex; align-items: center; gap: 7px; }
+  .cap-color-chip { width: 26px; height: 26px; border-radius: 7px; flex: 0 0 auto; box-shadow: 0 0 0 1px rgba(255,255,255,.18) inset; background: #E2885F; }
+  .cap-hex { flex: 1; min-width: 0; font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: var(--text); background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+  .cap-hex:focus { outline: none; border-color: var(--accent); }
+  .cap-color-side .cap-swatches { flex-wrap: wrap; }
+
+  /* position zone grid (like Premiere's Align & Transform) */
+  .cap-zone-row { display: flex; align-items: center; gap: 14px; margin: 2px 0 4px; }
+  .cap-zone-grid { display: grid; grid-template-columns: repeat(3, 26px); grid-template-rows: repeat(3, 26px); gap: 4px; flex: 0 0 auto; padding: 6px; background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 10px; }
+  .cap-zone-grid button { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,.05); cursor: pointer; transition: background .12s, border-color .12s, transform .1s; padding: 0; }
+  .cap-zone-grid button:hover { border-color: var(--accent-line); background: rgba(255,255,255,.1); transform: scale(1.08); }
+  .cap-zone-grid button.sel { background: var(--accent); border-color: var(--accent); }
+  .cap-zone-hint { font-size: 11px; color: var(--text-dim); line-height: 1.45; }
+  .cap-zone-hint b { color: var(--text); }
+
+  .cap-select { font: inherit; font-size: 12px; color: var(--text); background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; cursor: pointer; min-width: 150px; }
+  .cap-select:focus { outline: none; border-color: var(--accent); }
+
   /* draggable caption affordance */
   .cap-cap.draggable { cursor: grab; }
   .cap-cap.dragging { cursor: grabbing; }
@@ -3546,21 +3572,20 @@
           <div class="cap-style-desc">Understated, low-key</div>
           <div class="cap-style-prev"><span>minimal</span></div>
         </label>
+        <label class="cap-style" data-style="hormozi">
+          <input type="radio" name="capStyle" value="hormozi">
+          <div class="cap-style-name">Hormozi</div>
+          <div class="cap-style-desc">Bold, active word in a color box</div>
+          <div class="cap-style-prev"><span>big</span><b style="background:var(--accent-2);color:#15110d;padding:0 4px;border-radius:4px">BOLD</b></div>
+        </label>
       </div>
 
-      <div class="cap-sec-label">Options</div>
-      <div class="cap-opts">
-        <div class="cap-opt-row">
-          <span class="cap-opt-label">Position<small>or just drag the caption above</small></span>
-          <div class="cap-seg" id="capPosSeg">
-            <button type="button" data-pos="top">Top</button>
-            <button type="button" data-pos="middle">Mid</button>
-            <button type="button" data-pos="bottom" class="sel">Bottom</button>
-            <button type="button" data-pos="custom">Custom</button>
-          </div>
-        </div>
-        <div class="cap-opt-row">
-          <span class="cap-opt-label">Highlight color</span>
+      <div class="cap-sec-label">Highlight color</div>
+      <div class="cap-colorpick">
+        <div class="cap-sv" id="capSV"><i class="cap-sv-cur" id="capSVcur"></i></div>
+        <div class="cap-hue" id="capHue"><i class="cap-hue-cur" id="capHueCur"></i></div>
+        <div class="cap-color-side">
+          <div class="cap-hexrow"><span class="cap-color-chip" id="capColorChip"></span><input class="cap-hex" id="capHex" type="text" maxlength="7" spellcheck="false" value="#E2885F"></div>
           <div class="cap-swatches" id="capSwatches">
             <span class="cap-swatch sel" data-color="#E2885F" style="background:#E2885F"></span>
             <span class="cap-swatch" data-color="#F5C542" style="background:#F5C542"></span>
@@ -3570,28 +3595,59 @@
             <span class="cap-swatch" data-color="#FFFFFF" style="background:#FFFFFF"></span>
           </div>
         </div>
+      </div>
+
+      <div class="cap-sec-label">Position</div>
+      <div class="cap-zone-row">
+        <div class="cap-zone-grid" id="capZoneGrid">
+          <button type="button" data-zx="0.14" data-zy="0.12"></button>
+          <button type="button" data-zx="0.5"  data-zy="0.12"></button>
+          <button type="button" data-zx="0.86" data-zy="0.12"></button>
+          <button type="button" data-zx="0.14" data-zy="0.5"></button>
+          <button type="button" data-zx="0.5"  data-zy="0.5"></button>
+          <button type="button" data-zx="0.86" data-zy="0.5"></button>
+          <button type="button" data-zx="0.14" data-zy="0.86"></button>
+          <button type="button" data-zx="0.5"  data-zy="0.86"></button>
+          <button type="button" data-zx="0.86" data-zy="0.86"></button>
+        </div>
+        <div class="cap-zone-hint">Click a zone to place the captions — or just <b>drag</b> the text in the preview for anywhere.</div>
+      </div>
+
+      <div class="cap-sec-label">Text</div>
+      <div class="cap-opts">
         <div class="cap-opt-row">
-          <span class="cap-opt-label">Words per line</span>
-          <div class="cap-slider-wrap">
-            <input type="range" class="cap-slider" id="capWords" min="1" max="8" step="1" value="4">
-            <span class="cap-slider-val" id="capWordsVal">4</span>
-          </div>
+          <span class="cap-opt-label">Font</span>
+          <select class="cap-select" id="capFontFamily">
+            <option value="">Default (Grotesk)</option>
+            <option value="Montserrat, system-ui, sans-serif">Montserrat</option>
+            <option value="Inter, system-ui, sans-serif">Inter</option>
+            <option value="Poppins, system-ui, sans-serif">Poppins</option>
+            <option value="Anton, Impact, sans-serif">Anton</option>
+            <option value="Georgia, serif">Georgia</option>
+          </select>
         </div>
         <div class="cap-opt-row">
-          <span class="cap-opt-label">Font size</span>
-          <div class="cap-slider-wrap">
-            <input type="range" class="cap-slider" id="capFont" min="70" max="150" step="5" value="100">
-            <span class="cap-slider-val" id="capFontVal">100%</span>
-          </div>
+          <span class="cap-opt-label">Weight</span>
+          <div class="cap-seg" id="capWeightSeg"><button type="button" data-w="400">Reg</button><button type="button" data-w="600">Semi</button><button type="button" data-w="800" class="sel">Bold</button><button type="button" data-w="900">Black</button></div>
         </div>
         <div class="cap-opt-row">
-          <span class="cap-opt-label">UPPERCASE</span>
-          <div class="cap-toggle" id="capUpper" role="switch" tabindex="0"></div>
+          <span class="cap-opt-label">Align</span>
+          <div class="cap-seg" id="capAlignSeg"><button type="button" data-a="left">Left</button><button type="button" data-a="center" class="sel">Center</button><button type="button" data-a="right">Right</button></div>
         </div>
-        <div class="cap-opt-row">
-          <span class="cap-opt-label">Pill background<small>solid bar behind the words</small></span>
-          <div class="cap-toggle" id="capBox" role="switch" tabindex="0"></div>
-        </div>
+        <div class="cap-opt-row"><span class="cap-opt-label">Font size</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capFont" min="70" max="150" step="5" value="100"><span class="cap-slider-val" id="capFontVal">100%</span></div></div>
+        <div class="cap-opt-row"><span class="cap-opt-label">Letter spacing</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capTracking" min="-5" max="20" step="1" value="0"><span class="cap-slider-val" id="capTrackingVal">0</span></div></div>
+        <div class="cap-opt-row"><span class="cap-opt-label">Line height</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capLineHt" min="90" max="170" step="2" value="112"><span class="cap-slider-val" id="capLineHtVal">1.12</span></div></div>
+        <div class="cap-opt-row"><span class="cap-opt-label">Words per line</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capWords" min="1" max="8" step="1" value="4"><span class="cap-slider-val" id="capWordsVal">4</span></div></div>
+        <div class="cap-opt-row"><span class="cap-opt-label">UPPERCASE</span><div class="cap-toggle" id="capUpper" role="switch" tabindex="0"></div></div>
+      </div>
+
+      <div class="cap-sec-label">Effects</div>
+      <div class="cap-opts">
+        <div class="cap-opt-row"><span class="cap-opt-label">Shadow</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capShadow" min="0" max="100" step="5" value="55"><span class="cap-slider-val" id="capShadowVal">55%</span></div></div>
+        <div class="cap-opt-row"><span class="cap-opt-label">Outline</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capStroke" min="0" max="12" step="1" value="2"><span class="cap-slider-val" id="capStrokeVal">2px</span></div></div>
+        <div class="cap-opt-row"><span class="cap-opt-label">Outline color</span><div class="cap-swatches" id="capStrokeSwatches"><span class="cap-swatch sel" data-color="#000000" style="background:#000"></span><span class="cap-swatch" data-color="#FFFFFF" style="background:#fff"></span><span class="cap-swatch" data-color="#15110d" style="background:#15110d"></span><span class="cap-swatch" data-color="#3A2A1F" style="background:#3A2A1F"></span></div></div>
+        <div class="cap-opt-row"><span class="cap-opt-label">Vary per line<small>different color + motion each line</small></span><div class="cap-toggle" id="capVary" role="switch" tabindex="0"></div></div>
+        <div class="cap-opt-row"><span class="cap-opt-label">Pill background<small>solid bar behind the words</small></span><div class="cap-toggle" id="capBox" role="switch" tabindex="0"></div></div>
       </div>
     </div>
 
@@ -7966,22 +8022,78 @@ function capSaveOpts() {
   } catch {}
 }
 
+// ── color helpers (HSV <-> hex for the picker) ──
+let capHSV = { h: 20, s: 0.58, v: 0.886 };  // ~ #E2885F
+function capHsvToHex(h, s, v) {
+  h = ((h % 360) + 360) % 360; s = Math.max(0, Math.min(1, s)); v = Math.max(0, Math.min(1, v));
+  const c = v * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; } else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; } else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+  const to = (n) => ('0' + Math.round((n + m) * 255).toString(16)).slice(-2);
+  return ('#' + to(r) + to(g) + to(b)).toUpperCase();
+}
+function capHexToHsv(hex) {
+  const c = (hex || '').replace('#', '').trim();
+  if (!/^[0-9a-fA-F]{6}$/.test(c)) return null;
+  const r = parseInt(c.slice(0, 2), 16) / 255, g = parseInt(c.slice(2, 4), 16) / 255, b = parseInt(c.slice(4, 6), 16) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0;
+  if (d !== 0) { if (mx === r) h = 60 * (((g - b) / d) % 6); else if (mx === g) h = 60 * ((b - r) / d + 2); else h = 60 * ((r - g) / d + 4); }
+  if (h < 0) h += 360;
+  return { h, s: mx === 0 ? 0 : d / mx, v: mx };
+}
+function capSyncColorUI() {
+  const sv = document.getElementById('capSV'), svc = document.getElementById('capSVcur'), hueC = document.getElementById('capHueCur');
+  if (sv) sv.style.background = 'linear-gradient(to top, #000, rgba(0,0,0,0)), linear-gradient(to right, #fff, hsl(' + Math.round(capHSV.h) + ',100%,50%))';
+  if (svc) { svc.style.left = (capHSV.s * 100) + '%'; svc.style.top = ((1 - capHSV.v) * 100) + '%'; }
+  if (hueC) hueC.style.top = (capHSV.h / 360 * 100) + '%';
+  const chip = document.getElementById('capColorChip'); if (chip) chip.style.background = capState.highlight;
+  const hx = document.getElementById('capHex'); if (hx && document.activeElement !== hx) hx.value = capState.highlight;
+}
+function capSetColor(hex, fromHsv) {
+  hex = (hex || '').toUpperCase();
+  capState.highlight = hex;
+  if (!fromHsv) { const hsv = capHexToHsv(hex); if (hsv) capHSV = hsv; }
+  capSyncColorUI();
+  captionsModal.querySelectorAll('#capSwatches .cap-swatch').forEach(s =>
+    s.classList.toggle('sel', (s.getAttribute('data-color') || '').toUpperCase() === hex));
+  capSaveOpts();
+  capPreview.curLine = -1;   // rebuild preview line with the new color
+}
+function capSyncZoneUI() {
+  const g = document.getElementById('capZoneGrid'); if (!g) return;
+  g.querySelectorAll('button').forEach(b => {
+    const zx = +b.getAttribute('data-zx'), zy = +b.getAttribute('data-zy');
+    b.classList.toggle('sel', capState.position === 'custom' && Math.abs(zx - capState.customX) < 0.04 && Math.abs(zy - capState.customY) < 0.04);
+  });
+}
+
 function capSyncOptsUI() {
   captionsModal.querySelectorAll('.cap-style').forEach(el => {
     const on = el.getAttribute('data-style') === capState.style;
     el.classList.toggle('sel', on);
     const r = el.querySelector('input'); if (r) r.checked = on;
   });
-  captionsModal.querySelectorAll('#capPosSeg button').forEach(b =>
-    b.classList.toggle('sel', b.getAttribute('data-pos') === capState.position));
   captionsModal.querySelectorAll('#capSwatches .cap-swatch').forEach(s =>
-    s.classList.toggle('sel', (s.getAttribute('data-color') || '').toUpperCase() === capState.highlight.toUpperCase()));
+    s.classList.toggle('sel', (s.getAttribute('data-color') || '').toUpperCase() === (capState.highlight || '').toUpperCase()));
+  captionsModal.querySelectorAll('#capStrokeSwatches .cap-swatch').forEach(s =>
+    s.classList.toggle('sel', (s.getAttribute('data-color') || '').toUpperCase() === (capState.strokeColor || '').toUpperCase()));
+  captionsModal.querySelectorAll('#capWeightSeg button').forEach(b => b.classList.toggle('sel', +b.getAttribute('data-w') === capState.fontWeight));
+  captionsModal.querySelectorAll('#capAlignSeg button').forEach(b => b.classList.toggle('sel', b.getAttribute('data-a') === capState.align));
+  const ff = document.getElementById('capFontFamily'); if (ff) ff.value = capState.fontFamily || '';
   const up = document.getElementById('capUpper'); if (up) up.classList.toggle('on', capState.uppercase);
   const bx = document.getElementById('capBox'); if (bx) bx.classList.toggle('on', capState.box);
-  const ws = document.getElementById('capWords'); if (ws) ws.value = String(capState.maxWords);
-  const wv = document.getElementById('capWordsVal'); if (wv) wv.textContent = String(capState.maxWords);
-  const fs = document.getElementById('capFont'); if (fs) fs.value = String(capState.fontPct);
-  const fv = document.getElementById('capFontVal'); if (fv) fv.textContent = capState.fontPct + '%';
+  const vy = document.getElementById('capVary'); if (vy) vy.classList.toggle('on', capState.vary);
+  const setSlider = (id, valId, value, fmt) => { const s = document.getElementById(id); if (s) s.value = String(value); const v = document.getElementById(valId); if (v) v.textContent = fmt ? fmt(value) : String(value); };
+  setSlider('capWords', 'capWordsVal', capState.maxWords);
+  setSlider('capFont', 'capFontVal', capState.fontPct, v => v + '%');
+  setSlider('capTracking', 'capTrackingVal', capState.trackingPct);
+  setSlider('capLineHt', 'capLineHtVal', capState.lineHtPct, v => (v / 100).toFixed(2));
+  setSlider('capShadow', 'capShadowVal', capState.shadowPct, v => v + '%');
+  setSlider('capStroke', 'capStrokeVal', capState.strokePx, v => v + 'px');
+  capSyncZoneUI();
+  capSyncColorUI();
 }
 
 // ── Live preview engine — mirrors Captions.tsx animation in the DOM ──
@@ -8195,29 +8307,90 @@ function capStopPreview() { if (capPreview.raf) { cancelAnimationFrame(capPrevie
 // ── option wiring ──
 (function wireCaptionOpts() {
   if (!captionsModal) return;
+
+  // style cards
   captionsModal.querySelectorAll('.cap-style').forEach(el => {
     el.addEventListener('click', () => { capState.style = el.getAttribute('data-style'); capSyncOptsUI(); capSaveOpts(); capRefreshPreview(true); });
   });
-  captionsModal.querySelectorAll('#capPosSeg button').forEach(b => {
+
+  // ── color picker: SV square + hue strip + hex + presets ──
+  const dragHandler = (el, onMove) => {
+    if (!el) return;
+    el.addEventListener('pointerdown', (ev) => {
+      onMove(ev);
+      const mv = (e) => onMove(e);
+      const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+      window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+      ev.preventDefault();
+    });
+  };
+  const sv = document.getElementById('capSV');
+  dragHandler(sv, (ev) => {
+    const r = sv.getBoundingClientRect();
+    capHSV.s = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+    capHSV.v = Math.max(0, Math.min(1, 1 - (ev.clientY - r.top) / r.height));
+    capSetColor(capHsvToHex(capHSV.h, capHSV.s, capHSV.v), true);
+  });
+  const hue = document.getElementById('capHue');
+  dragHandler(hue, (ev) => {
+    const r = hue.getBoundingClientRect();
+    capHSV.h = Math.max(0, Math.min(360, (ev.clientY - r.top) / r.height * 360));
+    capSetColor(capHsvToHex(capHSV.h, capHSV.s, capHSV.v), true);
+  });
+  const hx = document.getElementById('capHex');
+  if (hx) {
+    const apply = () => { let v = hx.value.trim(); if (v && v[0] !== '#') v = '#' + v; if (/^#[0-9a-fA-F]{6}$/.test(v)) capSetColor(v, false); else hx.value = capState.highlight; };
+    hx.addEventListener('change', apply);
+    hx.addEventListener('keydown', (e) => { if (e.key === 'Enter') { apply(); hx.blur(); } });
+  }
+  captionsModal.querySelectorAll('#capSwatches .cap-swatch').forEach(s => {
+    s.addEventListener('click', () => capSetColor(s.getAttribute('data-color'), false));
+  });
+
+  // ── position zone grid ──
+  captionsModal.querySelectorAll('#capZoneGrid button').forEach(b => {
     b.addEventListener('click', () => {
-      capState.position = b.getAttribute('data-pos');
+      capState.position = 'custom';
+      capState.customX = +b.getAttribute('data-zx');
+      capState.customY = +b.getAttribute('data-zy');
       capSyncOptsUI(); capSaveOpts();
       const capEl = document.getElementById('capCap'); if (capEl) capApplyPos(capEl);
     });
   });
-  captionsModal.querySelectorAll('#capSwatches .cap-swatch').forEach(s => {
-    s.addEventListener('click', () => { capState.highlight = s.getAttribute('data-color'); capSyncOptsUI(); capSaveOpts(); });
+
+  // ── weight + align + font family ──
+  captionsModal.querySelectorAll('#capWeightSeg button').forEach(b => {
+    b.addEventListener('click', () => { capState.fontWeight = +b.getAttribute('data-w'); capSyncOptsUI(); capSaveOpts(); capPreview.curLine = -1; });
   });
-  const up = document.getElementById('capUpper');
-  if (up) up.addEventListener('click', () => { capState.uppercase = !capState.uppercase; capSyncOptsUI(); capSaveOpts(); capPreview.curLine = -1; });
-  const bx = document.getElementById('capBox');
-  if (bx) bx.addEventListener('click', () => { capState.box = !capState.box; capSyncOptsUI(); capSaveOpts(); const capEl = document.getElementById('capCap'); if (capEl) capEl.classList.toggle('boxed', capState.box); });
-  const ws = document.getElementById('capWords');
-  if (ws) ws.addEventListener('input', () => { capState.maxWords = parseInt(ws.value, 10) || 4; capSyncOptsUI(); capSaveOpts(); capRefreshPreview(false); });
-  const fs = document.getElementById('capFont');
-  if (fs) fs.addEventListener('input', () => { capState.fontPct = parseInt(fs.value, 10) || 100; capSyncOptsUI(); capSaveOpts(); capPreview.curLine = -1; });
+  captionsModal.querySelectorAll('#capAlignSeg button').forEach(b => {
+    b.addEventListener('click', () => { capState.align = b.getAttribute('data-a'); capSyncOptsUI(); capSaveOpts(); capPreview.curLine = -1; });
+  });
+  const ff = document.getElementById('capFontFamily');
+  if (ff) ff.addEventListener('change', () => { capState.fontFamily = ff.value; capSaveOpts(); capPreview.curLine = -1; });
+
+  // ── toggles ──
+  const tgl = (id, key, after) => { const el = document.getElementById(id); if (el) el.addEventListener('click', () => { capState[key] = !capState[key]; capSyncOptsUI(); capSaveOpts(); if (after) after(); }); };
+  tgl('capUpper', 'uppercase', () => { capPreview.curLine = -1; });
+  tgl('capBox', 'box', () => { const capEl = document.getElementById('capCap'); if (capEl) capEl.classList.toggle('boxed', capState.box); });
+  tgl('capVary', 'vary', () => { capPreview.curLine = -1; });
+
+  // ── sliders ──
+  const sl = (id, key, after) => { const el = document.getElementById(id); if (el) el.addEventListener('input', () => { capState[key] = parseInt(el.value, 10); capSyncOptsUI(); capSaveOpts(); if (after) after(); }); };
+  sl('capWords', 'maxWords', () => capRefreshPreview(false));
+  sl('capFont', 'fontPct', () => { capPreview.curLine = -1; });
+  sl('capTracking', 'trackingPct', () => { capPreview.curLine = -1; });
+  sl('capLineHt', 'lineHtPct', () => { capPreview.curLine = -1; });
+  sl('capShadow', 'shadowPct', () => { capPreview.curLine = -1; });
+  sl('capStroke', 'strokePx', () => { capPreview.curLine = -1; });
+  captionsModal.querySelectorAll('#capStrokeSwatches .cap-swatch').forEach(s => {
+    s.addEventListener('click', () => { capState.strokeColor = s.getAttribute('data-color'); capSyncOptsUI(); capSaveOpts(); capPreview.curLine = -1; });
+  });
+
   const rp = document.getElementById('capReplay');
   if (rp) rp.addEventListener('click', () => { capPreview.start = 0; });
+
+  // init the picker's HSV from the saved highlight
+  const hsv0 = capHexToHsv(capState.highlight); if (hsv0) capHSV = hsv0;
 })();
 
 function capAdjustStageAspect() {
