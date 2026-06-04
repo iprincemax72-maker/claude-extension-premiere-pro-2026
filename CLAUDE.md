@@ -8,7 +8,7 @@
 
 ## 30-second elevator pitch
 
-A CEP panel docked in Premiere Pro 2024+ that does two main things:
+A CEP panel docked in Premiere Pro 2023+ that does two main things:
 
 1. **Generate motion graphics from natural language** — chat with Claude, it writes a Remotion composition, renders an MP4, and the panel offers to drop it on your timeline.
 2. **Auto-cut talking-head clips** — point at a selected clip, the panel runs ffmpeg silencedetect + asks Claude to transcribe and find filler words / false starts, then ripple-deletes the cuts.
@@ -84,7 +84,7 @@ still exists as a secondary; the unified JSONL is the one to read.
 ## INSTALL — one-prompt agent playbook
 
 Prereqs the user must have:
-- Adobe Premiere Pro 2024 or newer (tested on Premiere Pro 2026)
+- Adobe Premiere Pro 2023 or newer (tested on Premiere Pro 2026)
 - Internet for first install
 - A Claude Code Pro or Max plan (the bridge spawns the `claude` CLI; no API key)
 

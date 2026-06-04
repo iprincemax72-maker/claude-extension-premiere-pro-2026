@@ -4,7 +4,7 @@
 
 > Uses your existing **Claude Code subscription**. No API key required.
 
-![status](https://img.shields.io/badge/Premiere_Pro-2024%2B-9999ff) ![status](https://img.shields.io/badge/macOS-supported-success) ![status](https://img.shields.io/badge/Windows-supported-success) ![status](https://img.shields.io/badge/license-Proprietary-red)
+![status](https://img.shields.io/badge/Premiere_Pro-2023%2B-9999ff) ![status](https://img.shields.io/badge/macOS-supported-success) ![status](https://img.shields.io/badge/Windows-supported-success) ![status](https://img.shields.io/badge/license-Proprietary-red)
 
 ---
 
@@ -40,7 +40,7 @@ Premiere CEP Panel  ─HTTP─►  Local Node bridge  ─spawns─►  claude CL
 ## Requirements
 
 - **macOS** (Darwin 22+) **or Windows 10/11**
-- **Adobe Premiere Pro 2024+** (tested on Premiere Pro 2026)
+- **Adobe Premiere Pro 2023+** (tested on Premiere Pro 2026)
 - **Claude Code** ([Pro or Max plan](https://www.claude.com/pricing)) — the bridge uses your Claude Code login, not an API key
 - Internet — for downloading Node, Claude CLI, ffmpeg, and Remotion deps on first install
 
