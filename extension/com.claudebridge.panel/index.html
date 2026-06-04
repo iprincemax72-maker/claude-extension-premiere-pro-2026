@@ -8186,6 +8186,49 @@ function capNotice(msg) {
   requestAnimationFrame(() => t.classList.add('show'));
   setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 3200);
 }
+// Retry an ExtendScript call until it returns non-null. evalES resolves null when
+// another ES call is mid-flight (_esBusy) — a transient we must not treat as a real
+// answer (that's why the selection chip wrongly showed "No clip selected").
+async function esRetry(script, tries, delayMs) {
+  tries = tries || 6; delayMs = delayMs || 180;
+  for (let i = 0; i < tries; i++) {
+    const r = await evalES(script);
+    if (r != null) return r;
+    await new Promise(res => setTimeout(res, delayMs));
+  }
+  return null;
+}
+
+let _capSelPoll = null;
+// Read the current Premiere selection and update the chip. A transient null (ES
+// busy) is IGNORED so the chip never flips to "No clip" mid-poll; only a real
+// {ok:false} shows the empty state. Polled while the modal is open so selecting
+// a clip AFTER opening updates live.
+async function capRefreshSelection(retry) {
+  const info = document.getElementById('capSelInfo');
+  let raw = await evalES('ccGetSelectedClips()');
+  if (raw == null && retry) raw = await esRetry('ccGetSelectedClips()');
+  if (raw == null) return;                       // busy/transient — keep current chip
+  let sel = null; try { sel = JSON.parse(raw); } catch { return; }
+  if (sel && sel.ok && sel.segments && sel.segments.length) {
+    capState.selection = sel;
+    const total = sel.durationSec || 0;
+    const mins = Math.floor(total / 60), secs = Math.round(total % 60);
+    if (info) { info.className = 'cap-selchip'; info.innerHTML = '<b>' + sel.count + '</b> clip' + (sel.count === 1 ? '' : 's') + ' · <b>' + mins + ':' + String(secs).padStart(2, '0') + '</b>'; }
+  } else {
+    capState.selection = null;
+    if (info) { info.className = 'cap-selchip warn'; info.textContent = 'No clip selected'; }
+  }
+}
+function capStartSelPoll() {
+  capStopSelPoll();
+  _capSelPoll = setInterval(() => {
+    if (!captionsModal.classList.contains('show')) { capStopSelPoll(); return; }
+    capRefreshSelection(false);
+  }, 1500);
+}
+function capStopSelPoll() { if (_capSelPoll) { clearInterval(_capSelPoll); _capSelPoll = null; } }
+
 async function openCaptionsModal() {
   if (!captionsAllowed()) { capNotice('Captions are in early access — not available on your account yet.'); return; }
   capCleanup();
@@ -8197,38 +8240,25 @@ async function openCaptionsModal() {
   capAdjustStageAspect();
   capRefreshPreview(true);
 
+  const info = document.getElementById('capSelInfo');
+  if (info) { info.className = 'cap-selchip'; info.textContent = 'Reading selection…'; }
+
+  // sequence dims (retry past transient ES-busy so aspect matches)
   try {
-    const dims = JSON.parse(await evalES('ccGetSeqDims()'));
+    const rawDims = await esRetry('ccGetSeqDims()');
+    const dims = rawDims ? JSON.parse(rawDims) : null;
     if (dims && dims.width) { capState.width = dims.width; capState.height = dims.height; capState.fps = dims.fps || 30; capAdjustStageAspect(); }
   } catch {}
 
-  const info = document.getElementById('capSelInfo');
-  if (info) {
-    info.className = 'cap-selchip'; info.textContent = 'Reading selection…';
-    try {
-      const sel = JSON.parse(await evalES('ccGetSelectedClips()'));
-      if (!sel.ok) {
-        info.className = 'cap-selchip warn';
-        info.textContent = (sel.error === 'no clip selected') ? 'No clip selected' : ('Selection: ' + (sel.error || 'unknown'));
-        capState.selection = null;
-      } else {
-        capState.selection = sel;
-        const total = sel.durationSec || 0;
-        const mins = Math.floor(total / 60), secs = Math.round(total % 60);
-        info.className = 'cap-selchip';
-        info.innerHTML = '<b>' + sel.count + '</b> clip' + (sel.count === 1 ? '' : 's') + ' · <b>' + mins + ':' + String(secs).padStart(2, '0') + '</b>';
-      }
-    } catch (e) {
-      info.className = 'cap-selchip warn'; info.textContent = 'No selection'; capState.selection = null;
-    }
-  }
+  await capRefreshSelection(true);   // initial read (with retry)
+  capStartSelPoll();                 // keep it live while the modal is open
 }
 
 function capCleanup() {
   if (capState.es) { try { capState.es.close(); } catch {} capState.es = null; }
   if (capState.abort) { try { capState.abort.abort(); } catch {} capState.abort = null; }
 }
-function closeCaptionsModal() { captionsModal.classList.remove('show'); capStopPreview(); }
+function closeCaptionsModal() { captionsModal.classList.remove('show'); capStopPreview(); capStopSelPoll(); }
 function capCancel() {
   // capCleanup() aborts the in-flight /captions fetch; the bridge's req.on('aborted')
   // handler then kills the parakeet + remotion child processes (no separate
