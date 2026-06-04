@@ -7666,7 +7666,7 @@ async function analyzeAutoEdit() {
   const startedAt = Date.now();
   if (aeWizard.ticker) clearInterval(aeWizard.ticker);
   aeWizard.ticker = setInterval(() => {
-    const t = Math.floor((Date.now() - startedAt) / 1000) + 's';
+    const t = formatDuration(Math.floor((Date.now() - startedAt) / 1000));
     if (elapsedEl) elapsedEl.textContent = t;
     if (miniElapsedEl) miniElapsedEl.textContent = t;
   }, 500);
@@ -7910,7 +7910,7 @@ function startInlineProgress(reqId) {
   const ticker = setInterval(() => {
     if (finished) return;
     const sec = Math.floor((Date.now() - startedAt) / 1000);
-    elapsedEl.textContent = sec + 's';
+    elapsedEl.textContent = formatDuration(sec);
   }, 500);
 
   // Live log tail — reads ~/PremiereClaude/output/autoedit-<reqId>.log
