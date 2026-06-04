@@ -1,100 +1,26 @@
-// Standalone copy of the caption helpers for unit testing before inserting into bridge.js.
+// Unit tests for the caption helpers. To guarantee we test the SHIPPED code (not
+// a drifting copy), extract tokensToWords + groupWordsIntoLines straight from
+// bridge/bridge.js source and eval them in isolation.
+const fs = require('fs');
+const path = require('path');
 
-// Reconstruct word-level [{text,startMs,endMs}] from parakeet-mlx subword tokens.
-// parakeet emits sentencepiece tokens (" F","li","mi","f","y"," mak","es",...);
-// a new word begins at a token whose text starts with whitespace, or the first
-// token of the stream. We merge tokens until the next word-boundary token.
-function tokensToWords(sentences) {
-  const words = [];
-  let cur = null;
-  for (const s of (sentences || [])) {
-    for (const t of (s.tokens || [])) {
-      const raw = t && t.text != null ? String(t.text) : '';
-      if (!raw) continue;
-      const startsWord = /^\s/.test(raw) || cur === null;
-      const piece = raw.replace(/^\s+/, '');
-      const startMs = Math.round((Number(t.start) || 0) * 1000);
-      const endMs = Math.round((Number(t.end) || 0) * 1000);
-      if (startsWord) {
-        if (cur && cur.text) words.push(cur);
-        cur = { text: piece, startMs, endMs };
-      } else if (cur) {
-        cur.text += piece;
-        cur.endMs = endMs;
-      }
-    }
+function extractFn(src, name) {
+  const re = new RegExp('function\\s+' + name + '\\s*\\(');
+  const m = re.exec(src);
+  if (!m) throw new Error('function not found in bridge.js: ' + name);
+  let i = src.indexOf('{', m.index), depth = 0;
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) { i++; break; } }
   }
-  if (cur && cur.text) words.push(cur);
-  // sanitise: trim, drop empties, ensure end >= start, ensure monotonic non-overlap
-  const out = [];
-  for (const w of words) {
-    const text = w.text.trim();
-    if (!text) continue;
-    let startMs = Math.max(0, Math.round(w.startMs));
-    let endMs = Math.max(startMs + 1, Math.round(w.endMs));
-    const prev = out[out.length - 1];
-    if (prev && startMs < prev.endMs) startMs = prev.endMs; // no overlap
-    if (endMs <= startMs) endMs = startMs + 1;
-    out.push({ text, startMs, endMs });
-  }
-  return out;
+  return src.slice(m.index, i);
 }
 
-// Group a flat word list into caption lines. A line breaks when any of:
-//  - it already holds maxWordsPerLine words
-//  - the silent gap before the next word exceeds maxGapMs (natural pause)
-//  - adding the word would push the line past maxLineMs of on-screen time
-//  - adding the word would exceed maxCharsPerLine characters
-// Returns [{words, startMs, endMs}] with line.endMs extended slightly so the
-// last word doesn't vanish the instant it's spoken.
-function groupWordsIntoLines(words, opts) {
-  opts = opts || {};
-  const maxWordsPerLine = Math.max(1, opts.maxWordsPerLine || 4);
-  const maxGapMs = opts.maxGapMs != null ? opts.maxGapMs : 600;
-  const maxLineMs = opts.maxLineMs != null ? opts.maxLineMs : 2600;
-  const maxCharsPerLine = opts.maxCharsPerLine != null ? opts.maxCharsPerLine : 24;
-  const holdMs = opts.holdMs != null ? opts.holdMs : 250; // linger after last word
-
-  const clean = (words || [])
-    .filter(w => w && String(w.text || '').trim() && Number.isFinite(w.startMs) && Number.isFinite(w.endMs))
-    .map(w => ({ text: String(w.text).trim(), startMs: Math.max(0, w.startMs), endMs: Math.max(w.startMs + 1, w.endMs) }))
-    .sort((a, b) => a.startMs - b.startMs);
-
-  const lines = [];
-  let cur = [];
-  let curChars = 0;
-
-  const flush = () => {
-    if (!cur.length) return;
-    const startMs = cur[0].startMs;
-    const endMs = cur[cur.length - 1].endMs + holdMs;
-    lines.push({ words: cur.slice(), startMs, endMs });
-    cur = [];
-    curChars = 0;
-  };
-
-  for (let i = 0; i < clean.length; i++) {
-    const w = clean[i];
-    if (cur.length) {
-      const prev = cur[cur.length - 1];
-      const gap = w.startMs - prev.endMs;
-      const lineDur = w.endMs - cur[0].startMs;
-      const wouldChars = curChars + 1 + w.text.length;
-      if (
-        cur.length >= maxWordsPerLine ||
-        gap > maxGapMs ||
-        lineDur > maxLineMs ||
-        wouldChars > maxCharsPerLine
-      ) {
-        flush();
-      }
-    }
-    cur.push(w);
-    curChars += (curChars ? 1 : 0) + w.text.length;
-  }
-  flush();
-  return lines;
-}
+const BRIDGE = path.join(__dirname, '..', 'bridge', 'bridge.js');
+const _src = fs.readFileSync(BRIDGE, 'utf8');
+const _code = extractFn(_src, 'tokensToWords') + '\n' + extractFn(_src, 'groupWordsIntoLines') +
+  '\nreturn { tokensToWords, groupWordsIntoLines };';
+const { tokensToWords, groupWordsIntoLines } = (new Function(_code))();
 
 module.exports = { tokensToWords, groupWordsIntoLines };
 
