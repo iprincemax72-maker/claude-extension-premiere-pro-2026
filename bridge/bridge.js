@@ -2113,6 +2113,11 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
            + 'the same timing/placement, and the rest of the look — only change what was\n'
            + 'asked. Build it as a fresh composition (do not try to read the old render).')
         : '',
+      (opts && opts.userExtra)
+        ? ('\nUSER\'S EXTRA INSTRUCTIONS for the whole edit — honor these on this graphic\n'
+           + 'too (as long as they don\'t break the placement/timing rules below):\n'
+           + '  "' + String(opts.userExtra).replace(/"/g, "'").slice(0, 600) + '"')
+        : '',
       '',
       'BUILD IT:',
       '- Write a FRESH Remotion composition from scratch. Do NOT copy or import',
@@ -5387,7 +5392,8 @@ const server = http.createServer((req, res) => {
 
         // ── Generate (style-locked or varied per the answers) ─────────────
         broadcastProgress('Generating motion graphics', 42, reqId);
-        const genOpts = { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames };
+        const userExtra = String(answers.custom || '').trim().slice(0, 600);
+        const genOpts = { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames, userExtra };
         // Persist the final plan + render options so a SINGLE graphic can be
         // re-rendered later (the per-graphic "Change" feature) without re-running
         // analyze. Keyed by reqId; merges over the analyze-time cache entry.

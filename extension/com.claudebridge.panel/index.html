@@ -2378,6 +2378,18 @@
   .ae-optbtn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
   .ae-optbtn:active { transform: scale(0.96); }
   .ae-optbtn.selected { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(217,119,87,0.3); }
+  .ae-q-title .ae-q-opt-tag { font-weight: 500; color: var(--text-dim); font-size: 11px; }
+  .ae-custom-input {
+    width: 100%; box-sizing: border-box;
+    min-height: 38px; max-height: 120px; resize: vertical;
+    font: inherit; font-size: 12px; color: var(--text);
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: var(--radius-sm);
+    padding: 8px 10px; outline: none;
+    transition: border-color .14s var(--ease-out);
+  }
+  .ae-custom-input::placeholder { color: var(--text-dim); }
+  .ae-custom-input:focus { border-color: var(--accent); }
   .ae-err { font-size: 11.5px; color: var(--accent); margin: 8px 0 2px; min-height: 1px; }
 
   /* ───── Ask-Questions (Plan mode) interview card ───── */
@@ -9730,6 +9742,19 @@ function renderAeQuestions() {
     });
     qEl.appendChild(opts); wrap.appendChild(qEl);
   });
+  // Optional free-text — anything extra the user wants for the whole edit.
+  // Steers both which moments get picked and how the graphics are designed.
+  const cEl = document.createElement('div'); cEl.className = 'ae-q';
+  const cT = document.createElement('div'); cT.className = 'ae-q-title';
+  cT.innerHTML = 'Anything else? <span class="ae-q-opt-tag">(optional)</span>';
+  cEl.appendChild(cT);
+  const ta = document.createElement('textarea');
+  ta.className = 'ae-custom-input';
+  ta.rows = 2;
+  ta.placeholder = 'e.g. focus on the tools he mentions, keep it bold, add a logo bottom-right…';
+  ta.value = aeWizard.answers.custom || '';
+  ta.addEventListener('input', () => { aeWizard.answers.custom = ta.value; });
+  cEl.appendChild(ta); wrap.appendChild(cEl);
 }
 
 // STEP 3 → generate (runs plan → fit-check → generate automatically)
