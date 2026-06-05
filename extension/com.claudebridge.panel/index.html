@@ -2385,31 +2385,56 @@
   .ae-mini-cancel:hover { color: var(--accent); }
 
   /* ── Captions — full-screen studio ──────────────────────────────────── */
-  .cap-full.autocut-modal { align-items: stretch; justify-content: stretch; background: rgba(6,6,8,0.86); }
+  /* Claude design language, scoped to the captions modal only (rest of the panel
+     keeps its own tokens). Warm darks, cream text, hairline borders, NO glows,
+     NO multi-stop gradients, scarce coral. Overriding the shared tokens here means
+     existing captions rules pick up the calm palette automatically. */
+  .cap-full {
+    --cc-bg:        #1a1916;   /* panel base (warm) */
+    --cc-sunken:    #151412;   /* wells, slider tracks, inputs */
+    --cc-raised:    #211f1c;   /* chips, panels */
+    --cc-card:      #252320;   /* cards, active segment */
+    --cc-hover:     #2c2a26;
+    --cc-active:    #34312c;
+    --cc-text:      #f4f0e9;
+    --cc-body:      #ddd8cf;
+    --cc-muted:     #a09d96;
+    --cc-faint:     #7d7a72;
+    /* override shared tokens within captions → warm hairlines, no glow */
+    --border:       rgba(235,230,223,0.10);
+    --accent-line:  rgba(217,119,87,0.55);
+    --accent-soft:  rgba(217,119,87,0.13);
+    --accent-glow:  rgba(217,119,87,0.0);   /* kills every glow that used this */
+    --text:         #f4f0e9;
+    --text-dim:     #a09d96;
+  }
+  .cap-full.autocut-modal { align-items: stretch; justify-content: stretch; background: rgba(10,9,8,0.88); }
   .cap-full .cap-full-card {
     width: 100%; height: 100%; max-width: none; max-height: none;
     border-radius: 0; border: none; padding: 0; overflow: hidden;
-    background: radial-gradient(120% 80% at 50% -10%, #17151b 0%, #100f13 55%, #0b0a0d 100%);
+    background: var(--cc-bg);
     display: flex; flex-direction: column;
     transform: translate3d(0,0,0) scale(0.995);
   }
   .cap-full .cap-full-card::before { left: 0; right: 0; opacity: 0.5; }
 
   /* header */
-  .cap-head { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 14px 16px 12px; position: relative;
-    background: linear-gradient(180deg, rgba(255,255,255,.025), transparent); border-bottom: 1px solid rgba(255,255,255,.06); }
-  .cap-head::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-glow) 50%, transparent); opacity: .5; }
+  /* header — compact; slides up + fades on scroll-down (see .cap-head.hide) */
+  .cap-head { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 9px 14px; position: relative;
+    background: var(--cc-bg); border-bottom: 1px solid var(--border);
+    transition: transform .28s var(--ease-out), opacity .22s var(--ease-out); transform-origin: top; }
+  .cap-head.hide { transform: translateY(-100%); opacity: 0; pointer-events: none; }
   .cap-head .cap-x {
-    width: 30px; height: 30px; border-radius: 9px; flex: 0 0 auto;
+    width: 28px; height: 28px; border-radius: 8px; flex: 0 0 auto;
     display: flex; align-items: center; justify-content: center;
-    background: rgba(255,255,255,.05); border: 1px solid var(--border); color: var(--text-dim);
-    cursor: pointer; transition: background .14s, color .14s, transform .12s;
+    background: var(--cc-raised); border: 1px solid var(--border); color: var(--cc-muted);
+    cursor: pointer; transition: background .15s var(--ease-out), color .15s var(--ease-out);
   }
-  .cap-head .cap-x:hover { background: rgba(255,255,255,.1); color: var(--text); transform: scale(1.06); }
-  .cap-head .cap-x svg { width: 15px; height: 15px; }
-  .cap-head-title { font-size: 16px; font-weight: 720; color: var(--text); letter-spacing: -0.015em;
-    background: linear-gradient(92deg, #fff 30%, var(--accent-2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-  .cap-head-sub { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
+  .cap-head .cap-x:hover { background: var(--cc-hover); color: var(--cc-text); }
+  .cap-head .cap-x svg { width: 14px; height: 14px; }
+  .cap-head-title { font-family: var(--font-display, "Cormorant Garamond","EB Garamond",Georgia,serif);
+    font-size: 19px; font-weight: 500; color: var(--cc-text); letter-spacing: -0.01em; }
+  .cap-head-sub { font-size: 11px; color: var(--cc-muted); margin-top: 0; }
   .cap-head-spacer { flex: 1; }
   .cap-selchip {
     font-size: 11px; color: var(--text-dim); padding: 5px 10px; border-radius: 20px;
@@ -2508,13 +2533,13 @@
   .cap-mini-inner { position: absolute; top: 0; left: 0; transform-origin: top left; }
 
   /* section labels — premium, with a leading accent tick */
-  .cap-sec-label { display: flex; align-items: center; gap: 8px; font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--text-dim); font-weight: 700; margin: 18px 2px 9px; }
-  .cap-sec-label::before { content: ''; flex: 0 0 auto; width: 3px; height: 12px; border-radius: 3px; background: linear-gradient(180deg, var(--accent-2), var(--accent)); box-shadow: 0 0 8px -1px var(--accent-glow); }
+  .cap-sec-label { display: flex; align-items: center; gap: 9px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--cc-muted); font-weight: 600; margin: 18px 2px 10px; }
+  .cap-sec-label::before { content: ''; flex: 0 0 auto; width: 3px; height: 11px; border-radius: 2px; background: var(--accent); }
   .cap-sec-label::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
 
   /* style chips — horizontal, hover-lift */
   /* Quick-looks gallery — one-click complete presets (visual, not a bar) */
-  .cap-looks { display: flex; gap: 10px; overflow-x: auto; padding: 2px 1px 8px; scrollbar-width: thin; }
+  .cap-looks { display: flex; gap: 6px; overflow-x: auto; padding: 2px 1px 8px; scrollbar-width: thin; scroll-behavior: smooth; }
   /* horizontal filmstrip — slim accent bar that invites a swipe */
   .cap-looks::-webkit-scrollbar { height: 6px; }
   .cap-looks::-webkit-scrollbar-track { background: transparent; }
@@ -2522,9 +2547,9 @@
   .cap-looks:hover::-webkit-scrollbar-thumb { opacity: .8; }
   .cap-looks::-webkit-scrollbar-thumb:hover { opacity: 1; }
   .cap-look { flex: 0 0 auto; width: 104px; cursor: pointer; background: none; border: none; padding: 0; display: flex; flex-direction: column; gap: 5px; }
-  .cap-look-prev { height: 60px; border-radius: 11px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; transition: border-color .15s, transform .15s var(--ease-out), box-shadow .15s; background: linear-gradient(145deg,#2b2f3a,#1b1820); }
-  .cap-look:hover .cap-look-prev { transform: translateY(-2px); border-color: var(--accent-line); box-shadow: 0 10px 22px -14px #000; }
-  .cap-look.sel .cap-look-prev { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .cap-look-prev { height: 54px; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; transition: border-color .15s var(--ease-out), background .15s var(--ease-out); background: var(--cc-card); }
+  .cap-look:hover .cap-look-prev { border-color: var(--line-strong, rgba(235,230,223,.16)); background: var(--cc-hover); }
+  .cap-look.sel .cap-look-prev { border-color: var(--accent-line); box-shadow: 0 0 0 1px var(--accent-line) inset; }
   .cap-look-prev b { font-size: 16px; font-weight: 900; letter-spacing: .01em; line-height: 1; }
   .cap-look-name { font-size: 11px; color: var(--text-dim); text-align: center; font-weight: 600; }
   .cap-look.sel .cap-look-name { color: var(--accent-2); }
@@ -2535,23 +2560,37 @@
   .cap-chip:hover { color: var(--text); border-color: var(--accent-line); }
   .cap-chip.sel { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-2); }
 
-  .cap-styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 9px; }
+  /* style picker — compact horizontal scroller (like Quick Looks) */
+  .cap-styles { display: flex; gap: 6px; overflow-x: auto; padding: 2px 1px 8px; scrollbar-width: thin; scroll-behavior: smooth; }
   .cap-style {
-    position: relative; display: flex; flex-direction: column; gap: 3px;
-    padding: 11px 12px; cursor: pointer;
-    background: rgba(255,255,255,.035);
-    border: 1px solid var(--border); border-radius: 13px;
-    transition: border-color .16s, background .16s, transform .16s var(--ease-out), box-shadow .16s;
+    position: relative; flex: 0 0 auto; width: 138px; display: flex; flex-direction: column; gap: 2px;
+    padding: 9px 11px; cursor: pointer;
+    background: var(--cc-card);
+    border: 1px solid var(--border); border-radius: var(--r-lg, 12px);
+    transition: border-color .15s var(--ease-out), background .15s var(--ease-out);
   }
-  .cap-style:hover { border-color: var(--accent-line); background: rgba(255,255,255,.06); transform: translateY(-2px); box-shadow: 0 10px 24px -16px #000; }
+  .cap-style:hover { border-color: var(--line-strong, rgba(235,230,223,.16)); background: var(--cc-hover); }
   .cap-style input { position: absolute; opacity: 0; pointer-events: none; }
-  .cap-style.sel { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent) inset, 0 12px 26px -18px var(--accent-glow); }
-  .cap-style-name { font-size: 13px; font-weight: 680; color: var(--text); }
-  .cap-style.sel .cap-style-name { color: var(--accent-2); }
-  .cap-style-desc { font-size: 10.5px; color: var(--text-dim); line-height: 1.35; }
-  .cap-style-prev { margin-top: 5px; height: 17px; display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 800; letter-spacing: .01em; }
-  .cap-style-prev span { color: rgba(255,255,255,.45); }
-  .cap-style-prev .hot { color: var(--accent-2); }
+  .cap-style.sel { border-color: var(--accent-line); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent-line) inset; }
+  .cap-style-name { font-size: 13px; font-weight: 600; color: var(--cc-text); }
+  .cap-style.sel .cap-style-name { color: var(--cc-text); }
+  .cap-style-desc { font-size: 10.5px; color: var(--cc-dim, var(--cc-muted)); line-height: 1.35; }
+  .cap-style-prev { margin-top: 4px; height: 16px; display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; letter-spacing: .01em; }
+  .cap-style-prev span { color: var(--cc-faint); }
+  .cap-style-prev .hot { color: var(--accent); }
+
+  /* horizontal scroller arrow (Quick Looks + Style) — appears only when there's more */
+  .cap-scroller { position: relative; }
+  .cap-scroll-arrow { position: absolute; top: 0; bottom: 8px; right: -1px; width: 34px;
+    display: none; align-items: center; justify-content: flex-end; padding-right: 3px;
+    background: linear-gradient(90deg, rgba(26,25,22,0) 0%, var(--cc-bg) 62%);
+    border: none; color: var(--cc-muted); cursor: pointer; z-index: 2; transition: color .15s var(--ease-out); }
+  .cap-scroll-arrow.show { display: flex; }
+  .cap-scroll-arrow:hover { color: var(--cc-text); }
+  .cap-scroll-arrow:active { transform: translateX(1px); }
+  .cap-scroll-arrow svg { width: 17px; height: 17px; }
+  .cap-scroll-arrow.left { right: auto; left: -1px; justify-content: flex-start; padding: 0 0 0 3px;
+    background: linear-gradient(270deg, rgba(26,25,22,0) 0%, var(--cc-bg) 62%); }
 
   /* options — responsive grid: 2–3 per line on a wide panel, 1 col only when very narrow.
      max-width caps it at ~3 columns so it never sprawls on an ultrawide window. */
@@ -2570,48 +2609,47 @@
   .cap-seg { display: inline-flex; background: rgba(0,0,0,.22); border: 1px solid var(--border); border-radius: 11px; overflow: hidden; padding: 2px; gap: 2px; box-shadow: inset 0 1px 2px rgba(0,0,0,.3); }
   .cap-seg button { font: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-dim); background: none; border: none; padding: 6px 13px; border-radius: 9px; cursor: pointer; transition: background .14s, color .14s, box-shadow .14s; }
   .cap-seg button:hover { color: var(--text); }
-  .cap-seg button.sel { background: linear-gradient(135deg, var(--accent-2), var(--accent)); color: #fff; box-shadow: 0 2px 8px -2px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.25); }
+  .cap-seg button.sel { background: var(--cc-card); color: var(--cc-text); box-shadow: 0 1px 2px rgba(0,0,0,.22); }
   .cap-swatches { display: inline-flex; gap: 7px; }
   .cap-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: 0 0 0 1px rgba(255,255,255,.15) inset; transition: transform .12s; }
   .cap-swatch:hover { transform: scale(1.14); }
   .cap-swatch.sel { border-color: #fff; transform: scale(1.1); }
   .cap-toggle { position: relative; width: 42px; height: 23px; border-radius: 23px; background: rgba(120,120,130,.32); cursor: pointer; transition: background .18s; flex: 0 0 auto; box-shadow: inset 0 1px 3px rgba(0,0,0,.4); }
   .cap-toggle::after { content: ''; position: absolute; top: 2.5px; left: 2.5px; width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(180deg,#fff,#e9e9ee); box-shadow: 0 1px 3px rgba(0,0,0,.45), 0 0 0 .5px rgba(0,0,0,.06); transition: transform .2s var(--ease-out); }
-  .cap-toggle.on { background: linear-gradient(135deg, var(--accent-2), var(--accent)); box-shadow: inset 0 1px 2px rgba(0,0,0,.25), 0 0 12px -3px var(--accent-glow); }
+  .cap-toggle.on { background: var(--accent); box-shadow: inset 0 1px 2px rgba(0,0,0,.2); }
   .cap-toggle.on::after { transform: translateX(19px); }
 
   /* sliders — premium (filled track + glowing thumb) */
   .cap-slider-wrap { display: inline-flex; align-items: center; gap: 12px; min-width: 168px; }
-  .cap-slider { -webkit-appearance: none; appearance: none; width: 132px; height: 5px; border-radius: 5px; outline: none; cursor: pointer;
-    background: linear-gradient(to right, var(--accent) 0%, var(--accent-2) var(--cap-fill, 50%), rgba(255,255,255,.13) var(--cap-fill, 50%), rgba(255,255,255,.13) 100%); }
-  .cap-slider::-webkit-slider-runnable-track { height: 5px; border-radius: 5px; background: transparent; }
-  .cap-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 17px; height: 17px; margin-top: -6px; border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #fff, var(--accent-2) 55%, var(--accent));
-    box-shadow: 0 0 0 1px rgba(0,0,0,.25), 0 0 10px -1px var(--accent-glow), 0 2px 6px rgba(0,0,0,.45); cursor: grab; transition: transform .12s; }
+  /* Claude slider — sunken track, coral fill to thumb, cream thumb (coral while dragging) */
+  .cap-slider { -webkit-appearance: none; appearance: none; width: 132px; height: 4px; border-radius: 4px; outline: none; cursor: pointer;
+    background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--cap-fill, 50%), var(--cc-sunken) var(--cap-fill, 50%), var(--cc-sunken) 100%); }
+  .cap-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: transparent; }
+  .cap-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%;
+    background: var(--cc-text); border: 2px solid var(--cc-bg);
+    box-shadow: 0 1px 2px rgba(0,0,0,.4); cursor: grab; transition: transform .08s var(--ease-out), background .12s; }
   .cap-slider::-webkit-slider-thumb:hover { transform: scale(1.12); }
-  .cap-slider::-webkit-slider-thumb:active { transform: scale(1.22); cursor: grabbing; }
-  .cap-slider-val { min-width: 30px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 600; color: var(--accent-2); }
+  .cap-slider::-webkit-slider-thumb:active { background: var(--accent); cursor: grabbing; }
+  .cap-slider-val { min-width: 30px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 500; color: var(--cc-muted); }
 
-  /* color picker — premium */
-  .cap-colorpick { display: grid; grid-template-columns: 200px 26px 1fr; gap: 16px; height: 158px; margin: 4px 0 6px; max-width: 580px; }
-  .cap-sv { position: relative; border-radius: 14px; cursor: crosshair;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 10px 28px -14px rgba(0,0,0,.7); }
-  .cap-sv-cur { position: absolute; width: 17px; height: 17px; border-radius: 50%; border: 2.5px solid #fff;
-    box-shadow: 0 0 0 1.5px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.6); transform: translate(-50%,-50%); pointer-events: none; }
-  .cap-hue { position: relative; border-radius: 13px; cursor: pointer;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 6px 18px -12px rgba(0,0,0,.6);
+  /* color picker — compact (was oversized) */
+  .cap-colorpick { display: grid; grid-template-columns: 116px 16px 1fr; gap: 12px; height: 104px; margin: 2px 0 4px; max-width: 460px; }
+  .cap-sv { position: relative; border-radius: 8px; cursor: crosshair; box-shadow: inset 0 0 0 1px var(--border); }
+  .cap-sv-cur { position: absolute; width: 13px; height: 13px; border-radius: 50%; border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.5); transform: translate(-50%,-50%); pointer-events: none; }
+  .cap-hue { position: relative; border-radius: 8px; cursor: pointer; box-shadow: inset 0 0 0 1px var(--border);
     background: linear-gradient(to bottom, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%); }
-  .cap-hue-cur { position: absolute; left: -3px; right: -3px; height: 6px; border-radius: 4px; border: 2.5px solid #fff;
-    box-shadow: 0 0 0 1.5px rgba(0,0,0,.55), 0 1px 5px rgba(0,0,0,.5); transform: translateY(-50%); pointer-events: none; }
-  .cap-color-side { display: flex; flex-direction: column; gap: 12px; justify-content: center; }
-  .cap-hexrow { display: flex; align-items: center; gap: 9px; }
-  .cap-color-chip { width: 34px; height: 34px; border-radius: 10px; flex: 0 0 auto;
-    box-shadow: 0 0 0 1px rgba(255,255,255,.2) inset, 0 4px 14px -4px rgba(0,0,0,.5); background: #E2885F; transition: background .15s; }
-  .cap-hex { flex: 1; min-width: 0; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; letter-spacing: .04em; font-weight: 600; text-transform: uppercase;
-    color: var(--text); background: rgba(255,255,255,.045); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; transition: border-color .15s, box-shadow .15s; }
-  .cap-hex:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-  .cap-color-side .cap-swatches { flex-wrap: wrap; gap: 9px; }
-  .cap-color-side .cap-swatch { width: 24px; height: 24px; box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 2px 6px -2px rgba(0,0,0,.5); }
+  .cap-hue-cur { position: absolute; left: -2px; right: -2px; height: 5px; border-radius: 3px; border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.5); transform: translateY(-50%); pointer-events: none; }
+  .cap-color-side { display: flex; flex-direction: column; gap: 9px; justify-content: center; }
+  .cap-hexrow { display: flex; align-items: center; gap: 8px; }
+  .cap-color-chip { width: 28px; height: 28px; border-radius: 6px; flex: 0 0 auto;
+    box-shadow: inset 0 0 0 1px var(--border); background: #E2885F; transition: background .15s; }
+  .cap-hex { flex: 1; min-width: 0; font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace); font-size: 12px; letter-spacing: .03em; font-weight: 500; text-transform: uppercase;
+    color: var(--cc-text); background: var(--cc-sunken); border: 1px solid var(--border); border-radius: var(--r-md, 8px); padding: 7px 11px; transition: border-color .15s, box-shadow .15s; }
+  .cap-hex:focus { outline: none; border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .cap-color-side .cap-swatches { flex-wrap: wrap; gap: 7px; }
+  .cap-color-side .cap-swatch { width: 20px; height: 20px; box-shadow: inset 0 0 0 1px var(--border); }
   .cap-color-side .cap-swatch:hover { box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset, 0 4px 12px -3px rgba(0,0,0,.6); }
   .cap-color-side .cap-swatch.sel { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--accent-soft); }
 
@@ -2625,21 +2663,23 @@
   .cap-zone-hint b { color: var(--text); }
 
   /* position editor — draggable frame (shows where text lands) + X/Y sliders + zone snaps */
-  .cap-posedit { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: stretch; margin: 2px 0 2px; }
-  .cap-posframe { position: relative; width: 58px; height: 96px; border-radius: 9px; border: 1px solid rgba(255,255,255,.09); overflow: hidden; cursor: crosshair; flex: 0 0 auto;
-    background: radial-gradient(60% 50% at 28% 22%, rgba(90,140,200,.42), transparent 70%), radial-gradient(55% 60% at 78% 75%, rgba(217,119,87,.36), transparent 72%), linear-gradient(145deg,#2b2f3a,#1b1820); }
-  .cap-posframe-badge { position: absolute; top: 4px; left: 5px; z-index: 2; font-size: 6.5px; letter-spacing: .03em; text-transform: uppercase; color: rgba(255,255,255,.5); pointer-events: none; }
-  .cap-posframe-cap { position: absolute; z-index: 2; transform: translate(-50%,-50%); font-size: 7px; font-weight: 800; color: #fff; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,.85); }
+  /* bigger preview frame, smaller X/Y + Snap controls (per user) */
+  .cap-posedit { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; margin: 2px 0 2px; }
+  .cap-posframe { position: relative; width: 80px; height: 132px; border-radius: 9px; border: 1px solid var(--border); overflow: hidden; cursor: crosshair; flex: 0 0 auto;
+    background: radial-gradient(60% 50% at 28% 22%, rgba(90,140,200,.40), transparent 70%), radial-gradient(55% 60% at 78% 75%, rgba(217,119,87,.34), transparent 72%), linear-gradient(145deg,#2b2f3a,#1b1820); }
+  .cap-posframe-badge { position: absolute; top: 5px; left: 6px; z-index: 2; font-size: 7px; letter-spacing: .03em; text-transform: uppercase; color: rgba(255,255,255,.5); pointer-events: none; }
+  .cap-posframe-cap { position: absolute; z-index: 2; transform: translate(-50%,-50%); font-size: 8px; font-weight: 800; color: #fff; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,.85); }
   .cap-posframe-handle { position: absolute; z-index: 3; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; background: rgba(217,119,87,.32); transform: translate(-50%,-50%); box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 2px 7px rgba(0,0,0,.5); pointer-events: none; }
-  .cap-posctrl { display: flex; flex-direction: column; gap: 8px; min-width: 0; justify-content: center; }
-  .cap-posctrl .cap-opt-label { flex: 0 0 14px; }
+  .cap-posctrl { display: flex; flex-direction: column; gap: 6px; min-width: 0; justify-content: center; }
+  .cap-posctrl .cap-opt-row { padding: 1px 0; }
+  .cap-posctrl .cap-opt-label { flex: 0 0 12px; font-size: 11px; }
   .cap-posctrl .cap-slider-wrap { flex: 1; min-width: 0; }
   .cap-posctrl .cap-slider { flex: 1; width: auto; }
-  .cap-posctrl .cap-slider-val { flex: 0 0 38px; }
-  .cap-poszones { display: flex; align-items: center; gap: 10px; }
-  .cap-poszones .cap-zone-lbl { font-size: 11px; color: var(--text-dim); flex: 0 0 auto; }
-  .cap-poszones .cap-zone-grid { grid-template-columns: repeat(3, 19px); grid-template-rows: repeat(3, 19px); gap: 3px; padding: 5px; }
-  .cap-poszones .cap-zone-grid button { width: 19px; height: 19px; border-radius: 5px; }
+  .cap-posctrl .cap-slider-val { flex: 0 0 34px; font-size: 11px; }
+  .cap-poszones { display: flex; align-items: center; gap: 8px; }
+  .cap-poszones .cap-zone-lbl { font-size: 10.5px; color: var(--cc-muted); flex: 0 0 auto; }
+  .cap-poszones .cap-zone-grid { grid-template-columns: repeat(3, 15px); grid-template-rows: repeat(3, 15px); gap: 2px; padding: 4px; }
+  .cap-poszones .cap-zone-grid button { width: 15px; height: 15px; border-radius: 4px; }
 
   .cap-select { font: inherit; font-size: 12px; color: var(--text); background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; cursor: pointer; min-width: 150px; }
   .cap-select:focus { outline: none; border-color: var(--accent); }
@@ -2650,40 +2690,35 @@
   .cap-drag-hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: 9px; z-index: 3; font-size: 10px; color: rgba(255,255,255,.6); background: rgba(0,0,0,.55); padding: 3px 9px; border-radius: 14px; pointer-events: none; opacity: 0; transition: opacity .2s; }
   .cap-stage-inner:hover .cap-drag-hint { opacity: 1; }
 
-  /* footer — sticky generate bar */
-  .cap-footer { flex: 0 0 auto; display: flex; gap: 10px; align-items: center; padding: 13px 16px; position: relative;
-    border-top: 1px solid rgba(255,255,255,.07); background: linear-gradient(0deg, rgba(15,13,18,.92), rgba(10,9,12,.66)); }
-  .cap-footer::before { content: ''; position: absolute; left: 0; right: 0; top: -1px; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-glow) 50%, transparent); opacity: .45; }
+  /* footer — generate bar (flat warm surface, hairline top) */
+  .cap-footer { flex: 0 0 auto; display: flex; gap: 10px; align-items: center; padding: 11px 14px;
+    border-top: 1px solid var(--border); background: var(--cc-bg); }
   .cap-footer .cap-err { flex: 1; font-size: 11.5px; color: #e7b07f; min-height: 14px; }
+  /* primary action — the one coral moment. Flat, no gradient/sheen/glow. */
   .cap-gen {
-    position: relative; overflow: hidden;
-    flex: 0 0 auto; min-width: 196px; font: inherit; font-size: 13.5px; font-weight: 750; letter-spacing: .01em; color: #1a1208;
-    padding: 12px 24px; border: none; border-radius: 13px; cursor: pointer;
-    background: linear-gradient(135deg, #f0ad82 0%, var(--accent-2) 45%, var(--accent) 100%);
-    box-shadow: 0 12px 30px -10px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.18);
-    transition: filter .14s, transform .12s, box-shadow .16s;
+    flex: 0 0 auto; min-width: 172px; font: inherit; font-size: 13px; font-weight: 500; letter-spacing: .1px; color: var(--on-accent, #fff);
+    height: 36px; padding: 0 20px; border: none; border-radius: var(--r-md, 8px); cursor: pointer;
+    background: var(--accent); transition: background .15s var(--ease-out), transform .06s var(--ease-out);
   }
-  /* sweeping sheen */
-  .cap-gen::after { content: ''; position: absolute; top: 0; left: -60%; width: 45%; height: 100%;
-    background: linear-gradient(105deg, transparent, rgba(255,255,255,.55), transparent); transform: skewX(-18deg); transition: left .5s var(--ease-out); }
-  .cap-gen:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 16px 36px -10px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.5), inset 0 -1px 0 rgba(0,0,0,.18); }
-  .cap-gen:hover::after { left: 130%; }
-  .cap-gen:active { transform: translateY(0); }
-  .cap-gen:disabled { opacity: .55; cursor: default; transform: none; box-shadow: none; }
-  .cap-gen:disabled::after { display: none; }
+  .cap-gen:hover { background: #e08a6c; }
+  .cap-gen:active { background: #c06547; transform: translateY(1px); }
+  .cap-gen:disabled { background: #3a342f; color: var(--cc-faint); cursor: default; transform: none; }
 
   /* working overlay */
-  .cap-working { position: absolute; inset: 0; z-index: 5; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: #0d0c10; padding: 30px; text-align: center; }
-  .cap-full-card.working .cap-working { display: flex; animation: capPaneIn .42s var(--ease-out); }
-  /* the shared cancel button has flex:1 (for the horizontal actions row); in this
-     vertical column that makes it grow to fill all the height — pin it to content */
-  .cap-working .autocut-modal-cancel { flex: 0 0 auto; width: auto; min-width: 130px; }
-  .cap-working-title { font-size: 16px; font-weight: 680; color: var(--text); }
-  .cap-working-sub { font-size: 12px; color: var(--text-dim); max-width: 280px; line-height: 1.5; }
-  .cap-progress { width: 100%; max-width: 300px; }
-  .cap-progress-bar { height: 6px; border-radius: 6px; background: rgba(120,120,130,.25); overflow: hidden; }
-  .cap-progress-bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 6px; transition: width .35s ease; }
-  .cap-progress-text { margin-top: 9px; font-size: 12px; color: var(--text-dim); display: flex; align-items: center; justify-content: center; gap: 8px; }
+  /* generating = a small chip in the bottom-right corner, NOT a full black overlay.
+     The studio stays visible behind it. */
+  .cap-working { position: absolute; right: 14px; bottom: 62px; z-index: 7; display: none; flex-direction: column; align-items: stretch; gap: 9px;
+    width: 252px; max-width: calc(100% - 28px); text-align: left;
+    background: var(--cc-card); border: 1px solid var(--border); border-radius: var(--r-lg, 12px); padding: 13px 14px;
+    box-shadow: 0 14px 36px -12px rgba(0,0,0,.7); }
+  .cap-full-card.working .cap-working { display: flex; animation: capPaneIn .26s var(--ease-out); }
+  .cap-working .autocut-modal-cancel { flex: 0 0 auto; width: auto; min-width: 0; align-self: flex-start; padding: 5px 12px; font-size: 12px; }
+  .cap-working-title { font-size: 13px; font-weight: 600; color: var(--cc-text); }
+  .cap-working-sub { font-size: 11px; color: var(--cc-muted); max-width: none; line-height: 1.45; }
+  .cap-progress { width: 100%; }
+  .cap-progress-bar { height: 5px; border-radius: 5px; background: var(--cc-sunken); overflow: hidden; }
+  .cap-progress-bar > i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 5px; transition: width .35s ease; }
+  .cap-progress-text { margin-top: 7px; font-size: 11px; color: var(--cc-muted); display: flex; align-items: center; gap: 7px; }
 
   /* transcript review/edit pane */
   .cap-transcript { position: absolute; inset: 0; z-index: 6; display: none; flex-direction: column; background: #0d0c10; padding: 16px 18px; }
@@ -8855,6 +8890,53 @@ async function capLoadFonts() {
   } catch (e) { try { cclog('warn', 'captions: font load failed', { err: String((e && e.message) || e) }); } catch {} }
 }
 
+// Turn the Quick Looks + Style rows into proper scrollers with a click-to-slide
+// arrow that only appears when there's more off-screen. Wraps each row once.
+function capWireScrollers() {
+  ['capLooks', 'capStyles'].forEach(id => {
+    const row = document.getElementById(id);
+    if (!row || row._scrollWired) return;
+    row._scrollWired = true;
+    const wrap = document.createElement('div');
+    wrap.className = 'cap-scroller';
+    row.parentNode.insertBefore(wrap, row);
+    wrap.appendChild(row);
+    const mkArrow = (dir) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'cap-scroll-arrow ' + dir;
+      b.setAttribute('aria-label', dir === 'right' ? 'Scroll right' : 'Scroll left');
+      b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M' + (dir === 'right' ? '9 6l6 6-6 6' : '15 6l-6 6 6 6') + '"/></svg>';
+      b.addEventListener('click', () => { const d = Math.round(row.clientWidth * 0.8); row.scrollBy({ left: dir === 'right' ? d : -d, behavior: 'smooth' }); });
+      return b;
+    };
+    const right = mkArrow('right'), left = mkArrow('left');
+    wrap.appendChild(left); wrap.appendChild(right);
+    const update = () => {
+      const maxX = row.scrollWidth - row.clientWidth - 2;
+      const overflow = row.scrollWidth > row.clientWidth + 6;
+      right.classList.toggle('show', overflow && row.scrollLeft < maxX);
+      left.classList.toggle('show', overflow && row.scrollLeft > 4);
+    };
+    row.addEventListener('scroll', update, { passive: true });
+    requestAnimationFrame(update); setTimeout(update, 250);
+    row._scrollArrowUpdate = update;
+  });
+}
+// Slide the header up + fade it out while scrolling down; bring it back on scroll up.
+function capWireHeaderHide() {
+  const body = document.querySelector('.cap-body');
+  const head = document.querySelector('.cap-head');
+  if (!body || !head || body._headHideWired) return;
+  body._headHideWired = true;
+  let last = 0;
+  body.addEventListener('scroll', () => {
+    const y = body.scrollTop;
+    if (y > 52 && y > last + 3) head.classList.add('hide');
+    else if (y < last - 3 || y < 20) head.classList.remove('hide');
+    last = y;
+  }, { passive: true });
+}
+
 async function openCaptionsModal() {
   if (!captionsAllowed()) { capNotice('Captions are in early access — not available on your account yet.'); return; }
   capCleanup();
@@ -8867,6 +8949,8 @@ async function openCaptionsModal() {
   capAdjustStageAspect();
   capRefreshPreview(true);
   capLoadFonts();   // populate the font picker with every installed system font (async)
+  capWireScrollers();
+  capWireHeaderHide();
 
   const info = document.getElementById('capSelInfo');
   if (info) { info.className = 'cap-selchip'; info.textContent = 'Reading selection…'; }
