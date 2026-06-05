@@ -2037,13 +2037,37 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
   // while leaving margin above anti-aliasing noise.
   const FACE_ZONE_LIMIT = 12;
 
+  // Sorted moment start times — used to stop each graphic BEFORE the next one
+  // begins. Every graphic sits in the same lower-third band now, so two on
+  // screen at once would visually collide. This is the hand-off gap.
+  const _startsAsc = moments
+    .map(m => (m && typeof m.startSec === 'number') ? m.startSec : null)
+    .filter(s => s !== null)
+    .sort((a, b) => a - b);
+  function _nextStartAfter(s) {
+    for (let i = 0; i < _startsAsc.length; i++) if (_startsAsc[i] > s + 0.05) return _startsAsc[i];
+    return null;
+  }
+
   const tasks = moments.map((m, idx) => {
     const speechDur = Math.max(0.5, m.endSec - m.startSec);
     // Cover the WHOLE moment's speech plus a tail, so the graphic NEVER finishes before
     // the sentence does. (Was capped at 6s, which truncated longer sentences by 2-3s.)
     // The +1.0s tail leaves room for a quick exit AFTER the speech; 20s is just a
     // runaway guard (normal moments are a few seconds).
-    const durationSec = Math.max(2.8, Math.min(20, speechDur + 1.0));
+    let durationSec = Math.max(2.8, Math.min(20, speechDur + 1.0));
+    // ...but NEVER run into the next graphic. They share the same lower-third
+    // spot, so overlapping in time = overlapping on screen. End ~0.25s before
+    // the next moment starts. For sequential sentences the next moment begins
+    // after this one ends, so this only trims the bonus tail — the sentence is
+    // still fully covered. (Only a genuinely overlapping plan gets shortened,
+    // which is correct: you can't show two graphics in one spot at once.)
+    const ns = _nextStartAfter(m.startSec);
+    if (ns != null) {
+      const room = ns - m.startSec - 0.25;
+      if (room > 0) durationSec = Math.min(durationSec, room);
+    }
+    durationSec = Math.max(1.4, durationSec);   // floor: never a sub-frame flash
     const durationFrames = Math.round(durationSec * 30);
     const outFile = path.join(cacheDir, `ae_${reqId.slice(0, 8)}_${idx}_${Date.now()}.mov`);
     return { idx, moment: m, outFile, durationSec, durationFrames };
