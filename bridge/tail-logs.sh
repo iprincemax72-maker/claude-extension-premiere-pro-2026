@@ -8,7 +8,7 @@
 #   bash bridge/tail-logs.sh --dump [N]       # print last N lines (default 200) and exit
 #   bash bridge/tail-logs.sh --dump --module panel   # filter to one module
 #
-# Modules: panel | bridge | autocut | autoedit | host | render
+# Modules: panel | bridge | autocut | autoedit | captions | host | render
 
 LOG="$HOME/PremiereClaude/logs/unified.jsonl"
 HAVE_JQ=0

@@ -35,6 +35,7 @@
     --spring:    cubic-bezier(0.34, 1.56, 0.64, 1);
     --ease-out:  cubic-bezier(0.16, 1, 0.3, 1);
     --ease:      cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-emil: cubic-bezier(0.32, 0.72, 0, 1);  /* the Vaul/Sonner curve — confident, settled motion */
 
     --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
     --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
@@ -2395,7 +2396,9 @@
   .cap-full .cap-full-card::before { left: 0; right: 0; opacity: 0.5; }
 
   /* header */
-  .cap-head { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 13px 15px 11px; }
+  .cap-head { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 14px 16px 12px; position: relative;
+    background: linear-gradient(180deg, rgba(255,255,255,.025), transparent); border-bottom: 1px solid rgba(255,255,255,.06); }
+  .cap-head::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-glow) 50%, transparent); opacity: .5; }
   .cap-head .cap-x {
     width: 30px; height: 30px; border-radius: 9px; flex: 0 0 auto;
     display: flex; align-items: center; justify-content: center;
@@ -2404,7 +2407,8 @@
   }
   .cap-head .cap-x:hover { background: rgba(255,255,255,.1); color: var(--text); transform: scale(1.06); }
   .cap-head .cap-x svg { width: 15px; height: 15px; }
-  .cap-head-title { font-size: 15.5px; font-weight: 680; color: var(--text); letter-spacing: -0.01em; }
+  .cap-head-title { font-size: 16px; font-weight: 720; color: var(--text); letter-spacing: -0.015em;
+    background: linear-gradient(92deg, #fff 30%, var(--accent-2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
   .cap-head-sub { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
   .cap-head-spacer { flex: 1; }
   .cap-selchip {
@@ -2416,8 +2420,12 @@
 
   /* scrollable body */
   .cap-body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 15px 14px; }
-  .cap-body::-webkit-scrollbar { width: 9px; }
-  .cap-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 9px; }
+  /* primary studio scroll — neutral at rest, accent on grab, padded inset thumb */
+  .cap-body::-webkit-scrollbar { width: 11px; }
+  .cap-body::-webkit-scrollbar-track { background: rgba(255,255,255,.022); border-radius: 11px; margin: 4px 0; }
+  .cap-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); background-clip: padding-box; border: 3px solid transparent; border-radius: 11px; min-height: 44px; transition: background .15s; }
+  .cap-body::-webkit-scrollbar-thumb:hover { background: var(--accent); background-clip: padding-box; }
+  .cap-body::-webkit-scrollbar-thumb:active { background: var(--accent-2); background-clip: padding-box; }
 
   /* preview stage — a faux video frame the caption sits over */
   .cap-stage {
@@ -2473,14 +2481,46 @@
   }
   .cap-cap.boxed .cap-cap-line { background: rgba(0,0,0,.42); border-radius: 12px; padding: .26em .6em; }
 
-  /* section labels */
-  .cap-sec-label { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-dim); font-weight: 650; margin: 14px 2px 8px; }
+  /* live mini-preview — an inline full-bleed bar that sits right above the Text/Effects
+     controls. It MIRRORS the real top preview (same words/animation/style) so what you
+     tweak here matches the actual output. Full-bleed via negative margins (cap-body pads 15px). */
+  .cap-mini { position: relative; overflow: hidden; margin: 6px -15px 8px;
+    border-top: 1px solid rgba(255,255,255,.08); border-bottom: 1px solid rgba(255,255,255,.07);
+    box-shadow: 0 12px 26px -22px #000; }
+  .cap-mini::before { content: ''; position: absolute; left: 0; right: 0; top: -1px; height: 1px; z-index: 3;
+    background: linear-gradient(90deg, transparent, var(--accent-glow) 50%, transparent); opacity: .4; }
+  .cap-mini-tag { position: absolute; top: 7px; left: 12px; z-index: 2; display: flex; align-items: center; gap: 6px;
+    font-size: 8.5px; letter-spacing: .09em; text-transform: uppercase; font-weight: 700; color: rgba(255,255,255,.55); pointer-events: none; }
+  .cap-mini-tag::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); animation: capLivePulse 1.8s ease-in-out infinite; }
+  @keyframes capLivePulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  /* the inline preview holds a VERTICAL frame matching the real sequence aspect (a scaled
+     mirror of the top stage) so it shows the true output shape, not a wide rectangle. */
+  .cap-mini-stage { position: relative; min-height: 132px; display: flex; align-items: center; justify-content: center; padding: 11px 12px 12px;
+    background: linear-gradient(160deg, #16151b 0%, #110f15 100%); }
+  .cap-mini-frame { position: relative; height: 116px; border-radius: 11px; overflow: hidden; flex: 0 0 auto;
+    background:
+      radial-gradient(78% 120% at 26% 8%, rgba(90,140,200,.32), transparent 60%),
+      radial-gradient(72% 130% at 82% 92%, rgba(217,119,87,.28), transparent 64%),
+      linear-gradient(150deg, #2b2f3a, #1b1820);
+    box-shadow: 0 10px 24px -10px #000, 0 0 0 1px rgba(255,255,255,.07); }
+  .cap-mini-frame::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: 11px;
+    box-shadow: inset 0 0 36px rgba(0,0,0,.4); }
+  .cap-mini-inner { position: absolute; top: 0; left: 0; transform-origin: top left; }
+
+  /* section labels — premium, with a leading accent tick */
+  .cap-sec-label { display: flex; align-items: center; gap: 8px; font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--text-dim); font-weight: 700; margin: 18px 2px 9px; }
+  .cap-sec-label::before { content: ''; flex: 0 0 auto; width: 3px; height: 12px; border-radius: 3px; background: linear-gradient(180deg, var(--accent-2), var(--accent)); box-shadow: 0 0 8px -1px var(--accent-glow); }
+  .cap-sec-label::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
 
   /* style chips — horizontal, hover-lift */
   /* Quick-looks gallery — one-click complete presets (visual, not a bar) */
   .cap-looks { display: flex; gap: 10px; overflow-x: auto; padding: 2px 1px 8px; scrollbar-width: thin; }
-  .cap-looks::-webkit-scrollbar { height: 7px; }
-  .cap-looks::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 7px; }
+  /* horizontal filmstrip — slim accent bar that invites a swipe */
+  .cap-looks::-webkit-scrollbar { height: 6px; }
+  .cap-looks::-webkit-scrollbar-track { background: transparent; }
+  .cap-looks::-webkit-scrollbar-thumb { background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 6px; opacity: .55; transition: opacity .15s; }
+  .cap-looks:hover::-webkit-scrollbar-thumb { opacity: .8; }
+  .cap-looks::-webkit-scrollbar-thumb:hover { opacity: 1; }
   .cap-look { flex: 0 0 auto; width: 104px; cursor: pointer; background: none; border: none; padding: 0; display: flex; flex-direction: column; gap: 5px; }
   .cap-look-prev { height: 60px; border-radius: 11px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; transition: border-color .15s, transform .15s var(--ease-out), box-shadow .15s; background: linear-gradient(145deg,#2b2f3a,#1b1820); }
   .cap-look:hover .cap-look-prev { transform: translateY(-2px); border-color: var(--accent-line); box-shadow: 0 10px 22px -14px #000; }
@@ -2513,45 +2553,67 @@
   .cap-style-prev span { color: rgba(255,255,255,.45); }
   .cap-style-prev .hot { color: var(--accent-2); }
 
-  /* options */
-  .cap-opts { margin: 2px 0 0; display: flex; flex-direction: column; gap: 11px; }
-  .cap-opt-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .cap-opt-label { font-size: 12px; color: var(--text); }
+  /* options — responsive grid: 2–3 per line on a wide panel, 1 col only when very narrow.
+     max-width caps it at ~3 columns so it never sprawls on an ultrawide window. */
+  .cap-opts { margin: 2px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(192px, 1fr)); gap: 8px 18px; align-items: center; max-width: 660px; }
+  .cap-opt-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 3px 0; }
+  .cap-opt-row.wide { grid-column: 1 / -1; }            /* force a full-width row (chips, etc.) */
+  /* two related controls sharing one row (Weight + Align) to save vertical space */
+  .cap-opt-duo { justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; align-items: center; }
+  .cap-opt-duo .cap-duo { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .cap-opt-label { font-size: 12px; color: var(--text); flex: 0 0 auto; }
   .cap-opt-label small { display: block; color: var(--text-dim); font-size: 10.5px; margin-top: 1px; }
-  .cap-seg { display: inline-flex; background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-  .cap-seg button { font: inherit; font-size: 11.5px; color: var(--text-dim); background: none; border: none; padding: 6px 13px; cursor: pointer; transition: background .14s, color .14s; }
+  /* inside the grid, sliders + selects flex to fill their cell instead of a fixed width */
+  .cap-opts .cap-slider-wrap { flex: 1 1 auto; min-width: 0; }
+  .cap-opts .cap-slider { flex: 1 1 auto; width: auto; min-width: 0; }
+  .cap-opts .cap-select { flex: 1 1 auto; min-width: 0; }
+  .cap-seg { display: inline-flex; background: rgba(0,0,0,.22); border: 1px solid var(--border); border-radius: 11px; overflow: hidden; padding: 2px; gap: 2px; box-shadow: inset 0 1px 2px rgba(0,0,0,.3); }
+  .cap-seg button { font: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-dim); background: none; border: none; padding: 6px 13px; border-radius: 9px; cursor: pointer; transition: background .14s, color .14s, box-shadow .14s; }
   .cap-seg button:hover { color: var(--text); }
-  .cap-seg button.sel { background: var(--accent); color: #fff; }
+  .cap-seg button.sel { background: linear-gradient(135deg, var(--accent-2), var(--accent)); color: #fff; box-shadow: 0 2px 8px -2px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.25); }
   .cap-swatches { display: inline-flex; gap: 7px; }
   .cap-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: 0 0 0 1px rgba(255,255,255,.15) inset; transition: transform .12s; }
   .cap-swatch:hover { transform: scale(1.14); }
   .cap-swatch.sel { border-color: #fff; transform: scale(1.1); }
-  .cap-toggle { position: relative; width: 40px; height: 22px; border-radius: 22px; background: rgba(120,120,130,.35); cursor: pointer; transition: background .16s; flex: 0 0 auto; }
-  .cap-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .18s var(--ease-out); }
-  .cap-toggle.on { background: var(--accent); }
-  .cap-toggle.on::after { transform: translateX(18px); }
+  .cap-toggle { position: relative; width: 42px; height: 23px; border-radius: 23px; background: rgba(120,120,130,.32); cursor: pointer; transition: background .18s; flex: 0 0 auto; box-shadow: inset 0 1px 3px rgba(0,0,0,.4); }
+  .cap-toggle::after { content: ''; position: absolute; top: 2.5px; left: 2.5px; width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(180deg,#fff,#e9e9ee); box-shadow: 0 1px 3px rgba(0,0,0,.45), 0 0 0 .5px rgba(0,0,0,.06); transition: transform .2s var(--ease-out); }
+  .cap-toggle.on { background: linear-gradient(135deg, var(--accent-2), var(--accent)); box-shadow: inset 0 1px 2px rgba(0,0,0,.25), 0 0 12px -3px var(--accent-glow); }
+  .cap-toggle.on::after { transform: translateX(19px); }
 
-  /* sliders */
-  .cap-slider-wrap { display: inline-flex; align-items: center; gap: 11px; min-width: 168px; }
-  .cap-slider { -webkit-appearance: none; appearance: none; width: 132px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.16); outline: none; cursor: pointer; }
-  .cap-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: transparent; }
-  .cap-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px rgba(255,255,255,.25), 0 2px 6px rgba(0,0,0,.4); cursor: grab; transition: transform .12s; }
-  .cap-slider::-webkit-slider-thumb:active { transform: scale(1.18); cursor: grabbing; }
-  .cap-slider-val { min-width: 30px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--text); }
+  /* sliders — premium (filled track + glowing thumb) */
+  .cap-slider-wrap { display: inline-flex; align-items: center; gap: 12px; min-width: 168px; }
+  .cap-slider { -webkit-appearance: none; appearance: none; width: 132px; height: 5px; border-radius: 5px; outline: none; cursor: pointer;
+    background: linear-gradient(to right, var(--accent) 0%, var(--accent-2) var(--cap-fill, 50%), rgba(255,255,255,.13) var(--cap-fill, 50%), rgba(255,255,255,.13) 100%); }
+  .cap-slider::-webkit-slider-runnable-track { height: 5px; border-radius: 5px; background: transparent; }
+  .cap-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 17px; height: 17px; margin-top: -6px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff, var(--accent-2) 55%, var(--accent));
+    box-shadow: 0 0 0 1px rgba(0,0,0,.25), 0 0 10px -1px var(--accent-glow), 0 2px 6px rgba(0,0,0,.45); cursor: grab; transition: transform .12s; }
+  .cap-slider::-webkit-slider-thumb:hover { transform: scale(1.12); }
+  .cap-slider::-webkit-slider-thumb:active { transform: scale(1.22); cursor: grabbing; }
+  .cap-slider-val { min-width: 30px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 600; color: var(--accent-2); }
 
-  /* color picker */
-  .cap-colorpick { display: grid; grid-template-columns: 200px 22px 1fr; gap: 12px; height: 150px; margin: 2px 0 4px; max-width: 560px; }
-  .cap-sv { position: relative; border-radius: 10px; cursor: crosshair; border: 1px solid var(--border); }
-  .cap-sv-cur { position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.55); transform: translate(-50%,-50%); pointer-events: none; }
-  .cap-hue { position: relative; border-radius: 8px; cursor: pointer; border: 1px solid var(--border);
+  /* color picker — premium */
+  .cap-colorpick { display: grid; grid-template-columns: 200px 26px 1fr; gap: 16px; height: 158px; margin: 4px 0 6px; max-width: 580px; }
+  .cap-sv { position: relative; border-radius: 14px; cursor: crosshair;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 10px 28px -14px rgba(0,0,0,.7); }
+  .cap-sv-cur { position: absolute; width: 17px; height: 17px; border-radius: 50%; border: 2.5px solid #fff;
+    box-shadow: 0 0 0 1.5px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.6); transform: translate(-50%,-50%); pointer-events: none; }
+  .cap-hue { position: relative; border-radius: 13px; cursor: pointer;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 6px 18px -12px rgba(0,0,0,.6);
     background: linear-gradient(to bottom, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%); }
-  .cap-hue-cur { position: absolute; left: -2px; right: -2px; height: 5px; border-radius: 3px; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.55); transform: translateY(-50%); pointer-events: none; }
-  .cap-color-side { display: flex; flex-direction: column; gap: 9px; justify-content: center; }
-  .cap-hexrow { display: flex; align-items: center; gap: 7px; }
-  .cap-color-chip { width: 26px; height: 26px; border-radius: 7px; flex: 0 0 auto; box-shadow: 0 0 0 1px rgba(255,255,255,.18) inset; background: #E2885F; }
-  .cap-hex { flex: 1; min-width: 0; font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: var(--text); background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
-  .cap-hex:focus { outline: none; border-color: var(--accent); }
-  .cap-color-side .cap-swatches { flex-wrap: wrap; }
+  .cap-hue-cur { position: absolute; left: -3px; right: -3px; height: 6px; border-radius: 4px; border: 2.5px solid #fff;
+    box-shadow: 0 0 0 1.5px rgba(0,0,0,.55), 0 1px 5px rgba(0,0,0,.5); transform: translateY(-50%); pointer-events: none; }
+  .cap-color-side { display: flex; flex-direction: column; gap: 12px; justify-content: center; }
+  .cap-hexrow { display: flex; align-items: center; gap: 9px; }
+  .cap-color-chip { width: 34px; height: 34px; border-radius: 10px; flex: 0 0 auto;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.2) inset, 0 4px 14px -4px rgba(0,0,0,.5); background: #E2885F; transition: background .15s; }
+  .cap-hex { flex: 1; min-width: 0; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; letter-spacing: .04em; font-weight: 600; text-transform: uppercase;
+    color: var(--text); background: rgba(255,255,255,.045); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; transition: border-color .15s, box-shadow .15s; }
+  .cap-hex:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .cap-color-side .cap-swatches { flex-wrap: wrap; gap: 9px; }
+  .cap-color-side .cap-swatch { width: 24px; height: 24px; box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 2px 6px -2px rgba(0,0,0,.5); }
+  .cap-color-side .cap-swatch:hover { box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset, 0 4px 12px -3px rgba(0,0,0,.6); }
+  .cap-color-side .cap-swatch.sel { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--accent-soft); }
 
   /* position zone grid (like Premiere's Align & Transform) */
   .cap-zone-row { display: flex; align-items: center; gap: 14px; margin: 2px 0 4px; }
@@ -2563,13 +2625,13 @@
   .cap-zone-hint b { color: var(--text); }
 
   /* position editor — draggable frame (shows where text lands) + X/Y sliders + zone snaps */
-  .cap-posedit { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: stretch; margin: 2px 0 4px; }
-  .cap-posframe { position: relative; width: 92px; height: 150px; border-radius: 11px; border: 1px solid rgba(255,255,255,.09); overflow: hidden; cursor: crosshair; flex: 0 0 auto;
+  .cap-posedit { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: stretch; margin: 2px 0 2px; }
+  .cap-posframe { position: relative; width: 58px; height: 96px; border-radius: 9px; border: 1px solid rgba(255,255,255,.09); overflow: hidden; cursor: crosshair; flex: 0 0 auto;
     background: radial-gradient(60% 50% at 28% 22%, rgba(90,140,200,.42), transparent 70%), radial-gradient(55% 60% at 78% 75%, rgba(217,119,87,.36), transparent 72%), linear-gradient(145deg,#2b2f3a,#1b1820); }
-  .cap-posframe-badge { position: absolute; top: 6px; left: 7px; z-index: 2; font-size: 8px; letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,.5); pointer-events: none; }
-  .cap-posframe-cap { position: absolute; z-index: 2; transform: translate(-50%,-50%); font-size: 9px; font-weight: 800; color: #fff; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,.85); }
-  .cap-posframe-handle { position: absolute; z-index: 3; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; background: rgba(217,119,87,.32); transform: translate(-50%,-50%); box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 2px 7px rgba(0,0,0,.5); pointer-events: none; }
-  .cap-posctrl { display: flex; flex-direction: column; gap: 11px; min-width: 0; justify-content: center; }
+  .cap-posframe-badge { position: absolute; top: 4px; left: 5px; z-index: 2; font-size: 6.5px; letter-spacing: .03em; text-transform: uppercase; color: rgba(255,255,255,.5); pointer-events: none; }
+  .cap-posframe-cap { position: absolute; z-index: 2; transform: translate(-50%,-50%); font-size: 7px; font-weight: 800; color: #fff; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,.85); }
+  .cap-posframe-handle { position: absolute; z-index: 3; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; background: rgba(217,119,87,.32); transform: translate(-50%,-50%); box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 2px 7px rgba(0,0,0,.5); pointer-events: none; }
+  .cap-posctrl { display: flex; flex-direction: column; gap: 8px; min-width: 0; justify-content: center; }
   .cap-posctrl .cap-opt-label { flex: 0 0 14px; }
   .cap-posctrl .cap-slider-wrap { flex: 1; min-width: 0; }
   .cap-posctrl .cap-slider { flex: 1; width: auto; }
@@ -2589,20 +2651,30 @@
   .cap-stage-inner:hover .cap-drag-hint { opacity: 1; }
 
   /* footer — sticky generate bar */
-  .cap-footer { flex: 0 0 auto; display: flex; gap: 10px; align-items: center; padding: 12px 15px; border-top: 1px solid var(--border); background: rgba(10,9,12,.7); }
+  .cap-footer { flex: 0 0 auto; display: flex; gap: 10px; align-items: center; padding: 13px 16px; position: relative;
+    border-top: 1px solid rgba(255,255,255,.07); background: linear-gradient(0deg, rgba(15,13,18,.92), rgba(10,9,12,.66)); }
+  .cap-footer::before { content: ''; position: absolute; left: 0; right: 0; top: -1px; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-glow) 50%, transparent); opacity: .45; }
   .cap-footer .cap-err { flex: 1; font-size: 11.5px; color: #e7b07f; min-height: 14px; }
   .cap-gen {
-    flex: 0 0 auto; min-width: 190px; font: inherit; font-size: 13.5px; font-weight: 700; color: #1a1208;
-    padding: 11px 22px; border: none; border-radius: 12px; cursor: pointer;
-    background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent) 100%);
-    box-shadow: 0 10px 26px -12px var(--accent-glow); transition: filter .14s, transform .12s;
+    position: relative; overflow: hidden;
+    flex: 0 0 auto; min-width: 196px; font: inherit; font-size: 13.5px; font-weight: 750; letter-spacing: .01em; color: #1a1208;
+    padding: 12px 24px; border: none; border-radius: 13px; cursor: pointer;
+    background: linear-gradient(135deg, #f0ad82 0%, var(--accent-2) 45%, var(--accent) 100%);
+    box-shadow: 0 12px 30px -10px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.18);
+    transition: filter .14s, transform .12s, box-shadow .16s;
   }
-  .cap-gen:hover { filter: brightness(1.06); transform: translateY(-1px); }
-  .cap-gen:disabled { opacity: .6; cursor: default; transform: none; }
+  /* sweeping sheen */
+  .cap-gen::after { content: ''; position: absolute; top: 0; left: -60%; width: 45%; height: 100%;
+    background: linear-gradient(105deg, transparent, rgba(255,255,255,.55), transparent); transform: skewX(-18deg); transition: left .5s var(--ease-out); }
+  .cap-gen:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 16px 36px -10px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.5), inset 0 -1px 0 rgba(0,0,0,.18); }
+  .cap-gen:hover::after { left: 130%; }
+  .cap-gen:active { transform: translateY(0); }
+  .cap-gen:disabled { opacity: .55; cursor: default; transform: none; box-shadow: none; }
+  .cap-gen:disabled::after { display: none; }
 
   /* working overlay */
   .cap-working { position: absolute; inset: 0; z-index: 5; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: #0d0c10; padding: 30px; text-align: center; }
-  .cap-full-card.working .cap-working { display: flex; }
+  .cap-full-card.working .cap-working { display: flex; animation: capPaneIn .42s var(--ease-out); }
   /* the shared cancel button has flex:1 (for the horizontal actions row); in this
      vertical column that makes it grow to fill all the height — pin it to content */
   .cap-working .autocut-modal-cancel { flex: 0 0 auto; width: auto; min-width: 130px; }
@@ -2615,13 +2687,16 @@
 
   /* transcript review/edit pane */
   .cap-transcript { position: absolute; inset: 0; z-index: 6; display: none; flex-direction: column; background: #0d0c10; padding: 16px 18px; }
-  .cap-full-card.reviewing .cap-transcript { display: flex; }
+  .cap-full-card.reviewing .cap-transcript { display: flex; animation: capPaneIn .42s var(--ease-out); }
   .cap-tr-head { flex: 0 0 auto; }
   .cap-tr-title { font-size: 16px; font-weight: 680; color: var(--text); }
   .cap-tr-sub { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
   .cap-tr-lines { flex: 1; overflow-y: auto; margin: 13px 0; display: flex; flex-direction: column; gap: 7px; padding-right: 4px; }
+  /* transcript editor — calm cool-neutral, faint groove; quiet so it doesn't pull the eye while reading */
   .cap-tr-lines::-webkit-scrollbar { width: 8px; }
-  .cap-tr-lines::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 8px; }
+  .cap-tr-lines::-webkit-scrollbar-track { background: rgba(150,160,185,.05); border-radius: 8px; }
+  .cap-tr-lines::-webkit-scrollbar-thumb { background: rgba(150,162,188,.26); background-clip: padding-box; border: 2px solid transparent; border-radius: 8px; transition: background .15s; }
+  .cap-tr-lines::-webkit-scrollbar-thumb:hover { background: rgba(172,184,210,.44); background-clip: padding-box; }
   .cap-tr-line { display: flex; align-items: center; gap: 10px; }
   .cap-tr-time { flex: 0 0 52px; font-size: 10px; color: var(--text-dim); font-variant-numeric: tabular-nums; text-align: right; }
   .cap-tr-input { flex: 1; min-width: 0; font: inherit; font-size: 13px; color: var(--text); background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px; transition: border-color .14s, background .14s; }
@@ -2631,6 +2706,58 @@
   .cap-tr-mode-lbl { font-size: 12px; color: var(--text); }
   .cap-tr-modehint { width: 100%; font-size: 11px; color: var(--text-dim); margin-top: 2px; min-height: 14px; }
   .cap-tr-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+  /* ── Motion polish — transform/opacity only (GPU-cheap, CEP-safe; NO backdrop-filter).
+     Three ideas borrowed from great web-animation craft: a staggered entrance, a soft
+     pane reveal, and a tactile press. Fast + eased so it feels confident, not flashy. */
+  @keyframes capRise   { from { opacity: 0; transform: translateY(11px); }            to { opacity: 1; transform: none; } }
+  @keyframes capPaneIn { from { opacity: 0; transform: translateY(9px) scale(.992); } to { opacity: 1; transform: none; } }
+
+  /* studio opens → each section rises in sequence (replayed via .intro on every open) */
+  .cap-full-card.intro .cap-body > * { animation: capRise .44s var(--ease-out) backwards; }
+  .cap-full-card.intro .cap-body > *:nth-child(1) { animation-delay: 0s; }
+  .cap-full-card.intro .cap-body > *:nth-child(2) { animation-delay: .03s; }
+  .cap-full-card.intro .cap-body > *:nth-child(3) { animation-delay: .06s; }
+  .cap-full-card.intro .cap-body > *:nth-child(4) { animation-delay: .09s; }
+  .cap-full-card.intro .cap-body > *:nth-child(5) { animation-delay: .12s; }
+  .cap-full-card.intro .cap-body > *:nth-child(6) { animation-delay: .15s; }
+  .cap-full-card.intro .cap-body > *:nth-child(7) { animation-delay: .18s; }
+  .cap-full-card.intro .cap-body > *:nth-child(8) { animation-delay: .20s; }
+  .cap-full-card.intro .cap-body > *:nth-child(n+9) { animation-delay: .22s; }
+  .cap-full-card.intro .cap-mini { animation: capRise .44s var(--ease-out) .24s backwards; }
+
+  /* tactile press — a quick, confident squeeze on click. Scoped to .cap-full-card so
+     these always win the cascade and guarantee a transform transition exists. */
+  .cap-full-card .cap-seg button { transition: background .14s var(--ease-out), color .14s var(--ease-out), box-shadow .14s var(--ease-out), transform .12s var(--ease-out); }
+  .cap-full-card .cap-look { transition: transform .14s var(--ease-out); }
+  .cap-full-card .cap-chip:active,
+  .cap-full-card .cap-swatch:active,
+  .cap-full-card .cap-zone-grid button:active,
+  .cap-full-card .cap-seg button:active,
+  .cap-full-card .cap-head .cap-x:active,
+  .cap-full-card .cap-replay:active { transform: scale(.92); transition-duration: .05s; }
+  .cap-full-card .cap-look:active   { transform: scale(.95); transition-duration: .05s; }
+  .cap-full-card .cap-style:active  { transform: scale(.98); transition-duration: .05s; }
+  .cap-gen:active { transform: scale(.985); }
+
+  /* selection "pop" — when a card/chip/swatch becomes selected, it eases in with a
+     gentle spring instead of snapping. Fires only on the element that gains .sel. */
+  @keyframes capSelectPop { 0% { transform: scale(.95); } 55% { transform: scale(1.035); } 100% { transform: none; } }
+  .cap-full-card .cap-style.sel,
+  .cap-full-card .cap-look.sel       { animation: capSelectPop .34s var(--ease-out); }
+  .cap-full-card .cap-chip.sel,
+  .cap-full-card .cap-seg button.sel { animation: capSelectPop .30s var(--ease-out); }
+  .cap-full-card .cap-swatch.sel     { animation: capSelectPop .30s var(--ease-out); }
+  /* selection ring fades in smoothly on swatches/looks */
+  .cap-full-card .cap-swatch, .cap-full-card .cap-look-prev, .cap-full-card .cap-style,
+  .cap-full-card .cap-chip { transition: transform .18s var(--ease-out), background .18s var(--ease-out), border-color .18s var(--ease-out), color .18s var(--ease-out), box-shadow .22s var(--ease-out); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cap-full-card.intro .cap-body > *, .cap-full-card.intro .cap-mini,
+    .cap-full-card.working .cap-working, .cap-full-card.reviewing .cap-transcript,
+    .cap-full-card .cap-style.sel, .cap-full-card .cap-look.sel,
+    .cap-full-card .cap-chip.sel, .cap-full-card .cap-seg button.sel, .cap-full-card .cap-swatch.sel { animation: none; }
+  }
 
   .autocut-card {
     margin-top: 10px;
@@ -3434,7 +3561,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot" role="img" aria-label="Flimify"></div>
     <span>Flimify</span>
-    <span class="version-tag" id="versionTag">10.9</span>
+    <span class="version-tag" id="versionTag">11.0</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -3564,15 +3691,15 @@
 
     <!-- header -->
     <div class="cap-head">
-      <div class="cap-x" id="capCloseBtn" title="Close (Esc)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </div>
       <div>
         <div class="cap-head-title">Captions</div>
         <div class="cap-head-sub">Pick a style — preview plays live. Drag the text to place it anywhere.</div>
       </div>
-      <div class="cap-head-spacer"></div>
       <div class="cap-selchip" id="capSelInfo">Reading selection&hellip;</div>
+      <div class="cap-head-spacer"></div>
+      <div class="cap-x" id="capCloseBtn" title="Close (Esc)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </div>
     </div>
 
     <!-- body -->
@@ -3689,9 +3816,19 @@
         </div>
       </div>
 
+      <!-- live preview bar — sits right above the Text/Effects controls so font size,
+           shadow, colour etc. update in view while you adjust them. Mirrors the real
+           top preview exactly (same words, animation + style) so it matches the output. -->
+      <div class="cap-mini" id="capMini">
+        <span class="cap-mini-tag">Live preview</span>
+        <div class="cap-mini-stage">
+          <div class="cap-mini-frame" id="capMiniFrame"><div class="cap-mini-inner" id="capMiniInner"></div></div>
+        </div>
+      </div>
+
       <div class="cap-sec-label">Text</div>
       <div class="cap-opts">
-        <div class="cap-opt-row">
+        <div class="cap-opt-row wide">
           <span class="cap-opt-label">Font</span>
           <select class="cap-select" id="capFontFamily">
             <option value="">Default (Grotesk)</option>
@@ -3702,13 +3839,15 @@
             <option value="Georgia, serif">Georgia</option>
           </select>
         </div>
-        <div class="cap-opt-row">
-          <span class="cap-opt-label">Weight</span>
-          <div class="cap-seg" id="capWeightSeg"><button type="button" data-w="400">Reg</button><button type="button" data-w="600">Semi</button><button type="button" data-w="800" class="sel">Bold</button><button type="button" data-w="900">Black</button></div>
-        </div>
-        <div class="cap-opt-row">
-          <span class="cap-opt-label">Align</span>
-          <div class="cap-seg" id="capAlignSeg"><button type="button" data-a="left">Left</button><button type="button" data-a="center" class="sel">Center</button><button type="button" data-a="right">Right</button></div>
+        <div class="cap-opt-row wide cap-opt-duo">
+          <div class="cap-duo">
+            <span class="cap-opt-label">Weight</span>
+            <div class="cap-seg" id="capWeightSeg"><button type="button" data-w="400">Reg</button><button type="button" data-w="600">Semi</button><button type="button" data-w="800" class="sel">Bold</button><button type="button" data-w="900">Black</button></div>
+          </div>
+          <div class="cap-duo">
+            <span class="cap-opt-label">Align</span>
+            <div class="cap-seg" id="capAlignSeg"><button type="button" data-a="left">Left</button><button type="button" data-a="center" class="sel">Center</button><button type="button" data-a="right">Right</button></div>
+          </div>
         </div>
         <div class="cap-opt-row"><span class="cap-opt-label">Font size</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capFont" min="70" max="150" step="5" value="100"><span class="cap-slider-val" id="capFontVal">100%</span></div></div>
         <div class="cap-opt-row"><span class="cap-opt-label">Letter spacing</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capTracking" min="-5" max="20" step="1" value="0"><span class="cap-slider-val" id="capTrackingVal">0</span></div></div>
@@ -3721,7 +3860,7 @@
         <div class="cap-opt-row"><span class="cap-opt-label">Shadow</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capShadow" min="0" max="100" step="5" value="55"><span class="cap-slider-val" id="capShadowVal">55%</span></div></div>
         <div class="cap-opt-row"><span class="cap-opt-label">Outline</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capStroke" min="0" max="12" step="1" value="2"><span class="cap-slider-val" id="capStrokeVal">2px</span></div></div>
         <div class="cap-opt-row"><span class="cap-opt-label">Outline color</span><div class="cap-swatches" id="capStrokeSwatches"><span class="cap-swatch sel" data-color="#000000" style="background:#000"></span><span class="cap-swatch" data-color="#FFFFFF" style="background:#fff"></span><span class="cap-swatch" data-color="#15110d" style="background:#15110d"></span><span class="cap-swatch" data-color="#3A2A1F" style="background:#3A2A1F"></span></div></div>
-        <div class="cap-opt-row" style="align-items:center"><span class="cap-opt-label">Options</span>
+        <div class="cap-opt-row wide" style="align-items:center"><span class="cap-opt-label">Options</span>
           <div class="cap-chips" id="capChips">
             <button type="button" class="cap-chip" data-chip="uppercase">UPPERCASE</button>
             <button type="button" class="cap-chip" data-chip="keywords">Keywords</button>
@@ -3992,7 +4131,7 @@
         <button class="settings-btn" id="settingCopyDiag" title="Copies env + a live claude probe + recent errors — paste it to support">Copy diagnostics for support</button>
         <button class="settings-btn danger" id="settingFactoryReset">Reset all settings</button>
       </div>
-      <div class="settings-foot">v<span id="settingsVersion">10.9</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
+      <div class="settings-foot">v<span id="settingsVersion">11.0</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
       <div class="settings-credit">
         Made by <a href="https://github.com/iprincemax72-maker" target="_blank" class="credit-link">iprincemax72-maker</a> <span class="credit-heart">&#10084;</span> Premiere Pro
       </div>
@@ -6423,7 +6562,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '10.9';
+  const PANEL_VERSION = '11.0';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -8257,6 +8396,44 @@ function capSyncOptsUI() {
   setSlider('capStroke', 'capStrokeVal', capState.strokePx, v => v + 'px');
   capSyncZoneUI();
   capSyncColorUI();
+  capUpdateSliderFills();
+  // force the live preview to rebuild its current line so font/shadow/etc. changes show at once
+  if (typeof capPreview !== 'undefined' && capPreview) capPreview.curLine = -1;
+}
+// premium filled-track look: set --cap-fill per slider from its value
+function capUpdateSliderFills() {
+  if (!captionsModal) return;
+  captionsModal.querySelectorAll('.cap-slider').forEach(s => {
+    const min = +s.min || 0, max = +s.max || 100, v = +s.value;
+    const pct = max > min ? Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100)) : 50;
+    s.style.setProperty('--cap-fill', pct.toFixed(1) + '%');
+  });
+}
+
+// Live mini-preview — MIRRORS the real top preview so it always matches the actual
+// output (same sample words, same animation frame, same style). Each tick we clone the
+// already-styled line from the top stage and scale it to read well in the short bar.
+// (No separate sample text — that's what made it look "different" before.)
+function capMirrorMini(capEl) {
+  const frame = document.getElementById('capMiniFrame');
+  const inner = document.getElementById('capMiniInner');
+  if (!frame || !inner) return;
+  const src = capEl || document.getElementById('capCap');
+  const topStage = capPreview.stage || document.getElementById('capStage');
+  if (!src || !topStage) return;
+  const topW = topStage.clientWidth, topH = topStage.clientHeight;
+  if (!topW || !topH) return;
+  // The frame is a scaled-down replica of the top stage → exact same aspect, position,
+  // font + animation. Everything inside is %/px from the top render, scaled uniformly by k.
+  const frameH = frame.clientHeight || 116;
+  const k = frameH / topH;
+  frame.style.width = Math.round(topW * k) + 'px';
+  inner.style.width = topW + 'px';
+  inner.style.height = topH + 'px';
+  inner.style.transform = 'scale(' + k.toFixed(4) + ')';
+  inner.innerHTML = src.outerHTML;                  // clone this frame's caption verbatim
+  const clone = inner.firstElementChild;
+  if (clone) { clone.removeAttribute('id'); clone.classList.remove('draggable', 'dragging'); clone.style.cursor = ''; }
 }
 
 // ── Live preview engine — mirrors Captions.tsx animation in the DOM ──
@@ -8334,9 +8511,11 @@ function capBuildLine(capEl, line, idx) {
   lineEl.style.lineHeight = String(capState.lineHtPct / 100);
   lineEl.style.justifyContent = capState.align === 'left' ? 'flex-start' : capState.align === 'right' ? 'flex-end' : 'center';
   lineEl.style.textAlign = capState.align;
-  // shadow + stroke
+  // shadow + stroke  (apply shadow per-WORD too — .cap-cap-word has a default
+  // text-shadow that would otherwise mask the Shadow slider entirely)
   const sh = capState.shadowPct / 100;
-  lineEl.style.textShadow = sh > 0 ? ('0 ' + (2.5 * sh).toFixed(1) + 'px ' + Math.round(12 * sh) + 'px rgba(0,0,0,' + (0.7 * sh).toFixed(2) + ')') : 'none';
+  const shadowCss = sh > 0 ? ('0 ' + (2.5 * sh).toFixed(1) + 'px ' + Math.round(12 * sh) + 'px rgba(0,0,0,' + (0.7 * sh).toFixed(2) + ')') : 'none';
+  lineEl.style.textShadow = shadowCss;
   const strokePreview = Math.max(0, capState.strokePx * (fontPx / 90)); // scale stroke to preview font
   lineEl.style.webkitTextStroke = strokePreview > 0 ? (strokePreview.toFixed(2) + 'px ' + capState.strokeColor) : '';
 
@@ -8362,6 +8541,8 @@ function capBuildLine(capEl, line, idx) {
     sp.className = 'cap-cap-word';
     sp.textContent = (capState.uppercase ? w.text.toUpperCase() : w.text) + (wi === emojiIdx ? ' ' + emojiChar : '');
     sp.dataset.s = w.s; sp.dataset.e = w.e;
+    sp.style.textShadow = shadowCss;
+    sp.style.fontWeight = String(capState.fontWeight || 800);  // .cap-cap-word hardcodes 800 — override per word so Weight actually shows
     if (wi === kwIdx) sp.dataset.kw = '1';
     lineEl.appendChild(sp);
   }
@@ -8429,6 +8610,7 @@ function capPreviewTick(now) {
     capApplyPos(capEl);
     const words = capPreview.words || capEl.querySelectorAll('.cap-cap-word');
     for (let i = 0; i < words.length; i++) capStyleWord(words[i], ms);
+    capMirrorMini(capEl);   // mirror this exact frame into the inline preview bar
     // per-line entrance (vary): animate the line container in
     if (capPreview.lineEl) {
       if (capPreview.entrance) {
@@ -8472,15 +8654,15 @@ function capStopPreview() { if (capPreview.raf) { cancelAnimationFrame(capPrevie
   const onUp = () => {
     if (!dragging) return;
     dragging = false; capEl.classList.remove('dragging'); capSaveOpts();
-    window.removeEventListener('pointermove', onMove);
-    window.removeEventListener('pointerup', onUp);
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
   };
-  capEl.addEventListener('pointerdown', (ev) => {
+  capEl.addEventListener('mousedown', (ev) => {
     dragging = true; capEl.classList.add('dragging');
     capState.position = 'custom';
     onMove(ev);
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
     ev.preventDefault();
   });
 })();
@@ -8495,13 +8677,15 @@ function capStopPreview() { if (capPreview.raf) { cancelAnimationFrame(capPrevie
   });
 
   // ── color picker: SV square + hue strip + hex + presets ──
+  // CEP's old Chromium fires MOUSE events reliably (pointer events often don't),
+  // so all the draggable controls use mousedown/mousemove/mouseup.
   const dragHandler = (el, onMove) => {
     if (!el) return;
-    el.addEventListener('pointerdown', (ev) => {
+    el.addEventListener('mousedown', (ev) => {
       onMove(ev);
       const mv = (e) => onMove(e);
-      const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
-      window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+      const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
+      document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
       ev.preventDefault();
     });
   };
@@ -8534,15 +8718,7 @@ function capStopPreview() { if (capPreview.raf) { cancelAnimationFrame(capPrevie
   });
   const posFrame = document.getElementById('capPosFrame');
   if (posFrame) {
-    let pdrag = false;
-    const pmove = (ev) => { const r = posFrame.getBoundingClientRect(); capSetPosition((ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height); };
-    posFrame.addEventListener('pointerdown', (ev) => {
-      pdrag = true; pmove(ev);
-      const mv = (e) => pdrag && pmove(e);
-      const up = () => { pdrag = false; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
-      window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
-      ev.preventDefault();
-    });
+    dragHandler(posFrame, (ev) => { const r = posFrame.getBoundingClientRect(); capSetPosition((ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height); });
   }
   const px = document.getElementById('capPosX');
   if (px) px.addEventListener('input', () => capSetPosition((parseInt(px.value, 10) || 0) / 100, capPosDisplay().y));
@@ -8653,6 +8829,32 @@ function capStartSelPoll() {
 }
 function capStopSelPoll() { if (_capSelPoll) { clearInterval(_capSelPoll); _capSelPoll = null; } }
 
+// Populate the font picker with every installed system font (fetched once from the bridge).
+// Keeps the curated picks at the top, then "All system fonts" below — each shown in its own face.
+let _capFontsLoaded = false;
+async function capLoadFonts() {
+  if (_capFontsLoaded) return;
+  const sel = document.getElementById('capFontFamily');
+  if (!sel) return;
+  try {
+    const r = await fetch(BRIDGE + '/captions/fonts');
+    const d = await r.json();
+    const fonts = (d && d.fonts) || [];
+    if (!fonts.length) return;
+    _capFontsLoaded = true;
+    const curated = [].map.call(sel.options, o => ({ v: o.value, t: o.textContent }));
+    sel.innerHTML = '';
+    const gRec = document.createElement('optgroup'); gRec.label = 'Recommended';
+    curated.forEach(o => { const op = document.createElement('option'); op.value = o.v; op.textContent = o.t; gRec.appendChild(op); });
+    sel.appendChild(gRec);
+    const gSys = document.createElement('optgroup'); gSys.label = 'All system fonts (' + fonts.length + ')';
+    fonts.forEach(f => { const op = document.createElement('option'); op.value = f; op.textContent = f; try { op.style.fontFamily = '"' + f + '"'; } catch {} gSys.appendChild(op); });
+    sel.appendChild(gSys);
+    sel.value = capState.fontFamily || '';
+    try { cclog('info', 'captions: fonts loaded', { count: fonts.length }); } catch {}
+  } catch (e) { try { cclog('warn', 'captions: font load failed', { err: String((e && e.message) || e) }); } catch {} }
+}
+
 async function openCaptionsModal() {
   if (!captionsAllowed()) { capNotice('Captions are in early access — not available on your account yet.'); return; }
   capCleanup();
@@ -8661,8 +8863,10 @@ async function openCaptionsModal() {
   const errEl = document.getElementById('capErr'); if (errEl) errEl.textContent = '';
   capSyncOptsUI();
   captionsModal.classList.add('show');
+  capPlayIntro();
   capAdjustStageAspect();
   capRefreshPreview(true);
+  capLoadFonts();   // populate the font picker with every installed system font (async)
 
   const info = document.getElementById('capSelInfo');
   if (info) { info.className = 'cap-selchip'; info.textContent = 'Reading selection…'; }
@@ -8676,6 +8880,15 @@ async function openCaptionsModal() {
 
   await capRefreshSelection(true);   // initial read (with retry)
   capStartSelPoll();                 // keep it live while the modal is open
+}
+
+// Replay the staggered entrance each time the studio opens (toggle the class,
+// force a reflow so the animation restarts even though the nodes never unmount).
+function capPlayIntro() {
+  if (!capCard) return;
+  capCard.classList.remove('intro');
+  void capCard.offsetWidth;
+  capCard.classList.add('intro');
 }
 
 function capCleanup() {
@@ -8735,6 +8948,7 @@ async function generateCaptions() {
   if (capCard) capCard.classList.add('working');
   capSetProgress('Transcribing…', 8);
   capWireProgressES(reqId);
+  try { cclog('info', 'captions: transcribe start', { reqId, segments: sel.segments.length, style: capState.style, maxWords: capState.maxWords }); } catch {}
 
   let data = null;
   try {
@@ -8748,14 +8962,17 @@ async function generateCaptions() {
     if (abort.signal.aborted) return;
     capCleanup(); if (capCard) capCard.classList.remove('working');
     if (errEl) errEl.textContent = 'Transcription failed: ' + (e.message || e);
+    try { cclog('error', 'captions: transcribe request failed', { reqId, err: String((e && e.message) || e) }); } catch {}
     return;
   }
   capCleanup();
   if (!data || !data.ok) {
     if (capCard) capCard.classList.remove('working');
     if (errEl) errEl.textContent = (data && data.error) || 'Transcription failed.';
+    try { cclog('warn', 'captions: transcribe rejected', { reqId, error: (data && data.error) || 'unknown' }); } catch {}
     return;
   }
+  try { cclog('info', 'captions: transcript ready', { reqId, lines: (data.lines || []).length, words: data.wordCount }); } catch {}
   capShowTranscript(data);
 }
 
@@ -8819,6 +9036,7 @@ async function capCreateCaptions() {
   if (capCard) { capCard.classList.remove('reviewing'); capCard.classList.add('working'); }
   capSetProgress(capState.mode === 'native' ? 'Creating editable captions…' : 'Rendering…', 6);
   capWireProgressES(reqId);
+  try { cclog('info', 'captions: create start', { reqId, mode: capState.mode, style: capState.style, lines: lines.length }); } catch {}
 
   const body = {
     reqId, lines, mode: capState.mode, style: capState.style,
@@ -8834,14 +9052,17 @@ async function capCreateCaptions() {
     if (abort.signal.aborted) return;
     capCleanup(); if (capCard) { capCard.classList.remove('working'); capCard.classList.add('reviewing'); }
     if (hint) hint.textContent = 'Failed: ' + (e.message || e);
+    try { cclog('error', 'captions: create request failed', { reqId, mode: capState.mode, err: String((e && e.message) || e) }); } catch {}
     return;
   }
   capCleanup();
   if (!data || !data.ok) {
     if (capCard) { capCard.classList.remove('working'); capCard.classList.add('reviewing'); }
     if (hint) hint.textContent = 'Failed: ' + ((data && data.error) || 'error');
+    try { cclog('warn', 'captions: create rejected', { reqId, mode: capState.mode, error: (data && data.error) || 'unknown' }); } catch {}
     return;
   }
+  try { cclog('info', 'captions: created', { reqId, mode: capState.mode, native: !!data.native, lineCount: data.lineCount, clips: (data.clips && data.clips.length) || undefined }); } catch {}
   closeCaptionsModal();
   addCaptionsResultCard(data);
 }
@@ -8868,10 +9089,12 @@ function addNativeCaptionCard(data) {
     try {
       const raw = await evalES('ccImportCaptions(' + JSON.stringify(srt) + ')');
       const r = raw ? JSON.parse(raw) : null;
-      if (r && r.ok) setStatus(r.placed ? 'added as an editable caption track' : (r.reason || 'imported to bin — drag it onto the timeline'));
-      else setStatus('failed: ' + ((r && r.error) || 'import error'));
+      if (r && r.ok) { setStatus(r.placed ? 'added as an editable caption track' : (r.reason || 'imported to bin — drag it onto the timeline'));
+        try { cclog('info', 'captions: native SRT imported', { placed: !!r.placed, reason: r.reason }); } catch {} }
+      else { setStatus('failed: ' + ((r && r.error) || 'import error'));
+        try { cclog('error', 'captions: native SRT import failed', { error: (r && r.error) || 'import error' }); } catch {} }
       refreshStatus && refreshStatus(false);
-    } catch (e) { setStatus('import failed'); }
+    } catch (e) { setStatus('import failed'); try { cclog('error', 'captions: native SRT import threw', { err: String((e && e.message) || e) }); } catch {} }
     finally { importBtn.disabled = false; }
   }
   importBtn.addEventListener('click', doImport);
@@ -8914,11 +9137,14 @@ function addCaptionsResultCard(data) {
       const arg = JSON.stringify(clips.map(c => ({ path: c.path, timelineSec: c.timelineSec })));
       const raw = await evalES('ccImportCaptionClips(' + JSON.stringify(arg) + ')');
       const r = raw ? JSON.parse(raw) : null;
-      if (r && r.ok) setStatus('added ' + r.placed + '/' + r.total + ' caption layer' + (r.total === 1 ? '' : 's'));
-      else setStatus('failed: ' + ((r && r.error) || 'import error'));
+      if (r && r.ok) { setStatus('added ' + r.placed + '/' + r.total + ' caption layer' + (r.total === 1 ? '' : 's'));
+        try { cclog('info', 'captions: clips placed on timeline', { placed: r.placed, total: r.total }); } catch {} }
+      else { setStatus('failed: ' + ((r && r.error) || 'import error'));
+        try { cclog('error', 'captions: clip import failed', { error: (r && r.error) || 'import error', clips: clips.length }); } catch {} }
       refreshStatus && refreshStatus(false);
     } catch (e) {
       setStatus('import failed');
+      try { cclog('error', 'captions: clip import threw', { err: String((e && e.message) || e) }); } catch {}
     } finally {
       importBtn.disabled = false;
     }

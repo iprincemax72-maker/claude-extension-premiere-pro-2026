@@ -7,7 +7,7 @@ const fs = require('fs');
 const os = require('os');
 
 const PORT = 3737;
-const PANEL_VERSION = '10.9';   // bump each release — drives the /check-update badge + /diagnostics
+const PANEL_VERSION = '11.0';   // bump each release — drives the /check-update badge + /diagnostics
 const SESSION_ID = crypto.randomUUID();
 // WORK_DIR pins to wherever bridge.js itself lives, so the bridge always
 // finds the remotion-intro project sitting next to it — even if the user
@@ -135,6 +135,92 @@ function resolveFFmpeg() {
 }
 const FFMPEG_BIN = resolveFFmpeg();
 console.log('ffmpeg bin: ' + FFMPEG_BIN);
+
+// ── System font enumeration ───────────────────────────────────────────────
+// Lists every installed font FAMILY so the captions panel can offer them all.
+// We read the OS font directories and parse each font's 'name' table for its
+// real family name (the only reliable way to get a name CSS/Chromium can render,
+// cross-platform, with no external tools). Result is cached for the process.
+function _fontDirs() {
+  if (process.platform === 'win32') {
+    const dirs = ['C:\\Windows\\Fonts'];
+    if (process.env.LOCALAPPDATA) dirs.push(path.join(process.env.LOCALAPPDATA, 'Microsoft', 'Windows', 'Fonts'));
+    return dirs;
+  }
+  if (process.platform === 'darwin') {
+    return ['/System/Library/Fonts', '/System/Library/Fonts/Supplemental', '/Library/Fonts', path.join(os.homedir(), 'Library', 'Fonts')];
+  }
+  return ['/usr/share/fonts', '/usr/local/share/fonts', path.join(os.homedir(), '.fonts'), path.join(os.homedir(), '.local', 'share', 'fonts')];
+}
+function _walkFontFiles(dir, out, depth) {
+  if (depth > 4 || out.length > 6000) return;
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of entries) {
+    const full = path.join(dir, e.name);
+    try {
+      if (e.isDirectory()) { _walkFontFiles(full, out, depth + 1); }
+      else if (/\.(ttf|otf|ttc|otc)$/i.test(e.name)) out.push(full);
+    } catch {}
+  }
+}
+// Decode one sfnt header at `base` and pull family names from its 'name' table.
+function _readSfntNames(buf, base, fams) {
+  if (base + 12 > buf.length) return;
+  const numTables = buf.readUInt16BE(base + 4);
+  let nameOff = 0;
+  for (let i = 0; i < numTables; i++) {
+    const rec = base + 12 + i * 16;
+    if (rec + 16 > buf.length) return;
+    if (buf.toString('latin1', rec, rec + 4) === 'name') { nameOff = buf.readUInt32BE(rec + 8); break; }
+  }
+  if (!nameOff || nameOff + 6 > buf.length) return;
+  const count = buf.readUInt16BE(nameOff + 2);
+  const strBase = nameOff + buf.readUInt16BE(nameOff + 4);
+  let family = '', typo = '';
+  for (let i = 0; i < count; i++) {
+    const r = nameOff + 6 + i * 12;
+    if (r + 12 > buf.length) break;
+    const platformID = buf.readUInt16BE(r), nameID = buf.readUInt16BE(r + 6);
+    if (nameID !== 1 && nameID !== 16) continue;
+    const len = buf.readUInt16BE(r + 8), off = strBase + buf.readUInt16BE(r + 10);
+    if (off + len > buf.length || len <= 0) continue;
+    let s;
+    if (platformID === 3 || platformID === 0) s = buf.toString('utf16le', off, off + len).replace(/.?(.)/g, '$1'); // UTF-16BE → swap
+    else s = buf.toString('latin1', off, off + len);
+    // proper UTF-16BE decode (the regex above is unreliable) — do it cleanly:
+    if (platformID === 3 || platformID === 0) { s = ''; for (let j = 0; j + 1 < len; j += 2) s += String.fromCharCode(buf.readUInt16BE(off + j)); }
+    s = s.replace(/\u0000/g, '').trim();   // drop stray nulls, KEEP spaces (family names)
+    if (!s) continue;
+    if (nameID === 16) typo = typo || s;
+    else if (nameID === 1) family = family || s;
+  }
+  const fam = typo || family;
+  if (fam && fam[0] !== '.') fams.add(fam);  // skip hidden system faces like ".SF NS"
+}
+function _familiesFromFile(file, fams) {
+  let buf;
+  try { buf = fs.readFileSync(file); } catch { return; }
+  if (buf.length < 12) return;
+  const tag = buf.toString('latin1', 0, 4);
+  if (tag === 'ttcf') {
+    const n = buf.readUInt32BE(8);
+    for (let i = 0; i < n && i < 200; i++) { const o = 12 + i * 4; if (o + 4 <= buf.length) _readSfntNames(buf, buf.readUInt32BE(o), fams); }
+  } else {
+    _readSfntNames(buf, 0, fams);
+  }
+}
+let _fontCache = null;
+function getSystemFonts() {
+  if (_fontCache) return _fontCache;
+  const files = [];
+  for (const d of _fontDirs()) _walkFontFiles(d, files, 0);
+  const fams = new Set();
+  for (const f of files) { try { _familiesFromFile(f, fams); } catch {} }
+  _fontCache = Array.from(fams).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+  clog('captions', 'info', 'enumerated system fonts', { files: files.length, families: _fontCache.length });
+  return _fontCache;
+}
 
 // Resolve how to launch the Claude Code CLI as a child process.
 //   macOS / Linux: `claude` is a normal executable on PATH → spawn it directly
@@ -3264,6 +3350,19 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // List every installed system font family (for the captions font picker).
+  if (req.method === 'GET' && req.url === '/captions/fonts') {
+    try {
+      const fonts = getSystemFonts();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, fonts }));
+    } catch (e) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: String((e && e.message) || e), fonts: [] }));
+    }
+    return;
+  }
+
   if (req.method === 'GET' && req.url === '/version') {
     try {
       const panelPath = path.join(
@@ -4485,7 +4584,7 @@ const server = http.createServer((req, res) => {
       const segments = Array.isArray(payload.segments) ? payload.segments : [];
       const grouping = (payload.grouping && typeof payload.grouping === 'object') ? payload.grouping : {};
       const style = payload.style || 'karaoke';
-      const log = (m) => { try { clog('autoedit', 'info', '[captions/transcribe] ' + m, { reqId }, reqId); } catch {} };
+      const log = (m) => { try { clog('captions', 'info', '[transcribe] ' + m, { reqId }, reqId); } catch {} };
       const fail = (msg) => { try { broadcastProgressDone(reqId); } catch {} if (!res.writableEnded) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: msg, reqId })); } };
       const childProcs = new Set(); let aborted = false;
       const onProc = (p) => { if (aborted) { try { p.kill('SIGKILL'); } catch {} return; } childProcs.add(p); p.on('close', () => childProcs.delete(p)); };
@@ -4530,9 +4629,9 @@ const server = http.createServer((req, res) => {
       const options = (payload.options && typeof payload.options === 'object') ? payload.options : {};
       const grouping = (payload.grouping && typeof payload.grouping === 'object') ? payload.grouping : {};
       const width = payload.width, height = payload.height, fps = payload.fps || 30;
-      const log = (m) => { try { clog('autoedit', 'info', '[captions] ' + m, { reqId }, reqId); } catch {} };
+      const log = (m) => { try { clog('captions', 'info', m, { reqId, mode, style }, reqId); } catch {} };
       const fail = (msg, code) => {
-        try { clog('autoedit', 'error', '[captions] ' + msg, { reqId }, reqId); } catch {}
+        try { clog('captions', 'error', msg, { reqId, mode, style }, reqId); } catch {}
         try { broadcastProgressDone(reqId); } catch {}
         if (!res.writableEnded) {
           res.writeHead(code || 200, { 'Content-Type': 'application/json' });
@@ -4552,7 +4651,7 @@ const server = http.createServer((req, res) => {
       req.on('aborted', () => {
         aborted = true;
         for (const p of childProcs) { try { p.kill('SIGKILL'); } catch {} }
-        try { clog('autoedit', 'warn', '[captions] client aborted — killed ' + childProcs.size + ' procs', { reqId }, reqId); } catch {}
+        try { clog('captions', 'warn', 'client aborted — killed ' + childProcs.size + ' procs', { reqId }, reqId); } catch {}
         try { broadcastProgressDone(reqId); } catch {}
       });
       try {

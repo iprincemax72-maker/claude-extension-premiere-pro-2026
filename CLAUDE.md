@@ -32,7 +32,7 @@ the panel, bridge, autocut, autoedit, and ExtendScript — time-ordered.
 File: `~/PremiereClaude/logs/unified.jsonl` (one JSON object per line)
 
 Each line: `{ t, session, module, level, msg, data?, reqId? }`
-- **module**: `panel` | `bridge` | `autocut` | `autoedit` | `host` | `render`
+- **module**: `panel` | `bridge` | `autocut` | `autoedit` | `captions` | `host` | `render`
 - **level**: `debug` | `info` | `warn` | `error`
 - **reqId**: ties a panel action → bridge handling → render together
 
@@ -70,6 +70,11 @@ tail -100 ~/PremiereClaude/logs/unified.jsonl
   call surfaces here instead of silently returning null.
 - **autocut / autoedit**: their per-request file logs ALSO mirror into the
   unified log, so render events sit inline with the panel action that triggered them.
+- **captions**: panel (`captions: transcribe/create start|ready|rejected|failed`,
+  import placement) + bridge (`module:captions` transcribe/render/split/native),
+  tied by `reqId`. Debug a captions bug with:
+  `bash bridge/tail-logs.sh --dump --module captions` (then cross-ref the same
+  reqId under `module=panel`).
 
 ### How to log a new event
 - **Panel JS**: `cclog('info'|'warn'|'error', 'message', optionalDataObj)`
