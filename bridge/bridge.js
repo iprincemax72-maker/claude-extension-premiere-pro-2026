@@ -461,6 +461,33 @@ function markKeywords(lines) {
   return lines;
 }
 
+// Curated keyword -> emoji map for the optional auto-emoji feature. Color emoji
+// render fine in the ProRes output (verified). One emoji per line keeps it clean.
+const CAP_EMOJI = {
+  money: '💰', cash: '💰', dollar: '💵', rich: '🤑', profit: '💰', fire: '🔥', lit: '🔥', hot: '🔥',
+  love: '❤️', heart: '❤️', time: '⏰', clock: '⏰', idea: '💡', light: '💡', think: '💭', brain: '🧠',
+  smart: '🧠', mind: '🤯', crazy: '🤯', insane: '🤯', work: '💪', strong: '💪', power: '💪', win: '🏆',
+  winner: '🏆', best: '🏆', champion: '🏆', growth: '📈', grow: '📈', growing: '📈', rocket: '🚀',
+  launch: '🚀', fast: '⚡', speed: '⚡', quick: '⚡', energy: '⚡', star: '⭐', amazing: '🤩', incredible: '🤩',
+  awesome: '🤩', cool: '😎', huge: '💯', massive: '💯', percent: '💯', music: '🎵', video: '🎬', movie: '🎬',
+  camera: '📸', photo: '📸', phone: '📱', world: '🌍', global: '🌍', earth: '🌍', people: '👥', team: '🤝',
+  deal: '🤝', secret: '🤫', important: '❗', key: '🔑', gold: '🥇', first: '🥇', free: '🆓', check: '✅',
+  food: '🍔', coffee: '☕', sleep: '😴', happy: '😊', boom: '💥', explode: '💥', target: '🎯', goal: '🎯',
+  focus: '🎯', book: '📚', learn: '📚', study: '📚', school: '🎓', diamond: '💎', crown: '👑', king: '👑',
+  queen: '👑', sun: '☀️', water: '💧', ocean: '🌊', tree: '🌳', game: '🎮', play: '🎮', art: '🎨',
+  paint: '🎨', build: '🔨', create: '✨', magic: '✨', special: '✨', heavy: '🏋️', lift: '🏋️', run: '🏃',
+};
+function applyEmojis(lines) {
+  for (const l of (lines || [])) {
+    for (const w of (l.words || [])) {
+      const t = String(w.text || '').replace(/[^a-zA-Z]/g, '').toLowerCase();
+      const e = CAP_EMOJI[t];
+      if (e) { w.text = w.text + ' ' + e; break; }   // one emoji per line, keep it clean
+    }
+  }
+  return lines;
+}
+
 // Like runParakeet, but keeps the sub-word tokens and returns reconstructed
 // words alongside the sentence segments. Cleans up its temp files.
 function runParakeetWords(wavPath, audioDuration, onProc) {
@@ -4421,6 +4448,7 @@ const server = http.createServer((req, res) => {
           maxCharsPerLine: grouping.maxCharsPerLine,
         });
         if (options.keywords) markKeywords(lines);
+        if (options.emoji) applyEmojis(lines);
         log(`grouped into ${lines.length} caption lines`);
 
         if (aborted) return;

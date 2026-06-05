@@ -3678,6 +3678,7 @@
           <div class="cap-chips" id="capChips">
             <button type="button" class="cap-chip" data-chip="uppercase">UPPERCASE</button>
             <button type="button" class="cap-chip" data-chip="keywords">Keywords</button>
+            <button type="button" class="cap-chip" data-chip="emoji">Emoji ✨</button>
             <button type="button" class="cap-chip" data-chip="vary">Vary per line</button>
             <button type="button" class="cap-chip" data-chip="box">Pill background</button>
           </div>
@@ -8034,13 +8035,13 @@ let capState = {
   style: 'karaoke', position: 'bottom', highlight: '#E2885F',
   uppercase: false, box: false, maxWords: 4, fontPct: 100,
   fontWeight: 800, align: 'center', trackingPct: 0, lineHtPct: 112,
-  shadowPct: 55, strokePx: 2, strokeColor: '#000000', vary: false, keywords: false, fontFamily: '',
+  shadowPct: 55, strokePx: 2, strokeColor: '#000000', vary: false, keywords: false, emoji: false, fontFamily: '',
   customX: 0.5, customY: 0.85,
   selection: null, width: 1080, height: 1920, fps: 30,
   abort: null, reqId: null, es: null,
 };
 const CAP_SAVE_KEYS = ['style','position','highlight','uppercase','box','maxWords','fontPct',
-  'fontWeight','align','trackingPct','lineHtPct','shadowPct','strokePx','strokeColor','vary','keywords','fontFamily',
+  'fontWeight','align','trackingPct','lineHtPct','shadowPct','strokePx','strokeColor','vary','keywords','emoji','fontFamily',
   'customX','customY'];
 try {
   const saved = JSON.parse(localStorage.getItem('claudeBridge.captions.opts') || 'null');
@@ -8156,13 +8157,15 @@ function capSyncOptsUI() {
 
 // ── Live preview engine — mirrors Captions.tsx animation in the DOM ──
 const CAP_SAMPLE = [
-  { text: 'Flimify',  s: 0,    e: 560  },
-  { text: 'makes',    s: 560,  e: 880  },
-  { text: 'captions', s: 880,  e: 1300 },
-  { text: 'super',    s: 1300, e: 1560 },
-  { text: 'simple',   s: 1560, e: 1980 },
-  { text: 'today',    s: 1980, e: 2500 },
+  { text: 'Flimify', s: 0,    e: 560  },
+  { text: 'makes',   s: 560,  e: 880  },
+  { text: 'money',   s: 880,  e: 1300 },
+  { text: 'grow',    s: 1300, e: 1620 },
+  { text: 'so',      s: 1620, e: 1820 },
+  { text: 'fast',    s: 1820, e: 2400 },
 ];
+// small preview map (mirrors the bridge's auto-emoji for the sample words)
+const CAP_PREVIEW_EMOJI = { money: '💰', grow: '📈', fast: '⚡', makes: '', flimify: '' };
 const CAP_HOLD = 700;
 const CAP_PALETTE = ['#E2885F', '#5AA9FF', '#4ECB71', '#F5C542', '#FF5D8F', '#B98CFF'];
 const CAP_ENTRANCES = [
@@ -8241,11 +8244,19 @@ function capBuildLine(capEl, line, idx) {
       if (t.length >= 4 && t.length > kwLen) { kwIdx = i; kwLen = t.length; }
     });
   }
+  // first emoji-matched word on this line (preview demo)
+  let emojiIdx = -1, emojiChar = '';
+  if (capState.emoji) {
+    for (let i = 0; i < line.words.length; i++) {
+      const t = String(line.words[i].text || '').replace(/[^a-zA-Z]/g, '').toLowerCase();
+      if (CAP_PREVIEW_EMOJI[t]) { emojiIdx = i; emojiChar = CAP_PREVIEW_EMOJI[t]; break; }
+    }
+  }
   for (let wi = 0; wi < line.words.length; wi++) {
     const w = line.words[wi];
     const sp = document.createElement('span');
     sp.className = 'cap-cap-word';
-    sp.textContent = capState.uppercase ? w.text.toUpperCase() : w.text;
+    sp.textContent = (capState.uppercase ? w.text.toUpperCase() : w.text) + (wi === emojiIdx ? ' ' + emojiChar : '');
     sp.dataset.s = w.s; sp.dataset.e = w.e;
     if (wi === kwIdx) sp.dataset.kw = '1';
     lineEl.appendChild(sp);
@@ -8616,6 +8627,7 @@ async function generateCaptions() {
       strokeColor: capState.strokeColor,
       varyPerLine: capState.vary,
       keywords: capState.keywords,
+      emoji: capState.emoji,
       fontFamily: capState.fontFamily || undefined,
       customX: capState.customX, customY: capState.customY,
     },
