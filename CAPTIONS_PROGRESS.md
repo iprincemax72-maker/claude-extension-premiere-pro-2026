@@ -3,7 +3,16 @@
 Autonomous build. Goal: select a clip → transcribe word-level → render styled,
 animated, transparent captions → drop each as its own layer on the timeline.
 
-## STATUS: feature-complete (Mac). Owner-only early access. Everything below verified.
+## STATUS: feature-complete + robust + well-tested. Owner-only early access.
+
+FULL-PIPELINE end-to-end verified on real audio + real render (Jun 5): parakeet
+words -> groupWordsIntoLines -> markKeywords -> applyEmojis -> styled ProRes 4444
+render -> ffmpeg split into N SEPARATE alpha clips. Result: 3 lines (keywords
+[Flimify]/[fast.]/[today.] + emojis 💰/⚡/🔥) -> 3/3 separate alpha layers. Plus:
+parakeet+whisper transcription both verified, 6 styles + 11 looks + full options
+all render-verified, panel screenshot-verified, no regressions, 12 helper tests
+pass against the real bridge source. The only remaining items need Windows (ship
+whisper binary+model in install.ps1 — code ready) or the user (live in-Premiere).
 
 ### Overnight session (Jun 5) — everything the user asked, done + verified
 - Full-screen "captions studio" modal (not a narrow bar) with a LIVE animated preview
