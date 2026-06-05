@@ -8476,6 +8476,16 @@ function aeShowStep(step) {
     el.style.display = (el.getAttribute('data-step') === step) ? 'block' : 'none';
   });
 }
+// Force the questions view to open at the TOP (first question visible). Both the
+// inner #aeQuestions list AND the outer modal card can scroll on a short CEP
+// panel, and something in CEP nudges it down on open — so reset both, now and
+// again after layout settles (rAF + a short timeout beat any late auto-scroll).
+function aeScrollQuestionsTop() {
+  const q = document.getElementById('aeQuestions');
+  if (q) q.scrollTop = 0;
+  const card = autoeditModal && autoeditModal.querySelector('.autocut-modal-card');
+  if (card) card.scrollTop = 0;
+}
 let aeMinimized = false;
 function closeAutoeditModal() {
   autoeditModal.classList.remove('show');
@@ -9711,6 +9721,9 @@ async function analyzeAutoEdit() {
     renderAeQuestions();
     aeShowStep('questions');
     if (aeMinimized) aeRestore();   // pop back up — it's time to answer
+    aeScrollQuestionsTop();
+    requestAnimationFrame(aeScrollQuestionsTop);
+    setTimeout(aeScrollQuestionsTop, 140);
   } catch (e) {
     if (aeWizard.ticker) { clearInterval(aeWizard.ticker); aeWizard.ticker = null; }
     if (e && e.name === 'AbortError') return; // cancelled by user
@@ -9755,6 +9768,7 @@ function renderAeQuestions() {
   ta.value = aeWizard.answers.custom || '';
   ta.addEventListener('input', () => { aeWizard.answers.custom = ta.value; });
   cEl.appendChild(ta); wrap.appendChild(cEl);
+  wrap.scrollTop = 0;   // always render with the first question in view
 }
 
 // STEP 3 → generate (runs plan → fit-check → generate automatically)
