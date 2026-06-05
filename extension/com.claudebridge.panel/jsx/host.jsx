@@ -1228,8 +1228,29 @@ function ccAutoEditApply(payloadJson) {
         if (!vTracks) return JSON.stringify({ ok: false, error: "no video tracks", debug: debug });
         var nTracks = _ccSafe(function () { return vTracks.numTracks; });
         if (!nTracks || nTracks < 2) {
-            return JSON.stringify({ ok: false, error: "need at least 2 video tracks (V1 + V2)", debug: debug });
+            _ccEnsureVideoTracks(seq, 2);
+            vTracks = _ccSafe(function () { return seq.videoTracks; });
+            nTracks = _ccSafe(function () { return vTracks.numTracks; }) || nTracks;
+            if (!nTracks || nTracks < 2) return JSON.stringify({ ok: false, error: "need at least 2 video tracks (V1 + V2)", debug: debug });
         }
+
+        // Place every animation ABOVE all of the user's existing content, each on its
+        // own free track — so they never overwrite each other and stay individually
+        // editable. (Fixes "can't change any of the animations": they were stacking /
+        // overwriting on a low overlay track.) Find the highest track holding any clip.
+        var topUsed = 0;
+        for (var u = 0; u < nTracks; u++) {
+            var utk = _ccSafe(function () { return vTracks[u]; });
+            var ucl = utk ? _ccSafe(function () { return utk.clips; }) : null;
+            var ucn = ucl ? (_ccSafe(function () { return ucl.numItems; }) || 0) : 0;
+            if (ucn > 0) topUsed = u;
+        }
+        var animBase = topUsed + 1;
+        if (animBase < 1) animBase = 1;
+        _ccEnsureVideoTracks(seq, animBase + 1);
+        vTracks = _ccSafe(function () { return seq.videoTracks; });
+        nTracks = _ccSafe(function () { return vTracks.numTracks; }) || nTracks;
+        note("anim band base=V" + (animBase + 1) + " (above content), tracks=" + nTracks);
 
         // Save the current playhead so we can restore it at the end.
         var origPlayhead = null;
@@ -1266,14 +1287,21 @@ function ccAutoEditApply(payloadJson) {
             var snappedSec = Math.floor(rawSec * fps) / fps;
             if (snappedSec < 0) snappedSec = 0;
 
-            // 3. Pick the first overlay track (>= V2) with no clip at this time.
+            // 3. Pick the first free track in the animation band (above all content).
+            //    If none is free at this time, ADD a track and use it — NEVER overwrite
+            //    another animation, so each one stays a separate, editable clip.
             var track = null, trackIdx = -1;
-            for (var t = 1; t < nTracks; t++) {
+            for (var t = animBase; t < nTracks; t++) {
                 var trk = _ccSafe(function () { return vTracks[t]; });
                 if (trk && !_ccTrackHasClipAt(trk, snappedSec)) { track = trk; trackIdx = t; break; }
             }
-            // Fallback — if every overlay track is busy at this point, use V2.
-            if (!track) { trackIdx = 1; track = _ccSafe(function () { return vTracks[1]; }); }
+            if (!track) {
+                _ccEnsureVideoTracks(seq, nTracks + 1);
+                vTracks = _ccSafe(function () { return seq.videoTracks; });
+                nTracks = _ccSafe(function () { return vTracks.numTracks; }) || nTracks;
+                trackIdx = nTracks - 1;
+                track = _ccSafe(function () { return vTracks[trackIdx]; });
+            }
             if (!track) { skipped.push({ index: i, file: it.file, reason: "no overlay track" }); continue; }
 
             // 4. Move the playhead to the target time so insertClip(item, time)
