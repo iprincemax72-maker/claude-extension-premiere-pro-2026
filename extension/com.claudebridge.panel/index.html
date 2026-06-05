@@ -2390,6 +2390,17 @@
   }
   .ae-custom-input::placeholder { color: var(--text-dim); }
   .ae-custom-input:focus { border-color: var(--accent); }
+  .ae-detected {
+    display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+    padding: 7px 10px; margin-bottom: 2px;
+    background: rgba(217,119,87,0.07);
+    border: 1px solid rgba(217,119,87,0.18); border-radius: var(--radius-sm);
+    font-size: 11px; color: var(--text-dim);
+  }
+  .ae-detected-ico { color: var(--accent); font-size: 12px; line-height: 1; }
+  .ae-detected-fmt { color: var(--text); font-weight: 600; }
+  .ae-detected-dim { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .ae-detected-tag { color: var(--text-dim); opacity: 0.7; margin-left: auto; }
   .ae-err { font-size: 11.5px; color: var(--accent); margin: 8px 0 2px; min-height: 1px; }
 
   /* ───── Ask-Questions (Plan mode) interview card ───── */
@@ -8486,6 +8497,47 @@ function aeScrollQuestionsTop() {
   const card = autoeditModal && autoeditModal.querySelector('.autocut-modal-card');
   if (card) card.scrollTop = 0;
 }
+// Auto-detect the sequence format so we never ask the user for aspect ratio.
+// Cap the longest edge to keep overlay renders fast on 4K sequences (aspect
+// is preserved, and placement is fraction-based so absolute res doesn't matter).
+function aeNormalizeRenderSize(w, h) {
+  w = Math.round(Number(w)); h = Math.round(Number(h));
+  if (!(w > 0 && h > 0)) return null;
+  const MAX = 1920, longest = Math.max(w, h);
+  if (longest > MAX) {
+    const s = MAX / longest;
+    w = Math.max(2, Math.round(w * s / 2) * 2);
+    h = Math.max(2, Math.round(h * s / 2) * 2);
+  }
+  return w + 'x' + h;
+}
+function aeFormatLabel(w, h) {
+  const r = w / h;
+  if (Math.abs(r - 16 / 9) < 0.06) return 'Landscape 16:9';
+  if (Math.abs(r - 9 / 16) < 0.06) return 'Vertical 9:16';
+  if (Math.abs(r - 1) < 0.05)      return 'Square 1:1';
+  if (Math.abs(r - 4 / 5) < 0.05)  return 'Portrait 4:5';
+  if (Math.abs(r - 4 / 3) < 0.07)  return 'Standard 4:3';
+  if (Math.abs(r - 21 / 9) < 0.12) return 'Cinematic 21:9';
+  return r < 0.95 ? 'Vertical' : (r > 1.05 ? 'Landscape' : 'Square');
+}
+// Read the active sequence's dimensions and stash a normalized format on the
+// wizard. Best-effort — if it fails, the ratio question falls back to manual.
+async function aeDetectSeqFormat() {
+  try {
+    const raw = await esRetry('ccGetSeqDims()');
+    const d = raw ? JSON.parse(raw) : null;
+    if (d && d.ok && d.width > 0 && d.height > 0) {
+      aeWizard.seqDims = {
+        width: d.width, height: d.height,
+        ratio: aeNormalizeRenderSize(d.width, d.height),
+        label: aeFormatLabel(d.width, d.height),
+      };
+      return aeWizard.seqDims;
+    }
+  } catch (e) {}
+  return null;
+}
 let aeMinimized = false;
 function closeAutoeditModal() {
   autoeditModal.classList.remove('show');
@@ -9681,6 +9733,9 @@ async function analyzeAutoEdit() {
     return;
   }
 
+  // Auto-detect the sequence aspect/resolution now (so we never ask for it).
+  await aeDetectSeqFormat();
+
   const reqId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
   const abort = new AbortController();
   aeWizard.reqId = reqId; aeWizard.abort = abort;
@@ -9717,6 +9772,13 @@ async function analyzeAutoEdit() {
     const data = await resp.json();
     aeWizard.questions = data.questions || [];
     aeWizard.answers = {};
+    // Aspect ratio auto-detected from the sequence — fill the answer and hide
+    // the question so the user never has to pick it. (Falls back to the manual
+    // question if detection failed.)
+    if (aeWizard.seqDims && aeWizard.seqDims.ratio) {
+      aeWizard.answers.ratio = aeWizard.seqDims.ratio;
+      aeWizard.questions = aeWizard.questions.filter(q => q && q.id !== 'ratio');
+    }
     activeAutoedit = null; updateEscHint && updateEscHint();
     renderAeQuestions();
     aeShowStep('questions');
@@ -9737,6 +9799,17 @@ function renderAeQuestions() {
   const wrap = document.getElementById('aeQuestions');
   if (!wrap) return;
   wrap.innerHTML = '';
+  // Auto-detected sequence format chip — shows what we read so the user knows
+  // the aspect ratio is handled (no question to answer).
+  if (aeWizard.seqDims && aeWizard.seqDims.label) {
+    const dc = document.createElement('div');
+    dc.className = 'ae-detected';
+    dc.innerHTML = '<span class="ae-detected-ico">▦</span>'
+      + '<span class="ae-detected-fmt">' + escapeHTML(aeWizard.seqDims.label) + '</span>'
+      + '<span class="ae-detected-dim">' + aeWizard.seqDims.width + '×' + aeWizard.seqDims.height + '</span>'
+      + '<span class="ae-detected-tag">detected from your sequence</span>';
+    wrap.appendChild(dc);
+  }
   (aeWizard.questions || []).forEach((q) => {
     if (q.options && q.options.length && !(q.id in aeWizard.answers)) aeWizard.answers[q.id] = q.options[0].value;
     const qEl = document.createElement('div'); qEl.className = 'ae-q';
