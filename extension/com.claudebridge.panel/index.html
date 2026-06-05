@@ -2541,11 +2541,11 @@
   /* Quick-looks gallery — one-click complete presets (visual, not a bar) */
   .cap-looks { display: flex; gap: 6px; overflow-x: auto; padding: 2px 1px 8px; scrollbar-width: thin; scroll-behavior: smooth; }
   /* horizontal filmstrip — slim accent bar that invites a swipe */
-  .cap-looks::-webkit-scrollbar { height: 6px; }
-  .cap-looks::-webkit-scrollbar-track { background: transparent; }
-  .cap-looks::-webkit-scrollbar-thumb { background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 6px; opacity: .55; transition: opacity .15s; }
-  .cap-looks:hover::-webkit-scrollbar-thumb { opacity: .8; }
-  .cap-looks::-webkit-scrollbar-thumb:hover { opacity: 1; }
+  /* gray horizontal scrollbar for both card scrollers (Quick Looks + Style) */
+  .cap-looks::-webkit-scrollbar, .cap-styles::-webkit-scrollbar { height: 6px; }
+  .cap-looks::-webkit-scrollbar-track, .cap-styles::-webkit-scrollbar-track { background: transparent; }
+  .cap-looks::-webkit-scrollbar-thumb, .cap-styles::-webkit-scrollbar-thumb { background: rgba(235,230,223,.18); border-radius: 6px; transition: background .15s; }
+  .cap-looks::-webkit-scrollbar-thumb:hover, .cap-styles::-webkit-scrollbar-thumb:hover { background: rgba(235,230,223,.30); }
   .cap-look { flex: 0 0 auto; width: 74px; cursor: pointer; background: none; border: none; padding: 0; display: flex; flex-direction: column; gap: 4px; }
   .cap-look-prev { height: 54px; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; transition: border-color .15s var(--ease-out), background .15s var(--ease-out); background: var(--cc-card); }
   .cap-look:hover .cap-look-prev { border-color: var(--line-strong, rgba(235,230,223,.16)); background: var(--cc-hover); }
@@ -2710,8 +2710,9 @@
   .cap-fontpick-list::-webkit-scrollbar { width: 9px; }
   .cap-fontpick-list::-webkit-scrollbar-thumb { background: var(--surf-hover, #2c2a26); border-radius: 9px; border: 2px solid transparent; background-clip: padding-box; }
   .cap-fontpick-group { font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--cc-muted); font-weight: 700; padding: 9px 9px 4px; }
-  .cap-fontpick-item { font: inherit; font-size: 13px; color: var(--cc-text); background: none; border: none; border-radius: 6px;
-    padding: 7px 9px; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .1s; }
+  .cap-fontpick-item { display: flex; align-items: center; min-height: 38px; font-size: 16px; font-weight: 600; line-height: 1.35;
+    color: var(--cc-text); background: none; border: none; border-radius: 6px;
+    padding: 7px 11px; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .1s; }
   .cap-fontpick-item:hover { background: var(--cc-hover); }
   .cap-fontpick-item.sel { background: var(--accent-soft); color: var(--accent); }
   .cap-fontpick-empty { font-size: 12px; color: var(--cc-muted); padding: 10px 9px; }
