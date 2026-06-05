@@ -497,7 +497,7 @@ function groupWordsIntoLines(words, opts) {
   const maxWordsPerLine = Math.max(1, opts.maxWordsPerLine || 4);
   const maxGapMs = opts.maxGapMs != null ? opts.maxGapMs : 600;
   const maxLineMs = opts.maxLineMs != null ? opts.maxLineMs : 2600;
-  const maxCharsPerLine = opts.maxCharsPerLine != null ? opts.maxCharsPerLine : 24;
+  const maxCharsPerLine = opts.maxCharsPerLine != null ? opts.maxCharsPerLine : 36;
   const holdMs = opts.holdMs != null ? opts.holdMs : 250;
 
   const clean = (words || [])
