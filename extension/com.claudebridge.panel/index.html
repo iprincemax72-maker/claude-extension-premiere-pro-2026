@@ -10919,6 +10919,10 @@ async function sendMessage(presetMsg, sendOpts) {
   // so a resumed task knows roughly where it was when killed.
   let lastStatus = '';
   let progressES = null;
+  // Paths already shown via the live per-version stream — so the final batch
+  // response doesn't add a duplicate card for a version we already surfaced.
+  const streamedPaths = new Set();
+  const activeTabTypeEarly = (tabs[activeTabIdx] && tabs[activeTabIdx].type) || 'animation';
   try {
     progressES = new EventSource(BRIDGE + '/progress-stream');
     progressES.addEventListener('progress', (ev) => {
@@ -10929,6 +10933,20 @@ async function sendMessage(presetMsg, sendOpts) {
         if (text) lastStatus = text;
         if (text && labelEl) labelEl.textContent = text;
         if (text && progressUI && progressUI.setStatus) progressUI.setStatus(text);
+      } catch {}
+    });
+    // A version finished while others still render → show its card immediately.
+    progressES.addEventListener('versionReady', (ev) => {
+      try {
+        const payload = JSON.parse(ev.data);
+        if (payload.reqId && payload.reqId !== reqId) return;
+        if (activeTabTypeEarly === 'chat') return;
+        for (const p of (payload.imports || [])) {
+          if (!p || streamedPaths.has(p)) continue;
+          streamedPaths.add(p);
+          try { addRenderPreview(placeholder.wrap, p, msg, ''); } catch {}
+          try { addHistoryEntry({ prompt: msg || '', path: p, mode: '', reply: '', iterationOf: _iterationOf }); } catch {}
+        }
       } catch {}
     });
     progressES.addEventListener('done', (ev) => {
@@ -10973,6 +10991,8 @@ async function sendMessage(presetMsg, sendOpts) {
 
     if (activeTabType !== 'chat' && data.imports && data.imports.length) {
       for (const p of data.imports) {
+        if (streamedPaths.has(p)) continue;   // already shown live as it finished
+        streamedPaths.add(p);
         addRenderPreview(placeholder.wrap, p, msg, replyText);
         // CRITICAL: log to history immediately, BEFORE the user clicks Import.
         // Previously history only got written on Import click — which meant

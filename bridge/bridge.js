@@ -2222,6 +2222,14 @@ function broadcastProgressDone(reqId) {
     try { c.write('event: done\ndata: ' + data + '\n\n'); } catch {}
   }
 }
+// Push ONE finished version's importable files to the panel the moment it's done,
+// so the user can preview v1 while v2/v3 are still rendering (multi-version fan-out).
+function broadcastVersionReady(reqId, info) {
+  const data = JSON.stringify(Object.assign({ reqId: reqId || '' }, info || {}));
+  for (const c of progressClients) {
+    try { c.write('event: versionReady\ndata: ' + data + '\n\n'); } catch {}
+  }
+}
 
 // Translate a Claude stream-json event into a short human-readable status line.
 // Returns null if the event isn't worth showing the user.
@@ -4124,7 +4132,16 @@ const server = http.createServer((req, res) => {
             const imports = [];
             const reV = /\[\[IMPORT:([^\]]+)\]\]/g; let mv;
             while ((mv = reV.exec(vReply)) !== null) imports.push(mv[1].trim());
-            return { ok: true, reply: vReply, imports };
+            // Make THIS version importable + push it to the panel right away so the
+            // user can preview it while the other versions keep rendering.
+            let vSafe = [];
+            try { vSafe = (await Promise.all(imports.map(p => ensurePremiereImportable(p)))).filter(Boolean); }
+            catch { vSafe = imports; }
+            if (vSafe.length && !batchAborted) {
+              try { broadcastVersionReady(reqId, { idx, n: N, imports: vSafe }); } catch {}
+              clog('bridge', 'info', 'version ready (streamed)', { idx, n: N, files: vSafe.length }, reqId);
+            }
+            return { ok: true, reply: vReply, imports: vSafe };
           });
         }
 
@@ -4137,11 +4154,10 @@ const server = http.createServer((req, res) => {
 
         if (batchAborted) { chatDone = true; broadcastProgressDone(reqId); clog('bridge', 'info', 'multi-version aborted by user', null, reqId); return; }
 
-        const rawImports = [];
-        for (const rr of results) { if (rr && rr.ok && Array.isArray(rr.imports)) rawImports.push(...rr.imports); }
-        let safe;
-        try { safe = (await Promise.all(rawImports.map(p => ensurePremiereImportable(p)))).filter(Boolean); }
-        catch { safe = rawImports; }
+        // Each version already ran ensurePremiereImportable() in its thunk (and was
+        // streamed to the panel), so just collect those already-safe paths here.
+        const safe = [];
+        for (const rr of results) { if (rr && rr.ok && Array.isArray(rr.imports)) safe.push(...rr.imports); }
 
         const made = safe.length;
         clog('bridge', 'info', 'multi-version done', { requested: versionCount, rendered: made }, reqId);
