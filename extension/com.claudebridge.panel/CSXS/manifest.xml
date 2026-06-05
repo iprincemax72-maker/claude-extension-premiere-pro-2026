@@ -33,6 +33,11 @@
                         <Parameter>--enable-accelerated-2d-canvas</Parameter>
                         <Parameter>--enable-zero-copy</Parameter>
                         <Parameter>--disable-features=CalculateNativeWinOcclusion</Parameter>
+                        <!-- Lift the frame-rate cap. CEF throttles the panel (it feels like
+                             ~30fps); these uncap it so it can composite at the display's
+                             full rate. Needs a FULL Premiere restart. -->
+                        <Parameter>--disable-frame-rate-limit</Parameter>
+                        <Parameter>--disable-gpu-vsync</Parameter>
                     </CEFCommandLine>
                 </Resources>
                 <Lifecycle>
