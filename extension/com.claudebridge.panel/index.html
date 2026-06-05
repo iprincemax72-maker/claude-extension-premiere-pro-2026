@@ -3673,6 +3673,7 @@
         <div class="cap-opt-row" style="align-items:center"><span class="cap-opt-label">Options</span>
           <div class="cap-chips" id="capChips">
             <button type="button" class="cap-chip" data-chip="uppercase">UPPERCASE</button>
+            <button type="button" class="cap-chip" data-chip="keywords">Keywords</button>
             <button type="button" class="cap-chip" data-chip="vary">Vary per line</button>
             <button type="button" class="cap-chip" data-chip="box">Pill background</button>
           </div>
@@ -8029,13 +8030,13 @@ let capState = {
   style: 'karaoke', position: 'bottom', highlight: '#E2885F',
   uppercase: false, box: false, maxWords: 4, fontPct: 100,
   fontWeight: 800, align: 'center', trackingPct: 0, lineHtPct: 112,
-  shadowPct: 55, strokePx: 2, strokeColor: '#000000', vary: false, fontFamily: '',
+  shadowPct: 55, strokePx: 2, strokeColor: '#000000', vary: false, keywords: false, fontFamily: '',
   customX: 0.5, customY: 0.85,
   selection: null, width: 1080, height: 1920, fps: 30,
   abort: null, reqId: null, es: null,
 };
 const CAP_SAVE_KEYS = ['style','position','highlight','uppercase','box','maxWords','fontPct',
-  'fontWeight','align','trackingPct','lineHtPct','shadowPct','strokePx','strokeColor','vary','fontFamily',
+  'fontWeight','align','trackingPct','lineHtPct','shadowPct','strokePx','strokeColor','vary','keywords','fontFamily',
   'customX','customY'];
 try {
   const saved = JSON.parse(localStorage.getItem('claudeBridge.captions.opts') || 'null');
@@ -8224,11 +8225,21 @@ function capBuildLine(capEl, line, idx) {
   const strokePreview = Math.max(0, capState.strokePx * (fontPx / 90)); // scale stroke to preview font
   lineEl.style.webkitTextStroke = strokePreview > 0 ? (strokePreview.toFixed(2) + 'px ' + capState.strokeColor) : '';
 
-  for (const w of line.words) {
+  // mark the keyword (longest content word) on this line for the preview
+  let kwIdx = -1, kwLen = 0;
+  if (capState.keywords) {
+    line.words.forEach((w, i) => {
+      const t = String(w.text || '').replace(/[^a-zA-Z']/g, '').toLowerCase();
+      if (t.length >= 4 && t.length > kwLen) { kwIdx = i; kwLen = t.length; }
+    });
+  }
+  for (let wi = 0; wi < line.words.length; wi++) {
+    const w = line.words[wi];
     const sp = document.createElement('span');
     sp.className = 'cap-cap-word';
     sp.textContent = capState.uppercase ? w.text.toUpperCase() : w.text;
     sp.dataset.s = w.s; sp.dataset.e = w.e;
+    if (wi === kwIdx) sp.dataset.kw = '1';
     lineEl.appendChild(sp);
   }
   capEl.innerHTML = '';
@@ -8247,11 +8258,12 @@ function capStyleWord(sp, ms) {
   const pop = Math.max(0, Math.min(1, sinceWord / 240));
   const ease = pop < 1 ? (1 - Math.pow(1 - pop, 3)) : 1;
   const vary = capState.vary;
-  let color = '#fff', opacity = 1, transform = '', background = '', padding = '', radius = '', stroke = '';
+  const baseColor = (capState.keywords && sp.dataset.kw === '1') ? hl : '#fff';
+  let color = baseColor, opacity = 1, transform = '', background = '', padding = '', radius = '', stroke = '';
   const st = capState.style;
   if (st === 'hormozi') {
     if (active) { color = '#15110d'; background = hl; padding = '0.02em 0.12em'; radius = '6px'; stroke = '0'; transform = 'scale(' + (1 + 0.05 * Math.sin(Math.min(1, sinceWord / Math.max(1, e - s)) * Math.PI)).toFixed(3) + ')'; }
-    else color = '#fff';
+    else color = baseColor;
   } else if (st === 'karaoke') {
     if (active) { color = hl; const k = Math.sin(Math.min(1, sinceWord / Math.max(1, e - s)) * Math.PI); transform = 'scale(' + (1 + 0.09 * k).toFixed(3) + ')'; }
     else if (!spoken) color = 'rgba(255,255,255,.45)';
@@ -8595,6 +8607,7 @@ async function generateCaptions() {
       stroke: capState.strokePx,
       strokeColor: capState.strokeColor,
       varyPerLine: capState.vary,
+      keywords: capState.keywords,
       fontFamily: capState.fontFamily || undefined,
       customX: capState.customX, customY: capState.customY,
     },

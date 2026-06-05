@@ -443,6 +443,24 @@ function groupWordsIntoLines(words, opts) {
   return lines;
 }
 
+// Mark the most important word per line as a keyword (submagic-style highlight).
+// No NLP: pick the longest content word (>=4 chars, not a stopword) on each line.
+const CAP_STOPWORDS = new Set(('the a an and or but to of in on at for with is are was were be been being it its ' +
+  'this that these those i you he she we they me my your our their as so if then than just about into over from ' +
+  'up down out off not no yes do does did have has had will would can could should what when where who how why ' +
+  'there here them him her us your yours theirs all any some more most very really gonna wanna kinda like').split(' '));
+function markKeywords(lines) {
+  for (const l of (lines || [])) {
+    let best = null, bestLen = 0;
+    for (const w of (l.words || [])) {
+      const t = String(w.text || '').replace(/[^a-zA-Z']/g, '').toLowerCase();
+      if (t.length >= 4 && !CAP_STOPWORDS.has(t) && t.length > bestLen) { best = w; bestLen = t.length; }
+    }
+    if (best) best.kw = true;
+  }
+  return lines;
+}
+
 // Like runParakeet, but keeps the sub-word tokens and returns reconstructed
 // words alongside the sentence segments. Cleans up its temp files.
 function runParakeetWords(wavPath, audioDuration, onProc) {
@@ -4402,6 +4420,7 @@ const server = http.createServer((req, res) => {
           maxLineMs: grouping.maxLineMs,
           maxCharsPerLine: grouping.maxCharsPerLine,
         });
+        if (options.keywords) markKeywords(lines);
         log(`grouped into ${lines.length} caption lines`);
 
         if (aborted) return;

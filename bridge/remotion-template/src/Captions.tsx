@@ -20,7 +20,7 @@
 import React, { type CSSProperties } from 'react';
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Easing } from 'remotion';
 
-export type CaptionWord = { text: string; startMs: number; endMs: number };
+export type CaptionWord = { text: string; startMs: number; endMs: number; kw?: boolean };
 export type CaptionLine = { words: CaptionWord[]; startMs: number; endMs: number };
 export type CaptionStyle = 'classic' | 'karaoke' | 'reels' | 'tiktok' | 'minimal' | 'hormozi';
 
@@ -44,6 +44,7 @@ export type CaptionOptions = {
   stroke?: number;          // px text outline width (0 = off; per-style default otherwise)
   strokeColor?: string;
   varyPerLine?: boolean;    // each line a different color + entrance animation
+  keywords?: boolean;       // colour important keywords persistently (submagic-style)
 };
 
 export type CaptionsProps = {
@@ -76,6 +77,7 @@ const DEFAULTS = {
   stroke: null as number | null,
   strokeColor: 'rgba(0,0,0,0.92)',
   varyPerLine: false,
+  keywords: false,
 };
 
 // per-style default font size as a fraction of comp height
@@ -299,7 +301,10 @@ const WordView: React.FC<{
   const wordFrame = Math.max(0, frame - msToFrames(word.startMs, fps));
   const pop = spring({ frame: wordFrame, fps, config: { damping: 12, mass: 0.5 } });
 
-  let color = opt.accent;
+  // keyword highlighting: important words stay coloured even when not the active word
+  const isKw = !!(opt.keywords && word.kw);
+  const baseColor = isKw ? hlColor : opt.accent;
+  let color = baseColor;
   let transform = '';
   let opacity = 1;
   let background: string | undefined;
@@ -316,12 +321,11 @@ const WordView: React.FC<{
       borderRadius = 8;
       transform = `scale(${(1 + 0.06 * Math.sin(clamp01((ms - word.startMs) / Math.max(1, word.endMs - word.startMs)) * Math.PI)).toFixed(3)})`;
     } else {
-      color = '#FFFFFF';
+      color = baseColor;
     }
   } else if (style === 'classic') {
     opacity = interpolate(lineInProgress, [0, 160], [0, 1], { extrapolateRight: 'clamp', easing: easeOut });
     if (vary) color = hlColor;
-    else if (active) color = opt.accent;
   } else if (style === 'minimal') {
     opacity = interpolate(lineInProgress, [0, 130], [0, 1], { extrapolateRight: 'clamp', easing: easeOut });
     if (vary) color = hlColor;
