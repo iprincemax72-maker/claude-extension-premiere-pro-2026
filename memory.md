@@ -13,6 +13,8 @@ when something is fixed. Newest at top.
 
 ## Open / watch
 - [ ] Auto-Edit animation placement (V-tracks, no overwrite) — code done, **needs live in-Premiere verification** (QE addTracks is build-dependent).
+- [ ] Auto-Edit face-avoidance + voiceover-only — code done, **needs a live Auto-Edit run** to confirm Claude reads the start/mid/end frames and places graphics off the face, and that voiceover-only makes full-screen graphics.
+- [ ] Panel laggy in Premiere (feels ~30fps): added GPU + frame-rate CEF flags to manifest; user says still laggy. Likely a CEP/Premiere host cap we can't override from the extension. NOT caused by our JS (smooth in a browser). Don't cap our animations to 30fps — user explicitly forbade it.
 - [ ] Captions native/animated render correctness on a real clip — needs the user in Premiere.
 
 ## Fixed (this session)

@@ -3754,6 +3754,13 @@
         </div>
       </label>
 
+      <label class="autocut-opt" data-opt="voiceover" style="margin-top:10px">
+        <input type="checkbox" id="aeVoiceover">
+        <div class="autocut-opt-text">
+          <div class="autocut-opt-name">Voiceover only <span class="autocut-opt-desc" style="margin:0">· no face on screen → full-screen graphics</span></div>
+        </div>
+      </label>
+
       <div class="ae-err" id="aeOptionsErr"></div>
       <div class="autocut-modal-actions">
         <button type="button" class="autocut-modal-cancel" data-ae-cancel>Cancel</button>
@@ -9599,7 +9606,7 @@ async function analyzeAutoEdit() {
   try {
     const resp = await fetch(BRIDGE + '/autoedit/analyze', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reqId, density, segments: aeWizard.selection.segments, span: aeWizard.selection.span }),
+      body: JSON.stringify({ reqId, density, voiceoverOnly: !!(document.getElementById('aeVoiceover') && document.getElementById('aeVoiceover').checked), segments: aeWizard.selection.segments, span: aeWizard.selection.span }),
       signal: abort.signal,
     });
     if (aeWizard.ticker) { clearInterval(aeWizard.ticker); aeWizard.ticker = null; }

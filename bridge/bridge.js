@@ -1512,6 +1512,32 @@ function _aeCacheSet(reqId, val) {
   }
 }
 
+// Grab start / middle / end frames of the selected clip so the graphics generator can
+// SEE where the speaker/face sits and place overlays in the empty area (no face cover).
+// Small downscaled JPGs (fast for vision). Best-effort — returns [{label, path}].
+async function extractFaceFrames(seg, reqId, log) {
+  if (!seg || !seg.path || !fs.existsSync(seg.path)) return [];
+  const inSec = Math.max(0, Number(seg.inSec) || 0);
+  const outSec = Number(seg.outSec) || (inSec + 1);
+  const dur = Math.max(0.6, outSec - inSec);
+  const pad = Math.min(0.2, dur * 0.06);
+  const spots = [{ label: 'start', t: inSec + pad }, { label: 'mid', t: inSec + dur / 2 }, { label: 'end', t: outSec - pad }];
+  const out = [];
+  for (const s of spots) {
+    const dest = path.join(OUTPUT_DIR, 'ae_frame_' + String(reqId).slice(0, 8) + '_' + s.label + '.jpg');
+    const ok = await new Promise((res) => {
+      const ff = spawn(FFMPEG_BIN, ['-y', '-ss', String(Math.max(0, s.t)), '-i', seg.path, '-frames:v', '1', '-vf', 'scale=480:-2', '-q:v', '5', dest]);
+      ff.stderr.on('data', () => {});
+      const k = setTimeout(() => { try { ff.kill('SIGKILL'); } catch {} res(false); }, 30000);
+      ff.on('error', () => { clearTimeout(k); res(false); });
+      ff.on('close', c => { clearTimeout(k); res(c === 0 && fs.existsSync(dest)); });
+    });
+    if (ok) out.push({ label: s.label, path: dest });
+  }
+  if (log) log('face frames: ' + out.length + '/3 extracted');
+  return out;
+}
+
 // One-shot Haiku text call (no tools, no session) — used for the interview
 // questions and the plan fit-check. Returns raw stdout (best-effort; '' on
 // failure so callers degrade gracefully). Registered as an _activeAutoedit
@@ -2011,6 +2037,30 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
         + momentTypeToTrendPack(m.type, task.idx) + '). Across the video the graphics should feel VARIED — '
         + 'do not default to the same generic caption palette/type/motion every time.';
     }
+    // PLACEMENT: full-screen for voiceover-only clips, else a lower-third overlay
+    // that avoids the speaker's face (using the start/mid/end frames if we have them).
+    let placement;
+    if (opts && opts.voiceoverOnly) {
+      placement =
+        '- FULL-SCREEN graphic. This is a VOICEOVER-ONLY video — there is NO face on\n' +
+        '  screen to protect, so use the ENTIRE frame: a big, centred, full-bleed\n' +
+        '  composition that fills the canvas edge to edge. Bold and cinematic, not a\n' +
+        '  small corner card. (Background still transparent so it sits over the footage.)';
+    } else if (opts && Array.isArray(opts.faceFrames) && opts.faceFrames.length) {
+      placement =
+        '- It is an OVERLAY, not a full-screen card: keep it to a lower-third, corner,\n' +
+        '  or side panel as fits the type. It supports the speech, it does not cover the speaker.\n' +
+        '- AVOID THE SPEAKER\'S FACE. Here are frames from the start, middle and end of the\n' +
+        '  clip — Read each image file to SEE where the person/face sits, then place THIS\n' +
+        '  overlay in an EMPTY area (the opposite side / the very bottom) so it never covers\n' +
+        '  their face:\n' +
+        opts.faceFrames.map(f => '    ' + (f.label || '') + ': ' + f.path).join('\n');
+    } else {
+      placement =
+        '- It is an OVERLAY, not a full-screen card: keep it to a lower-third,\n' +
+        '  corner, or side panel as fits the type. It supports the speech, it\n' +
+        '  does not cover the speaker.';
+    }
     return [
       'Create a motion-graphic OVERLAY for a video. It will be placed on a',
       'track ABOVE the speaker\'s footage, so it MUST have a fully transparent',
@@ -2061,9 +2111,7 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
       '  ffmpeg -an to strip the silent track entirely after render. After',
       '  rendering, the file\'s pixel format must be yuva444p10le (alpha-',
       '  capable) — verify with ffprobe if unsure and re-render if it is not.',
-      '- It is an OVERLAY, not a full-screen card: keep it to a lower-third,',
-      '  corner, or side panel as fits the type. It supports the speech, it',
-      '  does not cover the speaker.',
+      placement,
       '- It MUST animate in at the start and out before the end — never static.',
       '- Render the final file to EXACTLY this path:',
       '  ' + task.outFile,
@@ -5116,6 +5164,7 @@ const server = http.createServer((req, res) => {
       const segments = Array.isArray(payload.segments) ? payload.segments : null;
       const density = payload.density || 'moderate';
       const style = payload.style || 'auto';
+      const voiceoverOnly = !!payload.voiceoverOnly;   // full-screen graphics, no face to protect
       if (!segments || !segments.length) { res.writeHead(400); res.end(JSON.stringify({ error: 'missing segments', reqId })); return; }
       for (const s of segments) {
         if (!s || !s.path || !fs.existsSync(s.path)) { res.writeHead(404); res.end(JSON.stringify({ error: 'media file not found: ' + ((s && s.path) || '?'), reqId })); return; }
@@ -5162,8 +5211,15 @@ const server = http.createServer((req, res) => {
         broadcastProgress('Reading the speech', 24, reqId);
         if (_activeAutoedit.aborted) throw new Error('cancelled');
         const questions = await detectInterviewQuestions(sentences, density, log);
-        _aeCacheSet(reqId, { sentences, span: { start: spanStart, end: spanEnd }, density, style });
-        log(`analyze done: ${sentences.length} sentences, ${questions.length} questions`);
+
+        // Face-avoidance: grab start/mid/end frames so the generator can place graphics
+        // away from the speaker's face. Skipped for voiceover-only (full-screen) mode.
+        let faceFrames = [];
+        if (!voiceoverOnly) {
+          try { faceFrames = await extractFaceFrames(segments[0], reqId, log); } catch (e) { log('face frames failed: ' + e.message); }
+        }
+        _aeCacheSet(reqId, { sentences, span: { start: spanStart, end: spanEnd }, density, style, voiceoverOnly, faceFrames });
+        log(`analyze done: ${sentences.length} sentences, ${questions.length} questions, voiceoverOnly=${voiceoverOnly}, frames=${faceFrames.length}`);
 
         broadcastProgressDone(reqId);
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -5192,6 +5248,8 @@ const server = http.createServer((req, res) => {
       const log = (s) => { try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${s}\n`); } catch {} clog('autoedit', /error|fail|timeout/i.test(String(s)) ? 'error' : 'info', String(s), null, reqId); };
       try {
         const { sentences, span } = cached;
+        const voiceoverOnly = !!cached.voiceoverOnly;
+        const faceFrames = Array.isArray(cached.faceFrames) ? cached.faceFrames : [];
         const density = payload.density || cached.density || 'moderate';
         const style = payload.style || cached.style || 'auto';
         const spanStart = span.start, spanEnd = span.end, totalDur = spanEnd - spanStart;
@@ -5250,7 +5308,7 @@ const server = http.createServer((req, res) => {
         broadcastProgress('Generating motion graphics', 42, reqId);
         const renderResults = await generateMomentsParallel(plan, reqId, log, (done, total) => {
           broadcastProgress(`Generating motion graphics (${done}/${total})`, 42 + Math.floor((done / total) * 48), reqId);
-        }, { styleMode, styleSpec, width: vidW, height: vidH });
+        }, { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames });
 
         const applied = renderResults.filter(r => r && r.ok).map(r => ({ ...r, timelineSec: r.atSec }));
         const skipped = renderResults.filter(r => r && !r.ok);
