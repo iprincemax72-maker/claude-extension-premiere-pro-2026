@@ -2076,6 +2076,13 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
       '  on screen for: ' + task.durationSec.toFixed(1) + 's (' + task.durationFrames + ' frames @ 30fps)',
       '',
       styleBlock,
+      (opts && opts.changeDirective)
+        ? ('\nREVISION — the user reviewed THIS graphic and wants ONE specific change:\n'
+           + '  "' + String(opts.changeDirective).replace(/"/g, "'").slice(0, 600) + '"\n'
+           + 'Apply exactly that change and nothing else. Keep the same moment text,\n'
+           + 'the same timing/placement, and the rest of the look — only change what was\n'
+           + 'asked. Build it as a fresh composition (do not try to read the old render).')
+        : '',
       '',
       'BUILD IT:',
       '- Write a FRESH Remotion composition from scratch. Do NOT copy or import',
@@ -2191,7 +2198,7 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
         })();
         if (!fileExists) {
           log(`${tag} produced no output file`);
-          resolve({ ok: false, atSec: task.moment.startSec, type: task.moment.type, label: task.moment.label || '', reason: 'no output' });
+          resolve({ ok: false, idx: task.idx, atSec: task.moment.startSec, type: task.moment.type, label: task.moment.label || '', reason: 'no output' });
           return;
         }
         // Verify the .mov actually has an alpha channel. ProRes 422 (no
@@ -2213,20 +2220,20 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
         if (hasAlpha) {
           log(`${tag} ok -> ${task.outFile}`);
           resolve({
-            ok: true, file: task.outFile, atSec: task.moment.startSec,
+            ok: true, idx: task.idx, file: task.outFile, atSec: task.moment.startSec,
             type: task.moment.type, label: task.moment.label || '',
             durationSec: task.durationSec,
           });
         } else {
           try { fs.unlinkSync(task.outFile); } catch {}
-          resolve({ ok: false, atSec: task.moment.startSec, type: task.moment.type, label: task.moment.label || '', reason: 'opaque (no alpha)' });
+          resolve({ ok: false, idx: task.idx, atSec: task.moment.startSec, type: task.moment.type, label: task.moment.label || '', reason: 'opaque (no alpha)' });
         }
       };
       proc.on('exit', conclude);
       proc.on('close', conclude);
       proc.on('error', (e) => {
         log(`${tag} spawn error ${e.message}`);
-        if (!finished) { finished = true; clearInterval(watchdog); resolve({ ok: false, atSec: task.moment.startSec, type: task.moment.type, label: task.moment.label || '', reason: e.message }); }
+        if (!finished) { finished = true; clearInterval(watchdog); resolve({ ok: false, idx: task.idx, atSec: task.moment.startSec, type: task.moment.type, label: task.moment.label || '', reason: e.message }); }
       });
     });
   }
@@ -3200,7 +3207,7 @@ const server = http.createServer((req, res) => {
 
   // Track in-flight heavy requests so the periodic auto-update never restarts
   // the bridge mid-render. res 'close' fires on normal finish OR client abort.
-  if (req.method === 'POST' && (req.url === '/chat' || req.url === '/autoedit' || req.url === '/autoedit/run' || req.url === '/autoedit/analyze' || req.url === '/autocut' || req.url === '/captions' || req.url === '/captions/transcribe' || req.url === '/plan/questions')) {
+  if (req.method === 'POST' && (req.url === '/chat' || req.url === '/autoedit' || req.url === '/autoedit/run' || req.url === '/autoedit/rerender' || req.url === '/autoedit/analyze' || req.url === '/autocut' || req.url === '/captions' || req.url === '/captions/transcribe' || req.url === '/plan/questions')) {
     _heavyInflight++;
     res.on('close', () => { _heavyInflight = Math.max(0, _heavyInflight - 1); });
   }
@@ -3208,7 +3215,7 @@ const server = http.createServer((req, res) => {
   // Plan backstop: Auto-Edit / Auto-Cut are Studio-only. Only blocks when we KNOW
   // the plan isn't Studio (cache populated by /auth/status polls) — fail-open
   // otherwise, since the panel already locks the button.
-  if (req.method === 'POST' && (req.url === '/autoedit' || req.url === '/autoedit/run' || req.url === '/autoedit/analyze' || req.url === '/autocut')) {
+  if (req.method === 'POST' && (req.url === '/autoedit' || req.url === '/autoedit/run' || req.url === '/autoedit/rerender' || req.url === '/autoedit/analyze' || req.url === '/autocut')) {
     if (AUTH_ENABLED && _planCache.plan && !(PLAN_FEATURES[_planCache.plan] || {}).autoedit) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Auto-Edit is a Studio feature — upgrade to unlock it.', planBlock: true, need: 'studio' }));
@@ -5315,9 +5322,14 @@ const server = http.createServer((req, res) => {
 
         // ── Generate (style-locked or varied per the answers) ─────────────
         broadcastProgress('Generating motion graphics', 42, reqId);
+        const genOpts = { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames };
+        // Persist the final plan + render options so a SINGLE graphic can be
+        // re-rendered later (the per-graphic "Change" feature) without re-running
+        // analyze. Keyed by reqId; merges over the analyze-time cache entry.
+        try { _aeCacheSet(reqId, Object.assign({}, cached, { plan, genOpts })); } catch {}
         const renderResults = await generateMomentsParallel(plan, reqId, log, (done, total) => {
           broadcastProgress(`Generating motion graphics (${done}/${total})`, 42 + Math.floor((done / total) * 48), reqId);
-        }, { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames });
+        }, genOpts);
 
         const applied = renderResults.filter(r => r && r.ok).map(r => ({ ...r, timelineSec: r.atSec }));
         const skipped = renderResults.filter(r => r && !r.ok);
@@ -5334,6 +5346,62 @@ const server = http.createServer((req, res) => {
         log(`run ERROR ${e.message}`);
         broadcastProgressDone(reqId);
         try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e), reqId, logFile: logPath })); } catch {}
+      } finally { _activeAutoedit = null; }
+    });
+    return;
+  }
+
+  // ── AUTO-EDIT: re-render ONE graphic with a user change ───────────────────
+  // Body: { reqId, idx, change }. idx is the plan index of the graphic the user
+  // picked. Re-renders just that moment with the change applied, reusing the
+  // run's locked style + resolution, and returns the new file so the panel can
+  // swap it on the timeline in place. Needs the run's plan+genOpts in the cache
+  // (persisted by /autoedit/run) — i.e. the same session, within the cache TTL.
+  if (req.method === 'POST' && req.url === '/autoedit/rerender') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      let payload;
+      try { payload = JSON.parse(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+      const reqId = payload.reqId;
+      const idx = Number(payload.idx);
+      const change = String(payload.change || '').trim();
+      const cached = reqId && _autoeditCache.get(reqId);
+      if (!cached) { res.writeHead(400); res.end(JSON.stringify({ error: 'Auto-Edit session expired — run Auto-Edit again to change graphics', reqId })); return; }
+      if (!cached.plan || !cached.genOpts) { res.writeHead(400); res.end(JSON.stringify({ error: 'Nothing to change yet — generate the graphics first', reqId })); return; }
+      if (!Number.isInteger(idx) || idx < 0 || idx >= cached.plan.length) { res.writeHead(400); res.end(JSON.stringify({ error: 'That graphic is no longer available', reqId })); return; }
+      if (!change) { res.writeHead(400); res.end(JSON.stringify({ error: 'No change described', reqId })); return; }
+      _activeAutoedit = { children: new Set(), aborted: false };
+      const logPath = path.join(OUTPUT_DIR, `autoedit-${reqId}.log`);
+      const log = (s) => { try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${s}\n`); } catch {} clog('autoedit', /error|fail|timeout/i.test(String(s)) ? 'error' : 'info', String(s), null, reqId); };
+      try {
+        const moment = cached.plan[idx];
+        log(`AUTO EDIT rerender reqId=${reqId} idx=${idx} change="${change.slice(0, 120)}"`);
+        broadcastProgress('Re-rendering graphic ' + (idx + 1), 20, reqId);
+        const genOpts = Object.assign({}, cached.genOpts, { changeDirective: change });
+        const results = await generateMomentsParallel([moment], reqId, log, (done, total) => {
+          broadcastProgress('Re-rendering graphic ' + (idx + 1), 20 + Math.floor((done / total) * 70), reqId);
+        }, genOpts);
+        const r = results && results[0];
+        broadcastProgressDone(reqId);
+        if (!r || !r.ok) {
+          const reason = (r && r.reason) || 'render failed';
+          log(`rerender FAILED idx=${idx} reason=${reason}`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, reqId, idx, error: reason }));
+          return;
+        }
+        log(`rerender ok idx=${idx} -> ${r.file}`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: true, reqId, idx,
+          file: r.file, atSec: r.atSec, timelineSec: r.atSec,
+          durationSec: r.durationSec, type: r.type, label: r.label || '',
+        }));
+      } catch (e) {
+        log(`rerender ERROR ${e.message}`);
+        broadcastProgressDone(reqId);
+        try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e), reqId })); } catch {}
       } finally { _activeAutoedit = null; }
     });
     return;

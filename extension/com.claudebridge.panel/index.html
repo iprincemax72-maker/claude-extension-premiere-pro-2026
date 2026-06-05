@@ -1407,6 +1407,80 @@
   }
   .render-discard-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
 
+  /* ───── AUTO-EDIT per-graphic results (change just one) ───── */
+  .ae-results {
+    margin-top: 10px;
+    padding: 10px 10px 6px;
+    background: rgba(20, 20, 24, 0.55);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    animation: receiptIn 0.55s var(--spring) backwards;
+    transform-origin: left center;
+  }
+  .ae-results-head {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin: 0 2px 8px;
+    line-height: 1.4;
+  }
+  .ae-results-head b { color: var(--text); font-weight: 600; }
+  .ae-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 6px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+  .ae-row:first-of-type { border-top: none; }
+  .ae-row-num {
+    width: 20px; height: 20px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: var(--text-dim);
+    background: rgba(255,255,255,0.05); border-radius: 6px;
+  }
+  .ae-row-label {
+    flex: 1; min-width: 0;
+    font-size: 12px; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ae-row-status { font-size: 10.5px; color: var(--text-dim); flex: none; }
+  .ae-row-status.ok  { color: #7bbf86; }
+  .ae-row-status.err { color: #e0735f; }
+  .ae-change-btn {
+    padding: 5px 10px; flex: none;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    font-family: var(--font-ui); font-size: 11px; cursor: pointer;
+    transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+  }
+  .ae-change-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+  .ae-change-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ae-edit {
+    display: none;
+    gap: 6px;
+    padding: 0 6px 9px 34px;
+  }
+  .ae-edit.open { display: flex; }
+  .ae-edit input {
+    flex: 1; min-width: 0;
+    padding: 7px 9px; font-size: 12px;
+    background: rgba(0,0,0,0.25); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-family: var(--font-ui); outline: none;
+  }
+  .ae-edit input:focus { border-color: var(--accent); }
+  .ae-edit-apply {
+    padding: 7px 12px; flex: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border: none; border-radius: var(--radius-sm); color: #fff;
+    font-family: var(--font-ui); font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: filter 0.2s var(--ease);
+  }
+  .ae-edit-apply:hover { filter: brightness(1.08); }
+  .ae-edit-apply:disabled { opacity: 0.55; cursor: not-allowed; }
+
   /* ───── COMPOSER ───── */
   .composer {
     flex-shrink: 0;
@@ -9714,12 +9788,153 @@ async function runAutoEditV2(opts) {
         summary: 'Auto-Edit — ' + _aeN + ' animation' + (_aeN === 1 ? '' : 's'),
       });
     } catch {}
+    // Per-graphic "Change" list — join the bridge results (which carry the plan
+    // idx) with the placement result (which carries the track each graphic
+    // landed on) so the user can revise any single graphic and swap it in place.
+    try {
+      const placedByIndex = {};
+      (applyRes.applied || []).forEach(p => { if (p && typeof p.index === 'number') placedByIndex[p.index] = p; });
+      const aeRecords = applied.map((a, k) => {
+        const placed = placedByIndex[k] || null;
+        const tlSec = (typeof a.timelineSec === 'number') ? a.timelineSec : a.atSec;
+        return {
+          reqId,
+          idx: (typeof a.idx === 'number') ? a.idx : k,
+          file: a.file,
+          label: a.label || a.type || ('Graphic ' + (k + 1)),
+          type: a.type || '',
+          timelineSec: tlSec,
+          durationSec: a.durationSec,
+          track: placed ? placed.track : null,
+          placedAtSec: placed ? placed.atSec : tlSec,
+        };
+      });
+      renderAeResultsCard(aeRecords, reqId);
+    } catch (e) { cclog && cclog('warn', 'ae results card failed: ' + (e && e.message)); }
   } catch (e) {
     if (e && e.name !== 'AbortError') progressUI.fail('Auto-Edit failed: ' + (e.message || e));
   } finally {
     if (btn) { btn.disabled = false; btn.classList.remove('busy'); }
     if (activeAutoedit && activeAutoedit.reqId === reqId) activeAutoedit = null;
     updateEscHint && updateEscHint();
+  }
+}
+
+// Render the per-graphic results card with a "Change" control on each graphic.
+// `records` = [{ reqId, idx, file, label, type, timelineSec, durationSec, track, placedAtSec }].
+function renderAeResultsCard(records, reqId) {
+  if (!records || !records.length) return;
+  const card = document.createElement('div');
+  card.className = 'ae-results';
+  let rowsHtml = '';
+  records.forEach((rec, i) => {
+    rowsHtml +=
+        '<div class="ae-row" data-i="' + i + '">'
+      +   '<span class="ae-row-num">' + (i + 1) + '</span>'
+      +   '<span class="ae-row-label">' + escapeHTML(rec.label || ('Graphic ' + (i + 1))) + '</span>'
+      +   '<span class="ae-row-status" data-role="status"></span>'
+      +   '<button class="ae-change-btn" type="button" data-role="change">Change</button>'
+      + '</div>'
+      + '<div class="ae-edit" data-i="' + i + '">'
+      +   '<input type="text" placeholder="What to change? e.g. different background, bigger text, move to top" />'
+      +   '<button class="ae-edit-apply" type="button">Apply</button>'
+      + '</div>';
+  });
+  card.innerHTML =
+      '<div class="ae-results-head">Made <b>' + records.length + '</b> motion graphic'
+        + (records.length === 1 ? '' : 's')
+        + ' · hit <b>Change</b> on any one to tweak just that graphic</div>'
+    + rowsHtml;
+  (getActiveLogContent() || log).appendChild(card);
+
+  records.forEach((rec, i) => {
+    const rowEl  = card.querySelector('.ae-row[data-i="' + i + '"]');
+    const editEl = card.querySelector('.ae-edit[data-i="' + i + '"]');
+    if (!rowEl || !editEl) return;
+    const changeBtn = rowEl.querySelector('[data-role="change"]');
+    const statusEl  = rowEl.querySelector('[data-role="status"]');
+    const input     = editEl.querySelector('input');
+    const applyBtn  = editEl.querySelector('.ae-edit-apply');
+    changeBtn.addEventListener('click', () => {
+      const open = editEl.classList.toggle('open');
+      if (open) setTimeout(() => input.focus(), 0);
+    });
+    const submit = () => {
+      const change = (input.value || '').trim();
+      if (!change) { input.focus(); return; }
+      applyAeChange(rec, change, { rowEl, editEl, statusEl, changeBtn, input, applyBtn });
+    };
+    applyBtn.addEventListener('click', submit);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submit(); }
+      else if (e.key === 'Escape') { editEl.classList.remove('open'); }
+    });
+  });
+}
+
+// Re-render ONE Auto-Edit graphic with the user's change, then swap it on the
+// timeline in place (ccAutoEditReplace) — or, if we don't know its track, drop
+// the new version in as a fresh overlay (ccAutoEditApply).
+async function applyAeChange(rec, change, els) {
+  const { statusEl, changeBtn, input, applyBtn, editEl } = els;
+  const setBusy = (b) => { changeBtn.disabled = b; applyBtn.disabled = b; input.disabled = b; };
+  setBusy(true);
+  statusEl.className = 'ae-row-status';
+  statusEl.textContent = 'Re-rendering…';
+  try {
+    const resp = await fetch(BRIDGE + '/autoedit/rerender', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reqId: rec.reqId, idx: rec.idx, change }),
+    });
+    let data = {};
+    try { data = await resp.json(); } catch {}
+    if (!resp.ok || !data.ok || !data.file) {
+      statusEl.className = 'ae-row-status err';
+      statusEl.textContent = '✗ ' + (data.error || ('bridge ' + resp.status));
+      setBusy(false);
+      return;
+    }
+
+    statusEl.textContent = 'Swapping on timeline…';
+    const newFile = data.file;
+    const newDur = data.durationSec || rec.durationSec;
+    let swapRes = {};
+    if (rec.track) {
+      const payload = { file: newFile, track: rec.track, atSec: rec.placedAtSec, oldFile: rec.file, durationSec: newDur };
+      const esc = JSON.stringify(payload).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const raw = await evalES('ccAutoEditReplace("' + esc + '")');
+      swapRes = JSON.parse(raw || '{}');
+    } else {
+      // Unknown track (insert was skipped originally) — place as a fresh overlay.
+      const item = { file: newFile, atSec: rec.timelineSec, timelineSec: rec.timelineSec, type: rec.type, label: rec.label, durationSec: newDur };
+      const esc = JSON.stringify({ items: [item] }).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const raw = await evalES('ccAutoEditApply("' + esc + '")');
+      const r = JSON.parse(raw || '{}');
+      swapRes = r.ok ? { ok: true } : r;
+      if (r.ok && r.applied && r.applied[0] && r.applied[0].track) {
+        rec.track = r.applied[0].track;
+        rec.placedAtSec = r.applied[0].atSec;
+      }
+    }
+    if (!swapRes.ok) {
+      statusEl.className = 'ae-row-status err';
+      statusEl.textContent = '✗ swap: ' + (swapRes.error || 'failed');
+      setBusy(false);
+      return;
+    }
+
+    rec.file = newFile;
+    rec.durationSec = newDur;
+    statusEl.className = 'ae-row-status ok';
+    statusEl.textContent = '✓ changed';
+    editEl.classList.remove('open');
+    input.value = '';
+    changeBtn.textContent = 'Change again';
+    setBusy(false);
+  } catch (e) {
+    statusEl.className = 'ae-row-status err';
+    statusEl.textContent = '✗ ' + ((e && e.message) || e);
+    setBusy(false);
   }
 }
 

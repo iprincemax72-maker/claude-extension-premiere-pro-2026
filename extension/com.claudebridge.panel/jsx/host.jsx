@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "5.4";
+var HOST_JSX_VERSION = "5.5";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -1354,6 +1354,127 @@ function ccAutoEditApply(payloadJson) {
             ok: true,
             applied: applied,
             skipped: skipped,
+            debug: debug,
+        });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e), debug: debug });
+    }
+}
+
+// AUTO EDIT — swap ONE already-placed graphic for a freshly re-rendered file,
+// in place, without disturbing any other clip. The panel knows which track the
+// old graphic sits on ("V20") and the timeline second it was placed at (from
+// the original ccAutoEditApply result). We import the new file, LIFT the old
+// clip (QE remove, no ripple, leaves a gap), then overwriteClip the new file at
+// the same time on the same track. Overwrite alone would leave a tail if the
+// new clip is shorter, so the explicit lift is what makes it a clean swap.
+// Input JSON: { file, track:"V20", atSec, oldFile?, durationSec? }
+function ccAutoEditReplace(payloadJson) {
+    var debug = { steps: [] };
+    function note(s) { debug.steps.push(String(s)); }
+    try {
+        if (typeof app === "undefined" || !app || !app.project) return JSON.stringify({ ok: false, error: "no project", debug: debug });
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) return JSON.stringify({ ok: false, error: "no active sequence", debug: debug });
+
+        var payload;
+        try { payload = JSON.parse(payloadJson); } catch (e) { return JSON.stringify({ ok: false, error: "bad json", debug: debug }); }
+        if (!payload || !payload.file) return JSON.stringify({ ok: false, error: "no file", debug: debug });
+        if (typeof payload.atSec !== "number") return JSON.stringify({ ok: false, error: "no atSec", debug: debug });
+
+        // Parse the 1-based "V20" label to a 0-based track index.
+        var trackIdx = -1;
+        if (typeof payload.track === "string" && payload.track.charAt(0) === "V") {
+            trackIdx = parseInt(payload.track.substring(1), 10) - 1;
+        } else if (typeof payload.track === "number") {
+            trackIdx = payload.track;
+        }
+        if (!(trackIdx >= 0)) return JSON.stringify({ ok: false, error: "bad track", debug: debug });
+
+        // FPS for frame snapping + match tolerance.
+        var fps = 30;
+        try {
+            var settings = seq.getSettings && seq.getSettings();
+            if (settings && settings.videoFrameRate && settings.videoFrameRate.ticks) {
+                fps = 254016000000 / Number(settings.videoFrameRate.ticks);
+            }
+        } catch (e) {}
+        if (!fps || fps < 1 || fps > 240) fps = 30;
+        var targetSec = Math.floor(Number(payload.atSec) * fps) / fps;
+        var tol = (1 / fps) * 0.9;
+        note("replace track=V" + (trackIdx + 1) + " at " + targetSec.toFixed(3) + "s tol=" + tol.toFixed(4));
+
+        var vTracks = _ccSafe(function () { return seq.videoTracks; });
+        var nTracks = vTracks ? _ccSafe(function () { return vTracks.numTracks; }) : 0;
+        if (typeof nTracks !== "number" || trackIdx >= nTracks) return JSON.stringify({ ok: false, error: "track gone", debug: debug });
+
+        // Save the playhead so we can restore it after.
+        var origPlayhead = null;
+        try { origPlayhead = seq.getPlayerPosition && seq.getPlayerPosition(); } catch (e) {}
+
+        // 1. Import the new file FIRST — a failed import must not leave a hole.
+        var importedOk = _ccSafe(function () {
+            return app.project.importFiles([payload.file], true, app.project.rootItem, false);
+        });
+        if (!importedOk) return JSON.stringify({ ok: false, error: "import failed", debug: debug });
+        var newItem = _ccFindItemByPath(app.project.rootItem, payload.file, 0);
+        if (!newItem) return JSON.stringify({ ok: false, error: "item not found after import", debug: debug });
+        _ccSafe(function () { if (typeof newItem.setColorLabel === "function") newItem.setColorLabel(6); });
+
+        // 2. LIFT the old clip on that track at that second (QE remove(false,...)
+        //    = no ripple, leaves a gap; ripple would shift any later graphic on
+        //    the same track). Best-effort — if not found we still overwrite.
+        var removed = false;
+        _ccSafe(function () { if (typeof app.enableQE === "function") app.enableQE(); });
+        var qeSeq = _ccSafe(function () {
+            return (typeof qe !== "undefined" && qe && qe.project && qe.project.getActiveSequence) ? qe.project.getActiveSequence() : null;
+        });
+        if (qeSeq) {
+            var qTrack = _ccSafe(function () { return qeSeq.getVideoTrackAt(trackIdx); });
+            if (qTrack) {
+                var qn = _ccSafe(function () { return qTrack.numItems; }) || 0;
+                for (var j = 0; j < qn; j++) {
+                    var qItem = _ccSafe((function (jj) { return function () { return qTrack.getItemAt(jj); }; })(j));
+                    if (!qItem) continue;
+                    var s = _ccSafe(function () { return qItem.start && qItem.start.seconds; });
+                    if (typeof s !== "number") continue;
+                    if (Math.abs(s - targetSec) < tol) {
+                        var okRem = _ccSafe(function () { qItem.remove(false, false); return true; });
+                        if (okRem) { removed = true; note("  lifted old clip at " + s.toFixed(3)); }
+                        else note("  matched old clip but remove() refused");
+                        break;
+                    }
+                }
+                if (!removed) note("  no old clip matched on V" + (trackIdx + 1) + " at " + targetSec.toFixed(3));
+            }
+        }
+
+        // 3. Overwrite the new file at the same time on the same DOM track.
+        vTracks = _ccSafe(function () { return seq.videoTracks; });
+        var track = _ccSafe(function () { return vTracks[trackIdx]; });
+        if (!track) return JSON.stringify({ ok: false, error: "track unavailable", removed: removed, debug: debug });
+        var ticksStr = String(Math.floor(targetSec * 254016000000));
+        _ccSafe(function () { if (seq.setPlayerPosition) seq.setPlayerPosition(ticksStr); });
+        var time = _ccSafe(function () { return seq.getPlayerPosition && seq.getPlayerPosition(); });
+        if (!time) return JSON.stringify({ ok: false, error: "could not resolve time", removed: removed, debug: debug });
+        var placed = false;
+        try {
+            if (track.overwriteClip) { track.overwriteClip(newItem, time); placed = true; }
+            else if (track.insertClip) { track.insertClip(newItem, time); placed = true; }
+        } catch (placeErr) {
+            return JSON.stringify({ ok: false, error: "place error: " + String(placeErr), removed: removed, debug: debug });
+        }
+        if (!placed) return JSON.stringify({ ok: false, error: "no overwriteClip method", removed: removed, debug: debug });
+        note("  placed new clip at " + targetSec.toFixed(3) + " on V" + (trackIdx + 1));
+
+        // Restore the playhead.
+        if (origPlayhead) {
+            try { seq.setPlayerPosition && seq.setPlayerPosition(String(origPlayhead.ticks)); } catch (e) {}
+        }
+
+        return JSON.stringify({
+            ok: true, swapped: true, removed: removed,
+            track: "V" + (trackIdx + 1), atSec: targetSec, file: payload.file,
             debug: debug,
         });
     } catch (e) {
