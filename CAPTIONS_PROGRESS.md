@@ -26,11 +26,20 @@ animated, transparent captions → drop each as its own layer on the timeline.
 - Tests extract the real helpers from bridge.js (12 pass). No regressions to
   login/auto-edit/chat/renders (verified). ~24 commits, all pushed.
 
+### Cross-platform transcription (Jun 5, later)
+- [x] Windows / no-parakeet WORD-LEVEL fallback via whisper.cpp (`whisper-cli -ojf`):
+      resolveWhisper()/resolveWhisperModel() + runWhisperWords() normalize whisper's
+      sub-word tokens (ms offsets, leading-space boundaries) and REUSE tokensToWords.
+      transcribeWords() dispatches parakeet (mac) -> whisper (fallback). End-to-end
+      verified on real whisper-cli: accurate word timestamps, quote artifacts stripped.
+      NOTE: the `-nt` flag must NOT be passed (it zeroes token offsets).
+
 ### Deferred / future
+- Windows INSTALLER must ship whisper-cli + a ggml model (e.g. ggml-base.en.bin) and/or
+  set CLAUDE_BRIDGE_WHISPER_MODEL, so runWhisperWords has a model on Windows. (code ready)
 - AI-context emoji (current is a curated dictionary, ~90 words).
 - Native editable Premiere TEXT (current = separate styled video clips per line;
   Premiere ExtendScript can't reliably author styled animated text).
-- Windows whisper word-level path (parakeet is macOS-only).
 - Live in-Premiere verification on a real clip (needs the user).
 
 ## Done

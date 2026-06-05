@@ -531,6 +531,97 @@ function runParakeetWords(wavPath, audioDuration, onProc) {
   });
 }
 
+// ── Whisper.cpp word-level fallback (Windows, or any box without parakeet) ───
+// whisper-cli -ojf emits per-token timestamps (offsets in ms) with leading-space
+// word boundaries — the SAME sub-word shape as parakeet, so we reuse tokensToWords.
+function resolveWhisper() {
+  const isWin = process.platform === 'win32';
+  const names = isWin ? ['whisper-cli.exe', 'main.exe', 'whisper.exe'] : ['whisper-cli'];
+  const dirs = [
+    process.env.CLAUDE_BRIDGE_WHISPER_DIR,
+    path.join(WORK_DIR, 'whisper'),
+    '/opt/homebrew/bin', '/usr/local/bin',
+    path.join(process.env.HOME || process.env.USERPROFILE || '', '.local', 'bin'),
+  ].filter(Boolean);
+  for (const d of dirs) for (const n of names) {
+    try { const p = path.join(d, n); if (fs.existsSync(p)) return p; } catch {}
+  }
+  return isWin ? 'whisper-cli.exe' : 'whisper-cli';   // last resort: PATH
+}
+function resolveWhisperModel() {
+  if (process.env.CLAUDE_BRIDGE_WHISPER_MODEL && fs.existsSync(process.env.CLAUDE_BRIDGE_WHISPER_MODEL)) {
+    return process.env.CLAUDE_BRIDGE_WHISPER_MODEL;
+  }
+  const dirs = [
+    path.join(WORK_DIR, 'whisper'), path.join(WORK_DIR, 'models'),
+    path.join(process.env.HOME || '', '.cache', 'whisper'),
+    '/usr/local/share/whisper-cpp', '/opt/homebrew/share/whisper-cpp',
+  ];
+  try {
+    const cellar = '/opt/homebrew/Cellar/whisper-cpp';
+    if (fs.existsSync(cellar)) for (const v of fs.readdirSync(cellar)) dirs.push(path.join(cellar, v, 'share', 'whisper-cpp'));
+  } catch {}
+  for (const d of dirs) {
+    try {
+      if (!fs.existsSync(d)) continue;
+      const files = fs.readdirSync(d).filter(f => /^ggml-.*\.bin$/.test(f));
+      const pick = files.find(f => /base\.en/.test(f)) || files.find(f => /base/.test(f)) || files[0];
+      if (pick) return path.join(d, pick);
+    } catch {}
+  }
+  return null;
+}
+function runWhisperWords(wavPath, audioDuration, onProc) {
+  return new Promise((resolve, reject) => {
+    const model = resolveWhisperModel();
+    const cleanupAll = (extra) => { try { fs.unlinkSync(wavPath); } catch {} if (extra) { try { fs.unlinkSync(extra); } catch {} } };
+    if (!model) { cleanupAll(); reject(new Error('whisper model not found (set CLAUDE_BRIDGE_WHISPER_MODEL to a ggml-*.bin)')); return; }
+    const bin = resolveWhisper();
+    const outBase = path.join(path.dirname(wavPath), path.basename(wavPath, path.extname(wavPath)) + '_w');
+    const jsonOut = outBase + '.json';
+    try { fs.unlinkSync(jsonOut); } catch {}
+    const args = ['-m', model, '-ojf', '-of', outBase, '-ml', '0', wavPath];
+    const proc = spawn(bin, args, { env: process.env });
+    if (typeof onProc === 'function') onProc(proc);
+    let stderr = '';
+    proc.stderr.on('data', d => stderr += d.toString().slice(-2000));
+    proc.stdout.on('data', () => {});
+    const cap = Math.min(15 * 60 * 1000, Math.max(120000, audioDuration * 1500 + 60000));
+    const killer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} cleanupAll(jsonOut); reject(new Error('whisper timeout after ' + Math.round(cap / 1000) + 's')); }, cap);
+    proc.on('error', e => { clearTimeout(killer); cleanupAll(jsonOut); reject(e); });
+    proc.on('close', code => {
+      clearTimeout(killer);
+      if (!fs.existsSync(jsonOut)) { cleanupAll(); reject(new Error('whisper exit ' + code + ': ' + stderr.slice(-300))); return; }
+      try {
+        const j = JSON.parse(fs.readFileSync(jsonOut, 'utf8'));
+        // normalize whisper tokens -> parakeet-style sentences (ms->sec, drop special tokens)
+        const sentences = (j.transcription || []).map(seg => ({
+          tokens: (seg.tokens || [])
+            .filter(t => t && t.text && !/^\[_/.test(t.text))
+            .map(t => ({ text: t.text, start: ((t.offsets && t.offsets.from) || 0) / 1000, end: ((t.offsets && t.offsets.to) || 0) / 1000 })),
+        }));
+        const words = tokensToWords(sentences).map(w => ({ ...w, text: w.text.replace(/^["'`]+|["'`]+$/g, '') })).filter(w => w.text);
+        cleanupAll(jsonOut);
+        resolve({ words, sentences: [] });
+      } catch (e) {
+        cleanupAll(jsonOut);
+        reject(new Error('whisper json parse: ' + e.message));
+      }
+    });
+  });
+}
+
+// Word-level transcription dispatcher: parakeet-mlx if present (best, macOS),
+// else whisper.cpp (Windows / fallback). Both return { words:[{text,startMs,endMs}] }.
+async function transcribeWords(wavPath, audioDuration, onProc) {
+  const pk = resolveParakeet();
+  const pkInstalled = pk && (pk.includes('/') ? fs.existsSync(pk) : false);
+  if (pkInstalled) return runParakeetWords(wavPath, audioDuration, onProc);
+  if (resolveWhisperModel()) return runWhisperWords(wavPath, audioDuration, onProc);
+  try { fs.unlinkSync(wavPath); } catch {}
+  throw new Error('No word-level transcriber found. Install parakeet-mlx (macOS: `uv tool install parakeet-mlx`) or whisper-cli + a ggml model (Windows).');
+}
+
 // Make sure the render project has the canonical Captions.tsx. The installed
 // remotion-intro is NOT touched by auto-update (which only syncs 4 top-level
 // files), so we copy the component from the same source the updater uses:
@@ -4433,7 +4524,7 @@ const server = http.createServer((req, res) => {
 
         if (aborted) return;
         broadcastProgress('Transcribing word-by-word', 22, reqId);
-        const { words } = await runParakeetWords(wavPath, totalDur, onProc);
+        const { words } = await transcribeWords(wavPath, totalDur, onProc);
         if (aborted) return;
         log(`parakeet: ${words.length} words over ${totalDur.toFixed(1)}s`);
         if (!words.length) return fail('No speech found to caption in the selected clip.');
