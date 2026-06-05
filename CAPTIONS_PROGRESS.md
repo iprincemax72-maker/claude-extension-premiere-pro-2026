@@ -43,6 +43,19 @@ whisper binary+model in install.ps1 — code ready) or the user (live in-Premier
       verified on real whisper-cli: accurate word timestamps, quote artifacts stripped.
       NOTE: the `-nt` flag must NOT be passed (it zeroes token offsets).
 
+### Editability + native mode (Jun 5)
+- [x] TRANSCRIPT EDIT step: Generate -> POST /captions/transcribe -> editable
+      'Review your transcript' pane (fix typos/reword per line before it's made).
+      Edited lines re-tokenize within their time span; unchanged lines keep timings.
+- [x] NATIVE editable-captions mode: Output toggle (Animated style | Editable text).
+      Native -> writeSrt() (timeline-absolute) -> host ccImportCaptions() imports the
+      SRT + best-effort createCaptionTrack (fallback: bin, drag onto timeline). Real
+      editable Premiere captions. Animated stays the per-line Remotion clip path.
+- [x] POSITION editor: draggable frame ('where it lands') + X/Y sliders + zone snaps.
+- NOTE for the user to verify in Premiere: does ccImportCaptions auto-create a caption
+      track, or does the SRT just land in the bin to drag on? (createCaptionTrack args
+      vary by Premiere build — handled best-effort with a clear fallback message.)
+
 ### Deferred / future
 - Windows INSTALLER must ship whisper-cli + a ggml model (e.g. ggml-base.en.bin) and/or
   set CLAUDE_BRIDGE_WHISPER_MODEL, so runWhisperWords has a model on Windows. (code ready)
