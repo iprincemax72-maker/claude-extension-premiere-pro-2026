@@ -23,6 +23,16 @@
                     <CEFCommandLine>
                         <Parameter>--enable-nodejs</Parameter>
                         <Parameter>--mixed-context</Parameter>
+                        <!-- Force GPU acceleration for the embedded Chromium. By default CEP
+                             often software-renders the panel inside Premiere (smooth in a real
+                             browser, laggy here). These turn the GPU on so the panel composites
+                             on hardware. Requires a FULL Premiere restart to take effect. -->
+                        <Parameter>--ignore-gpu-blocklist</Parameter>
+                        <Parameter>--ignore-gpu-blacklist</Parameter>
+                        <Parameter>--enable-gpu-rasterization</Parameter>
+                        <Parameter>--enable-accelerated-2d-canvas</Parameter>
+                        <Parameter>--enable-zero-copy</Parameter>
+                        <Parameter>--disable-features=CalculateNativeWinOcclusion</Parameter>
                     </CEFCommandLine>
                 </Resources>
                 <Lifecycle>
