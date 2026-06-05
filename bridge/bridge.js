@@ -2013,19 +2013,24 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
   const cacheDir = path.join(OUTPUT_DIR, 'cache');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
 
-  // ── Face-safe zone (talking-head) ────────────────────────────────────────
+  // ── Lower-third safe zone (talking-head) ─────────────────────────────────
   // Auto-Edit footage is talking-head: the speaker's FACE is in the UPPER part
-  // of the frame. Rather than hope Claude reads the frames and avoids the face,
-  // we hard-constrain every overlay to a bottom band. `faceSafeTopFrac` is the
-  // highest a graphic may reach (fraction of height); everything above stays
-  // transparent. Vertical clips give the face more room than wide ones.
+  // of the frame. We hard-constrain every overlay to a FLOATING lower-third —
+  // below the face (so it never covers it) but NOT jammed against the bottom
+  // edge (a proper lower-third floats with margin below it). Three lines:
+  //   faceSafeTopPx  = top bound — content must stay below this (off the face)
+  //   safeBotPx      = bottom bound — content must stay above this (margin below)
+  //   targetCenterPx = where the block should sit (vertically centred here)
   const _isVertical = vidH > vidW * 1.1;
   const _isSquare = !_isVertical && Math.abs(vidW - vidH) < vidW * 0.12;
   const voiceoverOnly = !!(genOpts && genOpts.voiceoverOnly);
-  const faceSafeTopFrac = voiceoverOnly ? 0 : (_isVertical ? 0.60 : _isSquare ? 0.66 : 0.68);
+  const faceSafeTopFrac = voiceoverOnly ? 0 : (_isVertical ? 0.60 : _isSquare ? 0.64 : 0.66);
+  const bottomMarginFrac = _isVertical ? 0.11 : _isSquare ? 0.09 : 0.08;  // clear space BELOW the block
+  const targetCenterFrac = _isVertical ? 0.77 : _isSquare ? 0.79 : 0.81;  // where the lower-third sits
   const faceSafeTopPx = Math.round(vidH * faceSafeTopFrac);
+  const safeBotPx = Math.round(vidH * (1 - bottomMarginFrac));
+  const targetCenterPx = Math.round(vidH * targetCenterFrac);
   const safeMarginX = Math.round(vidW * 0.05);
-  const safeBottomPad = Math.round(vidH * 0.04);
   // Post-render guard: mean alpha (0-255) allowed in the face zone before we
   // call it an intrusion and retry. A compliant graphic reads exactly 0 up
   // there (validated), so this is set low to catch even partial intrusions
@@ -2060,10 +2065,9 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
         + momentTypeToTrendPack(m.type, task.idx) + '). Across the video the graphics should feel VARIED — '
         + 'do not default to the same generic caption palette/type/motion every time.';
     }
-    // PLACEMENT: full-screen for voiceover-only clips, else a bottom-band
-    // lower-third with a HARD pixel box so it can never reach the face. The box
-    // is geometric (computed from the frame), not a judgement call — Claude just
-    // has to keep every visible pixel inside it.
+    // PLACEMENT: full-screen for voiceover-only clips, else a FLOATING
+    // lower-third — below the face but NOT jammed to the bottom edge. Geometric
+    // pixel box + an explicit target centre, so Claude doesn't guess.
     let placement;
     if (opts && opts.voiceoverOnly) {
       placement =
@@ -2075,24 +2079,28 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
       const faceHint = (opts && Array.isArray(opts.faceFrames) && opts.faceFrames.length)
         ? ('\n- Optional refinement — these are frames from the start, middle and end of\n' +
            '  the clip. You may Read them to see which SIDE the speaker leans and bias the\n' +
-           '  graphic toward the emptier side, but STILL never go above the y line:\n' +
+           '  graphic toward the emptier side, but STILL stay inside the y box:\n' +
            opts.faceFrames.map(f => '    ' + (f.label || '') + ': ' + f.path).join('\n'))
         : '';
       placement =
         '- HARD PLACEMENT RULE — this is TALKING-HEAD footage; the speaker\'s FACE is in\n' +
-        '  the UPPER part of the frame. Your graphic is a LOWER-THIRD that lives ONLY in\n' +
-        '  the bottom band. EVERY visible pixel MUST fit inside this box:\n' +
+        '  the UPPER part of the frame. Build a FLOATING LOWER-THIRD. EVERY visible pixel\n' +
+        '  MUST fit inside this box:\n' +
         '      x: ' + safeMarginX + 'px  to  ' + (vidW - safeMarginX) + 'px\n' +
-        '      y: ' + faceSafeTopPx + 'px  to  ' + (vidH - safeBottomPad) + 'px      (the frame is ' + vidW + 'x' + vidH + 'px)\n' +
-        '  EVERYTHING above y=' + faceSafeTopPx + 'px MUST be 100% transparent — no text,\n' +
-        '  no shapes, no border, no scrim, nothing. The face is up there.\n' +
-        '- Do NOT draw a full-frame card, a full-height panel, a box or border that spans\n' +
-        '  the whole frame, or any centred card. Keep it compact and BOTTOM-ANCHORED:\n' +
-        '  anchor content to the bottom edge and only grow upward within the band.' +
+        '      y: ' + faceSafeTopPx + 'px  (top) to  ' + safeBotPx + 'px  (bottom)   (frame is ' + vidW + 'x' + vidH + 'px)\n' +
+        '  Vertically CENTRE the block around y=' + targetCenterPx + 'px (~' + Math.round(targetCenterFrac * 100) + '% down).\n' +
+        '- TWO margins are mandatory:\n' +
+        '    • Everything ABOVE y=' + faceSafeTopPx + 'px stays 100% transparent (the face).\n' +
+        '    • Leave clear empty space BELOW the block — it must NOT touch the bottom edge;\n' +
+        '      keep all content above y=' + safeBotPx + 'px (~' + Math.round(bottomMarginFrac * 100) + '% of the height is empty margin at the very bottom).\n' +
+        '  So it sits in the LOWER THIRD, floating, not glued to the top OR the bottom.\n' +
+        '- Do NOT draw a full-frame card, a full-height panel, or a border/scrim that spans\n' +
+        '  the whole frame. Keep it compact.' +
         faceHint;
       if (task._zoneRetry) {
         placement += '\n- ⚠ YOUR PREVIOUS ATTEMPT BROKE THIS RULE and covered the face. This time keep\n' +
-          '  ABSOLUTELY EVERYTHING below y=' + faceSafeTopPx + 'px — make it a slim bottom strip.';
+          '  ABSOLUTELY EVERYTHING below y=' + faceSafeTopPx + 'px (but still centred around\n' +
+          '  y=' + targetCenterPx + 'px — a floating lower-third, NOT a strip at the very bottom).';
       }
     }
     return [
