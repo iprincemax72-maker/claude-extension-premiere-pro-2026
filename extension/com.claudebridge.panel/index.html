@@ -2562,6 +2562,23 @@
   .cap-zone-hint { font-size: 11px; color: var(--text-dim); line-height: 1.45; }
   .cap-zone-hint b { color: var(--text); }
 
+  /* position editor — draggable frame (shows where text lands) + X/Y sliders + zone snaps */
+  .cap-posedit { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: stretch; margin: 2px 0 4px; }
+  .cap-posframe { position: relative; width: 92px; height: 150px; border-radius: 11px; border: 1px solid rgba(255,255,255,.09); overflow: hidden; cursor: crosshair; flex: 0 0 auto;
+    background: radial-gradient(60% 50% at 28% 22%, rgba(90,140,200,.42), transparent 70%), radial-gradient(55% 60% at 78% 75%, rgba(217,119,87,.36), transparent 72%), linear-gradient(145deg,#2b2f3a,#1b1820); }
+  .cap-posframe-badge { position: absolute; top: 6px; left: 7px; z-index: 2; font-size: 8px; letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,.5); pointer-events: none; }
+  .cap-posframe-cap { position: absolute; z-index: 2; transform: translate(-50%,-50%); font-size: 9px; font-weight: 800; color: #fff; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,.85); }
+  .cap-posframe-handle { position: absolute; z-index: 3; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; background: rgba(217,119,87,.32); transform: translate(-50%,-50%); box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 2px 7px rgba(0,0,0,.5); pointer-events: none; }
+  .cap-posctrl { display: flex; flex-direction: column; gap: 11px; min-width: 0; justify-content: center; }
+  .cap-posctrl .cap-opt-label { flex: 0 0 14px; }
+  .cap-posctrl .cap-slider-wrap { flex: 1; min-width: 0; }
+  .cap-posctrl .cap-slider { flex: 1; width: auto; }
+  .cap-posctrl .cap-slider-val { flex: 0 0 38px; }
+  .cap-poszones { display: flex; align-items: center; gap: 10px; }
+  .cap-poszones .cap-zone-lbl { font-size: 11px; color: var(--text-dim); flex: 0 0 auto; }
+  .cap-poszones .cap-zone-grid { grid-template-columns: repeat(3, 19px); grid-template-rows: repeat(3, 19px); gap: 3px; padding: 5px; }
+  .cap-poszones .cap-zone-grid button { width: 19px; height: 19px; border-radius: 5px; }
+
   .cap-select { font: inherit; font-size: 12px; color: var(--text); background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; cursor: pointer; min-width: 150px; }
   .cap-select:focus { outline: none; border-color: var(--accent); }
 
@@ -3626,20 +3643,31 @@
         </div>
       </div>
 
-      <div class="cap-sec-label">Position</div>
-      <div class="cap-zone-row">
-        <div class="cap-zone-grid" id="capZoneGrid">
-          <button type="button" data-zx="0.14" data-zy="0.12"></button>
-          <button type="button" data-zx="0.5"  data-zy="0.12"></button>
-          <button type="button" data-zx="0.86" data-zy="0.12"></button>
-          <button type="button" data-zx="0.14" data-zy="0.5"></button>
-          <button type="button" data-zx="0.5"  data-zy="0.5"></button>
-          <button type="button" data-zx="0.86" data-zy="0.5"></button>
-          <button type="button" data-zx="0.14" data-zy="0.86"></button>
-          <button type="button" data-zx="0.5"  data-zy="0.86"></button>
-          <button type="button" data-zx="0.86" data-zy="0.86"></button>
+      <div class="cap-sec-label">Position <span style="text-transform:none;letter-spacing:0;color:var(--text-dim);font-weight:500">— drag the dot, or use X / Y</span></div>
+      <div class="cap-posedit">
+        <div class="cap-posframe" id="capPosFrame" title="Drag to place the captions">
+          <span class="cap-posframe-badge">where it lands</span>
+          <div class="cap-posframe-cap" id="capPosCap">caption</div>
+          <div class="cap-posframe-handle" id="capPosHandle"></div>
         </div>
-        <div class="cap-zone-hint">Click a zone to place the captions — or just <b>drag</b> the text in the preview for anywhere.</div>
+        <div class="cap-posctrl">
+          <div class="cap-opt-row"><span class="cap-opt-label">X</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capPosX" min="0" max="100" step="1" value="50"><span class="cap-slider-val" id="capPosXVal">50%</span></div></div>
+          <div class="cap-opt-row"><span class="cap-opt-label">Y</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capPosY" min="0" max="100" step="1" value="85"><span class="cap-slider-val" id="capPosYVal">85%</span></div></div>
+          <div class="cap-poszones">
+            <span class="cap-zone-lbl">Snap</span>
+            <div class="cap-zone-grid" id="capZoneGrid">
+              <button type="button" data-zx="0.14" data-zy="0.12"></button>
+              <button type="button" data-zx="0.5"  data-zy="0.12"></button>
+              <button type="button" data-zx="0.86" data-zy="0.12"></button>
+              <button type="button" data-zx="0.14" data-zy="0.5"></button>
+              <button type="button" data-zx="0.5"  data-zy="0.5"></button>
+              <button type="button" data-zx="0.86" data-zy="0.5"></button>
+              <button type="button" data-zx="0.14" data-zy="0.86"></button>
+              <button type="button" data-zx="0.5"  data-zy="0.86"></button>
+              <button type="button" data-zx="0.86" data-zy="0.86"></button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="cap-sec-label">Text</div>
@@ -8097,13 +8125,46 @@ function capSetColor(hex, fromHsv) {
   capSaveOpts();
   capPreview.curLine = -1;   // rebuild preview line with the new color
 }
-function capSyncZoneUI() {
-  const g = document.getElementById('capZoneGrid'); if (!g) return;
-  g.querySelectorAll('button').forEach(b => {
+// where the caption currently sits, as 0..1 frame coords (presets map to a point)
+function capPosDisplay() {
+  if (capState.position === 'custom') return { x: capState.customX, y: capState.customY };
+  if (capState.position === 'top') return { x: 0.5, y: 0.11 };
+  if (capState.position === 'middle') return { x: 0.5, y: 0.5 };
+  return { x: 0.5, y: 0.89 }; // bottom
+}
+// the single place position changes flow through (frame drag, X/Y sliders, zone snaps, preview drag)
+function capSetPosition(x, y) {
+  capState.customX = Math.max(0, Math.min(1, x));
+  capState.customY = Math.max(0, Math.min(1, y));
+  capState.position = 'custom';
+  capState._look = '';
+  captionsModal.querySelectorAll('#capLooks .cap-look').forEach(l => l.classList.remove('sel'));
+  capSyncPosUI();
+  capSaveOpts();
+  const capEl = document.getElementById('capCap'); if (capEl) capApplyPos(capEl);
+}
+// sync the position editor (frame handle + caption marker + X/Y sliders + zone snaps)
+function capSyncPosUI() {
+  const d = capPosDisplay();
+  const handle = document.getElementById('capPosHandle');
+  const cap = document.getElementById('capPosCap');
+  if (handle) { handle.style.left = (d.x * 100) + '%'; handle.style.top = (d.y * 100) + '%'; }
+  if (cap) {
+    cap.style.left = (d.x * 100) + '%'; cap.style.top = (d.y * 100) + '%';
+    cap.textContent = capState.uppercase ? 'CAPTION' : 'caption';
+    cap.style.color = capState.highlight || '#fff';
+  }
+  const sx = document.getElementById('capPosX'), sxv = document.getElementById('capPosXVal');
+  const sy = document.getElementById('capPosY'), syv = document.getElementById('capPosYVal');
+  if (sx) sx.value = String(Math.round(d.x * 100)); if (sxv) sxv.textContent = Math.round(d.x * 100) + '%';
+  if (sy) sy.value = String(Math.round(d.y * 100)); if (syv) syv.textContent = Math.round(d.y * 100) + '%';
+  const g = document.getElementById('capZoneGrid');
+  if (g) g.querySelectorAll('button').forEach(b => {
     const zx = +b.getAttribute('data-zx'), zy = +b.getAttribute('data-zy');
-    b.classList.toggle('sel', capState.position === 'custom' && Math.abs(zx - capState.customX) < 0.04 && Math.abs(zy - capState.customY) < 0.04);
+    b.classList.toggle('sel', capState.position === 'custom' && Math.abs(zx - d.x) < 0.04 && Math.abs(zy - d.y) < 0.04);
   });
 }
+function capSyncZoneUI() { capSyncPosUI(); }   // back-compat name
 
 // Quick looks — one click applies a whole designed preset.
 const CAP_LOOKS = {
@@ -8362,11 +8423,8 @@ function capStopPreview() { if (capPreview.raf) { cancelAnimationFrame(capPrevie
   const onMove = (ev) => {
     if (!dragging) return;
     const r = stage.getBoundingClientRect();
-    capState.customX = Math.max(0.08, Math.min(0.92, (ev.clientX - r.left) / r.width));
-    capState.customY = Math.max(0.08, Math.min(0.92, (ev.clientY - r.top) / r.height));
-    capState.position = 'custom';
-    capApplyPos(capEl);
-    capSyncOptsUI();
+    // route through capSetPosition so the position editor (frame, X/Y, zones) stays in sync
+    capSetPosition((ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height);
   };
   const onUp = () => {
     if (!dragging) return;
@@ -8427,16 +8485,26 @@ function capStopPreview() { if (capPreview.raf) { cancelAnimationFrame(capPrevie
     s.addEventListener('click', () => capSetColor(s.getAttribute('data-color'), false));
   });
 
-  // ── position zone grid ──
+  // ── position editor: zone snaps + draggable frame + X/Y sliders ──
   captionsModal.querySelectorAll('#capZoneGrid button').forEach(b => {
-    b.addEventListener('click', () => {
-      capState.position = 'custom';
-      capState.customX = +b.getAttribute('data-zx');
-      capState.customY = +b.getAttribute('data-zy');
-      capSyncOptsUI(); capSaveOpts();
-      const capEl = document.getElementById('capCap'); if (capEl) capApplyPos(capEl);
-    });
+    b.addEventListener('click', () => capSetPosition(+b.getAttribute('data-zx'), +b.getAttribute('data-zy')));
   });
+  const posFrame = document.getElementById('capPosFrame');
+  if (posFrame) {
+    let pdrag = false;
+    const pmove = (ev) => { const r = posFrame.getBoundingClientRect(); capSetPosition((ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height); };
+    posFrame.addEventListener('pointerdown', (ev) => {
+      pdrag = true; pmove(ev);
+      const mv = (e) => pdrag && pmove(e);
+      const up = () => { pdrag = false; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+      window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+      ev.preventDefault();
+    });
+  }
+  const px = document.getElementById('capPosX');
+  if (px) px.addEventListener('input', () => capSetPosition((parseInt(px.value, 10) || 0) / 100, capPosDisplay().y));
+  const py = document.getElementById('capPosY');
+  if (py) py.addEventListener('input', () => capSetPosition(capPosDisplay().x, (parseInt(py.value, 10) || 0) / 100));
 
   // ── weight + align + font family ──
   captionsModal.querySelectorAll('#capWeightSeg button').forEach(b => {
