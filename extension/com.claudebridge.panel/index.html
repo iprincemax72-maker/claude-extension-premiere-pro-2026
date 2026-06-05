@@ -2613,6 +2613,25 @@
   .cap-progress-bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 6px; transition: width .35s ease; }
   .cap-progress-text { margin-top: 9px; font-size: 12px; color: var(--text-dim); display: flex; align-items: center; justify-content: center; gap: 8px; }
 
+  /* transcript review/edit pane */
+  .cap-transcript { position: absolute; inset: 0; z-index: 6; display: none; flex-direction: column; background: #0d0c10; padding: 16px 18px; }
+  .cap-full-card.reviewing .cap-transcript { display: flex; }
+  .cap-tr-head { flex: 0 0 auto; }
+  .cap-tr-title { font-size: 16px; font-weight: 680; color: var(--text); }
+  .cap-tr-sub { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+  .cap-tr-lines { flex: 1; overflow-y: auto; margin: 13px 0; display: flex; flex-direction: column; gap: 7px; padding-right: 4px; }
+  .cap-tr-lines::-webkit-scrollbar { width: 8px; }
+  .cap-tr-lines::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 8px; }
+  .cap-tr-line { display: flex; align-items: center; gap: 10px; }
+  .cap-tr-time { flex: 0 0 52px; font-size: 10px; color: var(--text-dim); font-variant-numeric: tabular-nums; text-align: right; }
+  .cap-tr-input { flex: 1; min-width: 0; font: inherit; font-size: 13px; color: var(--text); background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px; transition: border-color .14s, background .14s; }
+  .cap-tr-input:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,.08); }
+  .cap-tr-input.edited { border-color: var(--accent-line); }
+  .cap-tr-bar { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cap-tr-mode-lbl { font-size: 12px; color: var(--text); }
+  .cap-tr-modehint { width: 100%; font-size: 11px; color: var(--text-dim); margin-top: 2px; min-height: 14px; }
+  .cap-tr-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+
   .autocut-card {
     margin-top: 10px;
     padding: 10px 12px;
@@ -3729,6 +3748,28 @@
         <div class="cap-progress-text"><span class="ae-spinner" style="width:13px;height:13px"></span><span id="capProgText">Starting&hellip;</span></div>
       </div>
       <button type="button" class="autocut-modal-cancel" data-cap-cancel style="margin-top:4px">Cancel</button>
+    </div>
+
+    <!-- transcript review/edit pane -->
+    <div class="cap-transcript">
+      <div class="cap-tr-head">
+        <div class="cap-tr-title">Review your transcript</div>
+        <div class="cap-tr-sub">Fix any wrong words before it's created — each line keeps its timing.</div>
+      </div>
+      <div class="cap-tr-lines" id="capTrLines"></div>
+      <div class="cap-tr-bar">
+        <span class="cap-tr-mode-lbl">Output</span>
+        <div class="cap-seg" id="capModeSeg">
+          <button type="button" data-mode="animated" class="sel">Animated style</button>
+          <button type="button" data-mode="native">Editable text</button>
+        </div>
+        <div class="cap-tr-modehint" id="capModeHint"></div>
+      </div>
+      <div class="cap-tr-actions">
+        <button type="button" class="autocut-modal-cancel" id="capTrBack">&larr; Back</button>
+        <div style="flex:1"></div>
+        <button type="button" class="cap-gen" id="capCreateBtn">Create captions</button>
+      </div>
     </div>
 
   </div>
@@ -8065,11 +8106,12 @@ let capState = {
   fontWeight: 800, align: 'center', trackingPct: 0, lineHtPct: 112,
   shadowPct: 55, strokePx: 2, strokeColor: '#000000', vary: false, keywords: false, emoji: false, fontFamily: '',
   customX: 0.5, customY: 0.85,
+  mode: 'animated', trLines: [], trTimelineStart: 0,
   selection: null, width: 1080, height: 1920, fps: 30,
   abort: null, reqId: null, es: null,
 };
 const CAP_SAVE_KEYS = ['style','position','highlight','uppercase','box','maxWords','fontPct',
-  'fontWeight','align','trackingPct','lineHtPct','shadowPct','strokePx','strokeColor','vary','keywords','emoji','fontFamily',
+  'fontWeight','align','trackingPct','lineHtPct','shadowPct','strokePx','strokeColor','vary','keywords','emoji','mode','fontFamily',
   'customX','customY'];
 try {
   const saved = JSON.parse(localStorage.getItem('claudeBridge.captions.opts') || 'null');
@@ -8204,6 +8246,7 @@ function capSyncOptsUI() {
   captionsModal.querySelectorAll('#capAlignSeg button').forEach(b => b.classList.toggle('sel', b.getAttribute('data-a') === capState.align));
   const ff = document.getElementById('capFontFamily'); if (ff) ff.value = capState.fontFamily || '';
   captionsModal.querySelectorAll('#capChips .cap-chip').forEach(c => c.classList.toggle('sel', !!capState[c.getAttribute('data-chip')]));
+  captionsModal.querySelectorAll('#capModeSeg button').forEach(b => b.classList.toggle('sel', b.getAttribute('data-mode') === capState.mode));
   captionsModal.querySelectorAll('#capLooks .cap-look').forEach(l => l.classList.toggle('sel', l.getAttribute('data-look') === capState._look));
   const setSlider = (id, valId, value, fmt) => { const s = document.getElementById(id); if (s) s.value = String(value); const v = document.getElementById(valId); if (v) v.textContent = fmt ? fmt(value) : String(value); };
   setSlider('capWords', 'capWordsVal', capState.maxWords);
@@ -8614,7 +8657,7 @@ async function openCaptionsModal() {
   if (!captionsAllowed()) { capNotice('Captions are in early access — not available on your account yet.'); return; }
   capCleanup();
   capState.abort = null; capState.reqId = null;
-  if (capCard) capCard.classList.remove('working');
+  if (capCard) capCard.classList.remove('working', 'reviewing');
   const errEl = document.getElementById('capErr'); if (errEl) errEl.textContent = '';
   capSyncOptsUI();
   captionsModal.classList.add('show');
@@ -8639,7 +8682,7 @@ function capCleanup() {
   if (capState.es) { try { capState.es.close(); } catch {} capState.es = null; }
   if (capState.abort) { try { capState.abort.abort(); } catch {} capState.abort = null; }
 }
-function closeCaptionsModal() { captionsModal.classList.remove('show'); capStopPreview(); capStopSelPoll(); }
+function closeCaptionsModal() { captionsModal.classList.remove('show'); capStopPreview(); capStopSelPoll(); if (capCard) capCard.classList.remove('reviewing', 'working'); }
 function capCancel() {
   // capCleanup() aborts the in-flight /captions fetch; the bridge's req.on('aborted')
   // handler then kills the parakeet + remotion child processes (no separate
@@ -8654,10 +8697,32 @@ function capSetProgress(text, pct) {
   const f = document.getElementById('capProgFill'); if (f && typeof pct === 'number') f.style.width = Math.max(0, Math.min(100, pct)) + '%';
 }
 
+function capBuildOptions() {
+  return {
+    highlight: capState.highlight, position: capState.position,
+    uppercase: capState.uppercase, box: capState.box,
+    fontScale: capState.fontPct / 100, fontWeight: capState.fontWeight, align: capState.align,
+    letterSpacing: capState.trackingPct / 100, lineHeight: capState.lineHtPct / 100,
+    shadow: capState.shadowPct / 100, stroke: capState.strokePx, strokeColor: capState.strokeColor,
+    varyPerLine: capState.vary, keywords: capState.keywords, emoji: capState.emoji,
+    fontFamily: capState.fontFamily || undefined,
+    customX: capState.customX, customY: capState.customY,
+  };
+}
+function capWireProgressES(reqId) {
+  try {
+    const es = new EventSource(BRIDGE + '/progress-stream');
+    capState.es = es;
+    es.addEventListener('progress', (ev) => { try { const p = JSON.parse(ev.data); if (p.reqId && p.reqId !== reqId) return; capSetProgress(p.text, typeof p.pct === 'number' ? p.pct : undefined); } catch {} });
+    es.addEventListener('done', () => { try { es.close(); } catch {} if (capState.es === es) capState.es = null; });
+  } catch {}
+}
+
+// Phase 1: transcribe the selection, then show the editable transcript.
 async function generateCaptions() {
   const errEl = document.getElementById('capErr'); if (errEl) errEl.textContent = '';
   if (!capState.selection) {
-    try { const sel = JSON.parse(await evalES('ccGetSelectedClips()')); if (sel.ok) capState.selection = sel; } catch {}
+    try { const sel = JSON.parse(await evalES('ccGetSelectedClips()')); if (sel && sel.ok) capState.selection = sel; } catch {}
   }
   const sel = capState.selection;
   if (!sel || !sel.segments || !sel.segments.length) {
@@ -8668,54 +8733,113 @@ async function generateCaptions() {
   const abort = new AbortController();
   capState.reqId = reqId; capState.abort = abort;
   if (capCard) capCard.classList.add('working');
-  capSetProgress('Starting…', 4);
+  capSetProgress('Transcribing…', 8);
+  capWireProgressES(reqId);
 
+  let data = null;
   try {
-    const es = new EventSource(BRIDGE + '/progress-stream');
-    capState.es = es;
-    es.addEventListener('progress', (ev) => {
-      try { const p = JSON.parse(ev.data); if (p.reqId && p.reqId !== reqId) return; capSetProgress(p.text, typeof p.pct === 'number' ? p.pct : undefined); } catch {}
+    const r = await fetch(BRIDGE + '/captions/transcribe', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reqId, segments: sel.segments, style: capState.style, grouping: { maxWordsPerLine: capState.maxWords } }),
+      signal: abort.signal,
     });
-    es.addEventListener('done', () => { try { es.close(); } catch {} if (capState.es === es) capState.es = null; });
-  } catch {}
+    data = await r.json();
+  } catch (e) {
+    if (abort.signal.aborted) return;
+    capCleanup(); if (capCard) capCard.classList.remove('working');
+    if (errEl) errEl.textContent = 'Transcription failed: ' + (e.message || e);
+    return;
+  }
+  capCleanup();
+  if (!data || !data.ok) {
+    if (capCard) capCard.classList.remove('working');
+    if (errEl) errEl.textContent = (data && data.error) || 'Transcription failed.';
+    return;
+  }
+  capShowTranscript(data);
+}
+
+function capShowTranscript(data) {
+  capState.trLines = (data.lines || []).map(l => ({ startMs: l.startMs, endMs: l.endMs, words: (l.words || []).map(w => ({ text: w.text, startMs: w.startMs, endMs: w.endMs })) }));
+  capState.trTimelineStart = data.timelineStart || 0;
+  capRenderTrLines();
+  capSetModeHint();
+  if (capCard) { capCard.classList.remove('working'); capCard.classList.add('reviewing'); }
+}
+
+function capRenderTrLines() {
+  const wrap = document.getElementById('capTrLines'); if (!wrap) return;
+  wrap.innerHTML = '';
+  capState.trLines.forEach((l, i) => {
+    const row = document.createElement('div'); row.className = 'cap-tr-line';
+    const t = document.createElement('span'); t.className = 'cap-tr-time';
+    const sec = capState.trTimelineStart + l.startMs / 1000;
+    t.textContent = Math.floor(sec / 60) + ':' + String(Math.round(sec % 60)).padStart(2, '0');
+    const inp = document.createElement('input'); inp.className = 'cap-tr-input'; inp.type = 'text'; inp.spellcheck = false;
+    inp.value = (l.words || []).map(w => w.text).join(' ');
+    inp.dataset.orig = inp.value; inp.dataset.idx = i;
+    inp.addEventListener('input', () => inp.classList.toggle('edited', inp.value.trim() !== inp.dataset.orig.trim()));
+    row.appendChild(t); row.appendChild(inp);
+    wrap.appendChild(row);
+  });
+}
+
+function capSetModeHint() {
+  captionsModal.querySelectorAll('#capModeSeg button').forEach(b => b.classList.toggle('sel', b.getAttribute('data-mode') === capState.mode));
+  const h = document.getElementById('capModeHint'); if (!h) return;
+  h.textContent = capState.mode === 'native'
+    ? 'Editable text: a real Premiere caption track — edit words + position anytime in Premiere, but no animation.'
+    : 'Animated: the styled look (karaoke / box / motion). Baked video, not editable in Premiere.';
+}
+
+// re-split an edited line's text across its time span (unchanged lines keep their words)
+function capRedistributeLine(origLine, text) {
+  const orig = (origLine.words || []).map(w => w.text).join(' ').trim();
+  if (text.trim() === orig) return origLine;
+  const toks = text.trim().split(/\s+/).filter(Boolean);
+  if (!toks.length) return null;
+  const span = Math.max(1, origLine.endMs - origLine.startMs);
+  const totalChars = toks.reduce((n, t) => n + t.length, 0) || toks.length;
+  let acc = origLine.startMs;
+  const words = toks.map(tk => { const dur = Math.max(60, Math.round(span * (tk.length / totalChars))); const w = { text: tk, startMs: Math.round(acc), endMs: Math.round(acc + dur) }; acc += dur; return w; });
+  words[words.length - 1].endMs = origLine.endMs;
+  return { startMs: origLine.startMs, endMs: origLine.endMs, words };
+}
+
+// Phase 2: take the edited lines + create captions (animated or native).
+async function capCreateCaptions() {
+  const inputs = [...document.querySelectorAll('#capTrLines .cap-tr-input')];
+  const lines = [];
+  inputs.forEach(inp => { const i = +inp.dataset.idx; const orig = capState.trLines[i]; const ln = capRedistributeLine(orig, inp.value); if (ln) lines.push(ln); });
+  const hint = document.getElementById('capModeHint');
+  if (!lines.length) { if (hint) hint.textContent = 'Nothing to caption — add some text first.'; return; }
+  const reqId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
+  const abort = new AbortController();
+  capState.reqId = reqId; capState.abort = abort;
+  if (capCard) { capCard.classList.remove('reviewing'); capCard.classList.add('working'); }
+  capSetProgress(capState.mode === 'native' ? 'Creating editable captions…' : 'Rendering…', 6);
+  capWireProgressES(reqId);
 
   const body = {
-    reqId, segments: sel.segments, style: capState.style,
+    reqId, lines, mode: capState.mode, style: capState.style,
     width: capState.width, height: capState.height, fps: capState.fps,
-    options: {
-      highlight: capState.highlight, position: capState.position,
-      uppercase: capState.uppercase, box: capState.box,
-      fontScale: capState.fontPct / 100,
-      fontWeight: capState.fontWeight,
-      align: capState.align,
-      letterSpacing: capState.trackingPct / 100,
-      lineHeight: capState.lineHtPct / 100,
-      shadow: capState.shadowPct / 100,
-      stroke: capState.strokePx,
-      strokeColor: capState.strokeColor,
-      varyPerLine: capState.vary,
-      keywords: capState.keywords,
-      emoji: capState.emoji,
-      fontFamily: capState.fontFamily || undefined,
-      customX: capState.customX, customY: capState.customY,
-    },
+    timelineStart: capState.trTimelineStart, options: capBuildOptions(),
     grouping: { maxWordsPerLine: capState.maxWords },
   };
-
   let data = null;
   try {
     const r = await fetch(BRIDGE + '/captions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: abort.signal });
     data = await r.json();
   } catch (e) {
     if (abort.signal.aborted) return;
-    capCleanup(); if (capCard) capCard.classList.remove('working');
-    if (errEl) errEl.textContent = 'Captions failed: ' + (e.message || e);
+    capCleanup(); if (capCard) { capCard.classList.remove('working'); capCard.classList.add('reviewing'); }
+    if (hint) hint.textContent = 'Failed: ' + (e.message || e);
     return;
   }
   capCleanup();
   if (!data || !data.ok) {
-    if (capCard) capCard.classList.remove('working');
-    if (errEl) errEl.textContent = (data && data.error) || 'Captions failed.';
+    if (capCard) { capCard.classList.remove('working'); capCard.classList.add('reviewing'); }
+    if (hint) hint.textContent = 'Failed: ' + ((data && data.error) || 'error');
     return;
   }
   closeCaptionsModal();
@@ -8724,7 +8848,39 @@ async function generateCaptions() {
 
 // Result bubble + import card. Captions go on the track ABOVE the footage, so
 // the import is forced to 'overlay' regardless of the global placement setting.
+function addNativeCaptionCard(data) {
+  const srt = data.srt;
+  const m = makeMsg('claude',
+    'Editable captions ready - <b>' + (data.lineCount || 0) + ' lines</b> &middot; ' + (data.wordCount || 0) + ' words. '
+    + 'A real Premiere caption track - edit the words + position anytime in Premiere.');
+  const card = document.createElement('div');
+  card.className = 'render-preview';
+  const filename = (srt || '').split('/').pop().split('\\').pop();
+  card.innerHTML =
+      '<div class="render-preview-meta"><span class="render-preview-name">' + escapeHTML(filename) + '</span><span>adding&hellip;</span></div>'
+    + '<div class="render-preview-actions"><button class="render-import-btn" type="button">Re-add captions</button></div>';
+  m.body.appendChild(card);
+  const importBtn = card.querySelector('.render-import-btn');
+  const meta = card.querySelector('.render-preview-meta');
+  const setStatus = (t) => { const s = meta && meta.querySelectorAll('span')[1]; if (s) s.textContent = t; };
+  async function doImport() {
+    importBtn.disabled = true; setStatus('adding…');
+    try {
+      const raw = await evalES('ccImportCaptions(' + JSON.stringify(srt) + ')');
+      const r = raw ? JSON.parse(raw) : null;
+      if (r && r.ok) setStatus(r.placed ? 'added as an editable caption track' : (r.reason || 'imported to bin — drag it onto the timeline'));
+      else setStatus('failed: ' + ((r && r.error) || 'import error'));
+      refreshStatus && refreshStatus(false);
+    } catch (e) { setStatus('import failed'); }
+    finally { importBtn.disabled = false; }
+  }
+  importBtn.addEventListener('click', doImport);
+  doImport();
+}
+
 function addCaptionsResultCard(data) {
+  // NATIVE mode -> import the SRT as a real, editable Premiere caption track.
+  if (data.native && data.srt) { addNativeCaptionCard(data); return; }
   // Each caption line is its OWN clip -> place each as a separate timeline layer.
   const clips = (data.clips && data.clips.length) ? data.clips
     : (data.import ? [{ path: data.import, timelineSec: data.timelineStart || 0 }] : []);
@@ -8786,6 +8942,18 @@ const _capGenBtn = document.getElementById('capGenerateBtn');
 if (_capGenBtn) _capGenBtn.addEventListener('click', generateCaptions);
 const _capCloseBtn = document.getElementById('capCloseBtn');
 if (_capCloseBtn) _capCloseBtn.addEventListener('click', capCancel);
+// transcript review pane: create / back / output-mode
+const _capCreateBtn = document.getElementById('capCreateBtn');
+if (_capCreateBtn) _capCreateBtn.addEventListener('click', capCreateCaptions);
+const _capTrBack = document.getElementById('capTrBack');
+if (_capTrBack) _capTrBack.addEventListener('click', () => { capCleanup(); if (capCard) capCard.classList.remove('reviewing'); });
+captionsModal && captionsModal.querySelectorAll('#capModeSeg button').forEach(b => {
+  b.addEventListener('click', () => {
+    capState.mode = b.getAttribute('data-mode');
+    captionsModal.querySelectorAll('#capModeSeg button').forEach(x => x.classList.toggle('sel', x === b));
+    capSetModeHint(); capSaveOpts();
+  });
+});
 if (captionsModal) captionsModal.addEventListener('click', (e) => {
   if (e.target.closest && e.target.closest('[data-cap-cancel]')) capCancel();
 });
