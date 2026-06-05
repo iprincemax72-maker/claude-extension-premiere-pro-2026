@@ -3557,8 +3557,12 @@
       <div class="cap-sec-label">Quick looks</div>
       <div class="cap-looks" id="capLooks">
         <button type="button" class="cap-look" data-look="beast"><span class="cap-look-prev"><b style="color:#15110d;background:#F5C542;padding:2px 6px;border-radius:5px">BEAST</b></span><span class="cap-look-name">Beast</span></button>
+        <button type="button" class="cap-look" data-look="beastblue"><span class="cap-look-prev"><b style="color:#fff;background:#5AA9FF;padding:2px 6px;border-radius:5px">BLUE</b></span><span class="cap-look-name">Beast Blue</span></button>
         <button type="button" class="cap-look" data-look="pop"><span class="cap-look-prev"><b style="color:#FF5D8F;-webkit-text-stroke:1px #000">POP</b></span><span class="cap-look-name">Pop</span></button>
+        <button type="button" class="cap-look" data-look="highlight"><span class="cap-look-prev"><b style="color:#fff">it's <span style="color:#E2885F">key</span></b></span><span class="cap-look-name">Highlight</span></button>
+        <button type="button" class="cap-look" data-look="boldyellow"><span class="cap-look-prev"><b style="color:#F5C542;-webkit-text-stroke:1px #000">BOLD</b></span><span class="cap-look-name">Bold Yellow</span></button>
         <button type="button" class="cap-look" data-look="karaoke"><span class="cap-look-prev"><b style="color:#fff">word <span style="color:#E2885F">pop</span></b></span><span class="cap-look-name">Karaoke</span></button>
+        <button type="button" class="cap-look" data-look="minimalkw"><span class="cap-look-prev"><b style="color:#fff;font-weight:700;font-size:13px">go <span style="color:#4ECB71">green</span></b></span><span class="cap-look-name">Minimal+</span></button>
         <button type="button" class="cap-look" data-look="rainbow"><span class="cap-look-prev"><b><span style="color:#E2885F">a</span><span style="color:#5AA9FF">b</span><span style="color:#4ECB71">c</span></b></span><span class="cap-look-name">Rainbow</span></button>
         <button type="button" class="cap-look" data-look="tiktok"><span class="cap-look-prev"><b style="color:#5AA9FF">type</b></span><span class="cap-look-name">TikTok</span></button>
         <button type="button" class="cap-look" data-look="clean"><span class="cap-look-prev"><b style="color:#fff;font-weight:700;font-size:14px">clean</b></span><span class="cap-look-name">Clean</span></button>
@@ -8102,13 +8106,17 @@ function capSyncZoneUI() {
 
 // Quick looks — one click applies a whole designed preset.
 const CAP_LOOKS = {
-  beast:   { style: 'hormozi', highlight: '#F5C542', uppercase: true,  fontWeight: 900, strokePx: 5, shadowPct: 55, vary: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
-  pop:     { style: 'reels',   highlight: '#FF5D8F', uppercase: true,  fontWeight: 900, strokePx: 3, shadowPct: 55, vary: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
-  karaoke: { style: 'karaoke', highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 2, shadowPct: 55, vary: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
-  rainbow: { style: 'karaoke', highlight: '#E2885F', uppercase: true,  fontWeight: 800, strokePx: 2, shadowPct: 55, vary: true,  box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
-  tiktok:  { style: 'tiktok',  highlight: '#5AA9FF', uppercase: false, fontWeight: 800, strokePx: 2, shadowPct: 55, vary: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
-  clean:   { style: 'minimal', highlight: '#FFFFFF', uppercase: false, fontWeight: 700, strokePx: 0, shadowPct: 40, vary: false, box: false, maxWords: 5, align: 'center', strokeColor: '#000000' },
-  neon:    { style: 'reels',   highlight: '#4ECB71', uppercase: true,  fontWeight: 900, strokePx: 3, shadowPct: 70, vary: false, box: false, maxWords: 3, align: 'center', strokeColor: '#063b1e' },
+  beast:     { style: 'hormozi', highlight: '#F5C542', uppercase: true,  fontWeight: 900, strokePx: 5, shadowPct: 55, vary: false, keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
+  beastblue: { style: 'hormozi', highlight: '#5AA9FF', uppercase: true,  fontWeight: 900, strokePx: 5, shadowPct: 55, vary: false, keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
+  pop:       { style: 'reels',   highlight: '#FF5D8F', uppercase: true,  fontWeight: 900, strokePx: 3, shadowPct: 55, vary: false, keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
+  highlight: { style: 'karaoke', highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 2, shadowPct: 55, vary: false, keywords: true,  box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
+  karaoke:   { style: 'karaoke', highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 2, shadowPct: 55, vary: false, keywords: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
+  boldyellow:{ style: 'reels',   highlight: '#F5C542', uppercase: true,  fontWeight: 900, strokePx: 3, shadowPct: 55, vary: false, keywords: true,  box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
+  rainbow:   { style: 'karaoke', highlight: '#E2885F', uppercase: true,  fontWeight: 800, strokePx: 2, shadowPct: 55, vary: true,  keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
+  tiktok:    { style: 'tiktok',  highlight: '#5AA9FF', uppercase: false, fontWeight: 800, strokePx: 2, shadowPct: 55, vary: false, keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
+  minimalkw: { style: 'minimal', highlight: '#4ECB71', uppercase: false, fontWeight: 700, strokePx: 0, shadowPct: 40, vary: false, keywords: true,  box: false, maxWords: 5, align: 'center', strokeColor: '#000000' },
+  clean:     { style: 'minimal', highlight: '#FFFFFF', uppercase: false, fontWeight: 700, strokePx: 0, shadowPct: 40, vary: false, keywords: false, box: false, maxWords: 5, align: 'center', strokeColor: '#000000' },
+  neon:      { style: 'reels',   highlight: '#4ECB71', uppercase: true,  fontWeight: 900, strokePx: 3, shadowPct: 70, vary: false, keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#063b1e' },
 };
 function capApplyLook(name) {
   const o = CAP_LOOKS[name]; if (!o) return;
