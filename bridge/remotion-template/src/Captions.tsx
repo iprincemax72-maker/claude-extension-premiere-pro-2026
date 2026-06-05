@@ -231,8 +231,19 @@ const LineView: React.FC<{
   textStyle: CSSProperties;
 }> = ({ line, lineIndex, ms, fps, style, opt, textStyle }) => {
   const frame = useCurrentFrame();
+  const { width: vidW } = useVideoConfig();
   const sinceStart = ms - line.startMs;
   const lineInProgress = Math.max(0, sinceStart);
+
+  // Keep every word of the line on ONE row — shrink the font to fit the frame width
+  // (deterministic estimate; no DOM measurement needed in headless render). Matches
+  // the panel preview so "N words per line" looks the same on the timeline.
+  const baseFont = (typeof textStyle.fontSize === 'number' ? textStyle.fontSize : 40);
+  const lineText = line.words.map((w) => w.text).join(' ');
+  const estWidth = lineText.length * baseFont * 0.6;            // ~avg glyph width for bold sans
+  const availWidth = vidW * 0.86 * (opt.box ? 0.9 : 1);
+  const fitScale = estWidth > availWidth ? Math.max(0.4, availWidth / estWidth) : 1;
+  const fittedFont = Math.round(baseFont * fitScale);
 
   // per-line variety: a rotating color + a rotating entrance animation
   const vary = !!opt.varyPerLine;
@@ -247,8 +258,11 @@ const LineView: React.FC<{
 
   const wrapStyle: CSSProperties = {
     ...textStyle,
+    fontSize: fittedFont,                 // shrink-to-fit so the line never wraps
+    maxWidth: 'none',
     display: 'flex',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
+    whiteSpace: 'nowrap',
     justifyContent: opt.align === 'left' ? 'flex-start' : opt.align === 'right' ? 'flex-end' : 'center',
     gap: style === 'reels' || style === 'hormozi' ? '0.12em 0.28em' : '0.1em 0.26em',
     transform: varyEntrance
