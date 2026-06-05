@@ -397,6 +397,22 @@
     background: linear-gradient(90deg, transparent, var(--accent-line), transparent);
     opacity: 0.6;
   }
+  /* collapse the whole top bar with a small pull-tab; the tab stays so you can bring it back */
+  .header { transition: padding .2s var(--ease-out); }
+  .header-collapse {
+    position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%);
+    width: 38px; height: 17px; padding: 0; display: flex; align-items: center; justify-content: center;
+    background: var(--bg-elevated); border: 1px solid var(--border); border-top: none;
+    border-radius: 0 0 9px 9px; color: var(--text-dim); cursor: pointer; z-index: 13;
+    transition: color .14s, background .14s, bottom .2s var(--ease-out);
+  }
+  .header-collapse:hover { color: var(--text); background: rgba(255,255,255,.06); }
+  .header-collapse svg { width: 15px; height: 10px; transition: transform .25s var(--ease-out); }
+  .header.collapsed { padding-top: 0; padding-bottom: 0; border-bottom-color: transparent; }
+  .header.collapsed::after { opacity: 0; }
+  .header.collapsed > div { display: none !important; }  /* hide brand + toolbar (toolbar has inline display:flex), keep the tab */
+  .header.collapsed .header-collapse { bottom: -17px; }
+  .header.collapsed .header-collapse svg { transform: rotate(180deg); }
   .brand {
     display: flex;
     align-items: center;
@@ -3691,6 +3707,9 @@
       <span class="status-text">Connecting…</span>
     </div>
   </div>
+  <button class="header-collapse" id="headerCollapse" type="button" title="Hide the bar" aria-label="Hide the bar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+  </button>
 </div>
 
 <!-- Auto-Cut UI removed (v8.1) — Premiere's built-in transcript editor and
@@ -7480,6 +7499,26 @@ const Particles = (function () {
 applySettings();
 bindSettingsHandlers();
 syncSettingsUI();
+
+// Collapse/expand the whole top bar with the pull-tab arrow (state persists).
+(function wireHeaderCollapse() {
+  const header = document.querySelector('.header');
+  const btn = document.getElementById('headerCollapse');
+  if (!header || !btn) return;
+  const KEY = 'claudeBridge.headerCollapsed';
+  const sync = () => {
+    const c = header.classList.contains('collapsed');
+    btn.title = c ? 'Show the bar' : 'Hide the bar';
+    btn.setAttribute('aria-label', btn.title);
+  };
+  try { if (localStorage.getItem(KEY) === '1') header.classList.add('collapsed'); } catch {}
+  sync();
+  btn.addEventListener('click', () => {
+    header.classList.toggle('collapsed');
+    try { localStorage.setItem(KEY, header.classList.contains('collapsed') ? '1' : '0'); } catch {}
+    sync();
+  });
+})();
 
 // ───── Plan-mode toggle (header) ─────────────────────────────────────────
 // When on, sendMessage() prepends a [PLAN MODE] directive to the prompt so
