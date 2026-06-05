@@ -2686,8 +2686,35 @@
   .cap-select:focus { outline: none; border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
   /* the open dropdown popup — force solid, high-contrast option text (CEP Chromium
      was rendering these near-invisible). Solid warm surface + cream text. */
-  .cap-select option { background: #252320; color: #f4f0e9; font-size: 13px; padding: 4px 8px; }
-  .cap-select optgroup { background: #1a1916; color: #c9b8a6; font-weight: 700; font-style: normal; }
+  /* custom font dropdown — native <select> popups render unreliably in CEP's old
+     Chromium (and 300+ options is unusable). Fully-controlled + searchable. */
+  .cap-fontpick { position: relative; flex: 1 1 auto; min-width: 0; }
+  .cap-fontpick-btn { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+    font: inherit; font-size: 12px; color: var(--cc-text); background: var(--cc-sunken);
+    border: 1px solid var(--border); border-radius: var(--r-md, 8px); padding: 7px 10px; cursor: pointer; text-align: left;
+    transition: border-color .15s var(--ease-out); }
+  .cap-fontpick-btn:hover { border-color: var(--line-strong, rgba(235,230,223,.16)); }
+  .cap-fontpick.open .cap-fontpick-btn { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .cap-fontpick-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cap-fontpick-btn svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--cc-muted); transition: transform .15s var(--ease-out); }
+  .cap-fontpick.open .cap-fontpick-btn svg { transform: rotate(180deg); }
+  .cap-fontpick-menu { position: absolute; top: calc(100% + 5px); left: 0; right: 0; z-index: 20;
+    background: var(--cc-card); border: 1px solid var(--line-strong, rgba(235,230,223,.16)); border-radius: var(--r-md, 8px);
+    box-shadow: 0 16px 40px -12px rgba(0,0,0,.75); padding: 7px; display: flex; flex-direction: column; gap: 6px; }
+  .cap-fontpick-menu[hidden] { display: none; }
+  .cap-fontpick-search { font: inherit; font-size: 12px; color: var(--cc-text); background: var(--cc-sunken);
+    border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; width: 100%; }
+  .cap-fontpick-search::placeholder { color: var(--cc-faint); }
+  .cap-fontpick-search:focus { outline: none; border-color: var(--accent-line); }
+  .cap-fontpick-list { max-height: 244px; overflow-y: auto; display: flex; flex-direction: column; }
+  .cap-fontpick-list::-webkit-scrollbar { width: 9px; }
+  .cap-fontpick-list::-webkit-scrollbar-thumb { background: var(--surf-hover, #2c2a26); border-radius: 9px; border: 2px solid transparent; background-clip: padding-box; }
+  .cap-fontpick-group { font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--cc-muted); font-weight: 700; padding: 9px 9px 4px; }
+  .cap-fontpick-item { font: inherit; font-size: 13px; color: var(--cc-text); background: none; border: none; border-radius: 6px;
+    padding: 7px 9px; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .1s; }
+  .cap-fontpick-item:hover { background: var(--cc-hover); }
+  .cap-fontpick-item.sel { background: var(--accent-soft); color: var(--accent); }
+  .cap-fontpick-empty { font-size: 12px; color: var(--cc-muted); padding: 10px 9px; }
 
   /* draggable caption affordance */
   .cap-cap.draggable { cursor: grab; }
@@ -3871,14 +3898,16 @@
       <div class="cap-opts">
         <div class="cap-opt-row wide">
           <span class="cap-opt-label">Font</span>
-          <select class="cap-select" id="capFontFamily">
-            <option value="">Default (Grotesk)</option>
-            <option value="Montserrat, system-ui, sans-serif">Montserrat</option>
-            <option value="Inter, system-ui, sans-serif">Inter</option>
-            <option value="Poppins, system-ui, sans-serif">Poppins</option>
-            <option value="Anton, Impact, sans-serif">Anton</option>
-            <option value="Georgia, serif">Georgia</option>
-          </select>
+          <div class="cap-fontpick" id="capFontPick">
+            <button type="button" class="cap-fontpick-btn" id="capFontBtn">
+              <span class="cap-fontpick-label" id="capFontLabel">Default (Grotesk)</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="cap-fontpick-menu" id="capFontMenu" hidden>
+              <input type="text" class="cap-fontpick-search" id="capFontSearch" placeholder="Search fonts…" spellcheck="false" autocomplete="off">
+              <div class="cap-fontpick-list" id="capFontList"></div>
+            </div>
+          </div>
         </div>
         <div class="cap-opt-row wide cap-opt-duo">
           <div class="cap-duo">
@@ -8290,6 +8319,17 @@ let capState = {
   selection: null, width: 1080, height: 1920, fps: 30,
   abort: null, reqId: null, es: null,
 };
+// Font picker data (declared here so init-time wiring can read it before TDZ).
+const CAP_FONT_CURATED = [
+  { label: 'Default (Grotesk)', value: '' },
+  { label: 'Montserrat', value: 'Montserrat, system-ui, sans-serif' },
+  { label: 'Inter', value: 'Inter, system-ui, sans-serif' },
+  { label: 'Poppins', value: 'Poppins, system-ui, sans-serif' },
+  { label: 'Anton', value: 'Anton, Impact, sans-serif' },
+  { label: 'Georgia', value: 'Georgia, serif' },
+];
+let capFontItems = CAP_FONT_CURATED.slice();   // [{label, value, system?}]
+let _capFontsLoaded = false;
 const CAP_SAVE_KEYS = ['style','position','highlight','uppercase','box','maxWords','fontPct',
   'fontWeight','align','trackingPct','lineHtPct','shadowPct','strokePx','strokeColor','vary','keywords','emoji','mode','fontFamily',
   'customX','customY'];
@@ -8424,7 +8464,7 @@ function capSyncOptsUI() {
     s.classList.toggle('sel', (s.getAttribute('data-color') || '').toUpperCase() === (capState.strokeColor || '').toUpperCase()));
   captionsModal.querySelectorAll('#capWeightSeg button').forEach(b => b.classList.toggle('sel', +b.getAttribute('data-w') === capState.fontWeight));
   captionsModal.querySelectorAll('#capAlignSeg button').forEach(b => b.classList.toggle('sel', b.getAttribute('data-a') === capState.align));
-  const ff = document.getElementById('capFontFamily'); if (ff) ff.value = capState.fontFamily || '';
+  capSyncFontLabel();
   captionsModal.querySelectorAll('#capChips .cap-chip').forEach(c => c.classList.toggle('sel', !!capState[c.getAttribute('data-chip')]));
   captionsModal.querySelectorAll('#capModeSeg button').forEach(b => b.classList.toggle('sel', b.getAttribute('data-mode') === capState.mode));
   captionsModal.querySelectorAll('#capLooks .cap-look').forEach(l => l.classList.toggle('sel', l.getAttribute('data-look') === capState._look));
@@ -8773,8 +8813,7 @@ function capStopPreview() { if (capPreview.raf) { cancelAnimationFrame(capPrevie
   captionsModal.querySelectorAll('#capAlignSeg button').forEach(b => {
     b.addEventListener('click', () => { capState.align = b.getAttribute('data-a'); capSyncOptsUI(); capSaveOpts(); capPreview.curLine = -1; });
   });
-  const ff = document.getElementById('capFontFamily');
-  if (ff) ff.addEventListener('change', () => { capState.fontFamily = ff.value; capSaveOpts(); capPreview.curLine = -1; });
+  capWireFontPicker();
 
   // ── toggle chips ──
   captionsModal.querySelectorAll('#capChips .cap-chip').forEach(c => {
@@ -8870,28 +8909,83 @@ function capStartSelPoll() {
 }
 function capStopSelPoll() { if (_capSelPoll) { clearInterval(_capSelPoll); _capSelPoll = null; } }
 
-// Populate the font picker with every installed system font (fetched once from the bridge).
-// Keeps the curated picks at the top, then "All system fonts" below — each shown in its own face.
-let _capFontsLoaded = false;
+// ── Custom font picker (native <select> popups are unreliable in CEP) ──
+// Curated picks first, then every installed system font (fetched from the bridge),
+// searchable. State lives in capState.fontFamily. (Data declared up by capState.)
+function capSyncFontLabel() {
+  const lab = document.getElementById('capFontLabel'); if (!lab) return;
+  const cur = capState.fontFamily || '';
+  const hit = capFontItems.find(it => it.value === cur);
+  lab.textContent = hit ? hit.label : (cur ? cur.split(',')[0].replace(/["']/g, '') : 'Default (Grotesk)');
+}
+function capRenderFontList(filter) {
+  const list = document.getElementById('capFontList'); if (!list) return;
+  const q = (filter || '').trim().toLowerCase();
+  const cur = capState.fontFamily || '';
+  const items = q ? capFontItems.filter(it => it.label.toLowerCase().indexOf(q) !== -1) : capFontItems;
+  list.innerHTML = '';
+  if (!items.length) { const e = document.createElement('div'); e.className = 'cap-fontpick-empty'; e.textContent = 'No fonts match "' + filter + '"'; list.appendChild(e); return; }
+  let lastGroup = null;
+  items.forEach(it => {
+    const grp = it.system ? 'All system fonts' : 'Recommended';
+    if (grp !== lastGroup) { lastGroup = grp; const h = document.createElement('div'); h.className = 'cap-fontpick-group'; h.textContent = grp; list.appendChild(h); }
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'cap-fontpick-item' + (it.value === cur ? ' sel' : '');
+    b.textContent = it.label;
+    if (it.value) { try { b.style.fontFamily = it.value; } catch {} }
+    b.addEventListener('click', () => { capFontApply(it.value); capCloseFontMenu(); });
+    list.appendChild(b);
+  });
+}
+function capFontApply(value) {
+  capState.fontFamily = value || '';
+  capState._look = '';
+  capSyncFontLabel();
+  capSaveOpts();
+  capPreview.curLine = -1;   // rebuild preview line with the new font
+}
+function capOpenFontMenu() {
+  const pick = document.getElementById('capFontPick'), menu = document.getElementById('capFontMenu'), search = document.getElementById('capFontSearch');
+  if (!pick || !menu) return;
+  pick.classList.add('open'); menu.hidden = false;
+  if (search) { search.value = ''; }
+  capRenderFontList('');
+  if (search) setTimeout(() => { try { search.focus(); } catch {} }, 10);
+  // scroll the selected item into view
+  setTimeout(() => { const sel = menu.querySelector('.cap-fontpick-item.sel'); if (sel) sel.scrollIntoView({ block: 'nearest' }); }, 12);
+}
+function capCloseFontMenu() {
+  const pick = document.getElementById('capFontPick'), menu = document.getElementById('capFontMenu');
+  if (pick) pick.classList.remove('open');
+  if (menu) menu.hidden = true;
+}
+function capWireFontPicker() {
+  const btn = document.getElementById('capFontBtn'), pick = document.getElementById('capFontPick'), search = document.getElementById('capFontSearch');
+  if (!btn || !pick || btn._wired) return;
+  btn._wired = true;
+  btn.addEventListener('click', (e) => { e.stopPropagation(); if (pick.classList.contains('open')) capCloseFontMenu(); else capOpenFontMenu(); });
+  if (search) {
+    search.addEventListener('input', () => capRenderFontList(search.value));
+    search.addEventListener('click', (e) => e.stopPropagation());
+    search.addEventListener('keydown', (e) => { if (e.key === 'Escape') capCloseFontMenu(); });
+  }
+  // click outside closes
+  document.addEventListener('mousedown', (e) => { if (pick.classList.contains('open') && !pick.contains(e.target)) capCloseFontMenu(); });
+  capSyncFontLabel();
+}
 async function capLoadFonts() {
   if (_capFontsLoaded) return;
-  const sel = document.getElementById('capFontFamily');
-  if (!sel) return;
   try {
     const r = await fetch(BRIDGE + '/captions/fonts');
     const d = await r.json();
     const fonts = (d && d.fonts) || [];
     if (!fonts.length) return;
     _capFontsLoaded = true;
-    const curated = [].map.call(sel.options, o => ({ v: o.value, t: o.textContent }));
-    sel.innerHTML = '';
-    const gRec = document.createElement('optgroup'); gRec.label = 'Recommended';
-    curated.forEach(o => { const op = document.createElement('option'); op.value = o.v; op.textContent = o.t; gRec.appendChild(op); });
-    sel.appendChild(gRec);
-    const gSys = document.createElement('optgroup'); gSys.label = 'All system fonts (' + fonts.length + ')';
-    fonts.forEach(f => { const op = document.createElement('option'); op.value = f; op.textContent = f; try { op.style.fontFamily = '"' + f + '"'; } catch {} gSys.appendChild(op); });
-    sel.appendChild(gSys);
-    sel.value = capState.fontFamily || '';
+    // append system fonts (value === family name; spaces preserved)
+    capFontItems = CAP_FONT_CURATED.concat(fonts.map(f => ({ label: f, value: f, system: true })));
+    capSyncFontLabel();
+    const menu = document.getElementById('capFontMenu');
+    if (menu && !menu.hidden) capRenderFontList(document.getElementById('capFontSearch').value);
     try { cclog('info', 'captions: fonts loaded', { count: fonts.length }); } catch {}
   } catch (e) { try { cclog('warn', 'captions: font load failed', { err: String((e && e.message) || e) }); } catch {} }
 }
