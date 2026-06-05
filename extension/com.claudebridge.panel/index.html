@@ -2547,12 +2547,14 @@
   .cap-looks::-webkit-scrollbar-track, .cap-styles::-webkit-scrollbar-track { background: transparent; }
   .cap-looks::-webkit-scrollbar-thumb, .cap-styles::-webkit-scrollbar-thumb { background: rgba(235,230,223,.18); border-radius: 6px; transition: background .15s; }
   .cap-looks::-webkit-scrollbar-thumb:hover, .cap-styles::-webkit-scrollbar-thumb:hover { background: rgba(235,230,223,.30); }
-  .cap-look { flex: 0 0 auto; width: 74px; cursor: pointer; background: none; border: none; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-  .cap-look-prev { height: 54px; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; transition: border-color .15s var(--ease-out), background .15s var(--ease-out); background: var(--cc-card); }
+  /* content-width cards + uniform chip padding → every badge sits with the SAME space
+     around it (even spacing, consistent font, no clipping). */
+  .cap-look { flex: 0 0 auto; cursor: pointer; background: none; border: none; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .cap-look-prev { height: 52px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; transition: border-color .15s var(--ease-out), background .15s var(--ease-out); background: var(--cc-card); }
   .cap-look:hover .cap-look-prev { border-color: var(--line-strong, rgba(235,230,223,.16)); background: var(--cc-hover); }
   .cap-look.sel .cap-look-prev { border-color: var(--accent-line); box-shadow: 0 0 0 1px var(--accent-line) inset; }
   .cap-look-prev b { display: inline-block; font-size: 15px; font-weight: 900; letter-spacing: .01em; line-height: 1; }
-  .cap-look-name { font-size: 11px; color: var(--text-dim); text-align: center; font-weight: 600; }
+  .cap-look-name { font-size: 11px; color: var(--text-dim); text-align: center; font-weight: 600; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cap-look.sel .cap-look-name { color: var(--accent-2); }
 
   /* toggle chips (replace several identical toggle bars) */
@@ -9181,7 +9183,6 @@ async function openCaptionsModal() {
   capLoadFonts();   // populate the font picker with every installed system font (async)
   capWireScrollers();
   capWireHeaderHide();
-  requestAnimationFrame(capNormalizeLookBadges);   // even out the quick-look badge widths
 
   const info = document.getElementById('capSelInfo');
   if (info) { info.className = 'cap-selchip'; info.textContent = 'Reading selection…'; }
