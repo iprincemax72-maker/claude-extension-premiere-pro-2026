@@ -2551,7 +2551,7 @@
   .cap-look-prev { height: 54px; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; transition: border-color .15s var(--ease-out), background .15s var(--ease-out); background: var(--cc-card); }
   .cap-look:hover .cap-look-prev { border-color: var(--line-strong, rgba(235,230,223,.16)); background: var(--cc-hover); }
   .cap-look.sel .cap-look-prev { border-color: var(--accent-line); box-shadow: 0 0 0 1px var(--accent-line) inset; }
-  .cap-look-prev b { font-size: 16px; font-weight: 900; letter-spacing: .01em; line-height: 1; }
+  .cap-look-prev b { display: inline-block; font-size: 15px; font-weight: 900; letter-spacing: .01em; line-height: 1; }
   .cap-look-name { font-size: 11px; color: var(--text-dim); text-align: center; font-weight: 600; }
   .cap-look.sel .cap-look-name { color: var(--accent-2); }
 
@@ -3795,10 +3795,10 @@
         <button type="button" class="cap-look" data-look="highlight"><span class="cap-look-prev"><b style="color:#fff">it's <span style="color:#E2885F">key</span></b></span><span class="cap-look-name">Highlight</span></button>
         <button type="button" class="cap-look" data-look="boldyellow"><span class="cap-look-prev"><b style="color:#F5C542;-webkit-text-stroke:1px #000">BOLD</b></span><span class="cap-look-name">Bold Yellow</span></button>
         <button type="button" class="cap-look" data-look="karaoke"><span class="cap-look-prev"><b style="color:#fff">word <span style="color:#E2885F">pop</span></b></span><span class="cap-look-name">Karaoke</span></button>
-        <button type="button" class="cap-look" data-look="minimalkw"><span class="cap-look-prev"><b style="color:#fff;font-weight:700;font-size:13px">go <span style="color:#4ECB71">green</span></b></span><span class="cap-look-name">Minimal+</span></button>
+        <button type="button" class="cap-look" data-look="minimalkw"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">go <span style="color:#4ECB71">green</span></b></span><span class="cap-look-name">Minimal+</span></button>
         <button type="button" class="cap-look" data-look="rainbow"><span class="cap-look-prev"><b><span style="color:#E2885F">a</span><span style="color:#5AA9FF">b</span><span style="color:#4ECB71">c</span></b></span><span class="cap-look-name">Rainbow</span></button>
         <button type="button" class="cap-look" data-look="tiktok"><span class="cap-look-prev"><b style="color:#5AA9FF">type</b></span><span class="cap-look-name">TikTok</span></button>
-        <button type="button" class="cap-look" data-look="clean"><span class="cap-look-prev"><b style="color:#fff;font-weight:700;font-size:14px">clean</b></span><span class="cap-look-name">Clean</span></button>
+        <button type="button" class="cap-look" data-look="clean"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">clean</b></span><span class="cap-look-name">Clean</span></button>
         <button type="button" class="cap-look" data-look="neon"><span class="cap-look-prev"><b style="color:#4ECB71;-webkit-text-stroke:1px #063">NEON</b></span><span class="cap-look-name">Neon</span></button>
       </div>
 
@@ -9041,6 +9041,22 @@ function capWireScrollers() {
     row._scrollArrowUpdate = update;
   });
 }
+// Even out the Quick-Look badges: they're different text lengths, so without this some
+// cards look full and others look empty ("random space"). Scale each badge toward a
+// shared target width (clamped) so every card is filled about the same.
+function capNormalizeLookBadges() {
+  if (!captionsModal) return;
+  const TARGET = 54;
+  captionsModal.querySelectorAll('#capLooks .cap-look-prev b').forEach(b => {
+    b.style.transform = '';
+    const w = b.getBoundingClientRect().width;
+    if (w > 4) {
+      const k = Math.max(0.74, Math.min(1.4, TARGET / w));
+      b.style.transform = 'scale(' + k.toFixed(3) + ')';
+      b.style.transformOrigin = 'center';
+    }
+  });
+}
 // Slide the header up + fade it out while scrolling down; bring it back on scroll up.
 function capWireHeaderHide() {
   const body = document.querySelector('.cap-body');
@@ -9070,6 +9086,7 @@ async function openCaptionsModal() {
   capLoadFonts();   // populate the font picker with every installed system font (async)
   capWireScrollers();
   capWireHeaderHide();
+  requestAnimationFrame(capNormalizeLookBadges);   // even out the quick-look badge widths
 
   const info = document.getElementById('capSelInfo');
   if (info) { info.className = 'cap-selchip'; info.textContent = 'Reading selection…'; }
