@@ -335,6 +335,48 @@ function ccImportCaptionClips(clipsJson) {
     }
 }
 
+// NATIVE editable captions: import an SRT and try to add it as a real Premiere
+// caption track (fully editable text + position in Premiere). If the caption-track
+// API isn't available on this build, the SRT still lands in the bin and the user
+// drags it onto the timeline (Premiere turns it into an editable caption track).
+function ccImportCaptions(srtPath) {
+    var result = { ok: false, imported: false, placed: false, path: srtPath };
+    try {
+        if (typeof app === "undefined" || !app || !app.project) { result.error = "no project open"; return JSON.stringify(result); }
+        if (!srtPath) { result.error = "no path"; return JSON.stringify(result); }
+        var importedOk = _ccSafe(function () { return app.project.importFiles([srtPath], true, app.project.rootItem, false); });
+        if (!importedOk) { result.error = "import failed"; return JSON.stringify(result); }
+        result.imported = true;
+        var item = _ccFindItemByPath(app.project.rootItem, srtPath, 0);
+        if (!item) { result.ok = true; result.reason = "imported to bin (drag it onto the timeline to make a caption track)"; return JSON.stringify(result); }
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) { result.ok = true; result.reason = "imported to bin (no active sequence)"; return JSON.stringify(result); }
+
+        var placed = false;
+        _ccSafe(function () {
+            if (typeof seq.createCaptionTrack === "function") {
+                // arg/format forms vary across Premiere builds — try the likely ones
+                try { seq.createCaptionTrack(item, 0, seq.zeroPoint); placed = true; }
+                catch (e1) {
+                    try { seq.createCaptionTrack(item, 0); placed = true; }
+                    catch (e2) {
+                        try { seq.createCaptionTrack(item); placed = true; } catch (e3) {}
+                    }
+                }
+            }
+        });
+        result.ok = true;
+        result.placed = placed;
+        result.reason = placed
+            ? "added as an editable caption track"
+            : "imported to bin — drag it onto the timeline to create an editable caption track";
+        return JSON.stringify(result);
+    } catch (e) {
+        result.error = String(e);
+        return JSON.stringify(result);
+    }
+}
+
 function ccOpenInSource(path) {
     try {
         if (typeof app === "undefined" || !app || !app.project) {

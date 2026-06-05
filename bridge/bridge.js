@@ -793,6 +793,29 @@ async function splitCaptionClips(srcMov, lines, baseTimelineSec, reqId, log) {
   return out;
 }
 
+// Write an SRT for the NATIVE editable-captions mode. Times are made absolute to
+// the timeline (baseTimelineSec + line offset) so Premiere drops them at the clip.
+function writeSrt(lines, baseTimelineSec, options, reqId) {
+  const dest = path.join(OUTPUT_DIR, 'captions_' + String(reqId).slice(0, 8) + '_' + Date.now() + '.srt');
+  const pad = (n, w) => String(Math.floor(n)).padStart(w, '0');
+  const fmt = (ms) => {
+    ms = Math.max(0, Math.round(ms));
+    return pad(ms / 3600000, 2) + ':' + pad((ms % 3600000) / 60000, 2) + ':' + pad((ms % 60000) / 1000, 2) + ',' + pad(ms % 1000, 3);
+  };
+  const up = !!(options && options.uppercase);
+  const base = (Number(baseTimelineSec) || 0) * 1000;
+  let out = '', n = 0;
+  for (const l of (lines || [])) {
+    let text = (l.words || []).map(w => w.text).join(' ').trim();
+    if (!text) continue;
+    if (up) text = text.toUpperCase();
+    n++;
+    out += n + '\n' + fmt(base + l.startMs) + ' --> ' + fmt(base + l.endMs) + '\n' + text + '\n\n';
+  }
+  fs.writeFileSync(dest, out, 'utf8');
+  return dest;
+}
+
 // Ask Claude (small, fast call) to scan the transcript for fillers + false
 // starts. Claude doesn't need any tools — just reads text, returns JSON. So
 // no hanging on tool I/O. 60s hard cap. Used only when useTranscript is true.
@@ -3024,7 +3047,7 @@ const server = http.createServer((req, res) => {
 
   // Track in-flight heavy requests so the periodic auto-update never restarts
   // the bridge mid-render. res 'close' fires on normal finish OR client abort.
-  if (req.method === 'POST' && (req.url === '/chat' || req.url === '/autoedit' || req.url === '/autoedit/run' || req.url === '/autoedit/analyze' || req.url === '/autocut' || req.url === '/captions' || req.url === '/plan/questions')) {
+  if (req.method === 'POST' && (req.url === '/chat' || req.url === '/autoedit' || req.url === '/autoedit/run' || req.url === '/autoedit/analyze' || req.url === '/autocut' || req.url === '/captions' || req.url === '/captions/transcribe' || req.url === '/plan/questions')) {
     _heavyInflight++;
     res.on('close', () => { _heavyInflight = Math.max(0, _heavyInflight - 1); });
   }
@@ -4451,6 +4474,46 @@ const server = http.createServer((req, res) => {
   //         width, height, fps, grouping?, reqId? }. Transcribes the selected
   //         clip's audio word-by-word, groups into lines, renders the styled
   //         transparent Captions overlay, returns [[IMPORT]] + placement.
+  // PHASE 1 of the edit flow: transcribe the selection and return editable lines.
+  if (req.method === 'POST' && req.url === '/captions/transcribe') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      let payload;
+      try { payload = JSON.parse(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+      const reqId = payload.reqId || crypto.randomUUID();
+      const segments = Array.isArray(payload.segments) ? payload.segments : [];
+      const grouping = (payload.grouping && typeof payload.grouping === 'object') ? payload.grouping : {};
+      const style = payload.style || 'karaoke';
+      const log = (m) => { try { clog('autoedit', 'info', '[captions/transcribe] ' + m, { reqId }, reqId); } catch {} };
+      const fail = (msg) => { try { broadcastProgressDone(reqId); } catch {} if (!res.writableEnded) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: msg, reqId })); } };
+      const childProcs = new Set(); let aborted = false;
+      const onProc = (p) => { if (aborted) { try { p.kill('SIGKILL'); } catch {} return; } childProcs.add(p); p.on('close', () => childProcs.delete(p)); };
+      req.on('aborted', () => { aborted = true; for (const p of childProcs) { try { p.kill('SIGKILL'); } catch {} } try { broadcastProgressDone(reqId); } catch {} });
+      try {
+        if (!segments.length) return fail('No clip selected. Select the clip whose speech you want captioned.');
+        if (AUTH_ENABLED) { const s = loadSession(); if (!isOwnerEmail((s && s.user && s.user.email) || '')) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, planBlock: true, error: 'Captions are in early access — not available on your account yet.', reqId })); return; } }
+        broadcastProgress('Extracting audio', 8, reqId);
+        const { wavPath, totalDur } = await extractConcatAudio(segments, reqId, log);
+        if (aborted) return;
+        broadcastProgress('Transcribing word-by-word', 35, reqId);
+        const { words } = await transcribeWords(wavPath, totalDur, onProc);
+        if (aborted) return;
+        if (!words.length) return fail('No speech found to caption in the selected clip.');
+        const lines = groupWordsIntoLines(words, {
+          maxWordsPerLine: grouping.maxWordsPerLine || (style === 'reels' || style === 'tiktok' ? 3 : 4),
+          maxGapMs: grouping.maxGapMs, maxLineMs: grouping.maxLineMs, maxCharsPerLine: grouping.maxCharsPerLine,
+        });
+        broadcastProgress('Done', 100, reqId);
+        broadcastProgressDone(reqId);
+        log(`transcribed ${words.length} words -> ${lines.length} lines`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, reqId, lines, wordCount: words.length, lineCount: lines.length, durationSec: totalDur, timelineStart: Number(segments[0].timelineStart) || 0 }));
+      } catch (e) { fail(e && e.message ? e.message : String(e)); }
+    });
+    return;
+  }
+
   if (req.method === 'POST' && req.url === '/captions') {
     let body = '';
     req.on('data', c => body += c);
@@ -4460,7 +4523,9 @@ const server = http.createServer((req, res) => {
       catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
       const reqId = payload.reqId || crypto.randomUUID();
       const segments = Array.isArray(payload.segments) ? payload.segments : [];
-      const STYLES = ['classic', 'karaoke', 'reels', 'tiktok', 'minimal'];
+      const editedLines = (Array.isArray(payload.lines) && payload.lines.length) ? payload.lines : null;  // pre-transcribed/edited
+      const mode = payload.mode === 'native' ? 'native' : 'animated';
+      const STYLES = ['classic', 'karaoke', 'reels', 'tiktok', 'minimal', 'hormozi'];
       const style = STYLES.includes(payload.style) ? payload.style : 'karaoke';
       const options = (payload.options && typeof payload.options === 'object') ? payload.options : {};
       const grouping = (payload.grouping && typeof payload.grouping === 'object') ? payload.grouping : {};
@@ -4491,7 +4556,7 @@ const server = http.createServer((req, res) => {
         try { broadcastProgressDone(reqId); } catch {}
       });
       try {
-        if (!segments.length) return fail('No clip selected. Select the clip whose speech you want captioned.');
+        if (!segments.length && !editedLines) return fail('No clip selected. Select the clip whose speech you want captioned.');
 
         // Captions are in early access — owner-only for now. Refuse non-owners
         // here too (the panel hides the button, but never trust the client).
@@ -4519,43 +4584,61 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        broadcastProgress('Extracting audio', 6, reqId);
-        const { wavPath, totalDur } = await extractConcatAudio(segments, reqId, log);
-
-        if (aborted) return;
-        broadcastProgress('Transcribing word-by-word', 22, reqId);
-        const { words } = await transcribeWords(wavPath, totalDur, onProc);
-        if (aborted) return;
-        log(`parakeet: ${words.length} words over ${totalDur.toFixed(1)}s`);
-        if (!words.length) return fail('No speech found to caption in the selected clip.');
-
-        // words[].startMs/endMs are ms from the selection's in-point, which sits
-        // at segments[0].timelineStart on the timeline — so the overlay drops at
-        // timelineStart and every word lands on its real moment with no re-basing.
-        const lines = groupWordsIntoLines(words, {
-          maxWordsPerLine: grouping.maxWordsPerLine || (style === 'reels' || style === 'tiktok' ? 3 : 4),
-          maxGapMs: grouping.maxGapMs,
-          maxLineMs: grouping.maxLineMs,
-          maxCharsPerLine: grouping.maxCharsPerLine,
-        });
-        if (options.keywords) markKeywords(lines);
+        // Lines: use the panel-provided (edited) ones, else transcribe from audio.
+        let lines, totalDur, wordCount;
+        const baseTimeline = editedLines ? (Number(payload.timelineStart) || 0) : (Number(segments[0].timelineStart) || 0);
+        if (editedLines) {
+          lines = editedLines;
+          wordCount = lines.reduce((n, l) => n + ((l.words || []).length), 0);
+          totalDur = lines.length ? lines[lines.length - 1].endMs / 1000 : 0;
+          log(`using ${lines.length} edited lines (${wordCount} words)`);
+        } else {
+          broadcastProgress('Extracting audio', 6, reqId);
+          const ex = await extractConcatAudio(segments, reqId, log);
+          totalDur = ex.totalDur;
+          if (aborted) return;
+          broadcastProgress('Transcribing word-by-word', 22, reqId);
+          const tr = await transcribeWords(ex.wavPath, totalDur, onProc);
+          if (aborted) return;
+          const words = tr.words;
+          log(`transcribed ${words.length} words over ${totalDur.toFixed(1)}s`);
+          if (!words.length) return fail('No speech found to caption in the selected clip.');
+          wordCount = words.length;
+          lines = groupWordsIntoLines(words, {
+            maxWordsPerLine: grouping.maxWordsPerLine || (style === 'reels' || style === 'tiktok' ? 3 : 4),
+            maxGapMs: grouping.maxGapMs, maxLineMs: grouping.maxLineMs, maxCharsPerLine: grouping.maxCharsPerLine,
+          });
+          log(`grouped into ${lines.length} caption lines`);
+        }
+        if (options.keywords && mode !== 'native') markKeywords(lines);
         if (options.emoji) applyEmojis(lines);
-        log(`grouped into ${lines.length} caption lines`);
 
+        // ── NATIVE mode: write an SRT (real editable Premiere captions) ──
+        if (mode === 'native') {
+          const srt = writeSrt(lines, baseTimeline, options, reqId);
+          broadcastProgress('Done', 100, reqId);
+          broadcastProgressDone(reqId);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: true, reqId, native: true, srt,
+            lineCount: lines.length, wordCount, timelineStart: baseTimeline,
+            durationSec: lines.length ? lines[lines.length - 1].endMs / 1000 : totalDur,
+          }));
+          return;
+        }
+
+        // ── ANIMATED mode: render the styled overlay, split per line ──
         if (aborted) return;
         broadcastProgress('Rendering captions overlay', 45, reqId);
         const outFile = await renderCaptions({ lines, style, options, width, height, fps, reqId, log, onProc });
         if (aborted) { try { fs.unlinkSync(outFile); } catch {} return; }
         log('rendered ' + path.basename(outFile));
 
-        // Split into ONE clip per caption line so each lands as its own movable
-        // timeline element (not one baked file with all the captions).
-        const baseTimeline = Number(segments[0].timelineStart) || 0;
         broadcastProgress('Splitting into per-line clips', 82, reqId);
         let clips = [];
         try { clips = await splitCaptionClips(outFile, lines, baseTimeline, reqId, log); } catch (e) { log('split failed: ' + (e && e.message || e)); }
-        if (clips.length) { try { fs.unlinkSync(outFile); } catch {} }  // big file no longer needed
-        else clips = [{ path: outFile, timelineSec: baseTimeline, durationSec: (lines.length ? lines[lines.length - 1].endMs / 1000 : totalDur), text: '' }];  // fallback: whole file
+        if (clips.length) { try { fs.unlinkSync(outFile); } catch {} }
+        else clips = [{ path: outFile, timelineSec: baseTimeline, durationSec: (lines.length ? lines[lines.length - 1].endMs / 1000 : totalDur), text: '' }];
 
         broadcastProgress('Done', 100, reqId);
         broadcastProgressDone(reqId);
@@ -4564,9 +4647,9 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({
           ok: true, reqId,
           clips,
-          import: clips[0].path,   // back-compat (first clip)
-          reply: `Captions ready (${words.length} words, ${lines.length} lines, ${clips.length} clips, ${style} style).`,
-          style, wordCount: words.length, lineCount: lines.length, clipCount: clips.length,
+          import: clips[0].path,
+          reply: `Captions ready (${wordCount} words, ${lines.length} lines, ${clips.length} clips, ${style} style).`,
+          style, wordCount, lineCount: lines.length, clipCount: clips.length,
           timelineStart: baseTimeline,
           durationSec,
         }));
