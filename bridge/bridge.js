@@ -2015,7 +2015,11 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
 
   const tasks = moments.map((m, idx) => {
     const speechDur = Math.max(0.5, m.endSec - m.startSec);
-    const durationSec = Math.min(6, Math.max(2.5, speechDur + 0.6));
+    // Cover the WHOLE moment's speech plus a tail, so the graphic NEVER finishes before
+    // the sentence does. (Was capped at 6s, which truncated longer sentences by 2-3s.)
+    // The +1.0s tail leaves room for a quick exit AFTER the speech; 20s is just a
+    // runaway guard (normal moments are a few seconds).
+    const durationSec = Math.max(2.8, Math.min(20, speechDur + 1.0));
     const durationFrames = Math.round(durationSec * 30);
     const outFile = path.join(cacheDir, `ae_${reqId.slice(0, 8)}_${idx}_${Date.now()}.mov`);
     return { idx, moment: m, outFile, durationSec, durationFrames };
@@ -2112,7 +2116,12 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
       '  rendering, the file\'s pixel format must be yuva444p10le (alpha-',
       '  capable) — verify with ffprobe if unsure and re-render if it is not.',
       placement,
-      '- It MUST animate in at the start and out before the end — never static.',
+      '- TIMING IS CRITICAL — the narration plays for the ENTIRE ' + task.durationSec.toFixed(1) + 's,',
+      '  so the graphic MUST stay on screen and readable that whole time. Animate IN',
+      '  quickly at the very start (first ~0.4s), then HOLD it fully visible (it can',
+      '  keep subtly moving, but the main content stays put and legible). Do the exit',
+      '  ONLY in the LAST ~0.4s. NEVER finish, fade out, or clear the screen early —',
+      '  it must not disappear seconds before the sentence ends. Never static either.',
       '- Render the final file to EXACTLY this path:',
       '  ' + task.outFile,
       '',

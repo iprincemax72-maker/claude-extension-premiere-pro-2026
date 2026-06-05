@@ -12,12 +12,14 @@ when something is fixed. Newest at top.
 - Captions tab follows **Claude design**: warm darks, scarce coral accent, no glows/gradients, shadow-rare.
 
 ## Open / watch
+- [ ] Auto-Edit motion-graphic TIMING (graphic must never end before the sentence) — code done, **needs a live Auto-Edit run** to confirm graphics now hold through the whole sentence and exit only at the very end.
 - [ ] Auto-Edit animation placement (V-tracks, no overwrite) — code done, **needs live in-Premiere verification** (QE addTracks is build-dependent).
 - [ ] Auto-Edit face-avoidance + voiceover-only — code done, **needs a live Auto-Edit run** to confirm Claude reads the start/mid/end frames and places graphics off the face, and that voiceover-only makes full-screen graphics.
 - [ ] Panel laggy in Premiere (feels ~30fps): added GPU + frame-rate CEF flags to manifest; user says still laggy. Likely a CEP/Premiere host cap we can't override from the extension. NOT caused by our JS (smooth in a browser). Don't cap our animations to 30fps — user explicitly forbade it.
 - [ ] Captions native/animated render correctness on a real clip — needs the user in Premiere.
 
 ## Fixed (this session)
+- Auto-Edit timing: graphics no longer finish early. Root causes were (1) a hard **6s duration cap** (`Math.min(6, …)`) that truncated any sentence longer than ~5.4s by 2-3s, and (2) the render prompt saying "animate out **before** the end" (Claude faded it away early). Fix: `durationSec = max(2.8, min(20, speechDur + 1.0))` (covers the whole sentence + 1s tail), and the prompt now says HOLD fully visible for the entire duration, exit ONLY in the last ~0.4s, never clear the screen early. `m.endSec` confirmed = the moment's last-sentence end, so duration tracks real speech.
 - Quick-Look badges: content-width cards + uniform 16px chip padding → every badge exactly 40px apart, consistent 15px font, no clipping. (Earlier uniform-WIDTH scaling was wrong — it caused font variance + clipping. Don't re-introduce it.)
 - Words-per-line: lines now stay on ONE row + auto-fit-to-width (preview + render); default 3 words.
 - Caption clips → high tracks (V19-V22), non-overlapping/editable.
