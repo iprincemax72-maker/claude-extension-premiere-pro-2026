@@ -3426,6 +3426,16 @@
     color: var(--text-faint);
     font-size: 12px;
   }
+  /* history kind filter bar (All / Renders / Auto-Edit) */
+  .history-filter { display: flex; gap: 6px; padding: 8px 12px 0; }
+  .history-filter-btn { flex: 1; font: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-dim);
+    background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; cursor: pointer;
+    transition: background .14s var(--ease-out), color .14s var(--ease-out), border-color .14s var(--ease-out); }
+  .history-filter-btn:hover { color: var(--text); }
+  .history-filter-btn.sel { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
+  .history-item.history-autoedit .autoedit-thumb { display: flex; align-items: center; justify-content: center; color: var(--accent); background: var(--accent-soft); }
+  .history-item.history-autoedit .autoedit-thumb svg { width: 26px; height: 26px; }
+
   .history-item {
     display: flex;
     gap: 10px;
@@ -4003,6 +4013,11 @@
         <path d="M18 6L6 18M6 6l12 12"/>
       </svg>
     </button>
+  </div>
+  <div class="history-filter" id="historyFilter">
+    <button type="button" class="history-filter-btn sel" data-kind="all">All</button>
+    <button type="button" class="history-filter-btn" data-kind="render">Renders</button>
+    <button type="button" class="history-filter-btn" data-kind="autoedit">Auto-Edit</button>
   </div>
   <div class="history-search-wrap">
     <svg class="history-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -5910,7 +5925,8 @@ function pathToSrc(absPath, kind) {
 
 /* ───── History (past renders) ───── */
 const HISTORY_KEY = 'claudeBridge.history';
-const HISTORY_MAX = 30;
+const HISTORY_MAX = 50;
+let _historyKind = 'all';   // history filter: 'all' | 'render' | 'autoedit'
 const historyBtn = document.getElementById('historyBtn');
 const historyPanel = document.getElementById('historyPanel');
 const historyList = document.getElementById('historyList');
@@ -5973,6 +5989,49 @@ function addHistoryEntry({prompt, path, mode, reply, iterationOf}) {
   if (historyPanel.classList.contains('show')) renderHistory();
 }
 
+// Record one Auto-Edit RUN in history (kind:'autoedit') — a summary card, not a
+// per-file render. Lets the user see + re-apply past Auto-Edit runs.
+function addAutoEditHistory(info) {
+  info = info || {};
+  const cnt = info.count || (info.items ? info.items.length : 0);
+  const id = Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  const entry = {
+    id, thread: id, kind: 'autoedit',
+    prompt: info.summary || ('Auto-Edit — ' + cnt + ' animation' + (cnt === 1 ? '' : 's')),
+    count: cnt,
+    style: info.style || '',
+    source: info.source || '',
+    items: (info.items || []).slice(0, 200),
+    path: (info.items && info.items[0] && info.items[0].file) || '',
+    t: Date.now(),
+  };
+  history.unshift(entry);
+  if (history.length > HISTORY_MAX) history = history.slice(0, HISTORY_MAX);
+  saveHistory();
+  if (historyPanel.classList.contains('show')) renderHistory();
+}
+
+const ICON_AUTOEDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3"/></svg>';
+
+// One compact card for an Auto-Edit run.
+function renderAutoEditCard(e, key) {
+  const visited = _historyVisited.has(key);
+  const cnt = e.count || (e.items ? e.items.length : 0);
+  const meta = relTime(e.t) + ' · ' + cnt + ' animation' + (cnt === 1 ? '' : 's')
+    + (e.style ? ' · ' + escapeHTML(e.style) : '') + (e.source ? ' · ' + escapeHTML(e.source) : '');
+  return '<div class="history-item history-autoedit' + (visited ? ' visited' : '') + '" data-row-id="' + key + '" title="Auto-Edit run">'
+    + '<div class="history-thumb autoedit-thumb">' + ICON_AUTOEDIT + '</div>'
+    + '<div class="history-body">'
+    +   '<div class="history-prompt-row"><div class="history-prompt">' + escapeHTML(e.prompt || 'Auto-Edit run') + '</div>'
+    +     '<span class="hist-count" style="background:var(--accent-soft);color:var(--accent)">Auto-Edit</span></div>'
+    +   '<div class="history-meta">' + meta + '</div>'
+    +   '<div class="history-actions">'
+    +     '<button data-act="reapply-ae" data-id="' + e.id + '">Re-apply</button>'
+    +     '<button class="danger" data-act="delete" data-id="' + e.id + '">Delete</button>'
+    +   '</div>'
+    + '</div></div>';
+}
+
 function renderHistoryBadge() { /* badge removed — was stuck at 30 and not useful */ }
 
 function relTime(ts) {
@@ -6006,6 +6065,11 @@ function renderHistory() {
   _threads.forEach((g) => {
     const items = g.items;
     const latest = items[0];
+    // honor the All / Renders / Auto-Edit filter bar
+    const isAE = latest && latest.kind === 'autoedit';
+    if (_historyKind === 'autoedit' && !isAE) return;
+    if (_historyKind === 'render' && isAE) return;
+    if (isAE) { html += renderAutoEditCard(latest, g.key); return; }
     const root = items[items.length - 1];
     const e = latest;                       // thumbnail + actions act on the latest render
     const chrono = items.slice().reverse(); // oldest → newest
@@ -6076,6 +6140,10 @@ function renderHistory() {
       + '<button data-tool="locate-all" style="background:transparent;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer">Locate all</button>'
       + '</div>'
       + html;
+  }
+  if (!html) {
+    historyList.innerHTML = '<div class="history-empty">No ' + (_historyKind === 'autoedit' ? 'Auto-Edit runs' : _historyKind === 'render' ? 'renders' : 'history') + ' yet.</div>';
+    return;
   }
   historyList.innerHTML = html;
 
@@ -6151,6 +6219,19 @@ function renderHistory() {
           saveHistory();
           renderHistory();
         }
+      } else if (btn.dataset.act === 'reapply-ae') {
+        // Re-place a past Auto-Edit run's animations on the timeline.
+        const its = (e.items || []).filter(it => it && it.file);
+        if (!its.length) { btn.textContent = 'no files'; return; }
+        btn.disabled = true; btn.textContent = 'Re-applying…';
+        try {
+          const escaped = JSON.stringify({ items: its }).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+          const raw = await evalES('ccAutoEditApply("' + escaped + '")');
+          const res = JSON.parse(raw || '{}');
+          btn.textContent = res.ok ? ('Re-applied ' + ((res.applied || []).length)) : ('failed: ' + (res.error || '?'));
+          try { cclog('info', 'autoedit: re-applied from history', { count: (res.applied || []).length }); } catch {}
+        } catch (err) { btn.textContent = 'failed'; }
+        finally { setTimeout(() => { btn.disabled = false; btn.textContent = 'Re-apply'; }, 1600); }
       } else if (btn.dataset.act === 'delete') {
         // Delete the WHOLE conversation thread, not just the latest render.
         const th = e.thread || e.id;
@@ -6355,6 +6436,20 @@ historyBtn.addEventListener('click', () => {
   historyPanel.classList.contains('show') ? closeHistory() : openHistory();
 });
 document.getElementById('historyClose').addEventListener('click', closeHistory);
+
+// History kind filter: All / Renders / Auto-Edit
+(function wireHistoryFilter() {
+  const bar = document.getElementById('historyFilter');
+  if (!bar) return;
+  bar.querySelectorAll('.history-filter-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      _historyKind = b.getAttribute('data-kind') || 'all';
+      bar.querySelectorAll('.history-filter-btn').forEach(x => x.classList.toggle('sel', x === b));
+      renderHistory();
+      applyHistoryFilter();
+    });
+  });
+})();
 
 /* Search across the rendered history rows. We filter the DOM directly
    instead of re-rendering — keeps the action-button event handlers
@@ -9563,6 +9658,15 @@ async function runAutoEditV2(opts) {
       + ((applyRes.skipped || []).length ? ` (${applyRes.skipped.length} skipped)` : '')
       + (data.planReport ? ' · ' + data.planReport : '')
     );
+    try {
+      const _aeN = (applyRes.applied || []).length;
+      addAutoEditHistory({
+        count: _aeN, items,
+        style: (data && (data.style || (data.plan && data.plan.style))) || '',
+        source: (data && data.source) || '',
+        summary: 'Auto-Edit — ' + _aeN + ' animation' + (_aeN === 1 ? '' : 's'),
+      });
+    } catch {}
   } catch (e) {
     if (e && e.name !== 'AbortError') progressUI.fail('Auto-Edit failed: ' + (e.message || e));
   } finally {
