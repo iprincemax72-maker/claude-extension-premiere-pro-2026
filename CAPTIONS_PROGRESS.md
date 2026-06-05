@@ -1,7 +1,37 @@
 # Animated Captions — build progress
 
-Autonomous build (self-paced loop). Goal: select a clip → transcribe word-level →
-render a styled, animated, transparent caption overlay → drop on the timeline.
+Autonomous build. Goal: select a clip → transcribe word-level → render styled,
+animated, transparent captions → drop each as its own layer on the timeline.
+
+## STATUS: feature-complete (Mac). Owner-only early access. Everything below verified.
+
+### Overnight session (Jun 5) — everything the user asked, done + verified
+- Full-screen "captions studio" modal (not a narrow bar) with a LIVE animated preview
+  (rAF engine mirroring the real render), hover animations, smooth/minimal.
+- Color: full custom picker (saturation/value square + hue strip + hex + presets).
+- Position: 3x3 zone grid (like Premiere's Align&Transform) + drag the preview caption.
+- Text panel: font family, weight (Reg/Semi/Bold/Black), align, size, letter-spacing,
+  line-height, words/line — Premiere-Text-panel depth.
+- Effects: shadow, outline(stroke)+colour, pill background.
+- Per-line VARIETY: each line a different colour + entrance animation (vary toggle).
+- Trendy HORMOZI style (active word in a colour box) + 11 Quick-look presets.
+- Submagic-inspired: KEYWORD highlighting (important word stays coloured) + AUTO-EMOJI
+  (curated keyword->emoji, one per line, colour emoji verified in ProRes).
+- EACH CAPTION = ITS OWN TIMELINE LAYER: render once, ffmpeg -c copy split into one
+  alpha clip per line, place each via host ccImportCaptionClips() (not one baked file).
+- Auto-import on generate, synced at the clip's timelineStart.
+- Owner-only lock (button + bridge gate). Selection chip live-polls (fixed the
+  "No clip selected" bug). Robustness: real cancel (kills child procs), temp-file
+  cleanup on all paths, GitHub-raw fetch cached.
+- Tests extract the real helpers from bridge.js (12 pass). No regressions to
+  login/auto-edit/chat/renders (verified). ~24 commits, all pushed.
+
+### Deferred / future
+- AI-context emoji (current is a curated dictionary, ~90 words).
+- Native editable Premiere TEXT (current = separate styled video clips per line;
+  Premiere ExtendScript can't reliably author styled animated text).
+- Windows whisper word-level path (parakeet is macOS-only).
+- Live in-Premiere verification on a real clip (needs the user).
 
 ## Done
 - [x] Plan agreed (defaults: auto-transcribe word-level, match clip aspect, Mac first, 5 styles + options)
