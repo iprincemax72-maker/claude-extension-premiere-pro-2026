@@ -2024,9 +2024,9 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
   const _isVertical = vidH > vidW * 1.1;
   const _isSquare = !_isVertical && Math.abs(vidW - vidH) < vidW * 0.12;
   const voiceoverOnly = !!(genOpts && genOpts.voiceoverOnly);
-  const faceSafeTopFrac = voiceoverOnly ? 0 : (_isVertical ? 0.60 : _isSquare ? 0.64 : 0.66);
+  const faceSafeTopFrac = voiceoverOnly ? 0 : (_isVertical ? 0.54 : _isSquare ? 0.58 : 0.62);
   const bottomMarginFrac = _isVertical ? 0.11 : _isSquare ? 0.09 : 0.08;  // clear space BELOW the block
-  const targetCenterFrac = _isVertical ? 0.72 : _isSquare ? 0.74 : 0.77;  // where the lower-third sits
+  const targetCenterFrac = _isVertical ? 0.66 : _isSquare ? 0.69 : 0.74;  // where the lower-third sits (upper chest)
   const faceSafeTopPx = Math.round(vidH * faceSafeTopFrac);
   const safeBotPx = Math.round(vidH * (1 - bottomMarginFrac));
   const targetCenterPx = Math.round(vidH * targetCenterFrac);
