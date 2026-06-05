@@ -2681,8 +2681,13 @@
   .cap-poszones .cap-zone-grid { grid-template-columns: repeat(3, 15px); grid-template-rows: repeat(3, 15px); gap: 2px; padding: 4px; }
   .cap-poszones .cap-zone-grid button { width: 15px; height: 15px; border-radius: 4px; }
 
-  .cap-select { font: inherit; font-size: 12px; color: var(--text); background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; cursor: pointer; min-width: 150px; }
-  .cap-select:focus { outline: none; border-color: var(--accent); }
+  .cap-select { font: inherit; font-size: 12px; color: var(--cc-text); background: var(--cc-sunken); border: 1px solid var(--border); border-radius: var(--r-md, 8px); padding: 7px 10px; cursor: pointer; min-width: 150px; }
+  .cap-select:hover { border-color: var(--line-strong, rgba(235,230,223,.16)); }
+  .cap-select:focus { outline: none; border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+  /* the open dropdown popup — force solid, high-contrast option text (CEP Chromium
+     was rendering these near-invisible). Solid warm surface + cream text. */
+  .cap-select option { background: #252320; color: #f4f0e9; font-size: 13px; padding: 4px 8px; }
+  .cap-select optgroup { background: #1a1916; color: #c9b8a6; font-weight: 700; font-style: normal; }
 
   /* draggable caption affordance */
   .cap-cap.draggable { cursor: grab; }
