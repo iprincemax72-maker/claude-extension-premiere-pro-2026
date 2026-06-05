@@ -2692,8 +2692,9 @@
   /* draggable caption affordance */
   .cap-cap.draggable { cursor: grab; }
   .cap-cap.dragging { cursor: grabbing; }
-  .cap-drag-hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: 9px; z-index: 3; font-size: 10px; color: rgba(255,255,255,.6); background: rgba(0,0,0,.55); padding: 3px 9px; border-radius: 14px; pointer-events: none; opacity: 0; transition: opacity .2s; }
-  .cap-stage-inner:hover .cap-drag-hint { opacity: 1; }
+  /* on-stage drag hint removed — it collided with the Replay button on the narrow
+     phone-frame stage, and the header already says "Drag the text to place it". */
+  .cap-drag-hint { display: none; }
 
   /* footer — generate bar (flat warm surface, hairline top) */
   .cap-footer { flex: 0 0 auto; display: flex; gap: 10px; align-items: center; padding: 11px 14px;

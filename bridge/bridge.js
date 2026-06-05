@@ -817,9 +817,14 @@ async function renderCaptions(opts) {
   // Transparent overlay = ProRes 4444 WITH alpha. Both --image-format=png AND
   // --pixel-format=yuva444p10le are REQUIRED — without them Remotion emits an
   // opaque yuv422 stream (no alpha plane) that would cover the footage.
+  // Speed: render frames across (almost) all cores instead of Remotion's conservative
+  // default. Capped at 10 so a big machine doesn't OOM on 1080x1920 PNG frames.
+  const cores = (os.cpus() || []).length || 4;
+  const concurrency = Math.max(2, Math.min(10, cores - 1));
   const args = [cli, 'render', entryRel, 'Captions', outFile,
     '--codec', 'prores', '--prores-profile', '4444',
     '--image-format', 'png', '--pixel-format', 'yuva444p10le',
+    '--concurrency=' + concurrency,
     '--props=' + propsFile, '--log', 'error'];
   const env = { ...process.env };
   env.PATH = path.dirname(nodeBin) + path.delimiter + (env.PATH || '');
@@ -851,31 +856,28 @@ async function renderCaptions(opts) {
 // are frame-accurate and fast (no re-encode, alpha preserved). Returns
 // [{ path, timelineSec, durationSec, text }] in timeline order.
 async function splitCaptionClips(srcMov, lines, baseTimelineSec, reqId, log) {
-  const out = [];
-  for (let i = 0; i < lines.length; i++) {
-    const l = lines[i];
+  // Each cut is an independent ffmpeg `-c copy` (no re-encode) — run them in parallel
+  // instead of one-at-a-time. runWithConcurrency preserves input order, so the
+  // returned clips stay in timeline order.
+  const stamp = Date.now();
+  const jobs = lines.map((l, i) => () => new Promise((res) => {
     const startSec = Math.max(0, l.startMs / 1000);
     const dur = Math.max(0.1, (l.endMs - l.startMs) / 1000);
-    const dest = path.join(OUTPUT_DIR, 'caption_' + String(reqId).slice(0, 8) + '_' + i + '_' + Date.now() + '.mov');
-    const ok = await new Promise((res) => {
-      // -ss before -i = fast input seek; exact for all-intra ProRes. -c copy keeps alpha.
-      const ff = spawn(FFMPEG_BIN, ['-y', '-ss', String(startSec), '-i', srcMov, '-t', String(dur), '-c', 'copy', dest]);
-      let er = '';
-      ff.stderr.on('data', d => er += d.toString().slice(-600));
-      const k = setTimeout(() => { try { ff.kill('SIGKILL'); } catch {} res(false); }, 60000);
-      ff.on('error', () => { clearTimeout(k); res(false); });
-      ff.on('close', c => { clearTimeout(k); res(c === 0 && fs.existsSync(dest)); });
+    const dest = path.join(OUTPUT_DIR, 'caption_' + String(reqId).slice(0, 8) + '_' + i + '_' + stamp + '.mov');
+    // -ss before -i = fast input seek; exact for all-intra ProRes. -c copy keeps alpha.
+    const ff = spawn(FFMPEG_BIN, ['-y', '-ss', String(startSec), '-i', srcMov, '-t', String(dur), '-c', 'copy', dest]);
+    ff.stderr.on('data', () => {});
+    const k = setTimeout(() => { try { ff.kill('SIGKILL'); } catch {} res(null); }, 60000);
+    ff.on('error', () => { clearTimeout(k); res(null); });
+    ff.on('close', c => {
+      clearTimeout(k);
+      if (c === 0 && fs.existsSync(dest)) res({ path: dest, timelineSec: baseTimelineSec + startSec, durationSec: dur, text: (l.words || []).map(w => w.text).join(' ') });
+      else res(null);
     });
-    if (ok) {
-      out.push({
-        path: dest,
-        timelineSec: baseTimelineSec + startSec,
-        durationSec: dur,
-        text: (l.words || []).map(w => w.text).join(' '),
-      });
-    } else if (log) log('split clip ' + i + ' failed');
-  }
-  if (log) log('split into ' + out.length + ' caption clips');
+  }));
+  const results = await runWithConcurrency(jobs, 6);
+  const out = results.filter(Boolean);
+  if (log) log('split into ' + out.length + ' caption clips (parallel)');
   return out;
 }
 
