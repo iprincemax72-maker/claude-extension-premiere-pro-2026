@@ -278,6 +278,31 @@ function ccImportToTimeline(path, mode, atSec) {
 // timeline (every caption is a separate, movable layer — not one baked file).
 // clipsJson = [{ path, timelineSec }]. Each is overwriteClip'd at its time on an
 // overlay track above the base video.
+// Best-effort: ensure the active sequence has at least 'want' video tracks, so
+// captions can live up high (away from footage + each other). QE is the only reliable
+// way to add tracks in ExtendScript; the addTracks signature varies by Premiere build,
+// so we try a few. Returns the resulting track count (may be < want if QE is blocked).
+function _ccEnsureVideoTracks(seq, want) {
+    var vt = _ccSafe(function () { return seq.videoTracks; });
+    var n = vt ? _ccSafe(function () { return vt.numTracks; }) : 0;
+    if (typeof n !== "number") n = 0;
+    if (n >= want) return n;
+    var toAdd = want - n;
+    _ccSafe(function () { if (typeof app.enableQE === "function") app.enableQE(); });
+    var qs = _ccSafe(function () {
+        return (typeof qe !== "undefined" && qe && qe.project && qe.project.getActiveSequence) ? qe.project.getActiveSequence() : null;
+    });
+    if (qs) {
+        var added = _ccSafe(function () { qs.addTracks(toAdd, n, 0, 0, 0); return true; });
+        if (!added) added = _ccSafe(function () { qs.addTracks(toAdd, n, 0); return true; });
+        if (!added) added = _ccSafe(function () { qs.addTracks(toAdd, n); return true; });
+        if (!added) added = _ccSafe(function () { qs.addTracks(toAdd); return true; });
+    }
+    vt = _ccSafe(function () { return seq.videoTracks; });
+    n = vt ? _ccSafe(function () { return vt.numTracks; }) : n;
+    return (typeof n === "number") ? n : 0;
+}
+
 function ccImportCaptionClips(clipsJson) {
     var result = { ok: false, placed: 0, total: 0, errors: [] };
     try {
@@ -289,10 +314,19 @@ function ccImportCaptionClips(clipsJson) {
 
         var seq = _ccSafe(function () { return app.project.activeSequence; });
         if (!seq) { result.error = "no active sequence"; return JSON.stringify(result); }
+        // Put captions up HIGH (≈ V19–V22) so they never collide with the footage or
+        // each other. Best-effort grow the sequence to 22 video tracks; if QE can't add
+        // them, we degrade to the top tracks that DO exist.
+        _ccEnsureVideoTracks(seq, 22);
         var vTracks = _ccSafe(function () { return seq.videoTracks; });
         var nTracks = vTracks ? _ccSafe(function () { return vTracks.numTracks; }) : 0;
         if (typeof nTracks !== "number" || nTracks <= 0) { result.error = "no video tracks"; return JSON.stringify(result); }
         var overlayBase = nTracks > 1 ? 1 : 0;   // first track above the base video
+        // caption band = the top 4 video tracks (V19–V22 when 22 exist)
+        var bandTop = nTracks - 1;
+        var bandBottom = bandTop - 3;
+        if (bandBottom < overlayBase) bandBottom = overlayBase;
+        result.band = "V" + (bandBottom + 1) + "-V" + (bandTop + 1);
 
         for (var i = 0; i < clips.length; i++) {
             var clip = clips[i];
@@ -311,13 +345,14 @@ function ccImportCaptionClips(clipsJson) {
             var time = _ccSafe(function () { return seq.getPlayerPosition && seq.getPlayerPosition(); });
             if (!time) { result.errors.push("clip " + i + ": no time"); continue; }
 
-            // pick the first overlay track that's free at this time
+            // pick the first track in the high caption band that's free at this time
+            // (so overlapping captions spread across V19–V22 instead of colliding)
             var track = null;
-            for (var t = overlayBase; t < nTracks; t++) {
+            for (var t = bandBottom; t <= bandTop; t++) {
                 var tk = _ccSafe((function (idx) { return function () { return vTracks[idx]; }; })(t));
                 if (tk && !_ccTrackHasClipAt(tk, atSec)) { track = tk; break; }
             }
-            if (!track) track = _ccSafe(function () { return vTracks[overlayBase]; });
+            if (!track) track = _ccSafe((function (idx) { return function () { return vTracks[idx]; }; })(bandBottom));
             if (!track) { result.errors.push("clip " + i + ": no track"); continue; }
 
             var placed = false;
