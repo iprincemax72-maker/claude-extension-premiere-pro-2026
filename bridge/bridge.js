@@ -2013,6 +2013,25 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
   const cacheDir = path.join(OUTPUT_DIR, 'cache');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
 
+  // ── Face-safe zone (talking-head) ────────────────────────────────────────
+  // Auto-Edit footage is talking-head: the speaker's FACE is in the UPPER part
+  // of the frame. Rather than hope Claude reads the frames and avoids the face,
+  // we hard-constrain every overlay to a bottom band. `faceSafeTopFrac` is the
+  // highest a graphic may reach (fraction of height); everything above stays
+  // transparent. Vertical clips give the face more room than wide ones.
+  const _isVertical = vidH > vidW * 1.1;
+  const _isSquare = !_isVertical && Math.abs(vidW - vidH) < vidW * 0.12;
+  const voiceoverOnly = !!(genOpts && genOpts.voiceoverOnly);
+  const faceSafeTopFrac = voiceoverOnly ? 0 : (_isVertical ? 0.60 : _isSquare ? 0.66 : 0.68);
+  const faceSafeTopPx = Math.round(vidH * faceSafeTopFrac);
+  const safeMarginX = Math.round(vidW * 0.05);
+  const safeBottomPad = Math.round(vidH * 0.04);
+  // Post-render guard: mean alpha (0-255) allowed in the face zone before we
+  // call it an intrusion and retry. A compliant graphic reads exactly 0 up
+  // there (validated), so this is set low to catch even partial intrusions
+  // while leaving margin above anti-aliasing noise.
+  const FACE_ZONE_LIMIT = 12;
+
   const tasks = moments.map((m, idx) => {
     const speechDur = Math.max(0.5, m.endSec - m.startSec);
     // Cover the WHOLE moment's speech plus a tail, so the graphic NEVER finishes before
@@ -2041,8 +2060,10 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
         + momentTypeToTrendPack(m.type, task.idx) + '). Across the video the graphics should feel VARIED — '
         + 'do not default to the same generic caption palette/type/motion every time.';
     }
-    // PLACEMENT: full-screen for voiceover-only clips, else a lower-third overlay
-    // that avoids the speaker's face (using the start/mid/end frames if we have them).
+    // PLACEMENT: full-screen for voiceover-only clips, else a bottom-band
+    // lower-third with a HARD pixel box so it can never reach the face. The box
+    // is geometric (computed from the frame), not a judgement call — Claude just
+    // has to keep every visible pixel inside it.
     let placement;
     if (opts && opts.voiceoverOnly) {
       placement =
@@ -2050,20 +2071,29 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
         '  screen to protect, so use the ENTIRE frame: a big, centred, full-bleed\n' +
         '  composition that fills the canvas edge to edge. Bold and cinematic, not a\n' +
         '  small corner card. (Background still transparent so it sits over the footage.)';
-    } else if (opts && Array.isArray(opts.faceFrames) && opts.faceFrames.length) {
-      placement =
-        '- It is an OVERLAY, not a full-screen card: keep it to a lower-third, corner,\n' +
-        '  or side panel as fits the type. It supports the speech, it does not cover the speaker.\n' +
-        '- AVOID THE SPEAKER\'S FACE. Here are frames from the start, middle and end of the\n' +
-        '  clip — Read each image file to SEE where the person/face sits, then place THIS\n' +
-        '  overlay in an EMPTY area (the opposite side / the very bottom) so it never covers\n' +
-        '  their face:\n' +
-        opts.faceFrames.map(f => '    ' + (f.label || '') + ': ' + f.path).join('\n');
     } else {
+      const faceHint = (opts && Array.isArray(opts.faceFrames) && opts.faceFrames.length)
+        ? ('\n- Optional refinement — these are frames from the start, middle and end of\n' +
+           '  the clip. You may Read them to see which SIDE the speaker leans and bias the\n' +
+           '  graphic toward the emptier side, but STILL never go above the y line:\n' +
+           opts.faceFrames.map(f => '    ' + (f.label || '') + ': ' + f.path).join('\n'))
+        : '';
       placement =
-        '- It is an OVERLAY, not a full-screen card: keep it to a lower-third,\n' +
-        '  corner, or side panel as fits the type. It supports the speech, it\n' +
-        '  does not cover the speaker.';
+        '- HARD PLACEMENT RULE — this is TALKING-HEAD footage; the speaker\'s FACE is in\n' +
+        '  the UPPER part of the frame. Your graphic is a LOWER-THIRD that lives ONLY in\n' +
+        '  the bottom band. EVERY visible pixel MUST fit inside this box:\n' +
+        '      x: ' + safeMarginX + 'px  to  ' + (vidW - safeMarginX) + 'px\n' +
+        '      y: ' + faceSafeTopPx + 'px  to  ' + (vidH - safeBottomPad) + 'px      (the frame is ' + vidW + 'x' + vidH + 'px)\n' +
+        '  EVERYTHING above y=' + faceSafeTopPx + 'px MUST be 100% transparent — no text,\n' +
+        '  no shapes, no border, no scrim, nothing. The face is up there.\n' +
+        '- Do NOT draw a full-frame card, a full-height panel, a box or border that spans\n' +
+        '  the whole frame, or any centred card. Keep it compact and BOTTOM-ANCHORED:\n' +
+        '  anchor content to the bottom edge and only grow upward within the band.' +
+        faceHint;
+      if (task._zoneRetry) {
+        placement += '\n- ⚠ YOUR PREVIOUS ATTEMPT BROKE THIS RULE and covered the face. This time keep\n' +
+          '  ABSOLUTELY EVERYTHING below y=' + faceSafeTopPx + 'px — make it a slim bottom strip.';
+      }
     }
     return [
       'Create a motion-graphic OVERLAY for a video. It will be placed on a',
@@ -2135,6 +2165,23 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
       'When finished, the file at ' + task.outFile + ' must exist on disk.',
       'Emit [[IMPORT:' + task.outFile + ']] when done.',
     ].join('\n');
+  }
+
+  // Mean alpha (0-255) of the face zone (the region ABOVE topPx) at a sampled
+  // time. ~0 means the graphic stayed out of the face zone; a high value means
+  // it intruded. Returns null if it couldn't measure (don't fail on that alone).
+  function _faceZoneAlpha(file, topPx, sampleSec) {
+    if (!(topPx > 1)) return null;
+    try {
+      const buf = require('child_process').execFileSync(FFMPEG_BIN, [
+        '-ss', String(Math.max(0, sampleSec)),
+        '-i', file,
+        '-vf', 'alphaextract,crop=iw:' + Math.round(topPx) + ':0:0,scale=1:1:flags=area',
+        '-frames:v', '1', '-pix_fmt', 'gray', '-f', 'rawvideo', '-',
+      ], { timeout: 15000, maxBuffer: 1024 * 1024 });
+      if (buf && buf.length) return buf[0];
+    } catch (e) {}
+    return null;
   }
 
   function runOne(task, isRetry) {
@@ -2218,6 +2265,24 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
           hasAlpha = true;
         }
         if (hasAlpha) {
+          // Face-zone guard — confirm the graphic stayed out of the upper (face)
+          // band. Sample ~60% through (the held-visible phase). If it covers the
+          // face zone, fail so it retries ONCE with a firmer bound; on the retry
+          // we accept whatever we get so this never reduces the graphic count.
+          if (!voiceoverOnly && faceSafeTopPx > 4) {
+            const sampleSec = Math.max(0, Math.min(task.durationSec * 0.6, task.durationSec - 0.2));
+            const za = _faceZoneAlpha(task.outFile, faceSafeTopPx, sampleSec);
+            if (za != null) {
+              log(`${tag} face-zone alpha=${za} (limit ${FACE_ZONE_LIMIT}, topPx=${faceSafeTopPx})`);
+              if (za > FACE_ZONE_LIMIT && !isRetry) {
+                log(`${tag} intrudes into the face zone — retrying with a firmer bound`);
+                try { fs.unlinkSync(task.outFile); } catch {}
+                task._zoneRetry = true;
+                resolve({ ok: false, idx: task.idx, atSec: task.moment.startSec, type: task.moment.type, label: task.moment.label || '', reason: 'covers face zone' });
+                return;
+              }
+            }
+          }
           log(`${tag} ok -> ${task.outFile}`);
           resolve({
             ok: true, idx: task.idx, file: task.outFile, atSec: task.moment.startSec,
