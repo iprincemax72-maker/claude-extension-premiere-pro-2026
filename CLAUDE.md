@@ -235,7 +235,8 @@ CLAUDE.md     # This file — agent-facing
 Every function returns a JSON string. Every operation wrapped in try/catch — Premiere is fragile.
 
 - `ccGetContext()` → project name, sequence name, playhead seconds, selected clips
-- `ccImportToTimeline(path, mode)` — `mode` is `overwrite` or `overlay`. Imports the file, finds `ProjectItem`, places on the right track.
+- `ccImportToTimeline(path, mode)` — `mode` is `overwrite` or `overlay`. Imports the file, finds `ProjectItem`, places on the right track. Imports land in a dedicated project bin (see `_ccEnsureBin`).
+- `_ccEnsureBin(name)` — find-or-creates a top-level project bin by name (default `CC_BIN_NAME = "Flimify Graphics"`), so every Flimify import (renders, Auto-Edit graphics, caption clips, previews) lands in ONE tidy folder inside the Premiere project instead of cluttering the root. All `importFiles(...)` calls pass `(_ccEnsureBin(CC_BIN_NAME) || rootItem)` as the target bin; falls back to root if creation fails. `_ccFindItemByPath` still locates items (it recurses into bins), so timeline placement is unaffected.
 - `ccOpenInSource(path)` — loads file in Premiere's Source Monitor (`app.sourceMonitor.openProjectItem`)
 - `ccImportFile(path)` — bin import only, no timeline placement (legacy fallback)
 - `ccGetSelectedClip()` — walks video then audio tracks, returns the FIRST selected clip's source path, duration, in/out points, timeline position (legacy single-clip path; resolves media path via getMediaPath → column metadata → XMP → QE walk)

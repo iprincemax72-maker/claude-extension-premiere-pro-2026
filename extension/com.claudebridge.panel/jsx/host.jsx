@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "5.10";
+var HOST_JSX_VERSION = "5.11";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -76,6 +76,32 @@ function ccGetSeqDims() {
     return JSON.stringify(out);
 }
 
+// Find-or-create a top-level project bin by name, so all Flimify imports land
+// in ONE tidy folder inside the Premiere project instead of cluttering the root.
+// Returns the bin ProjectItem, or null on failure (callers fall back to root).
+function _ccEnsureBin(name) {
+    try {
+        if (typeof app === "undefined" || !app || !app.project) return null;
+        var root = _ccSafe(function () { return app.project.rootItem; });
+        if (!root) return null;
+        var kids = _ccSafe(function () { return root.children; });
+        if (kids) {
+            var n = _ccSafe(function () { return kids.numItems; }) || 0;
+            for (var i = 0; i < n; i++) {
+                var it = _ccSafe((function (k) { return function () { return kids[k]; }; })(i));
+                if (!it) continue;
+                var nm = _ccSafe(function () { return it.name; });
+                if (nm !== name) continue;
+                var isBin = _ccSafe(function () { return it.type === 2; }) || _ccSafe(function () { return typeof it.createBin === "function"; });
+                if (isBin) return it;   // existing bin
+            }
+        }
+        var bin = _ccSafe(function () { return root.createBin(name); });
+        return bin || null;
+    } catch (e) { return null; }
+}
+var CC_BIN_NAME = "Flimify Graphics";
+
 function _ccFindItemByPath(parent, path, depth) {
     if (!parent || depth > 6) return null;
     var children = _ccSafe(function () { return parent.children; });
@@ -138,7 +164,7 @@ function ccImportToTimeline(path, mode, atSec) {
 
         // 1. Import
         var importedOk = _ccSafe(function () {
-            return app.project.importFiles([path], true, app.project.rootItem, false);
+            return app.project.importFiles([path], true, (_ccEnsureBin(CC_BIN_NAME) || app.project.rootItem), false);
         });
         if (!importedOk) { result.error = "import failed"; return JSON.stringify(result); }
         result.imported = true;
@@ -333,7 +359,7 @@ function ccImportCaptionClips(clipsJson) {
             var p = clip && clip.path;
             if (!p) { result.errors.push("clip " + i + ": no path"); continue; }
 
-            var ok = _ccSafe(function () { return app.project.importFiles([p], true, app.project.rootItem, false); });
+            var ok = _ccSafe(function () { return app.project.importFiles([p], true, (_ccEnsureBin(CC_BIN_NAME) || app.project.rootItem), false); });
             var item = _ccFindItemByPath(app.project.rootItem, p, 0);
             if (!item) { result.errors.push("clip " + i + ": item not found"); continue; }
             _ccSafe(function () { if (typeof item.setColorLabel === "function") item.setColorLabel(6); });
@@ -379,7 +405,7 @@ function ccImportCaptions(srtPath) {
     try {
         if (typeof app === "undefined" || !app || !app.project) { result.error = "no project open"; return JSON.stringify(result); }
         if (!srtPath) { result.error = "no path"; return JSON.stringify(result); }
-        var importedOk = _ccSafe(function () { return app.project.importFiles([srtPath], true, app.project.rootItem, false); });
+        var importedOk = _ccSafe(function () { return app.project.importFiles([srtPath], true, (_ccEnsureBin(CC_BIN_NAME) || app.project.rootItem), false); });
         if (!importedOk) { result.error = "import failed"; return JSON.stringify(result); }
         result.imported = true;
         var item = _ccFindItemByPath(app.project.rootItem, srtPath, 0);
@@ -420,7 +446,7 @@ function ccOpenInSource(path) {
         var item = _ccFindItemByPath(app.project.rootItem, path, 0);
         if (!item) {
             // Last-ditch attempt: import it first, then locate
-            try { app.project.importFiles([path], true, app.project.rootItem, false); } catch (e) {}
+            try { app.project.importFiles([path], true, (_ccEnsureBin(CC_BIN_NAME) || app.project.rootItem), false); } catch (e) {}
             item = _ccFindItemByPath(app.project.rootItem, path, 0);
         }
         if (!item) return JSON.stringify({ ok: false, error: "file not in project" });
@@ -446,7 +472,7 @@ function ccImportFile(path) {
             return JSON.stringify({ ok: false, error: "no project open" });
         }
         var ok = _ccSafe(function () {
-            return app.project.importFiles([path], true, app.project.rootItem, false);
+            return app.project.importFiles([path], true, (_ccEnsureBin(CC_BIN_NAME) || app.project.rootItem), false);
         });
         return JSON.stringify({ ok: !!ok, path: path });
     } catch (e) {
@@ -1345,7 +1371,7 @@ function ccAutoEditApply(payloadJson) {
 
             // 1. Import
             var importedOk = _ccSafe(function () {
-                return app.project.importFiles([it.file], true, app.project.rootItem, false);
+                return app.project.importFiles([it.file], true, (_ccEnsureBin(CC_BIN_NAME) || app.project.rootItem), false);
             });
             if (!importedOk) { skipped.push({ index: i, file: it.file, reason: "import failed" }); continue; }
             var item = _ccFindItemByPath(app.project.rootItem, it.file, 0);
@@ -1494,7 +1520,7 @@ function ccAutoEditReplace(payloadJson) {
 
         // 1. Import the new file FIRST — a failed import must not leave a hole.
         var importedOk = _ccSafe(function () {
-            return app.project.importFiles([payload.file], true, app.project.rootItem, false);
+            return app.project.importFiles([payload.file], true, (_ccEnsureBin(CC_BIN_NAME) || app.project.rootItem), false);
         });
         if (!importedOk) return JSON.stringify({ ok: false, error: "import failed", debug: debug });
         var newItem = _ccFindItemByPath(app.project.rootItem, payload.file, 0);
