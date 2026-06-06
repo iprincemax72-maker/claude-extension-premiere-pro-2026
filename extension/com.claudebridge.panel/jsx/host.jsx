@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "5.8";
+var HOST_JSX_VERSION = "5.9";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -472,14 +472,20 @@ function ccSelectionSig() {
         var qsel = _ccSafe(function () { return seq.getSelection && seq.getSelection(); });
         if (qsel) {
             var qn = _ccSafe(function () { return qsel.length; }) || 0;
-            if (!qn) return JSON.stringify({ ok: true, sig: "" });
+            if (!qn) return JSON.stringify({ ok: true, sig: "", path: "" });
             var qc = _ccSafe(function () { return qsel[0]; });
             var qnm = qc ? (_ccSafe(function () { return qc.name; }) || "") : "";
             var qst = qc ? _ccSafe(function () { return qc.start && qc.start.seconds; }) : null;
-            return JSON.stringify({ ok: true, sig: "S" + qn + "|" + qnm + "|" + (typeof qst === "number" ? qst.toFixed(3) : "?") });
+            // Resolve the media path straight from the selected item's projectItem
+            // (cheap — no timeline walk), so the panel never needs the slow
+            // ccGetSelectedClip just to find the path.
+            var qpi = qc ? _ccSafe(function () { return qc.projectItem; }) : null;
+            var qpath = qpi ? (_ccSafe(function () { return qpi.getMediaPath && qpi.getMediaPath(); }) || "") : "";
+            return JSON.stringify({ ok: true, sig: "S" + qn + "|" + qnm + "|" + (typeof qst === "number" ? qst.toFixed(3) : "?"), path: qpath });
         }
         // FALLBACK — walk tracks (older builds without getSelection()).
         var sig = "";
+        var sigPath = "";
         var done = false;
         var scan = function (track, tag) {
             if (done || !track) return;
@@ -493,6 +499,8 @@ function ccSelectionSig() {
                     var nm = _ccSafe(function () { return c.name; }) || "";
                     var st = _ccSafe(function () { return c.start && c.start.seconds; });
                     sig = tag + "|" + nm + "|" + (typeof st === "number" ? st.toFixed(3) : "?");
+                    var pi = _ccSafe(function () { return c.projectItem; });
+                    sigPath = pi ? (_ccSafe(function () { return pi.getMediaPath && pi.getMediaPath(); }) || "") : "";
                     done = true; return;
                 }
             }
@@ -509,7 +517,7 @@ function ccSelectionSig() {
                 for (var a = 0; a < na && !done; a++) scan(_ccSafe((function (k) { return function () { return at[k]; }; })(a)), "A" + a);
             }
         }
-        return JSON.stringify({ ok: true, sig: sig });
+        return JSON.stringify({ ok: true, sig: sig, path: sigPath });
     } catch (e) {
         return JSON.stringify({ ok: false, error: String(e) });
     }

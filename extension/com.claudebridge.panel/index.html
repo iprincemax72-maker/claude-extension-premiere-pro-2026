@@ -6597,14 +6597,15 @@ async function _clipWatchTick() {
   if (activeChatAbort) return;                  // don't yank away mid-render
 
   if (_clipWatchUseSig) {
-    // CHEAP first: a tiny signature tells us if the selection changed at all,
-    // without resolving media paths — keeps the fast poll from stuttering.
+    // ONE cheap call gives us BOTH the change-signature AND the media path,
+    // straight from seq.getSelection() — no timeline walk, no slow
+    // ccGetSelectedClip. This is what makes select AND deselect instant.
     let rawSig; try { rawSig = await evalES('ccSelectionSig()'); } catch { return; }
     if (rawSig == null) return;                  // CEP busy/unavailable — ignore
     if (_esEvalError(rawSig)) {
-      // Old host.jsx engine without ccSelectionSig (the panel hasn't re-eval'd
-      // the new host yet). Stop calling it — no error spam — and fall back to
-      // ccGetSelectedClip. Slow the poll a touch since that call is heavier.
+      // Old host engine without ccSelectionSig — stop calling it (no error
+      // spam) and fall back to ccGetSelectedClip. Slow the poll since that
+      // call is heavier on a busy timeline.
       _clipWatchUseSig = false;
       if (_clipWatchPoll) { clearInterval(_clipWatchPoll); _clipWatchPoll = setInterval(_clipWatchTick, 1200); }
       // fall through to the fallback below this tick
@@ -6614,11 +6615,7 @@ async function _clipWatchTick() {
       const sig = sg.sig || '';                  // '' = nothing selected
       if (sig === _clipWatchLastSig) return;     // unchanged — cheap exit
       _clipWatchLastSig = sig;
-      if (!sig) { _clipWatchApply(null); return; }  // deselected
-      let raw; try { raw = await evalES('ccGetSelectedClip()'); } catch { return; }
-      if (raw == null || _esEvalError(raw)) return;
-      let sel; try { sel = JSON.parse(raw); } catch { return; }
-      _clipWatchApply((sel && sel.ok && sel.path) ? sel.path : null);
+      _clipWatchApply(sig ? (sg.path || null) : null);   // path from the SAME call
       return;
     }
   }
@@ -7828,19 +7825,25 @@ syncSettingsUI();
 // We compare the on-disk version to the loaded one and re-eval only on mismatch.
 async function ensureFreshHostScript() {
   try {
-    if (typeof CSInterface === 'undefined' || !_fs || !window.__adobe_cep__) return;
+    if (typeof CSInterface === 'undefined' || !window.__adobe_cep__) return;
     const csi = new CSInterface();
-    const extRoot = csi.getSystemPath(SystemPath.EXTENSION);
-    const hostPath = extRoot + '/jsx/host.jsx';
-    if (!_fs.existsSync(hostPath)) return;
-    let loadedVer = null;
-    try { const raw = await evalES('ccVersion()'); const j = JSON.parse(raw); loadedVer = j && j.version; } catch {}
-    const src = _fs.readFileSync(hostPath, 'utf8');
-    const m = src.match(/HOST_JSX_VERSION\s*=\s*"([^"]+)"/);
-    const diskVer = m ? m[1] : null;
-    if (diskVer && loadedVer && diskVer === loadedVer) return;   // already fresh — nothing to do
-    await new Promise((res) => { try { window.__adobe_cep__.evalScript(src, () => res()); } catch { res(); } });
-    try { cclog('info', 'host.jsx re-evaluated into engine', { from: loadedVer, to: diskVer }); } catch {}
+    const sp = (typeof SystemPath !== 'undefined' && SystemPath.EXTENSION) || 'extension';
+    let extRoot = '';
+    try { extRoot = csi.getSystemPath(sp) || ''; } catch {}
+    if (!extRoot) return;
+    try { extRoot = decodeURIComponent(extRoot); } catch {}
+    const hostPath = extRoot.replace(/[\\/]+$/, '') + '/jsx/host.jsx';
+    const esc = hostPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    // Load the file straight into the ExtendScript engine with $.evalFile —
+    // reliable for big files (passing 80KB as an evalScript STRING is not, which
+    // is why the previous attempt silently failed). Idempotent: it just
+    // redefines the cc* functions, so always-run is safe and guarantees the
+    // freshest host after an auto-update (no manual panel reopen needed).
+    await new Promise((res) => {
+      try { window.__adobe_cep__.evalScript('$.evalFile("' + esc + '")', () => res()); }
+      catch { res(); }
+    });
+    try { const raw = await evalES('ccVersion()'); const j = JSON.parse(raw); cclog('info', 'host.jsx loaded via $.evalFile', { version: j && j.version, path: hostPath }); } catch {}
   } catch (e) { try { cclog('warn', 'ensureFreshHostScript failed', { error: String(e && e.message || e) }); } catch {} }
 }
 
