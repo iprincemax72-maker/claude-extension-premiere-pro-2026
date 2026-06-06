@@ -7521,15 +7521,25 @@ const Particles = (function () {
   }
 
   let t = 0;
-  function frame() {
+  let lastTs = 0;
+  function frame(ts) {
     if (!running || !ctx) return;
-    t += 0.016;
+    // Delta-time so motion speed is INDEPENDENT of frame rate. The manifest's
+    // --disable-frame-rate-limit / --disable-gpu-vsync flags let CEF render far
+    // above 60fps; with the old per-frame velocity that made the particles fly
+    // ("going crazy"). dt is in 60fps-frame units: 1.0 @60fps, 0.5 @120fps.
+    if (!lastTs) lastTs = ts || 0;
+    let dt = ts ? (ts - lastTs) / 16.6667 : 1;
+    lastTs = ts || lastTs;
+    if (!(dt > 0)) dt = 1;
+    if (dt > 4) dt = 4;          // cap big gaps (returning from background)
+    t += 0.016 * dt;
     const c = cfg();
     ctx.clearRect(0, 0, W, H);
     ctx.globalCompositeOperation = 'lighter';
 
     for (const p of parts) {
-      p.x += p.vx; p.y += p.vy;
+      p.x += p.vx * dt; p.y += p.vy * dt;
       // wrap
       if (p.x < -spriteR) p.x = W + spriteR; else if (p.x > W + spriteR) p.x = -spriteR;
       if (p.y < -spriteR) p.y = H + spriteR; else if (p.y > H + spriteR) p.y = -spriteR;
@@ -7567,6 +7577,7 @@ const Particles = (function () {
   function start() {
     if (running || !ctx) return;
     running = true;
+    lastTs = 0;                  // reset so resuming doesn't compute a huge dt
     raf = requestAnimationFrame(frame);
   }
   function stop() {
