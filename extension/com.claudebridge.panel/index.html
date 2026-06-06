@@ -4643,6 +4643,7 @@ const _emptyHTML = empty ? empty.outerHTML : ''; // snapshot for "new chat" rest
 const tabs = [];   // [{ id, label, contentEl, inputDraft, activeChatAbort, activeAutocut, activeAutoedit, expanding }]
 let activeTabIdx = 0;
 let _suppressAutoFocus = false;   // true while auto-switching tabs on clip-select (don't grab focus from Premiere)
+let _clipWatchReturnTabId = null; // tab to return to when the clip is deselected (set on the first auto-jump)
 let _tabCounter = 1;
 
 function getActiveLogContent() {
@@ -4721,6 +4722,7 @@ function newTab(opts) {
   activeTabIdx = tabs.length - 1;
   applyActiveTabState();
   renderTabStrip();
+  if (!_suppressAutoFocus) _clipWatchReturnTabId = null;   // a manually-opened tab cancels auto-return
   setTimeout(() => { if (_suppressAutoFocus) return; try { input.focus(); } catch {} }, 50);
 }
 
@@ -4730,7 +4732,7 @@ function switchTab(idx) {
   activeTabIdx = idx;
   applyActiveTabState();
   renderTabStrip();
-  if (!_suppressAutoFocus) { try { input.focus(); } catch {} }
+  if (!_suppressAutoFocus) { _clipWatchReturnTabId = null; try { input.focus(); } catch {} }   // manual nav cancels auto-return
 }
 
 function closeTab(idx) {
@@ -6591,16 +6593,42 @@ async function _clipWatchTick() {
   if (_clipWatchModalOpen()) return;            // a modal owns the selection
   if (activeChatAbort) return;                  // don't yank away mid-render
   let raw; try { raw = await evalES('ccGetSelectedClip()'); } catch { return; }
-  if (raw == null) return;
+  if (raw == null) return;                       // ES busy/transient — ignore
   let sel; try { sel = JSON.parse(raw); } catch { return; }
   const p = (sel && sel.ok && sel.path) ? sel.path : null;
-  if (!p) { _clipWatchLastPath = null; return; }
-  if (p === _clipWatchLastPath) return;         // selection unchanged
+  _clipWatchApply(p);
+}
+// The selection→tab state machine, split out so it's testable without ExtendScript.
+function _clipWatchApply(p) {
+  if (!p) {
+    // Deselected. If we auto-jumped to a clip's conversation earlier, go back
+    // to wherever the user was before (their home screen or other tab).
+    const wasSelected = _clipWatchLastPath != null;
+    _clipWatchLastPath = null;
+    if (wasSelected && _clipWatchReturnTabId != null) {
+      const idx = tabs.findIndex(t => t && t.id === _clipWatchReturnTabId);
+      _clipWatchReturnTabId = null;
+      if (idx >= 0 && idx !== activeTabIdx) {
+        _suppressAutoFocus = true;
+        switchTab(idx);
+        setTimeout(() => { _suppressAutoFocus = false; }, 250);
+      }
+    }
+    return;
+  }
+
+  if (p === _clipWatchLastPath) return;          // selection unchanged
   _clipWatchLastPath = p;
-  // Suppress the panel grabbing keyboard focus while it switches tabs — the
-  // user is in Premiere, we don't want to yank focus out of the timeline.
+  if (!findThreadKeyForPath(p)) return;          // not a Flimify clip → leave the user where they are
+
+  // Remember where to return BEFORE we jump — only on the first jump (don't
+  // overwrite when hopping between clips) and only if the jump changes tab.
+  // Suppress focus so the panel never yanks the keyboard out of Premiere.
+  const prevId = tabs[activeTabIdx] && tabs[activeTabIdx].id;
   _suppressAutoFocus = true;
   try { openConversationForClipPath(p); } catch (e) {}
+  const nowId = tabs[activeTabIdx] && tabs[activeTabIdx].id;
+  if (nowId !== prevId && _clipWatchReturnTabId == null) _clipWatchReturnTabId = prevId;
   setTimeout(() => { _suppressAutoFocus = false; }, 250);
 }
 function startClipConversationWatch() {
