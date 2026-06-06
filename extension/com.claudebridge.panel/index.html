@@ -6587,28 +6587,52 @@ function _clipWatchModalOpen() {
     || has(document.getElementById('historyPanel')) || has(document.getElementById('settingsPanel'));
 }
 let _clipWatchLastSig = null;
+let _clipWatchUseSig = true;     // false → host has no ccSelectionSig (old engine); use ccGetSelectedClip
+function _esEvalError(s) { return s != null && String(s).indexOf('EvalScript error') === 0; }
 async function _clipWatchTick() {
   if (document.hidden) return;
   if (!userSettings.openClipConversation) return;
   if (_esBusy) return;                          // don't pile onto ExtendScript
   if (_clipWatchModalOpen()) return;            // a modal owns the selection
   if (activeChatAbort) return;                  // don't yank away mid-render
-  // CHEAP first: a tiny signature tells us if the selection changed at all,
-  // without resolving any media paths — keeps the fast poll from stuttering
-  // the timeline. Only on a real change do we do the heavier path lookup.
-  let rawSig; try { rawSig = await evalES('ccSelectionSig()'); } catch { return; }
-  if (rawSig == null) return;                    // ES busy/transient — ignore
-  let sg; try { sg = JSON.parse(rawSig); } catch { return; }
-  if (!sg || !sg.ok) return;
-  const sig = sg.sig || '';                      // '' = nothing selected
-  if (sig === _clipWatchLastSig) return;         // unchanged — cheap exit
-  _clipWatchLastSig = sig;
-  if (!sig) { _clipWatchApply(null); return; }   // deselected
-  // Selection changed → resolve the source path once, then act.
+
+  if (_clipWatchUseSig) {
+    // CHEAP first: a tiny signature tells us if the selection changed at all,
+    // without resolving media paths — keeps the fast poll from stuttering.
+    let rawSig; try { rawSig = await evalES('ccSelectionSig()'); } catch { return; }
+    if (rawSig == null) return;                  // CEP busy/unavailable — ignore
+    if (_esEvalError(rawSig)) {
+      // Old host.jsx engine without ccSelectionSig (the panel hasn't re-eval'd
+      // the new host yet). Stop calling it — no error spam — and fall back to
+      // ccGetSelectedClip. Slow the poll a touch since that call is heavier.
+      _clipWatchUseSig = false;
+      if (_clipWatchPoll) { clearInterval(_clipWatchPoll); _clipWatchPoll = setInterval(_clipWatchTick, 1200); }
+      // fall through to the fallback below this tick
+    } else {
+      let sg; try { sg = JSON.parse(rawSig); } catch { return; }
+      if (!sg || !sg.ok) return;
+      const sig = sg.sig || '';                  // '' = nothing selected
+      if (sig === _clipWatchLastSig) return;     // unchanged — cheap exit
+      _clipWatchLastSig = sig;
+      if (!sig) { _clipWatchApply(null); return; }  // deselected
+      let raw; try { raw = await evalES('ccGetSelectedClip()'); } catch { return; }
+      if (raw == null || _esEvalError(raw)) return;
+      let sel; try { sel = JSON.parse(raw); } catch { return; }
+      _clipWatchApply((sel && sel.ok && sel.path) ? sel.path : null);
+      return;
+    }
+  }
+
+  // FALLBACK — no ccSelectionSig in this host engine. Use ccGetSelectedClip's
+  // path as the change signature. Works on any host version; resets to the fast
+  // path on a full panel reload.
   let raw; try { raw = await evalES('ccGetSelectedClip()'); } catch { return; }
-  if (raw == null) return;
+  if (raw == null || _esEvalError(raw)) return;
   let sel; try { sel = JSON.parse(raw); } catch { return; }
   const p = (sel && sel.ok && sel.path) ? sel.path : null;
+  const sig = p || '';
+  if (sig === _clipWatchLastSig) return;
+  _clipWatchLastSig = sig;
   _clipWatchApply(p);
 }
 // The selection→tab state machine, split out so it's testable without ExtendScript.
@@ -7796,8 +7820,35 @@ const Particles = (function () {
 applySettings();
 bindSettingsHandlers();
 syncSettingsUI();
-// Watch for the user selecting a Flimify-made clip → open its conversation.
-if (userSettings.openClipConversation) startClipConversationWatch();
+
+// Force the freshest host.jsx into the ExtendScript engine. CEP only loads it
+// (via the manifest ScriptPath) when the extension first opens — so after an
+// auto-update the engine keeps the OLD host until the panel is fully reopened,
+// which is what made new host functions error out ("not working after update").
+// We compare the on-disk version to the loaded one and re-eval only on mismatch.
+async function ensureFreshHostScript() {
+  try {
+    if (typeof CSInterface === 'undefined' || !_fs || !window.__adobe_cep__) return;
+    const csi = new CSInterface();
+    const extRoot = csi.getSystemPath(SystemPath.EXTENSION);
+    const hostPath = extRoot + '/jsx/host.jsx';
+    if (!_fs.existsSync(hostPath)) return;
+    let loadedVer = null;
+    try { const raw = await evalES('ccVersion()'); const j = JSON.parse(raw); loadedVer = j && j.version; } catch {}
+    const src = _fs.readFileSync(hostPath, 'utf8');
+    const m = src.match(/HOST_JSX_VERSION\s*=\s*"([^"]+)"/);
+    const diskVer = m ? m[1] : null;
+    if (diskVer && loadedVer && diskVer === loadedVer) return;   // already fresh — nothing to do
+    await new Promise((res) => { try { window.__adobe_cep__.evalScript(src, () => res()); } catch { res(); } });
+    try { cclog('info', 'host.jsx re-evaluated into engine', { from: loadedVer, to: diskVer }); } catch {}
+  } catch (e) { try { cclog('warn', 'ensureFreshHostScript failed', { error: String(e && e.message || e) }); } catch {} }
+}
+
+// Re-eval the host if stale, THEN start the clip watch (so ccSelectionSig is
+// available and we don't immediately fall back to the slow path).
+ensureFreshHostScript().then(() => {
+  if (userSettings.openClipConversation) startClipConversationWatch();
+});
 
 // Collapse/expand the whole top bar with the pull-tab arrow (state persists).
 (function wireHeaderCollapse() {

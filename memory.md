@@ -5,6 +5,7 @@ Purpose: the user reports bugs/requests here so I don't forget or re-break thing
 when something is fixed. Newest at top.
 
 ## Hard rules (don't violate)
+- **HOST.JSX STALE-AFTER-UPDATE**: CEP only loads host.jsx (via manifest ScriptPath) when the extension first OPENS. Auto-update writes the new host.jsx to disk but the running ExtendScript ENGINE keeps the OLD one → new host functions error ("EvalScript error", e.g. the ccSelectionSig spam every 500ms = "not working"). FIX shipped: `ensureFreshHostScript()` on panel init reads host.jsx from disk (`_fs` + `CSInterface.getSystemPath(EXTENSION)`) and re-evals it into the engine when the loaded `ccVersion()` ≠ the on-disk `HOST_JSX_VERSION`. So after this lands, host updates self-apply on the next panel HTML reload (no manual reopen). When debugging "host function not working after an update", suspect a stale engine FIRST. Any code calling a NEW host fn must tolerate the "EvalScript error" string from evalES (it returns that string, NOT null).
 - CEP = old Chromium: use **mouse events** (pointerdown doesn't fire). **NO `backdrop-filter`** (crashes Premiere).
 - host.jsx is **ES3 only**: `var`/`function` only, no `const`/`let`/arrow/template-literals/`.includes`; wrap calls in `_ccSafe`; never `new Time()`.
 - Don't break login / auto-edit / chat / renders / website.
