@@ -6586,14 +6586,27 @@ function _clipWatchModalOpen() {
   return has(captionsModal) || has(autoeditModal)
     || has(document.getElementById('historyPanel')) || has(document.getElementById('settingsPanel'));
 }
+let _clipWatchLastSig = null;
 async function _clipWatchTick() {
   if (document.hidden) return;
   if (!userSettings.openClipConversation) return;
   if (_esBusy) return;                          // don't pile onto ExtendScript
   if (_clipWatchModalOpen()) return;            // a modal owns the selection
   if (activeChatAbort) return;                  // don't yank away mid-render
+  // CHEAP first: a tiny signature tells us if the selection changed at all,
+  // without resolving any media paths — keeps the fast poll from stuttering
+  // the timeline. Only on a real change do we do the heavier path lookup.
+  let rawSig; try { rawSig = await evalES('ccSelectionSig()'); } catch { return; }
+  if (rawSig == null) return;                    // ES busy/transient — ignore
+  let sg; try { sg = JSON.parse(rawSig); } catch { return; }
+  if (!sg || !sg.ok) return;
+  const sig = sg.sig || '';                      // '' = nothing selected
+  if (sig === _clipWatchLastSig) return;         // unchanged — cheap exit
+  _clipWatchLastSig = sig;
+  if (!sig) { _clipWatchApply(null); return; }   // deselected
+  // Selection changed → resolve the source path once, then act.
   let raw; try { raw = await evalES('ccGetSelectedClip()'); } catch { return; }
-  if (raw == null) return;                       // ES busy/transient — ignore
+  if (raw == null) return;
   let sel; try { sel = JSON.parse(raw); } catch { return; }
   const p = (sel && sel.ok && sel.path) ? sel.path : null;
   _clipWatchApply(p);
@@ -6633,7 +6646,10 @@ function _clipWatchApply(p) {
 }
 function startClipConversationWatch() {
   if (_clipWatchPoll) return;
-  _clipWatchPoll = setInterval(_clipWatchTick, 2500);
+  // 700ms feels near-instant. Safe to poll this fast because each tick is just
+  // the cheap ccSelectionSig() (no media-path work); the heavy lookup only runs
+  // when the selection actually changes.
+  _clipWatchPoll = setInterval(_clipWatchTick, 700);
 }
 function stopClipConversationWatch() {
   if (_clipWatchPoll) { clearInterval(_clipWatchPoll); _clipWatchPoll = null; }

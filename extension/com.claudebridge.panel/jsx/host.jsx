@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "5.6";
+var HOST_JSX_VERSION = "5.7";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -451,6 +451,53 @@ function ccImportFile(path) {
         return JSON.stringify({ ok: !!ok, path: path });
     } catch (e) {
         return JSON.stringify({ ok: false, error: String(e), path: path });
+    }
+}
+
+// CHEAP selection signature — lets the panel detect a selection CHANGE on a
+// fast poll without the expensive media-path resolution ccGetSelectedClip does
+// (getMediaPath + column metadata + XMP + QE fallbacks). Walks tracks for the
+// first selected clip and returns a tiny "track|name|start" string; "" = no
+// selection. The panel only does the heavy path lookup when this changes, so
+// the always-on watch stays light and never stutters the timeline.
+function ccSelectionSig() {
+    try {
+        if (typeof app === "undefined" || !app || !app.project) return JSON.stringify({ ok: false });
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) return JSON.stringify({ ok: false });
+        var sig = "";
+        var done = false;
+        var scan = function (track, tag) {
+            if (done || !track) return;
+            var clips = _ccSafe(function () { return track.clips; });
+            if (!clips) return;
+            var n = _ccSafe(function () { return clips.numItems; });
+            if (typeof n !== "number") return;
+            for (var i = 0; i < n; i++) {
+                var c = _ccSafe(function () { return clips[i]; });
+                if (c && c.isSelected && _ccSafe(function () { return c.isSelected(); })) {
+                    var nm = _ccSafe(function () { return c.name; }) || "";
+                    var st = _ccSafe(function () { return c.start && c.start.seconds; });
+                    sig = tag + "|" + nm + "|" + (typeof st === "number" ? st.toFixed(3) : "?");
+                    done = true; return;
+                }
+            }
+        };
+        var vt = _ccSafe(function () { return seq.videoTracks; });
+        if (vt) {
+            var nv = _ccSafe(function () { return vt.numTracks; }) || 0;
+            for (var v = 0; v < nv && !done; v++) scan(_ccSafe((function (k) { return function () { return vt[k]; }; })(v)), "V" + v);
+        }
+        if (!done) {
+            var at = _ccSafe(function () { return seq.audioTracks; });
+            if (at) {
+                var na = _ccSafe(function () { return at.numTracks; }) || 0;
+                for (var a = 0; a < na && !done; a++) scan(_ccSafe((function (k) { return function () { return at[k]; }; })(a)), "A" + a);
+            }
+        }
+        return JSON.stringify({ ok: true, sig: sig });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e) });
     }
 }
 
