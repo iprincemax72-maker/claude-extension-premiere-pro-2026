@@ -168,7 +168,12 @@ export const Captions: React.FC<CaptionsProps> = ({ lines, style, options }) => 
     textTransform: opt.uppercase ? 'uppercase' : 'none',
     letterSpacing: ls,
     textShadow,
-    WebkitTextStroke: strokeW > 0 ? `${strokeW}px ${opt.strokeColor}` : undefined,
+    // Premiere-Pro-style stroke: a clean OUTER stroke (paint-order draws the
+    // stroke BEHIND the fill so it never eats the letter). Width is proportional
+    // to the type size (resolution-independent) and doubled because the centered
+    // webkit stroke only shows its outer half once the fill paints over the inner
+    // half — so the slider value reads as the true outer thickness.
+    WebkitTextStroke: strokeW > 0 ? `${(strokeW * 0.02 * opt.fontSize).toFixed(2)}px ${opt.strokeColor}` : undefined,
     paintOrder: 'stroke fill' as any,
     padding: '0 6%',
     maxWidth: '92%',

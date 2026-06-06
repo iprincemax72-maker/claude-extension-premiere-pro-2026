@@ -4122,8 +4122,8 @@
       <div class="cap-sec-label">Effects</div>
       <div class="cap-opts">
         <div class="cap-opt-row"><span class="cap-opt-label">Shadow</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capShadow" min="0" max="100" step="5" value="55"><span class="cap-slider-val" id="capShadowVal">55%</span></div></div>
-        <div class="cap-opt-row"><span class="cap-opt-label">Outline</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capStroke" min="0" max="12" step="1" value="2"><span class="cap-slider-val" id="capStrokeVal">2px</span></div></div>
-        <div class="cap-opt-row"><span class="cap-opt-label">Outline color</span><div class="cap-swatches" id="capStrokeSwatches"><span class="cap-swatch sel" data-color="#000000" style="background:#000"></span><span class="cap-swatch" data-color="#FFFFFF" style="background:#fff"></span><span class="cap-swatch" data-color="#15110d" style="background:#15110d"></span><span class="cap-swatch" data-color="#3A2A1F" style="background:#3A2A1F"></span></div></div>
+        <div class="cap-opt-row"><span class="cap-opt-label">Stroke</span><div class="cap-slider-wrap"><input type="range" class="cap-slider" id="capStroke" min="0" max="12" step="1" value="2"><span class="cap-slider-val" id="capStrokeVal">2px</span></div></div>
+        <div class="cap-opt-row"><span class="cap-opt-label">Stroke color</span><div class="cap-swatches" id="capStrokeSwatches"><span class="cap-swatch sel" data-color="#000000" style="background:#000"></span><span class="cap-swatch" data-color="#FFFFFF" style="background:#fff"></span><span class="cap-swatch" data-color="#15110d" style="background:#15110d"></span><span class="cap-swatch" data-color="#3A2A1F" style="background:#3A2A1F"></span></div></div>
         <div class="cap-opt-row wide" style="align-items:center"><span class="cap-opt-label">Options</span>
           <div class="cap-chips" id="capChips">
             <button type="button" class="cap-chip" data-chip="uppercase">UPPERCASE</button>
@@ -9239,8 +9239,15 @@ function capBuildLine(capEl, line, idx) {
   const sh = capState.shadowPct / 100;
   const shadowCss = sh > 0 ? ('0 ' + (2.5 * sh).toFixed(1) + 'px ' + Math.round(12 * sh) + 'px rgba(0,0,0,' + (0.7 * sh).toFixed(2) + ')') : 'none';
   lineEl.style.textShadow = shadowCss;
-  const strokePreview = Math.max(0, capState.strokePx * (fontPx / 90)); // scale stroke to preview font
-  lineEl.style.webkitTextStroke = strokePreview > 0 ? (strokePreview.toFixed(2) + 'px ' + capState.strokeColor) : '';
+  // Premiere-style stroke: clean OUTER stroke (paint-order = stroke behind fill),
+  // width proportional to the type size and doubled so the slider value reads as
+  // the true outer thickness (matches the Captions.tsx render exactly). Applied
+  // per-WORD in capStyleWord (text-stroke-width doesn't inherit reliably in CEF),
+  // so we stash the computed CSS here.
+  const strokeWebkitPx = Math.max(0, capState.strokePx * 0.02 * fontPx);
+  capPreview.strokeCss = strokeWebkitPx > 0 ? (strokeWebkitPx.toFixed(2) + 'px ' + capState.strokeColor) : '';
+  lineEl.style.webkitTextStroke = capPreview.strokeCss;
+  lineEl.style.paintOrder = 'stroke fill';
 
   // mark the keyword (longest content word) on this line for the preview
   let kwIdx = -1, kwLen = 0;
@@ -9325,11 +9332,14 @@ function capStyleWord(sp, ms) {
     sp.style.color = (active || sp.dataset.kw === '1') ? hl : '#fff';
     sp.style.opacity = '1'; sp.style.transform = ''; sp.style.background = ''; sp.style.padding = ''; sp.style.borderRadius = ''; sp.style.webkitTextStroke = '';
     const chs = sp.querySelectorAll('.cap-ch'); const PER = 26, DUR = 320;
+    const fadeStroke = capPreview.strokeCss || '';
     for (let li = 0; li < chs.length; li++) {
       const p = Math.max(0, Math.min(1, (ms - s - li * PER) / DUR));
       const ez = p < 1 ? (1 - Math.pow(1 - p, 3)) : 1;
       chs[li].style.opacity = String(ez);
       chs[li].style.transform = 'translateY(' + ((1 - ez) * 0.5).toFixed(3) + 'em)';
+      chs[li].style.webkitTextStroke = fadeStroke;
+      chs[li].style.paintOrder = 'stroke fill';
     }
     return;
   }
@@ -9369,7 +9379,10 @@ function capStyleWord(sp, ms) {
   sp.style.background = background;
   sp.style.padding = padding;
   sp.style.borderRadius = radius;
-  sp.style.webkitTextStroke = stroke;
+  // Premiere-style outer stroke applied per-word (stroke === '0' = a style that
+  // forces no stroke, e.g. the Hormozi highlight box); else the user's stroke.
+  sp.style.webkitTextStroke = (stroke === '0') ? '' : (capPreview.strokeCss || '');
+  sp.style.paintOrder = 'stroke fill';
 }
 
 function capPreviewTick(now) {
