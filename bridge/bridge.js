@@ -2321,11 +2321,15 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
             }
           }
           log(`${tag} ok -> ${task.outFile}`);
-          resolve({
+          // Strip the silent audio track so the graphic imports clean — no linked
+          // audio clip on the timeline, exactly like a normal chat render. Uses
+          // -c:v copy so the ProRes 4444 alpha is preserved (no re-encode).
+          stripAudioInPlace(task.outFile).then(() => resolve({
             ok: true, idx: task.idx, file: task.outFile, atSec: task.moment.startSec,
             type: task.moment.type, label: task.moment.label || '',
             durationSec: task.durationSec,
-          });
+          }));
+          return;
         } else {
           try { fs.unlinkSync(task.outFile); } catch {}
           resolve({ ok: false, idx: task.idx, atSec: task.moment.startSec, type: task.moment.type, label: task.moment.label || '', reason: 'opaque (no alpha)' });

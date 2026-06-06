@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "5.5";
+var HOST_JSX_VERSION = "5.6";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -1276,6 +1276,12 @@ function ccAutoEditApply(payloadJson) {
             if (!importedOk) { skipped.push({ index: i, file: it.file, reason: "import failed" }); continue; }
             var item = _ccFindItemByPath(app.project.rootItem, it.file, 0);
             if (!item) { skipped.push({ index: i, file: it.file, reason: "item not found after import" }); continue; }
+            // Tag with the Rose color label so Auto-Edit graphics look the same
+            // as normal renders on the timeline (was defaulting to blue).
+            _ccSafe(function () {
+                if (typeof item.setColorLabel === "function") item.setColorLabel(6);
+                else if (typeof item.colorLabel !== "undefined") item.colorLabel = 6;
+            });
 
             // 2. Compute target timeline time (snap to frame). Auto-Edit v2
             //    sends timelineSec already in timeline time (multi-clip /
