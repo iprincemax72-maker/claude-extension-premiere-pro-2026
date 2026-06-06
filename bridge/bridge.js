@@ -5510,6 +5510,39 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── Delete a rendered file from disk (panel "Delete" buttons) ─────────────
+  // Safety: media files only, only inside the output dir (or any */output/
+  // render folder under the user's home), never a directory, never a path with
+  // ".." traversal. Idempotent — deleting an already-gone file returns ok.
+  if (req.method === 'POST' && req.url === '/delete-file') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      let payload;
+      try { payload = JSON.parse(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+      const raw = String(payload.path || '');
+      try {
+        if (!raw || raw.indexOf('..') !== -1) { res.writeHead(400); res.end(JSON.stringify({ error: 'bad path' })); return; }
+        const resolved = path.resolve(raw);
+        const MEDIA = /\.(mp4|mov|m4v|avi|mkv|mxf|mts|webm|png|jpe?g|tiff?|gif|webp|wav|mp3|aac|m4a)$/i;
+        const home = os.homedir();
+        const inOutput = resolved === OUTPUT_DIR || resolved.startsWith(OUTPUT_DIR + path.sep);
+        const inProjectOutput = resolved.startsWith(home + path.sep) && /[/\\]output[/\\]/i.test(resolved);
+        if (!MEDIA.test(resolved)) { res.writeHead(403); res.end(JSON.stringify({ error: 'not a media file' })); return; }
+        if (!(inOutput || inProjectOutput)) { res.writeHead(403); res.end(JSON.stringify({ error: 'file is outside the render output folder' })); return; }
+        if (!fs.existsSync(resolved)) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, alreadyGone: true })); return; }
+        if (!fs.statSync(resolved).isFile()) { res.writeHead(403); res.end(JSON.stringify({ error: 'not a file' })); return; }
+        fs.unlinkSync(resolved);
+        clog('bridge', 'info', 'deleted render file', { path: resolved });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, deleted: resolved }));
+      } catch (e) {
+        res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e) }));
+      }
+    });
+    return;
+  }
+
   res.writeHead(404); res.end();
 });
 

@@ -1371,6 +1371,7 @@
   }
   .render-preview-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
     margin-top: 8px;
   }
@@ -1406,6 +1407,9 @@
     transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
   }
   .render-discard-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+  .render-delete-btn { margin-left: auto; }
+  .render-delete-btn:hover { color: #e0735f; border-color: rgba(224,115,95,0.45); }
+  .render-delete-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
   /* ───── AUTO-EDIT per-graphic results (change just one) ───── */
   .ae-results {
@@ -6358,11 +6362,32 @@ function renderHistory() {
         } catch (err) { btn.textContent = 'failed'; }
         finally { setTimeout(() => { btn.disabled = false; btn.textContent = 'Re-apply'; }, 1600); }
       } else if (btn.dataset.act === 'delete') {
-        // Delete the WHOLE conversation thread, not just the latest render.
+        // Delete the WHOLE conversation thread. Now also deletes the rendered
+        // file(s) from disk (the user wanted to remove animations, not just the
+        // log row). Confirm first since it is irreversible.
         const th = e.thread || e.id;
+        const threadEntries = history.filter(x => (x.thread || x.id) === th);
+        const files = [];
+        for (const x of threadEntries) {
+          if (x.path) files.push(x.path);
+          if (Array.isArray(x.items)) for (const it of x.items) if (it && it.file) files.push(it.file);
+        }
+        const uniqFiles = [...new Set(files)];
+        const ok = await ccConfirm({
+          title: uniqFiles.length ? 'Delete this animation?' : 'Remove from history?',
+          message: uniqFiles.length
+            ? ('Permanently deletes ' + (uniqFiles.length === 1 ? 'the rendered file' : (uniqFiles.length + ' rendered files')) + ' from disk and removes the entry. This cannot be undone.')
+            : 'Removes this entry from the History panel.',
+          okLabel: 'Delete', cancelLabel: 'Keep', danger: true,
+        });
+        if (!ok) return;
+        for (const f of uniqFiles) {
+          try { await fetch(BRIDGE + '/delete-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: f }) }); } catch {}
+        }
         history = history.filter(x => (x.thread || x.id) !== th);
         saveHistory();
         renderHistory();
+        try { cclog('info', 'deleted animation from history', { files: uniqFiles.length }); } catch {}
       }
     });
   });
@@ -10656,6 +10681,7 @@ function addRenderPreview(msgWrap, absPath, prompt, reply) {
     +   '<button class="render-import-btn" type="button">Import to Timeline</button>'
     +   '<button class="render-discard-btn" type="button" data-act="preview">Preview</button>'
     +   '<button class="render-discard-btn" type="button" data-act="changes">Changes</button>'
+    +   '<button class="render-discard-btn render-delete-btn" type="button" data-act="delete" title="Delete this animation file from disk">Delete</button>'
     + '</div>';
 
   msgWrap.querySelector('.msg-content').appendChild(card);
@@ -10663,6 +10689,7 @@ function addRenderPreview(msgWrap, absPath, prompt, reply) {
   const importBtn = card.querySelector('.render-import-btn');
   const previewBtn = card.querySelector('[data-act="preview"]');
   const changesBtn = card.querySelector('[data-act="changes"]');
+  const deleteBtn = card.querySelector('[data-act="delete"]');
 
   importBtn.addEventListener('click', async () => {
     // Settings → "Confirm before timeline import" — gate the auto-import.
@@ -10741,6 +10768,38 @@ function addRenderPreview(msgWrap, absPath, prompt, reply) {
     // sending. A small chip above the input shows what's being iterated on.
     setIterationContext({ originalPrompt: (prompt || '').trim(), originalPath: absPath });
     input.focus();
+  });
+
+  deleteBtn.addEventListener('click', async () => {
+    const fn = (absPath || '').split('/').pop().split('\\').pop();
+    const ok = await ccConfirm({
+      title: 'Delete this animation?',
+      message: '"' + fn + '" will be permanently deleted from disk. This cannot be undone.',
+      okLabel: 'Delete', cancelLabel: 'Keep', danger: true,
+    });
+    if (!ok) return;
+    deleteBtn.disabled = true; deleteBtn.textContent = 'Deleting…';
+    try {
+      const resp = await fetch(BRIDGE + '/delete-file', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: absPath }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.ok) {
+        // Drop the matching history entry so it doesn't linger as a dead row.
+        try { history = history.filter(x => x.path !== absPath); saveHistory(); renderHistory(); } catch {}
+        try { cclog('info', 'deleted render from panel', { path: absPath }); } catch {}
+        card.style.transition = 'opacity .2s var(--ease), transform .2s var(--ease)';
+        card.style.opacity = '0'; card.style.transform = 'scale(0.97)';
+        setTimeout(() => { try { card.remove(); } catch {} }, 200);
+      } else {
+        deleteBtn.textContent = 'Delete failed';
+        setTimeout(() => { deleteBtn.disabled = false; deleteBtn.textContent = 'Delete'; }, 2200);
+      }
+    } catch (e) {
+      deleteBtn.textContent = 'Delete failed';
+      setTimeout(() => { deleteBtn.disabled = false; deleteBtn.textContent = 'Delete'; }, 2200);
+    }
   });
 
   log.scrollTop = log.scrollHeight;

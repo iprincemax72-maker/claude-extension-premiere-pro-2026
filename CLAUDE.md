@@ -220,6 +220,7 @@ CLAUDE.md     # This file — agent-facing
 | `/version` | GET | — | `{mtime, session}` — panel's `index.html` mtime + the bridge session ID. Used by the panel's hot-reload heartbeat to detect when the file on disk has changed |
 | `/restart` | POST | — | `{ok, restartingIn}` — spawns a replacement bridge and exits after 300ms. Used by the auto-update flow when `bridgeChanged: true` |
 | `/preview/<file>` | GET | — | Streams a file from `~/PremiereClaude/output/` with byte-range support |
+| `/delete-file` | POST | `{path}` | `{ok, deleted?}` — deletes a rendered file from disk for the panel's "Delete" buttons (render cards + History entries). SAFE-GUARDED: media extensions only, path must resolve inside `OUTPUT_DIR` or a `*/output/*` folder under the user's home, no `..` traversal, regular files only. Idempotent (already-gone returns `{ok, alreadyGone}`). Rejects system files / paths outside the output area with 403. |
 | `/progress-stream` | GET | — | SSE — pushes `{ text, pct }` per work-stage event |
 | `/addedit` | POST | — | `{ok}` — osascript-driven menu click to run Premiere's "Add Edit to All Tracks" (Cmd+Shift+K), with fallthrough to "Add Edit" (Cmd+K) if the All-Tracks variant doesn't exist on the user's Premiere build |
 | `/addedit-keystroke` | POST | — | `{ok}` — fires the raw Cmd+Shift+K keystroke via System Events. Backup path for builds where the menu-click variant fails (different Premiere locale / accessibility permissions) |
