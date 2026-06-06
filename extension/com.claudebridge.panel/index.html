@@ -6646,10 +6646,10 @@ function _clipWatchApply(p) {
 }
 function startClipConversationWatch() {
   if (_clipWatchPoll) return;
-  // 700ms feels near-instant. Safe to poll this fast because each tick is just
-  // the cheap ccSelectionSig() (no media-path work); the heavy lookup only runs
-  // when the selection actually changes.
-  _clipWatchPoll = setInterval(_clipWatchTick, 700);
+  // 500ms feels instant. Safe to poll this fast because each tick is just the
+  // cheap ccSelectionSig() (getSelection() — no timeline walk, no media-path
+  // work); the heavy lookup only runs when the selection actually changes.
+  _clipWatchPoll = setInterval(_clipWatchTick, 500);
 }
 function stopClipConversationWatch() {
   if (_clipWatchPoll) { clearInterval(_clipWatchPoll); _clipWatchPoll = null; }
