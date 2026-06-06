@@ -3982,14 +3982,9 @@
 
       <div class="cap-sec-label">Style</div>
       <div class="cap-styles" id="capStyles">
-        <label class="cap-style sel" data-style="karaoke">
-          <input type="radio" name="capStyle" value="karaoke" checked>
-          <div class="cap-style-name">Karaoke</div>
-          <div class="cap-style-desc">Active word highlights as it's spoken</div>
-          <div class="cap-style-prev"><span>the</span><b class="hot">word</b><span>now</span></div>
-        </label>
-        <label class="cap-style" data-style="fadeup">
-          <input type="radio" name="capStyle" value="fadeup">
+        <!-- Professional / clean styles FIRST -->
+        <label class="cap-style sel" data-style="fadeup">
+          <input type="radio" name="capStyle" value="fadeup" checked>
           <div class="cap-style-name">Fade Up</div>
           <div class="cap-style-desc">Letters fade in + rise, word by word — clean &amp; professional</div>
           <div class="cap-style-prev"><span>fade</span><span>up</span></div>
@@ -3999,18 +3994,6 @@
           <div class="cap-style-name">Word by Word</div>
           <div class="cap-style-desc">Each word fades in + rises as it's spoken — clean &amp; professional</div>
           <div class="cap-style-prev"><span>word</span><span>by</span><span>word</span></div>
-        </label>
-        <label class="cap-style" data-style="reels">
-          <input type="radio" name="capStyle" value="reels">
-          <div class="cap-style-name">Big Bold</div>
-          <div class="cap-style-desc">Punchy spring pop, 1–3 words</div>
-          <div class="cap-style-prev"><b class="hot" style="font-size:13px">BOLD</b></div>
-        </label>
-        <label class="cap-style" data-style="tiktok">
-          <input type="radio" name="capStyle" value="tiktok">
-          <div class="cap-style-name">TikTok Pop</div>
-          <div class="cap-style-desc">Words type on with a little wobble</div>
-          <div class="cap-style-prev"><span>type</span><span>on</span><b class="hot">pop</b></div>
         </label>
         <label class="cap-style" data-style="classic">
           <input type="radio" name="capStyle" value="classic">
@@ -4024,11 +4007,30 @@
           <div class="cap-style-desc">Understated, low-key</div>
           <div class="cap-style-prev"><span>minimal</span></div>
         </label>
+        <!-- Highlight / loud styles to the RIGHT -->
+        <label class="cap-style" data-style="karaoke">
+          <input type="radio" name="capStyle" value="karaoke">
+          <div class="cap-style-name">Karaoke</div>
+          <div class="cap-style-desc">Active word highlights as it's spoken</div>
+          <div class="cap-style-prev"><span>the</span><b class="hot">word</b><span>now</span></div>
+        </label>
         <label class="cap-style" data-style="hormozi">
           <input type="radio" name="capStyle" value="hormozi">
           <div class="cap-style-name">Hormozi</div>
           <div class="cap-style-desc">Bold, active word in a color box</div>
           <div class="cap-style-prev"><span>big</span><b style="background:var(--accent-2);color:#15110d;padding:0 4px;border-radius:4px">BOLD</b></div>
+        </label>
+        <label class="cap-style" data-style="reels">
+          <input type="radio" name="capStyle" value="reels">
+          <div class="cap-style-name">Big Bold</div>
+          <div class="cap-style-desc">Punchy spring pop, 1–3 words</div>
+          <div class="cap-style-prev"><b class="hot" style="font-size:13px">BOLD</b></div>
+        </label>
+        <label class="cap-style" data-style="tiktok">
+          <input type="radio" name="capStyle" value="tiktok">
+          <div class="cap-style-name">TikTok Pop</div>
+          <div class="cap-style-desc">Words type on with a little wobble</div>
+          <div class="cap-style-prev"><span>type</span><span>on</span><b class="hot">pop</b></div>
         </label>
       </div>
 
@@ -8945,7 +8947,7 @@ if (_autoeditBtn) _autoeditBtn.addEventListener('click', openAutoeditModal);
 const captionsModal = document.getElementById('captionsModal');
 const capCard = document.getElementById('capCard');
 let capState = {
-  style: 'karaoke', position: 'bottom', highlight: '#E2885F',
+  style: 'fadeup', position: 'bottom', highlight: '#E2885F',
   uppercase: false, box: false, maxWords: 3, fontPct: 100,
   fontWeight: 800, align: 'center', trackingPct: 0, lineHtPct: 112,
   shadowPct: 55, strokePx: 2, strokeColor: '#000000', vary: false, keywords: false, emoji: false, fontFamily: '',
