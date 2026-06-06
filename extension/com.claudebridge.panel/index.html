@@ -2414,6 +2414,20 @@
   }
   .ae-custom-input::placeholder { color: var(--text-dim); }
   .ae-custom-input:focus { border-color: var(--accent); }
+  .ae-ref-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .ae-ref-thumb {
+    position: relative; width: 44px; height: 44px; flex: none;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden;
+    background: rgba(0,0,0,0.25);
+  }
+  .ae-ref-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ae-ref-x {
+    position: absolute; top: 1px; right: 1px; width: 15px; height: 15px;
+    border: none; border-radius: 50%; cursor: pointer;
+    background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; line-height: 13px;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .ae-ref-x:hover { background: #e0735f; }
   .ae-detected {
     display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
     padding: 7px 10px; margin-bottom: 2px;
@@ -8139,7 +8153,10 @@ function pickReferenceFile() {
 }
 
 // Save a clipboard or dropped File/Blob to disk and attach
-async function attachBlobAsReference(blob, suggestedExt) {
+// Write a pasted clipboard image blob to disk; return its path (no reference
+// bookkeeping). Shared by the composer's attachBlobAsReference and the
+// Auto-Edit "Anything else?" box.
+async function _saveBlobToDisk(blob, suggestedExt) {
   if (!_fs || !OUTPUT_DIR_JS) return null;
   try { _fs.mkdirSync(OUTPUT_DIR_JS, { recursive: true }); } catch {}
   const ext = suggestedExt
@@ -8151,12 +8168,16 @@ async function attachBlobAsReference(blob, suggestedExt) {
     const buf = await blob.arrayBuffer();
     const data = (typeof Buffer !== 'undefined') ? Buffer.from(buf) : new Uint8Array(buf);
     _fs.writeFileSync(filePath, data);
-    addReference(filePath);
     return filePath;
   } catch (err) {
-    console.error('attach blob failed:', err);
+    console.error('save blob failed:', err);
     return null;
   }
+}
+async function attachBlobAsReference(blob, suggestedExt) {
+  const filePath = await _saveBlobToDisk(blob, suggestedExt);
+  if (filePath) addReference(filePath);
+  return filePath;
 }
 
 const ICON_PAPERCLIP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 1 1-8.49-8.49l8.57-8.57A4 4 0 1 1 17.93 8.83l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
@@ -10076,6 +10097,7 @@ async function analyzeAutoEdit() {
     const data = await resp.json();
     aeWizard.questions = data.questions || [];
     aeWizard.answers = {};
+    aeWizard.refImages = [];
     // Aspect ratio auto-detected from the sequence — fill the answer and hide
     // the question so the user never has to pick it. (Falls back to the manual
     // question if detection failed.)
@@ -10136,15 +10158,49 @@ function renderAeQuestions() {
   // Steers both which moments get picked and how the graphics are designed.
   const cEl = document.createElement('div'); cEl.className = 'ae-q';
   const cT = document.createElement('div'); cT.className = 'ae-q-title';
-  cT.innerHTML = 'Anything else? <span class="ae-q-opt-tag">(optional)</span>';
+  cT.innerHTML = 'Anything else? <span class="ae-q-opt-tag">(optional — you can paste a reference image)</span>';
   cEl.appendChild(cT);
   const ta = document.createElement('textarea');
   ta.className = 'ae-custom-input';
   ta.rows = 2;
-  ta.placeholder = 'e.g. focus on the tools he mentions, keep it bold, add a logo bottom-right…';
+  ta.placeholder = 'e.g. focus on the tools he mentions, keep it bold, add a logo bottom-right…  (or paste an image to match its style)';
   ta.value = aeWizard.answers.custom || '';
   ta.addEventListener('input', () => { aeWizard.answers.custom = ta.value; });
-  cEl.appendChild(ta); wrap.appendChild(cEl);
+  cEl.appendChild(ta);
+  // Pasted reference-image thumbnails.
+  aeWizard.refImages = aeWizard.refImages || [];
+  const refsEl = document.createElement('div'); refsEl.className = 'ae-ref-thumbs';
+  cEl.appendChild(refsEl);
+  const renderAeRefs = () => {
+    refsEl.innerHTML = (aeWizard.refImages || []).map((r, i) =>
+      '<div class="ae-ref-thumb" data-i="' + i + '">'
+      + (r.dataUrl ? '<img src="' + r.dataUrl + '" alt="">' : '')
+      + '<button type="button" class="ae-ref-x" data-i="' + i + '" aria-label="Remove">&times;</button>'
+      + '</div>').join('');
+    refsEl.querySelectorAll('.ae-ref-x').forEach(b => b.addEventListener('click', () => {
+      const i = parseInt(b.getAttribute('data-i'), 10);
+      if (i >= 0) { aeWizard.refImages.splice(i, 1); renderAeRefs(); }
+    }));
+  };
+  renderAeRefs();
+  ta.addEventListener('paste', async (e) => {
+    try {
+      const items = (e.clipboardData && e.clipboardData.items) || [];
+      for (const it of items) {
+        if (it.kind === 'file' && /^image\//i.test(it.type)) {
+          e.preventDefault();
+          const blob = it.getAsFile();
+          if (blob) {
+            const ext = (it.type.split('/')[1] || 'png').toLowerCase();
+            const p = await _saveBlobToDisk(blob, ext);
+            if (p) { aeWizard.refImages.push({ path: p, dataUrl: (typeof readImageAsDataUrl === 'function' ? readImageAsDataUrl(p) : null) }); renderAeRefs(); }
+          }
+          return;
+        }
+      }
+    } catch {}
+  });
+  wrap.appendChild(cEl);
   wrap.scrollTop = 0;   // always render with the first question in view
 }
 
@@ -10152,8 +10208,9 @@ function renderAeQuestions() {
 const aeGenerateBtn = document.getElementById('aeGenerateBtn');
 if (aeGenerateBtn) aeGenerateBtn.addEventListener('click', () => {
   const reqId = aeWizard.reqId, density = aeWizard.density, answers = Object.assign({}, aeWizard.answers);
+  const refImages = (aeWizard.refImages || []).map(r => r.path).filter(Boolean);
   closeAutoeditModal();
-  runAutoEditV2({ reqId, density, answers });
+  runAutoEditV2({ reqId, density, answers, refImages });
 });
 
 async function runAutoEditV2(opts) {
@@ -10168,7 +10225,7 @@ async function runAutoEditV2(opts) {
     progressUI.text('Planning the edit…');
     const resp = await fetch(BRIDGE + '/autoedit/run', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reqId, density: opts.density, answers: opts.answers }),
+      body: JSON.stringify({ reqId, density: opts.density, answers: opts.answers, refImages: opts.refImages || [] }),
       signal: abort.signal,
     });
     if (!resp.ok) {

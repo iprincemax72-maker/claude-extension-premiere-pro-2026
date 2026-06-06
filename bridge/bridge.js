@@ -2080,6 +2080,8 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
   function buildPrompt(task) {
     const m = task.moment;
     const opts = genOpts || null;
+    const vo = !!(opts && opts.voiceoverOnly);   // voiceover-only → full-screen WITH a background
+    const refImgs = (opts && Array.isArray(opts.refImages)) ? opts.refImages.filter(Boolean) : [];
     let styleBlock = '';
     if (opts && opts.styleMode === 'same' && opts.styleSpec) {
       styleBlock = 'LOCKED STYLE — every graphic in THIS video shares ONE consistent look. '
@@ -2093,12 +2095,15 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
     // lower-third — below the face but NOT jammed to the bottom edge. Geometric
     // pixel box + an explicit target centre, so Claude doesn't guess.
     let placement;
-    if (opts && opts.voiceoverOnly) {
+    if (vo) {
       placement =
-        '- FULL-SCREEN graphic. This is a VOICEOVER-ONLY video — there is NO face on\n' +
-        '  screen to protect, so use the ENTIRE frame: a big, centred, full-bleed\n' +
-        '  composition that fills the canvas edge to edge. Bold and cinematic, not a\n' +
-        '  small corner card. (Background still transparent so it sits over the footage.)';
+        '- FULL-SCREEN graphic. This is a VOICEOVER-ONLY video — there is NO face to\n' +
+        '  protect, so this graphic REPLACES the footage. It MUST have its OWN full-bleed\n' +
+        '  BACKGROUND (a solid color, gradient, or designed backdrop in the chosen style)\n' +
+        '  that fills the ENTIRE frame edge to edge and COVERS the footage — the footage\n' +
+        '  underneath must NOT show through. Put the text/elements ON that background.\n' +
+        '  Think full-screen title card / kinetic-typography slide, not a transparent\n' +
+        '  overlay. Use the whole canvas, bold and cinematic.';
     } else {
       const faceHint = (opts && Array.isArray(opts.faceFrames) && opts.faceFrames.length)
         ? ('\n- Optional refinement — these are frames from the start, middle and end of\n' +
@@ -2128,9 +2133,9 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
       }
     }
     return [
-      'Create a motion-graphic OVERLAY for a video. It will be placed on a',
-      'track ABOVE the speaker\'s footage, so it MUST have a fully transparent',
-      'background — only the graphic elements are visible.',
+      vo
+        ? 'Create a FULL-SCREEN motion graphic for a VOICEOVER-ONLY video. It is placed\non a track ABOVE the footage and REPLACES it — fill the ENTIRE frame with your\nown background; the footage underneath should not show through.'
+        : 'Create a motion-graphic OVERLAY for a video. It will be placed on a\ntrack ABOVE the speaker\'s footage, so it MUST have a fully transparent\nbackground — only the graphic elements are visible.',
       '',
       'THE MOMENT (pulled from the video transcript):',
       '  type: ' + (m.type || 'fact'),
@@ -2149,6 +2154,13 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
         ? ('\nUSER\'S EXTRA INSTRUCTIONS for the whole edit — honor these on this graphic\n'
            + 'too (as long as they don\'t break the placement/timing rules below):\n'
            + '  "' + String(opts.userExtra).replace(/"/g, "'").slice(0, 600) + '"')
+        : '',
+      refImgs.length
+        ? ('\nREFERENCE IMAGE' + (refImgs.length > 1 ? 'S' : '') + ' — the user pasted '
+           + (refImgs.length > 1 ? 'these as style references' : 'this as a style reference')
+           + '. READ each image file and mirror its look (palette, typography, composition,\n'
+           + 'mood, texture) in this graphic:\n'
+           + refImgs.map(p => '  ' + p).join('\n'))
         : '',
       '',
       'BUILD IT:',
@@ -2171,24 +2183,33 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
       '      overlay\'s in/out animation, not as a TransitionSeries.)',
       '  For TEXT-DRIVEN overlays (titles, captions, callouts, stats), write',
       '  bespoke Remotion components — pick fonts, motion, easing, palette',
-      '  based on what the user actually asked for. Pass `bg="transparent"`',
-      '  on the root AbsoluteFill so the ProRes 4444 alpha survives.',
+      vo
+        ? '  based on what the user asked for. Give the root AbsoluteFill a FULL-FRAME\n  background fill (solid / gradient / designed) — NOT transparent — so it covers the footage.'
+        : '  based on what the user actually asked for. Pass `bg="transparent"`\n  on the root AbsoluteFill so the ProRes 4444 alpha survives.',
       '- DO use the style library at ' + WORK_DIR + '/remotion-intro/src/lib/',
       '  for easings, palettes, typography and motion helpers — read the files',
       '  you need first to get exact export names.',
       '- ' + vidW + 'x' + vidH + ', 30fps, EXACTLY ' + task.durationFrames + ' frames.'
         + (vidW < vidH ? ' This is a VERTICAL frame — compose for a tall 9:16-ish canvas (stack elements, keep text within the centre safe area).' : (vidW === vidH ? ' This is a SQUARE frame.' : '')),
-      '- TRANSPARENT background — this is CRITICAL. The composition root must',
-      '  have NO opaque background (no solid-color AbsoluteFill behind it).',
-      '  Render with EXACTLY this codec config so the alpha channel survives:',
-      '      --codec prores --prores-profile 4444 --mute',
-      '  ProRes 422 (the default) has NO alpha and will black out the video.',
-      '  You MUST pass --prores-profile 4444. The --mute flag silences any',
-      '  audio track (without it Remotion adds silent stereo and Premiere',
-      '  shows an empty waveform). The bridge ALSO post-processes with',
-      '  ffmpeg -an to strip the silent track entirely after render. After',
-      '  rendering, the file\'s pixel format must be yuva444p10le (alpha-',
-      '  capable) — verify with ffprobe if unsure and re-render if it is not.',
+      vo
+        ? ('- FULL-FRAME BACKGROUND — fill the entire canvas with your background so it\n'
+           + '  COVERS the footage. Still render ProRes 4444 so the file imports cleanly:\n'
+           + '      --codec prores --prores-profile 4444 --mute\n'
+           + '  The alpha channel will simply be fully opaque — that is correct and\n'
+           + '  expected for a voiceover-only full-screen graphic. You MUST still pass\n'
+           + '  --prores-profile 4444 (pix_fmt yuva444p10le). --mute silences audio; the\n'
+           + '  bridge also strips it with ffmpeg -an.')
+        : ('- TRANSPARENT background — this is CRITICAL. The composition root must\n'
+           + '  have NO opaque background (no solid-color AbsoluteFill behind it).\n'
+           + '  Render with EXACTLY this codec config so the alpha channel survives:\n'
+           + '      --codec prores --prores-profile 4444 --mute\n'
+           + '  ProRes 422 (the default) has NO alpha and will black out the video.\n'
+           + '  You MUST pass --prores-profile 4444. The --mute flag silences any\n'
+           + '  audio track (without it Remotion adds silent stereo and Premiere\n'
+           + '  shows an empty waveform). The bridge ALSO post-processes with\n'
+           + '  ffmpeg -an to strip the silent track entirely after render. After\n'
+           + '  rendering, the file\'s pixel format must be yuva444p10le (alpha-\n'
+           + '  capable) — verify with ffprobe if unsure and re-render if it is not.'),
       placement,
       '- TIMING IS CRITICAL — the narration plays for the ENTIRE ' + task.durationSec.toFixed(1) + 's,',
       '  so the graphic MUST stay on screen and readable that whole time. Animate IN',
@@ -5438,7 +5459,12 @@ const server = http.createServer((req, res) => {
         // ── Generate (style-locked or varied per the answers) ─────────────
         broadcastProgress('Generating motion graphics', 42, reqId);
         const userExtra = String(answers.custom || '').trim().slice(0, 600);
-        const genOpts = { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames, userExtra };
+        // Reference images the user pasted into the "Anything else?" box — Claude
+        // reads them and mirrors their style. Keep only existing files.
+        const refImages = (Array.isArray(payload.refImages) ? payload.refImages : [])
+          .filter(p => typeof p === 'string' && p && (() => { try { return fs.existsSync(p); } catch { return false; } })())
+          .slice(0, 6);
+        const genOpts = { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames, userExtra, refImages };
         // Persist the final plan + render options so a SINGLE graphic can be
         // re-rendered later (the per-graphic "Change" feature) without re-running
         // analyze. Keyed by reqId; merges over the analyze-time cache entry.
