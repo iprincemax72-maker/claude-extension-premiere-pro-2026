@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "5.9";
+var HOST_JSX_VERSION = "5.10";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -469,9 +469,14 @@ function ccSelectionSig() {
         // empty selection (DESELECT) is detected instantly even on a busy
         // timeline full of graphics. Walking every clip checking isSelected()
         // is what made deselect feel slow; getSelection() returns it directly.
-        var qsel = _ccSafe(function () { return seq.getSelection && seq.getSelection(); });
-        if (qsel) {
-            var qn = _ccSafe(function () { return qsel.length; }) || 0;
+        // Key off whether getSelection EXISTS, not its result. Some builds return
+        // null (or throw) when nothing is selected — that must still be a FAST
+        // "empty", never a fall-through to the slow track walk (which was making
+        // DESELECT laggy while select stayed fast).
+        var hasGetSel = _ccSafe(function () { return typeof seq.getSelection === "function"; });
+        if (hasGetSel) {
+            var qsel = _ccSafe(function () { return seq.getSelection(); });
+            var qn = (qsel && typeof qsel.length === "number") ? qsel.length : 0;
             if (!qn) return JSON.stringify({ ok: true, sig: "", path: "" });
             var qc = _ccSafe(function () { return qsel[0]; });
             var qnm = qc ? (_ccSafe(function () { return qc.name; }) || "") : "";
