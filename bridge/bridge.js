@@ -824,6 +824,7 @@ async function renderCaptions(opts) {
   const args = [cli, 'render', entryRel, 'Captions', outFile,
     '--codec', 'prores', '--prores-profile', '4444',
     '--image-format', 'png', '--pixel-format', 'yuva444p10le',
+    '--mute',   // captions are silent — don't let Remotion add a silent stereo track
     '--concurrency=' + concurrency,
     '--props=' + propsFile, '--log', 'error'];
   const env = { ...process.env };
@@ -847,6 +848,11 @@ async function renderCaptions(opts) {
       else { try { fs.unlinkSync(outFile); } catch {} reject(new Error('caption render exit ' + code + ': ' + stderr.slice(-400))); }
     });
   });
+  // Belt + suspenders: strip any audio stream so caption clips import with NO
+  // linked audio. splitCaptionClips cuts this source with `-c copy`, so a
+  // clean source makes every split clip audio-free too. (-c:v copy preserves
+  // the ProRes 4444 alpha.)
+  await stripAudioInPlace(outFile);
   return outFile;
 }
 
