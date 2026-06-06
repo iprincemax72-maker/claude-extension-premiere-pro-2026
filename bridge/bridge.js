@@ -4332,15 +4332,24 @@ const server = http.createServer((req, res) => {
         for (const rr of results) { if (rr && rr.ok && Array.isArray(rr.imports)) safe.push(...rr.imports); }
 
         const made = safe.length;
-        clog('bridge', 'info', 'multi-version done', { requested: versionCount, rendered: made }, reqId);
+        clog('bridge', 'info', 'multi-version done', { requested: versionCount, attempted: N, rendered: made }, reqId);
         let reply;
         if (made === 0) {
           reply = "I tried to make those versions but none rendered — give it another go.";
         } else {
+          // Two different shortfalls, two different messages:
+          //   N < versionCount  → metering actually capped the batch (out of renders)
+          //   made < N          → all N were attempted but some failed to render
+          // (For the owner N always === versionCount, so the metering note never
+          //  fires — a "1 of 2" there is a render failure, not a quota.)
+          let note = '';
+          if (N < versionCount) {
+            note = " (rendered " + made + " of " + versionCount + " — you're out of renders for the rest this month)";
+          } else if (made < N) {
+            note = " (" + made + " of " + N + " rendered — the rest didn't come through, give it another go)";
+          }
           reply = (made === 1 ? "Here's your take" : "Here are " + made + " different takes")
-            + " — preview each and import the one you like"
-            + (made < versionCount ? " (rendered " + made + " of " + versionCount + " — you're out of renders for the rest this month)" : "")
-            + ".";
+            + " — preview each and import the one you like" + note + ".";
         }
         sendOk({ reply, imports: safe, versions: made });
         return;
