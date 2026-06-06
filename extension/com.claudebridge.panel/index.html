@@ -670,6 +670,14 @@
   }
   .tab-pill .tab-close:hover { background: rgba(255,255,255,0.12); color: var(--fg); opacity: 1; }
   .tab-pill .tab-close svg { width: 10px; height: 10px; }
+  .tab-pill .tab-delall {
+    width: 16px; height: 16px; border: none; background: transparent;
+    color: var(--text-dim); border-radius: 4px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0; flex-shrink: 0; opacity: 0.65;
+  }
+  .tab-pill .tab-delall:hover { background: rgba(224,115,95,0.16); color: #e0735f; opacity: 1; }
+  .tab-pill .tab-delall svg { width: 11px; height: 11px; }
   .new-tab-btn {
     width: 26px; height: 26px;
     border: none;
@@ -4338,6 +4346,13 @@
         </div>
         <label class="settings-toggle"><input type="checkbox" id="settingConfirmImport"><span></span></label>
       </div>
+      <div class="settings-row">
+        <div class="settings-row-label">
+          <div class="settings-row-name">Open conversation on clip select</div>
+          <div class="settings-row-hint">Select a clip Flimify made on your timeline and its chat tab opens automatically</div>
+        </div>
+        <label class="settings-toggle"><input type="checkbox" id="settingOpenClipConv" checked><span></span></label>
+      </div>
     </div>
 
     <div class="settings-section">
@@ -4627,6 +4642,7 @@ const _emptyHTML = empty ? empty.outerHTML : ''; // snapshot for "new chat" rest
    ═══════════════════════════════════════════════════════════════════════ */
 const tabs = [];   // [{ id, label, contentEl, inputDraft, activeChatAbort, activeAutocut, activeAutoedit, expanding }]
 let activeTabIdx = 0;
+let _suppressAutoFocus = false;   // true while auto-switching tabs on clip-select (don't grab focus from Premiere)
 let _tabCounter = 1;
 
 function getActiveLogContent() {
@@ -4700,11 +4716,12 @@ function newTab(opts) {
     renderMode: userSettings.renderMode || 'default',
     planMode: !!userSettings.planMode,
     outputs: 1,   // how many versions one prompt generates (1-10)
+    threadKeys: [],   // history threads whose renders live in this tab (select-clip → reopen)
   });
   activeTabIdx = tabs.length - 1;
   applyActiveTabState();
   renderTabStrip();
-  setTimeout(() => { try { input.focus(); } catch {} }, 50);
+  setTimeout(() => { if (_suppressAutoFocus) return; try { input.focus(); } catch {} }, 50);
 }
 
 function switchTab(idx) {
@@ -4713,7 +4730,7 @@ function switchTab(idx) {
   activeTabIdx = idx;
   applyActiveTabState();
   renderTabStrip();
-  try { input.focus(); } catch {}
+  if (!_suppressAutoFocus) { try { input.focus(); } catch {} }
 }
 
 function closeTab(idx) {
@@ -4810,10 +4827,19 @@ function renderTabStrip() {
     const typeIcon = (t.type === 'chat')
       ? '<span class="tab-type-icon" title="Free chat — no Remotion pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>'
       : '';
+    // Active tab only: a "delete all renders" trash button when it has any.
+    let renderCount = 0;
+    if (idx === activeTabIdx) { try { renderCount = t.contentEl.querySelectorAll('.render-preview[data-render-path]').length; } catch {} }
+    const delAllBtn = renderCount > 0
+      ? '<button class="tab-delall" type="button" aria-label="Delete all renders in this tab" title="Delete all ' + renderCount + ' rendered file' + (renderCount === 1 ? '' : 's') + ' in this tab">'
+        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>'
+        + '</button>'
+      : '';
     pill.innerHTML =
       (tabHasActivity(t) ? '<span class="tab-dot"></span>' : '')
       + typeIcon
       + '<span class="tab-label">' + escapeHTML(t.label) + '</span>'
+      + delAllBtn
       + '<button class="tab-close" type="button" aria-label="Close tab" title="Close · ⌘⇧W">'
       + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
       + '</button>';
@@ -4834,6 +4860,8 @@ function renderTabStrip() {
       e.stopPropagation();
       closeTab(idx);
     });
+    const delAllEl = pill.querySelector('.tab-delall');
+    if (delAllEl) delAllEl.addEventListener('click', (e) => { e.stopPropagation(); deleteAllRendersInTab(idx); });
     strip.insertBefore(pill, newBtn);
   });
 }
@@ -6114,6 +6142,14 @@ function addHistoryEntry({prompt, path, mode, reply, iterationOf}) {
     history.unshift(entry);
     if (history.length > HISTORY_MAX) history = history.slice(0, HISTORY_MAX);
   }
+  // Tag the active tab with this render's thread so selecting the clip in
+  // Premiere later returns to this conversation.
+  try {
+    const he = history.find(h => h && h.path === path);
+    const thr = he && (he.thread || he.id);
+    const tb = tabs[activeTabIdx];
+    if (thr && tb) { tb.threadKeys = tb.threadKeys || []; if (!tb.threadKeys.includes(thr)) tb.threadKeys.push(thr); }
+  } catch {}
   saveHistory();
   if (historyPanel.classList.contains('show')) renderHistory();
 }
@@ -6496,10 +6532,83 @@ function reopenConversation(entryOrItems) {
     if (typeof newTab === 'function') newTab();
     if (typeof clearEmpty === 'function') clearEmpty();
     for (const entry of items) renderEntry(entry);
+    // Tag this tab with the conversation thread + a readable label, so selecting
+    // the clip in Premiere later switches back here instead of duplicating.
+    const _tk = items[0] && (items[0].thread || items[0].id);
+    const tb = tabs[activeTabIdx];
+    if (_tk && tb) {
+      tb.threadKeys = tb.threadKeys || [];
+      if (!tb.threadKeys.includes(_tk)) tb.threadKeys.push(_tk);
+      const lbl = (items[0].prompt || '').trim();
+      if (lbl) tb.label = lbl.length > 22 ? lbl.slice(0, 22) + '…' : lbl;
+      if (typeof renderTabStrip === 'function') renderTabStrip();
+    }
   } catch (e) {
     console.error('reopenConversation failed:', e);
   }
   closeHistory();
+}
+
+// ───── Select a Flimify clip in Premiere → open its conversation ──────────
+// When the user clicks a clip on the timeline that Flimify generated, jump to
+// that animation's conversation tab (or reopen it). Matched by the clip's
+// source media path against the render history. Polled gently (visible + idle).
+function _aeBaseName(p) { return (p || '').split('/').pop().split('\\').pop(); }
+function findThreadKeyForPath(p) {
+  if (!p || !Array.isArray(history)) return null;
+  const base = _aeBaseName(p);
+  let e = history.find(x => x && x.path === p);
+  if (!e && base) e = history.find(x => x && _aeBaseName(x.path) === base);
+  if (!e) e = history.find(x => x && Array.isArray(x.items)
+    && x.items.some(it => it && (it.file === p || (base && _aeBaseName(it.file) === base))));
+  return e ? (e.thread || e.id) : null;
+}
+function openConversationForClipPath(p) {
+  const key = findThreadKeyForPath(p);
+  if (!key) return false;
+  const active = tabs[activeTabIdx];
+  if (active && (active.threadKeys || []).includes(key)) return true;     // already here
+  const existing = tabs.findIndex(t => t && (t.threadKeys || []).includes(key));
+  if (existing >= 0) { switchTab(existing); return true; }                // switch to its tab
+  // Reopen it (skip pure Auto-Edit summary entries — no conversation to show).
+  const items = history.filter(x => (x.thread || x.id) === key && x.kind !== 'autoedit')
+    .sort((a, b) => (a.t || 0) - (b.t || 0));
+  if (!items.length) return false;
+  reopenConversation(items);                                             // tags the new tab
+  return true;
+}
+let _clipWatchPoll = null;
+let _clipWatchLastPath = null;
+function _clipWatchModalOpen() {
+  const has = (el) => el && el.classList && el.classList.contains('show');
+  return has(captionsModal) || has(autoeditModal)
+    || has(document.getElementById('historyPanel')) || has(document.getElementById('settingsPanel'));
+}
+async function _clipWatchTick() {
+  if (document.hidden) return;
+  if (!userSettings.openClipConversation) return;
+  if (_esBusy) return;                          // don't pile onto ExtendScript
+  if (_clipWatchModalOpen()) return;            // a modal owns the selection
+  if (activeChatAbort) return;                  // don't yank away mid-render
+  let raw; try { raw = await evalES('ccGetSelectedClip()'); } catch { return; }
+  if (raw == null) return;
+  let sel; try { sel = JSON.parse(raw); } catch { return; }
+  const p = (sel && sel.ok && sel.path) ? sel.path : null;
+  if (!p) { _clipWatchLastPath = null; return; }
+  if (p === _clipWatchLastPath) return;         // selection unchanged
+  _clipWatchLastPath = p;
+  // Suppress the panel grabbing keyboard focus while it switches tabs — the
+  // user is in Premiere, we don't want to yank focus out of the timeline.
+  _suppressAutoFocus = true;
+  try { openConversationForClipPath(p); } catch (e) {}
+  setTimeout(() => { _suppressAutoFocus = false; }, 250);
+}
+function startClipConversationWatch() {
+  if (_clipWatchPoll) return;
+  _clipWatchPoll = setInterval(_clipWatchTick, 2500);
+}
+function stopClipConversationWatch() {
+  if (_clipWatchPoll) { clearInterval(_clipWatchPoll); _clipWatchPoll = null; }
 }
 
 // Try to relocate a missing entry by matching its basename against the
@@ -7249,6 +7358,7 @@ const SETTINGS_DEFAULTS = {
   aspect: 'auto',         // auto | 9:16 | 16:9 | 1:1 — prepended to every prompt
   duration: 'auto',       // auto | 3 | 5 | 10 | 15 | 30 — prepended when prompt doesn't specify
   confirmImport: false,   // when true, render cards ask before auto-placing on timeline
+  openClipConversation: true,   // select a Flimify clip in Premiere → open its conversation tab
   maxParallel: '3',       // 1 | 2 | 3 | 5 | all — how many versions render at once
 };
 const ACCENT_PALETTES = {
@@ -7334,7 +7444,7 @@ function syncSettingsUI() {
   const sw = document.getElementById('settingAccent');
   if (sw) sw.querySelectorAll('.sw').forEach(b => b.classList.toggle('active', b.dataset.val === userSettings.accent));
   // Toggles
-  const toggles = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingConfirmImport: 'confirmImport' };
+  const toggles = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingConfirmImport: 'confirmImport', settingOpenClipConv: 'openClipConversation' };
   for (const id in toggles) {
     const el = document.getElementById(id);
     if (el) el.checked = !!userSettings[toggles[id]];
@@ -7376,13 +7486,16 @@ function bindSettingsHandlers() {
     applySettings();
   });
   // Toggles
-  const toggleMap = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingConfirmImport: 'confirmImport' };
+  const toggleMap = { settingBootIntro: 'bootIntro', settingAutoUpdate: 'autoUpdate', settingConfirmImport: 'confirmImport', settingOpenClipConv: 'openClipConversation' };
   for (const id in toggleMap) {
     const el = document.getElementById(id);
     if (!el) continue;
     el.addEventListener('change', async () => {
       userSettings[toggleMap[id]] = el.checked;
       saveSettings();
+      if (id === 'settingOpenClipConv') {
+        if (el.checked) startClipConversationWatch(); else stopClipConversationWatch();
+      }
       // The 'Auto-check for updates' toggle ALSO needs to persist to the
       // bridge — the bridge reads a sentinel file at launch to decide
       // whether to skip the auto-update step.
@@ -7639,6 +7752,8 @@ const Particles = (function () {
 applySettings();
 bindSettingsHandlers();
 syncSettingsUI();
+// Watch for the user selecting a Flimify-made clip → open its conversation.
+if (userSettings.openClipConversation) startClipConversationWatch();
 
 // Collapse/expand the whole top bar with the pull-tab arrow (state persists).
 (function wireHeaderCollapse() {
@@ -10672,6 +10787,7 @@ function openInBrowser(absPath) {
 function addRenderPreview(msgWrap, absPath, prompt, reply) {
   const card = document.createElement('div');
   card.className = 'render-preview';
+  card.dataset.renderPath = absPath || '';   // lets "Delete all in this tab" find it
 
   const filename = (absPath || '').split('/').pop();
 
@@ -10791,7 +10907,7 @@ function addRenderPreview(msgWrap, absPath, prompt, reply) {
         try { cclog('info', 'deleted render from panel', { path: absPath }); } catch {}
         card.style.transition = 'opacity .2s var(--ease), transform .2s var(--ease)';
         card.style.opacity = '0'; card.style.transform = 'scale(0.97)';
-        setTimeout(() => { try { card.remove(); } catch {} }, 200);
+        setTimeout(() => { try { card.remove(); } catch {} try { renderTabStrip(); } catch {} }, 200);
       } else {
         deleteBtn.textContent = 'Delete failed';
         setTimeout(() => { deleteBtn.disabled = false; deleteBtn.textContent = 'Delete'; }, 2200);
@@ -10803,6 +10919,33 @@ function addRenderPreview(msgWrap, absPath, prompt, reply) {
   });
 
   log.scrollTop = log.scrollHeight;
+  try { renderTabStrip(); } catch {}   // refresh the tab's "Delete all renders" control
+}
+
+// Delete every rendered file in a tab (the per-tab bulk option). Collects the
+// render cards' paths, confirms, deletes each from disk, clears the cards +
+// history entries.
+async function deleteAllRendersInTab(idx) {
+  const t = tabs[idx];
+  if (!t || !t.contentEl) return;
+  const cards = Array.from(t.contentEl.querySelectorAll('.render-preview[data-render-path]'));
+  const paths = [...new Set(cards.map(c => c.dataset.renderPath).filter(Boolean))];
+  if (!paths.length) return;
+  const ok = await ccConfirm({
+    title: 'Delete all renders in this tab?',
+    message: 'Permanently deletes ' + paths.length + ' rendered file' + (paths.length === 1 ? '' : 's')
+      + ' from disk and clears them from this tab. This cannot be undone.',
+    okLabel: 'Delete ' + paths.length, cancelLabel: 'Keep', danger: true,
+  });
+  if (!ok) return;
+  for (const p of paths) {
+    try { await fetch(BRIDGE + '/delete-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: p }) }); } catch {}
+    try { history = history.filter(x => x.path !== p); } catch {}
+  }
+  try { saveHistory(); renderHistory(); } catch {}
+  cards.forEach(c => { try { c.remove(); } catch {} });
+  try { cclog('info', 'deleted all renders in tab', { count: paths.length }); } catch {}
+  try { renderTabStrip(); } catch {}
 }
 
 /* ───── Status indicator (read-only) ───── */
