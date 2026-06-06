@@ -4644,6 +4644,23 @@ const tabs = [];   // [{ id, label, contentEl, inputDraft, activeChatAbort, acti
 let activeTabIdx = 0;
 let _suppressAutoFocus = false;   // true while auto-switching tabs on clip-select (don't grab focus from Premiere)
 let _clipWatchReturnTabId = null; // tab to return to when the clip is deselected (set on the first auto-jump)
+let _clipWatchAutoTabId = null;   // the ephemeral "peek" tab auto-opened for a clip — closed on deselect / when peeking another clip
+// A peek tab is closeable unless the user actually did something in it
+// (in-flight render or typed a draft) — never kill real work.
+function _clipTabHasActivity(t) {
+  if (!t) return false;
+  if (t.activeChatAbort || t.activeAutocut || t.activeAutoedit) return true;
+  const draft = (t === tabs[activeTabIdx]) ? (typeof input !== 'undefined' && input ? input.value : '') : (t.inputDraft || '');
+  return (draft || '').trim().length > 0;
+}
+function _closeClipPeekTab(id) {
+  if (id == null) return;
+  const idx = tabs.findIndex(t => t && t.id === id);
+  if (idx < 0) return;
+  if (_clipTabHasActivity(tabs[idx])) return;   // user did real work — keep it
+  _suppressAutoFocus = true;
+  closeTab(idx);
+}
 let _tabCounter = 1;
 
 function getActiveLogContent() {
@@ -6568,15 +6585,22 @@ function findThreadKeyForPath(p) {
 function openConversationForClipPath(p) {
   const key = findThreadKeyForPath(p);
   if (!key) return false;
-  const active = tabs[activeTabIdx];
-  if (active && (active.threadKeys || []).includes(key)) return true;     // already here
+  if (tabs[activeTabIdx] && (tabs[activeTabIdx].threadKeys || []).includes(key)) return true;  // already showing it
+  // Moving to a DIFFERENT conversation → close the previous peek tab first so
+  // they never pile up (stash its draft so the activity guard can see it).
+  if (_clipWatchAutoTabId != null) {
+    if (tabs[activeTabIdx] && tabs[activeTabIdx].id === _clipWatchAutoTabId) stashActiveTabState();
+    _closeClipPeekTab(_clipWatchAutoTabId);
+    _clipWatchAutoTabId = null;
+  }
   const existing = tabs.findIndex(t => t && (t.threadKeys || []).includes(key));
-  if (existing >= 0) { switchTab(existing); return true; }                // switch to its tab
-  // Reopen it (skip pure Auto-Edit summary entries — no conversation to show).
+  if (existing >= 0) { switchTab(existing); return true; }                // an existing REAL tab — not a peek
+  // Reopen it as a fresh peek (skip Auto-Edit summary entries — no conversation).
   const items = history.filter(x => (x.thread || x.id) === key && x.kind !== 'autoedit')
     .sort((a, b) => (a.t || 0) - (b.t || 0));
   if (!items.length) return false;
-  reopenConversation(items);                                             // tags the new tab
+  reopenConversation(items);                                             // creates + activates a new tab
+  _clipWatchAutoTabId = tabs[activeTabIdx] && tabs[activeTabIdx].id;      // mark it the ephemeral peek
   return true;
 }
 let _clipWatchPoll = null;
@@ -6635,19 +6659,25 @@ async function _clipWatchTick() {
 // The selection→tab state machine, split out so it's testable without ExtendScript.
 function _clipWatchApply(p) {
   if (!p) {
-    // Deselected. If we auto-jumped to a clip's conversation earlier, go back
-    // to wherever the user was before (their home screen or other tab).
+    // Deselected. Go back to where the user was AND close the ephemeral peek tab
+    // we opened — so the clip's conversation isn't left lingering.
     const wasSelected = _clipWatchLastPath != null;
     _clipWatchLastPath = null;
-    if (wasSelected && _clipWatchReturnTabId != null) {
-      const idx = tabs.findIndex(t => t && t.id === _clipWatchReturnTabId);
-      _clipWatchReturnTabId = null;
-      if (idx >= 0 && idx !== activeTabIdx) {
-        _suppressAutoFocus = true;
-        switchTab(idx);
-        setTimeout(() => { _suppressAutoFocus = false; }, 250);
-      }
+    if (!wasSelected) return;
+    const autoId = _clipWatchAutoTabId;
+    const retId = _clipWatchReturnTabId;
+    _clipWatchAutoTabId = null;
+    _clipWatchReturnTabId = null;
+    _suppressAutoFocus = true;
+    // 1) switch back to the user's original tab (this stashes the peek's draft)
+    if (retId != null) {
+      const ri = tabs.findIndex(t => t && t.id === retId);
+      if (ri >= 0 && ri !== activeTabIdx) switchTab(ri);
     }
+    // 2) close the peek tab (guarded against real work + against closing the
+    //    return tab itself)
+    if (autoId != null && autoId !== retId) _closeClipPeekTab(autoId);
+    setTimeout(() => { _suppressAutoFocus = false; }, 250);
     return;
   }
 
