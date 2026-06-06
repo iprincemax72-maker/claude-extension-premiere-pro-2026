@@ -6530,6 +6530,19 @@ function reopenConversation(entryOrItems) {
     if (entry.prompt) {
       makeMsg('you', '<p>' + escapeHTML(entry.prompt) + '</p>');
     }
+    // Auto-Edit entries carry an items[] array of EVERY graphic the run made —
+    // show them ALL (one card each), not just the first one.
+    if (Array.isArray(entry.items) && entry.items.length) {
+      const files = entry.items.filter(it => it && it.file);
+      const m = makeMsg('claude', '<p style="color:var(--text-dim);font-style:italic">Reopened Auto-Edit run — ' + files.length + ' graphic' + (files.length === 1 ? '' : 's') + '.</p>');
+      files.forEach((it) => {
+        const fileOk = !_fs || (function(){ try { return _fs.existsSync(it.file); } catch { return true; } })();
+        if (fileOk && typeof addRenderPreview === 'function') {
+          addRenderPreview(m.wrap, it.file, it.label || entry.prompt || '', '');
+        }
+      });
+      return;
+    }
     if (entry.reply) {
       const html = (typeof renderMarkdown === 'function')
         ? renderMarkdown(entry.reply)
@@ -6595,8 +6608,8 @@ function openConversationForClipPath(p) {
   }
   const existing = tabs.findIndex(t => t && (t.threadKeys || []).includes(key));
   if (existing >= 0) { switchTab(existing); return true; }                // an existing REAL tab — not a peek
-  // Reopen it as a fresh peek (skip Auto-Edit summary entries — no conversation).
-  const items = history.filter(x => (x.thread || x.id) === key && x.kind !== 'autoedit')
+  // Reopen it as a fresh peek (Auto-Edit runs reopen with all their graphics now).
+  const items = history.filter(x => (x.thread || x.id) === key)
     .sort((a, b) => (a.t || 0) - (b.t || 0));
   if (!items.length) return false;
   reopenConversation(items);                                             // creates + activates a new tab
