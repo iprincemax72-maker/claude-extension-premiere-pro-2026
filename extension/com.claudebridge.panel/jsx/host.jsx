@@ -2,7 +2,7 @@
 // Defensive: every operation is wrapped in try/catch so a single bad call
 // can never bring Premiere down.
 
-var HOST_JSX_VERSION = "5.11";
+var HOST_JSX_VERSION = "5.12";
 
 function ccVersion() { return JSON.stringify({ ok: true, version: HOST_JSX_VERSION }); }
 
@@ -1583,6 +1583,53 @@ function ccAutoEditReplace(payloadJson) {
             track: "V" + (trackIdx + 1), atSec: targetSec, file: payload.file,
             debug: debug,
         });
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: String(e), debug: debug });
+    }
+}
+
+// AUTO EDIT — remove (lift) one graphic clip from the timeline at a known track
+// + second, for the per-graphic Delete. No ripple (overlay band), so nothing
+// else shifts. Input JSON: { track:"V20", atSec }.
+function ccAutoEditRemove(payloadJson) {
+    var debug = { steps: [] };
+    function note(s) { debug.steps.push(String(s)); }
+    try {
+        if (typeof app === "undefined" || !app || !app.project) return JSON.stringify({ ok: false, error: "no project", debug: debug });
+        var seq = _ccSafe(function () { return app.project.activeSequence; });
+        if (!seq) return JSON.stringify({ ok: false, error: "no active sequence", debug: debug });
+        var payload; try { payload = JSON.parse(payloadJson); } catch (e) { return JSON.stringify({ ok: false, error: "bad json", debug: debug }); }
+        if (typeof payload.atSec !== "number") return JSON.stringify({ ok: false, error: "no atSec", debug: debug });
+        var trackIdx = -1;
+        if (typeof payload.track === "string" && payload.track.charAt(0) === "V") trackIdx = parseInt(payload.track.substring(1), 10) - 1;
+        else if (typeof payload.track === "number") trackIdx = payload.track;
+        if (!(trackIdx >= 0)) return JSON.stringify({ ok: false, error: "bad track", debug: debug });
+        var fps = 30;
+        try { var settings = seq.getSettings && seq.getSettings(); if (settings && settings.videoFrameRate && settings.videoFrameRate.ticks) fps = 254016000000 / Number(settings.videoFrameRate.ticks); } catch (e) {}
+        if (!fps || fps < 1 || fps > 240) fps = 30;
+        var targetSec = Math.floor(Number(payload.atSec) * fps) / fps;
+        var tol = (1 / fps) * 0.9;
+        _ccSafe(function () { if (typeof app.enableQE === "function") app.enableQE(); });
+        var qeSeq = _ccSafe(function () { return (typeof qe !== "undefined" && qe && qe.project && qe.project.getActiveSequence) ? qe.project.getActiveSequence() : null; });
+        var removed = false;
+        if (qeSeq) {
+            var qTrack = _ccSafe(function () { return qeSeq.getVideoTrackAt(trackIdx); });
+            if (qTrack) {
+                var qn = _ccSafe(function () { return qTrack.numItems; }) || 0;
+                for (var j = 0; j < qn; j++) {
+                    var qItem = _ccSafe((function (jj) { return function () { return qTrack.getItemAt(jj); }; })(j));
+                    if (!qItem) continue;
+                    var s = _ccSafe(function () { return qItem.start && qItem.start.seconds; });
+                    if (typeof s !== "number") continue;
+                    if (Math.abs(s - targetSec) < tol) {
+                        var okRem = _ccSafe(function () { qItem.remove(false, false); return true; });   // lift, no ripple
+                        if (okRem) { removed = true; note("lifted V" + (trackIdx + 1) + " at " + s.toFixed(3)); }
+                        break;
+                    }
+                }
+            }
+        }
+        return JSON.stringify({ ok: true, removed: removed, track: "V" + (trackIdx + 1), atSec: targetSec, debug: debug });
     } catch (e) {
         return JSON.stringify({ ok: false, error: String(e), debug: debug });
     }

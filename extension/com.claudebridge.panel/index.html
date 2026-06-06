@@ -1430,12 +1430,24 @@
     transform-origin: left center;
   }
   .ae-results-head {
+    display: flex; align-items: center; gap: 8px;
     font-size: 11px;
     color: var(--text-dim);
     margin: 0 2px 8px;
     line-height: 1.4;
   }
+  .ae-results-head-text { flex: 1; min-width: 0; }
   .ae-results-head b { color: var(--text); font-weight: 600; }
+  .ae-delall-btn, .ae-del-btn {
+    flex: none; padding: 5px 10px;
+    background: transparent;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    font-family: var(--font-ui); font-size: 11px; cursor: pointer;
+    transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+  }
+  .ae-delall-btn:hover, .ae-del-btn:hover { color: #e0735f; border-color: rgba(224,115,95,0.45); }
+  .ae-delall-btn:disabled, .ae-del-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .ae-row {
     display: flex;
     align-items: center;
@@ -10238,6 +10250,7 @@ function renderAeResultsCard(records, reqId) {
       +   '<span class="ae-row-label">' + escapeHTML(rec.label || ('Graphic ' + (i + 1))) + '</span>'
       +   '<span class="ae-row-status" data-role="status"></span>'
       +   '<button class="ae-change-btn" type="button" data-role="change">Change</button>'
+      +   '<button class="ae-del-btn" type="button" data-role="del" title="Remove this graphic from the timeline + disk">Delete</button>'
       + '</div>'
       + '<div class="ae-edit" data-i="' + i + '">'
       +   '<input type="text" placeholder="What to change? e.g. different background, bigger text, move to top" />'
@@ -10245,17 +10258,33 @@ function renderAeResultsCard(records, reqId) {
       + '</div>';
   });
   card.innerHTML =
-      '<div class="ae-results-head">Made <b>' + records.length + '</b> motion graphic'
+      '<div class="ae-results-head"><span class="ae-results-head-text">Made <b>' + records.length + '</b> motion graphic'
         + (records.length === 1 ? '' : 's')
-        + ' · hit <b>Change</b> on any one to tweak just that graphic</div>'
+        + ' · hit <b>Change</b> to tweak one, or <b>Delete</b> to remove it</span>'
+        + '<button class="ae-delall-btn" type="button">Delete all</button></div>'
     + rowsHtml;
   (getActiveLogContent() || log).appendChild(card);
+
+  // Remove ONE graphic: lift it off the timeline (if placed) + delete its file.
+  const deleteAeGraphic = async (rec) => {
+    if (rec && rec.track && typeof rec.placedAtSec === 'number') {
+      try {
+        const esc = JSON.stringify({ track: rec.track, atSec: rec.placedAtSec }).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        await evalES('ccAutoEditRemove("' + esc + '")');
+      } catch {}
+    }
+    if (rec && rec.file) {
+      try { await fetch(BRIDGE + '/delete-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: rec.file }) }); } catch {}
+      try { history = history.filter(x => x.path !== rec.file); } catch {}
+    }
+  };
 
   records.forEach((rec, i) => {
     const rowEl  = card.querySelector('.ae-row[data-i="' + i + '"]');
     const editEl = card.querySelector('.ae-edit[data-i="' + i + '"]');
     if (!rowEl || !editEl) return;
     const changeBtn = rowEl.querySelector('[data-role="change"]');
+    const delBtn    = rowEl.querySelector('[data-role="del"]');
     const statusEl  = rowEl.querySelector('[data-role="status"]');
     const input     = editEl.querySelector('input');
     const applyBtn  = editEl.querySelector('.ae-edit-apply');
@@ -10273,6 +10302,36 @@ function renderAeResultsCard(records, reqId) {
       if (e.key === 'Enter') { e.preventDefault(); submit(); }
       else if (e.key === 'Escape') { editEl.classList.remove('open'); }
     });
+    delBtn.addEventListener('click', async () => {
+      const ok = await ccConfirm({
+        title: 'Delete this graphic?',
+        message: '"' + (rec.label || ('Graphic ' + (i + 1))) + '" will be removed from the timeline and deleted from disk. This cannot be undone.',
+        okLabel: 'Delete', cancelLabel: 'Keep', danger: true,
+      });
+      if (!ok) return;
+      changeBtn.disabled = true; delBtn.disabled = true;
+      statusEl.className = 'ae-row-status'; statusEl.textContent = 'Deleting…';
+      await deleteAeGraphic(rec);
+      try { saveHistory(); renderHistory(); } catch {}
+      editEl.remove();
+      rowEl.style.transition = 'opacity .2s var(--ease)'; rowEl.style.opacity = '0';
+      setTimeout(() => { try { rowEl.remove(); } catch {} }, 200);
+    });
+  });
+
+  const delAllBtn = card.querySelector('.ae-delall-btn');
+  if (delAllBtn) delAllBtn.addEventListener('click', async () => {
+    const ok = await ccConfirm({
+      title: 'Delete all ' + records.length + ' graphics?',
+      message: 'All ' + records.length + ' graphics will be removed from the timeline and deleted from disk. This cannot be undone.',
+      okLabel: 'Delete all', cancelLabel: 'Keep', danger: true,
+    });
+    if (!ok) return;
+    delAllBtn.disabled = true; delAllBtn.textContent = 'Deleting…';
+    for (const rec of records) { await deleteAeGraphic(rec); }
+    try { saveHistory(); renderHistory(); } catch {}
+    card.style.transition = 'opacity .2s var(--ease)'; card.style.opacity = '0';
+    setTimeout(() => { try { card.remove(); } catch {} }, 200);
   });
 }
 
