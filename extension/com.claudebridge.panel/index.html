@@ -3962,17 +3962,22 @@
 
       <div class="cap-sec-label">Quick looks</div>
       <div class="cap-looks" id="capLooks">
+        <!-- Professional / clean looks FIRST -->
+        <button type="button" class="cap-look" data-look="fadeup"><span class="cap-look-prev"><b style="color:#fff;font-weight:800">fade <span style="color:#E2885F">up</span></b></span><span class="cap-look-name">Fade Up</span></button>
+        <button type="button" class="cap-look" data-look="fadeupkw"><span class="cap-look-prev"><b style="color:#fff;font-weight:800">key <span style="color:#E2885F">words</span></b></span><span class="cap-look-name">Fade Up + KW</span></button>
+        <button type="button" class="cap-look" data-look="karaoke"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">word <span style="color:#E2885F">pop</span></b></span><span class="cap-look-name">Karaoke</span></button>
+        <button type="button" class="cap-look" data-look="clean"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">clean line</b></span><span class="cap-look-name">Clean</span></button>
+        <button type="button" class="cap-look" data-look="minimalkw"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">go <span style="color:#4ECB71">green</span></b></span><span class="cap-look-name">Minimal+</span></button>
+        <button type="button" class="cap-look" data-look="highlight"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">it's <span style="color:#E2885F">key</span></b></span><span class="cap-look-name">Highlight</span></button>
+        <button type="button" class="cap-look" data-look="editorial"><span class="cap-look-prev"><b style="color:#EDEAE3;font-weight:700;letter-spacing:.02em">editorial</b></span><span class="cap-look-name">Editorial</span></button>
+        <button type="button" class="cap-look" data-look="tiktok"><span class="cap-look-prev"><b style="color:#5AA9FF">type on</b></span><span class="cap-look-name">Type-on</span></button>
+        <!-- Loud / TikTok-style looks to the RIGHT -->
+        <button type="button" class="cap-look" data-look="pop"><span class="cap-look-prev"><b style="color:#FF5D8F;-webkit-text-stroke:1px #000">POP</b></span><span class="cap-look-name">Pop</span></button>
         <button type="button" class="cap-look" data-look="beast"><span class="cap-look-prev"><b style="color:#15110d;background:#F5C542;padding:2px 6px;border-radius:5px">BEAST</b></span><span class="cap-look-name">Beast</span></button>
         <button type="button" class="cap-look" data-look="beastblue"><span class="cap-look-prev"><b style="color:#fff;background:#5AA9FF;padding:2px 6px;border-radius:5px">BLUE</b></span><span class="cap-look-name">Beast Blue</span></button>
-        <button type="button" class="cap-look" data-look="pop"><span class="cap-look-prev"><b style="color:#FF5D8F;-webkit-text-stroke:1px #000">POP</b></span><span class="cap-look-name">Pop</span></button>
-        <button type="button" class="cap-look" data-look="highlight"><span class="cap-look-prev"><b style="color:#fff">it's <span style="color:#E2885F">key</span></b></span><span class="cap-look-name">Highlight</span></button>
         <button type="button" class="cap-look" data-look="boldyellow"><span class="cap-look-prev"><b style="color:#F5C542;-webkit-text-stroke:1px #000">BOLD</b></span><span class="cap-look-name">Bold Yellow</span></button>
-        <button type="button" class="cap-look" data-look="karaoke"><span class="cap-look-prev"><b style="color:#fff">word <span style="color:#E2885F">pop</span></b></span><span class="cap-look-name">Karaoke</span></button>
-        <button type="button" class="cap-look" data-look="minimalkw"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">go <span style="color:#4ECB71">green</span></b></span><span class="cap-look-name">Minimal+</span></button>
-        <button type="button" class="cap-look" data-look="rainbow"><span class="cap-look-prev"><b><span style="color:#E2885F">a</span><span style="color:#5AA9FF">b</span><span style="color:#4ECB71">c</span></b></span><span class="cap-look-name">Rainbow</span></button>
-        <button type="button" class="cap-look" data-look="tiktok"><span class="cap-look-prev"><b style="color:#5AA9FF">type</b></span><span class="cap-look-name">TikTok</span></button>
-        <button type="button" class="cap-look" data-look="clean"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">clean</b></span><span class="cap-look-name">Clean</span></button>
         <button type="button" class="cap-look" data-look="neon"><span class="cap-look-prev"><b style="color:#4ECB71;-webkit-text-stroke:1px #063">NEON</b></span><span class="cap-look-name">Neon</span></button>
+        <button type="button" class="cap-look" data-look="rainbow"><span class="cap-look-prev"><b><span style="color:#E2885F">a</span><span style="color:#5AA9FF">b</span><span style="color:#4ECB71">c</span></b></span><span class="cap-look-name">Rainbow</span></button>
       </div>
 
       <div class="cap-sec-label">Style</div>
@@ -3982,6 +3987,12 @@
           <div class="cap-style-name">Karaoke</div>
           <div class="cap-style-desc">Active word highlights as it's spoken</div>
           <div class="cap-style-prev"><span>the</span><b class="hot">word</b><span>now</span></div>
+        </label>
+        <label class="cap-style" data-style="fadeup">
+          <input type="radio" name="capStyle" value="fadeup">
+          <div class="cap-style-name">Fade Up</div>
+          <div class="cap-style-desc">Letters fade in + rise, word by word — clean &amp; professional</div>
+          <div class="cap-style-prev"><span>fade</span><b class="hot">up</b></div>
         </label>
         <label class="cap-style" data-style="reels">
           <input type="radio" name="capStyle" value="reels">
@@ -9058,6 +9069,9 @@ const CAP_LOOKS = {
   tiktok:    { style: 'tiktok',  highlight: '#5AA9FF', uppercase: false, fontWeight: 800, strokePx: 2, shadowPct: 55, vary: false, keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
   minimalkw: { style: 'minimal', highlight: '#4ECB71', uppercase: false, fontWeight: 700, strokePx: 0, shadowPct: 40, vary: false, keywords: true,  box: false, maxWords: 5, align: 'center', strokeColor: '#000000' },
   clean:     { style: 'minimal', highlight: '#FFFFFF', uppercase: false, fontWeight: 700, strokePx: 0, shadowPct: 40, vary: false, keywords: false, box: false, maxWords: 5, align: 'center', strokeColor: '#000000' },
+  editorial: { style: 'minimal', highlight: '#EDEAE3', uppercase: false, fontWeight: 700, strokePx: 0, shadowPct: 45, vary: false, keywords: false, box: false, maxWords: 5, align: 'center', strokeColor: '#000000', trackingPct: 2, lineHtPct: 116 },
+  fadeup:    { style: 'fadeup',  highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 0, shadowPct: 45, vary: false, keywords: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
+  fadeupkw:  { style: 'fadeup',  highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 0, shadowPct: 45, vary: false, keywords: true,  box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
   neon:      { style: 'reels',   highlight: '#4ECB71', uppercase: true,  fontWeight: 900, strokePx: 3, shadowPct: 70, vary: false, keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#063b1e' },
 };
 function capApplyLook(name) {
@@ -9194,7 +9208,7 @@ function capApplyPos(capEl) {
 function capBuildLine(capEl, line, idx) {
   const stage = capPreview.stage || document.getElementById('capStage');
   const stageH = (stage && stage.clientHeight) || 300;
-  const frac = { classic: 0.072, karaoke: 0.078, reels: 0.115, tiktok: 0.10, minimal: 0.066, hormozi: 0.108 }[capState.style] || 0.08;
+  const frac = { classic: 0.072, karaoke: 0.078, reels: 0.115, tiktok: 0.10, minimal: 0.066, hormozi: 0.108, fadeup: 0.078 }[capState.style] || 0.08;
   const fontPx = Math.max(11, Math.round(stageH * frac * (capState.fontPct / 100)));
   // per-line color + entrance when "vary per line" is on
   capPreview.lineColor = capState.vary ? CAP_PALETTE[idx % CAP_PALETTE.length] : capState.highlight;
@@ -9238,7 +9252,22 @@ function capBuildLine(capEl, line, idx) {
     const w = line.words[wi];
     const sp = document.createElement('span');
     sp.className = 'cap-cap-word';
-    sp.textContent = (capState.uppercase ? w.text.toUpperCase() : w.text) + (wi === emojiIdx ? ' ' + emojiChar : '');
+    const wTxt = (capState.uppercase ? w.text.toUpperCase() : w.text);
+    if (capState.style === 'fadeup') {
+      // Per-letter spans so the preview can fade each character up (mirrors render).
+      sp.textContent = '';
+      Array.from(wTxt).forEach(ch => {
+        const cs = document.createElement('span');
+        cs.className = 'cap-ch';
+        cs.style.display = 'inline-block';
+        cs.style.whiteSpace = 'pre';
+        cs.textContent = ch;
+        sp.appendChild(cs);
+      });
+      if (wi === emojiIdx) sp.appendChild(document.createTextNode(' ' + emojiChar));
+    } else {
+      sp.textContent = wTxt + (wi === emojiIdx ? ' ' + emojiChar : '');
+    }
     sp.dataset.s = w.s; sp.dataset.e = w.e;
     sp.style.textShadow = shadowCss;
     sp.style.fontWeight = String(capState.fontWeight || 800);  // .cap-cap-word hardcodes 800 — override per word so Weight actually shows
@@ -9281,6 +9310,19 @@ function capStyleWord(sp, ms) {
   const baseColor = (capState.keywords && sp.dataset.kw === '1') ? hl : '#fff';
   let color = baseColor, opacity = 1, transform = '', background = '', padding = '', radius = '', stroke = '';
   const st = capState.style;
+  if (st === 'fadeup') {
+    // Letter-by-letter fade + rise (mirrors the Captions.tsx render).
+    sp.style.color = (active || sp.dataset.kw === '1') ? hl : '#fff';
+    sp.style.opacity = '1'; sp.style.transform = ''; sp.style.background = ''; sp.style.padding = ''; sp.style.borderRadius = ''; sp.style.webkitTextStroke = '';
+    const chs = sp.querySelectorAll('.cap-ch'); const PER = 26, DUR = 320;
+    for (let li = 0; li < chs.length; li++) {
+      const p = Math.max(0, Math.min(1, (ms - s - li * PER) / DUR));
+      const ez = p < 1 ? (1 - Math.pow(1 - p, 3)) : 1;
+      chs[li].style.opacity = String(ez);
+      chs[li].style.transform = 'translateY(' + ((1 - ez) * 0.5).toFixed(3) + 'em)';
+    }
+    return;
+  }
   if (st === 'hormozi') {
     if (active) { color = '#15110d'; background = hl; padding = '0.02em 0.12em'; radius = '6px'; stroke = '0'; transform = 'scale(' + (1 + 0.05 * Math.sin(Math.min(1, sinceWord / Math.max(1, e - s)) * Math.PI)).toFixed(3) + ')'; }
     else color = baseColor;

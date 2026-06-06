@@ -22,7 +22,7 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Eas
 
 export type CaptionWord = { text: string; startMs: number; endMs: number; kw?: boolean };
 export type CaptionLine = { words: CaptionWord[]; startMs: number; endMs: number };
-export type CaptionStyle = 'classic' | 'karaoke' | 'reels' | 'tiktok' | 'minimal' | 'hormozi';
+export type CaptionStyle = 'classic' | 'karaoke' | 'reels' | 'tiktok' | 'minimal' | 'hormozi' | 'fadeup';
 
 export type CaptionOptions = {
   accent?: string;          // base text color
@@ -88,6 +88,7 @@ const SIZE_FRACTION: Record<CaptionStyle, number> = {
   tiktok: 0.072,
   minimal: 0.04,
   hormozi: 0.078,
+  fadeup: 0.05,
 };
 
 // colors cycled across lines when varyPerLine is on
@@ -318,6 +319,27 @@ const WordView: React.FC<{
   // keyword highlighting: important words stay coloured even when not the active word
   const isKw = !!(opt.keywords && word.kw);
   const baseColor = isKw ? hlColor : opt.accent;
+
+  // FADE UP — letter-by-letter: each character fades in + rises, staggered,
+  // starting when its word is spoken. Clean, professional, fps-independent
+  // (ms-based interpolation, so it's smooth at 30 or 60fps).
+  if (style === 'fadeup') {
+    const letters = Array.from(word.text);
+    const PER = 26, DUR = 320;   // ms stagger per letter, ms per-letter fade
+    const col = (active || isKw) ? hlColor : opt.accent;
+    return (
+      <span style={{ display: 'inline-block', color: col, transformOrigin: 'center bottom', transition: 'color 90ms linear' }}>
+        {letters.map((ch, li) => {
+          const st = word.startMs + li * PER;
+          const p = clamp01(interpolate(ms, [st, st + DUR], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: easeOut }));
+          return (
+            <span key={li} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: p, transform: `translateY(${((1 - p) * 0.5).toFixed(3)}em)`, willChange: 'transform, opacity' }}>{ch}</span>
+          );
+        })}
+      </span>
+    );
+  }
+
   let color = baseColor;
   let transform = '';
   let opacity = 1;
