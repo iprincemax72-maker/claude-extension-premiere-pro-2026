@@ -332,7 +332,9 @@ const WordView: React.FC<{
   if (style === 'fadeup') {
     const letters = Array.from(word.text);
     const PER = 26, DUR = 320;   // ms stagger per letter, ms per-letter fade
-    const col = (active || isKw) ? hlColor : opt.accent;
+    // Clean & professional: plain text colour throughout. Only highlight when
+    // keyword mode is on (the "+ KW" looks) — no active-word colour shift.
+    const col = isKw ? hlColor : opt.accent;
     return (
       <span style={{ display: 'inline-block', color: col, transformOrigin: 'center bottom', transition: 'color 90ms linear' }}>
         {letters.map((ch, li) => {
@@ -352,7 +354,8 @@ const WordView: React.FC<{
   // ms-based, so it's smooth at 30 or 60fps.
   if (style === 'wordup') {
     const DUR = 300;   // ms per-word fade
-    const col = (active || isKw) ? hlColor : opt.accent;
+    // Clean & professional: plain colour throughout; highlight only in KW mode.
+    const col = isKw ? hlColor : opt.accent;
     const p = clamp01(interpolate(ms, [word.startMs, word.startMs + DUR], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: easeOut }));
     return (
       <span style={{ display: 'inline-block', color: col, opacity: p, transform: `translateY(${((1 - p) * 0.4).toFixed(3)}em)`, transformOrigin: 'center bottom', transition: 'color 90ms linear', willChange: 'transform, opacity' }}>{word.text}</span>

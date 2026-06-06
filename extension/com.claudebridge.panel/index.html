@@ -3963,9 +3963,9 @@
       <div class="cap-sec-label">Quick looks</div>
       <div class="cap-looks" id="capLooks">
         <!-- Professional / clean looks FIRST -->
-        <button type="button" class="cap-look" data-look="fadeup"><span class="cap-look-prev"><b style="color:#fff;font-weight:800">fade <span style="color:#E2885F">up</span></b></span><span class="cap-look-name">Fade Up</span></button>
+        <button type="button" class="cap-look" data-look="fadeup"><span class="cap-look-prev"><b style="color:#fff;font-weight:800">fade up</b></span><span class="cap-look-name">Fade Up</span></button>
         <button type="button" class="cap-look" data-look="fadeupkw"><span class="cap-look-prev"><b style="color:#fff;font-weight:800">key <span style="color:#E2885F">words</span></b></span><span class="cap-look-name">Fade Up + KW</span></button>
-        <button type="button" class="cap-look" data-look="wordup"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">word <span style="color:#E2885F">by</span> word</b></span><span class="cap-look-name">Word by Word</span></button>
+        <button type="button" class="cap-look" data-look="wordup"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">word by word</b></span><span class="cap-look-name">Word by Word</span></button>
         <button type="button" class="cap-look" data-look="wordupkw"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">say <span style="color:#4ECB71">more</span></b></span><span class="cap-look-name">Word + KW</span></button>
         <button type="button" class="cap-look" data-look="karaoke"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">word <span style="color:#E2885F">pop</span></b></span><span class="cap-look-name">Karaoke</span></button>
         <button type="button" class="cap-look" data-look="clean"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">clean line</b></span><span class="cap-look-name">Clean</span></button>
@@ -3994,13 +3994,13 @@
           <input type="radio" name="capStyle" value="fadeup">
           <div class="cap-style-name">Fade Up</div>
           <div class="cap-style-desc">Letters fade in + rise, word by word — clean &amp; professional</div>
-          <div class="cap-style-prev"><span>fade</span><b class="hot">up</b></div>
+          <div class="cap-style-prev"><span>fade</span><span>up</span></div>
         </label>
         <label class="cap-style" data-style="wordup">
           <input type="radio" name="capStyle" value="wordup">
           <div class="cap-style-name">Word by Word</div>
           <div class="cap-style-desc">Each word fades in + rises as it's spoken — clean &amp; professional</div>
-          <div class="cap-style-prev"><span>word</span><b class="hot">by</b><span>word</span></div>
+          <div class="cap-style-prev"><span>word</span><span>by</span><span>word</span></div>
         </label>
         <label class="cap-style" data-style="reels">
           <input type="radio" name="capStyle" value="reels">
@@ -9329,7 +9329,8 @@ function capStyleWord(sp, ms) {
   const st = capState.style;
   if (st === 'fadeup') {
     // Letter-by-letter fade + rise (mirrors the Captions.tsx render).
-    sp.style.color = (active || sp.dataset.kw === '1') ? hl : '#fff';
+    // Clean white throughout; highlight only the keyword (KW looks), no active shift.
+    sp.style.color = (sp.dataset.kw === '1') ? hl : '#fff';
     sp.style.opacity = '1'; sp.style.transform = ''; sp.style.background = ''; sp.style.padding = ''; sp.style.borderRadius = ''; sp.style.webkitTextStroke = '';
     const chs = sp.querySelectorAll('.cap-ch'); const PER = 26, DUR = 320;
     const fadeStroke = capPreview.strokeCss || '';
@@ -9345,9 +9346,10 @@ function capStyleWord(sp, ms) {
   }
   if (st === 'wordup') {
     // Word-by-word fade + rise (mirrors the Captions.tsx render).
+    // Clean white throughout; highlight only the keyword (KW looks), no active shift.
     const p = Math.max(0, Math.min(1, sinceWord / 300));
     const ez = p < 1 ? (1 - Math.pow(1 - p, 3)) : 1;
-    color = (active || sp.dataset.kw === '1') ? hl : '#fff';
+    color = (sp.dataset.kw === '1') ? hl : '#fff';
     opacity = ez;
     transform = 'translateY(' + ((1 - ez) * 0.4).toFixed(3) + 'em)';
   } else if (st === 'hormozi') {
