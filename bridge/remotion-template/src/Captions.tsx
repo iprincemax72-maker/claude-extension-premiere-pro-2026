@@ -22,7 +22,7 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Eas
 
 export type CaptionWord = { text: string; startMs: number; endMs: number; kw?: boolean };
 export type CaptionLine = { words: CaptionWord[]; startMs: number; endMs: number };
-export type CaptionStyle = 'classic' | 'karaoke' | 'reels' | 'tiktok' | 'minimal' | 'hormozi' | 'fadeup';
+export type CaptionStyle = 'classic' | 'karaoke' | 'reels' | 'tiktok' | 'minimal' | 'hormozi' | 'fadeup' | 'wordup';
 
 export type CaptionOptions = {
   accent?: string;          // base text color
@@ -89,6 +89,7 @@ const SIZE_FRACTION: Record<CaptionStyle, number> = {
   minimal: 0.04,
   hormozi: 0.078,
   fadeup: 0.05,
+  wordup: 0.05,
 };
 
 // colors cycled across lines when varyPerLine is on
@@ -337,6 +338,19 @@ const WordView: React.FC<{
           );
         })}
       </span>
+    );
+  }
+
+  // WORD BY WORD — each whole word fades in + rises as it's spoken, one after
+  // another. Same clean, professional reveal as Fade Up but at the word level.
+  // Words reserve their space (fade in place) so the line stays centered/stable.
+  // ms-based, so it's smooth at 30 or 60fps.
+  if (style === 'wordup') {
+    const DUR = 300;   // ms per-word fade
+    const col = (active || isKw) ? hlColor : opt.accent;
+    const p = clamp01(interpolate(ms, [word.startMs, word.startMs + DUR], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: easeOut }));
+    return (
+      <span style={{ display: 'inline-block', color: col, opacity: p, transform: `translateY(${((1 - p) * 0.4).toFixed(3)}em)`, transformOrigin: 'center bottom', transition: 'color 90ms linear', willChange: 'transform, opacity' }}>{word.text}</span>
     );
   }
 
