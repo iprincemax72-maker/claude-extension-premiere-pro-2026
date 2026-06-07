@@ -8601,7 +8601,7 @@ function setMode(m) {
 // default new tabs start from. Sent with every /chat request from that tab.
 function setRenderMode(m) {
   if (m === 'mid') m = 'default';  // old name migration
-  if (!['fast', 'default', 'slow'].includes(m)) m = 'default';
+  if (!['superfast', 'fast', 'default', 'slow'].includes(m)) m = 'default';
   const t = tabs[activeTabIdx];
   if (t) t.renderMode = m;
   userSettings.renderMode = m;   // remembered as the default for the next new tab
