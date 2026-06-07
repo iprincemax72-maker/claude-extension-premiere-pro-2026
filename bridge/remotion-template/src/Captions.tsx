@@ -22,7 +22,9 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Eas
 
 export type CaptionWord = { text: string; startMs: number; endMs: number; kw?: boolean };
 export type CaptionLine = { words: CaptionWord[]; startMs: number; endMs: number };
-export type CaptionStyle = 'classic' | 'karaoke' | 'reels' | 'tiktok' | 'minimal' | 'hormozi' | 'fadeup' | 'wordup';
+export type CaptionStyle = 'classic' | 'karaoke' | 'reels' | 'tiktok' | 'minimal' | 'hormozi'
+  | 'fadeup' | 'fadedown' | 'fadeleft' | 'faderight'
+  | 'wordup' | 'worddown' | 'wordleft' | 'wordright';
 
 export type CaptionOptions = {
   accent?: string;          // base text color
@@ -89,7 +91,27 @@ const SIZE_FRACTION: Record<CaptionStyle, number> = {
   minimal: 0.04,
   hormozi: 0.078,
   fadeup: 0.05,
+  fadedown: 0.05,
+  fadeleft: 0.05,
+  faderight: 0.05,
   wordup: 0.05,
+  worddown: 0.05,
+  wordleft: 0.05,
+  wordright: 0.05,
+};
+
+// Directional fade family — axis + sign of each unit's initial offset, and
+// whether it animates per word (true) or per letter (false). Up is the original
+// Fade Up / Word by Word; down/left/right are siblings.
+const FADE_DEFS: Record<string, { axis: 'x' | 'y'; sign: number; word: boolean }> = {
+  fadeup:    { axis: 'y', sign:  1, word: false },
+  fadedown:  { axis: 'y', sign: -1, word: false },
+  fadeleft:  { axis: 'x', sign: -1, word: false },
+  faderight: { axis: 'x', sign:  1, word: false },
+  wordup:    { axis: 'y', sign:  1, word: true  },
+  worddown:  { axis: 'y', sign: -1, word: true  },
+  wordleft:  { axis: 'x', sign: -1, word: true  },
+  wordright: { axis: 'x', sign:  1, word: true  },
 };
 
 // colors cycled across lines when varyPerLine is on
@@ -326,39 +348,39 @@ const WordView: React.FC<{
   const isKw = !!(opt.keywords && word.kw);
   const baseColor = isKw ? hlColor : opt.accent;
 
-  // FADE UP — letter-by-letter: each character fades in + rises, staggered,
-  // starting when its word is spoken. Clean, professional, fps-independent
-  // (ms-based interpolation, so it's smooth at 30 or 60fps).
-  if (style === 'fadeup') {
+  // DIRECTIONAL FADE FAMILY — letters (fadeXxx) or whole words (wordXxx) fade in
+  // while sliding from a direction (up/down/left/right). Up is the original Fade
+  // Up / Word by Word. Clean & professional: plain colour throughout; highlight
+  // only in keyword mode. ms-based, so it's smooth at 30 or 60fps.
+  const fadeDef = FADE_DEFS[style];
+  if (fadeDef) {
+    const col = isKw ? hlColor : opt.accent;
+    const slide = (p: number, mag: number) => {
+      const d = ((1 - p) * fadeDef.sign * mag).toFixed(3);
+      return fadeDef.axis === 'x' ? `translateX(${d}em)` : `translateY(${d}em)`;
+    };
+    if (fadeDef.word) {
+      // word-by-word: each whole word fades in + slides as it's spoken. Words
+      // reserve their space (fade in place) so the line stays centered/stable.
+      const DUR = 300;
+      const p = clamp01(interpolate(ms, [word.startMs, word.startMs + DUR], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: easeOut }));
+      return (
+        <span style={{ display: 'inline-block', color: col, opacity: p, transform: slide(p, 0.4), transformOrigin: 'center bottom', transition: 'color 90ms linear', willChange: 'transform, opacity' }}>{word.text}</span>
+      );
+    }
+    // letter-by-letter: each character fades in + slides, staggered.
     const letters = Array.from(word.text);
     const PER = 26, DUR = 320;   // ms stagger per letter, ms per-letter fade
-    // Clean & professional: plain text colour throughout. Only highlight when
-    // keyword mode is on (the "+ KW" looks) — no active-word colour shift.
-    const col = isKw ? hlColor : opt.accent;
     return (
       <span style={{ display: 'inline-block', color: col, transformOrigin: 'center bottom', transition: 'color 90ms linear' }}>
         {letters.map((ch, li) => {
           const st = word.startMs + li * PER;
           const p = clamp01(interpolate(ms, [st, st + DUR], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: easeOut }));
           return (
-            <span key={li} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: p, transform: `translateY(${((1 - p) * 0.5).toFixed(3)}em)`, willChange: 'transform, opacity' }}>{ch}</span>
+            <span key={li} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: p, transform: slide(p, 0.5), willChange: 'transform, opacity' }}>{ch}</span>
           );
         })}
       </span>
-    );
-  }
-
-  // WORD BY WORD — each whole word fades in + rises as it's spoken, one after
-  // another. Same clean, professional reveal as Fade Up but at the word level.
-  // Words reserve their space (fade in place) so the line stays centered/stable.
-  // ms-based, so it's smooth at 30 or 60fps.
-  if (style === 'wordup') {
-    const DUR = 300;   // ms per-word fade
-    // Clean & professional: plain colour throughout; highlight only in KW mode.
-    const col = isKw ? hlColor : opt.accent;
-    const p = clamp01(interpolate(ms, [word.startMs, word.startMs + DUR], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: easeOut }));
-    return (
-      <span style={{ display: 'inline-block', color: col, opacity: p, transform: `translateY(${((1 - p) * 0.4).toFixed(3)}em)`, transformOrigin: 'center bottom', transition: 'color 90ms linear', willChange: 'transform, opacity' }}>{word.text}</span>
     );
   }
 

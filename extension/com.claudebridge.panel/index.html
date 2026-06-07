@@ -2572,9 +2572,10 @@
   /* header */
   /* header — compact; slides up + fades on scroll-down (see .cap-head.hide) */
   .cap-head { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 9px 14px; position: relative;
-    background: var(--cc-bg); border-bottom: 1px solid var(--border);
-    transition: transform .28s var(--ease-out), opacity .22s var(--ease-out); transform-origin: top; }
-  .cap-head.hide { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+    background: var(--cc-bg); border-bottom: 1px solid var(--border); overflow: hidden; max-height: 120px;
+    transition: transform .28s var(--ease-out), opacity .22s var(--ease-out), max-height .28s var(--ease-out), padding-top .28s var(--ease-out), padding-bottom .28s var(--ease-out), border-bottom-width .28s var(--ease-out); transform-origin: top; }
+  /* hidden on scroll-down: slide up AND collapse the box so the body reclaims the space (no dead band) */
+  .cap-head.hide { transform: translateY(-100%); opacity: 0; pointer-events: none; max-height: 0; padding-top: 0; padding-bottom: 0; border-bottom-width: 0; }
   .cap-head .cap-x {
     width: 28px; height: 28px; border-radius: 8px; flex: 0 0 auto;
     display: flex; align-items: center; justify-content: center;
@@ -2880,7 +2881,10 @@
 
   /* footer — generate bar (flat warm surface, hairline top) */
   .cap-footer { flex: 0 0 auto; display: flex; gap: 10px; align-items: center; padding: 11px 14px;
-    border-top: 1px solid var(--border); background: var(--cc-bg); }
+    border-top: 1px solid var(--border); background: var(--cc-bg); overflow: hidden; max-height: 80px;
+    transition: transform .28s var(--ease-out), opacity .22s var(--ease-out), max-height .28s var(--ease-out), padding-top .28s var(--ease-out), padding-bottom .28s var(--ease-out), border-top-width .28s var(--ease-out); transform-origin: bottom; }
+  /* mirror of .cap-head.hide but downward: slide down + collapse so the body reclaims the space */
+  .cap-footer.hide { transform: translateY(100%); opacity: 0; pointer-events: none; max-height: 0; padding-top: 0; padding-bottom: 0; border-top-width: 0; }
   .cap-footer .cap-err { flex: 1; font-size: 11.5px; color: #e7b07f; min-height: 14px; }
   /* primary action — the one coral moment. Flat, no gradient/sheen/glow. */
   .cap-gen {
@@ -3960,26 +3964,6 @@
         </div>
       </div>
 
-      <div class="cap-sec-label">Quick looks</div>
-      <div class="cap-looks" id="capLooks">
-        <!-- Professional / clean looks FIRST -->
-        <button type="button" class="cap-look" data-look="fadeup"><span class="cap-look-prev"><b style="color:#fff;font-weight:800">fade up</b></span><span class="cap-look-name">Fade Up</span></button>
-        <button type="button" class="cap-look" data-look="wordup"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">word by word</b></span><span class="cap-look-name">Word by Word</span></button>
-        <button type="button" class="cap-look" data-look="karaoke"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">word <span style="color:#E2885F">pop</span></b></span><span class="cap-look-name">Karaoke</span></button>
-        <button type="button" class="cap-look" data-look="clean"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">clean line</b></span><span class="cap-look-name">Clean</span></button>
-        <button type="button" class="cap-look" data-look="minimalkw"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">go <span style="color:#4ECB71">green</span></b></span><span class="cap-look-name">Minimal+</span></button>
-        <button type="button" class="cap-look" data-look="highlight"><span class="cap-look-prev"><b style="color:#fff;font-weight:700">it's <span style="color:#E2885F">key</span></b></span><span class="cap-look-name">Highlight</span></button>
-        <button type="button" class="cap-look" data-look="editorial"><span class="cap-look-prev"><b style="color:#EDEAE3;font-weight:700;letter-spacing:.02em">editorial</b></span><span class="cap-look-name">Editorial</span></button>
-        <button type="button" class="cap-look" data-look="tiktok"><span class="cap-look-prev"><b style="color:#5AA9FF">type on</b></span><span class="cap-look-name">Type-on</span></button>
-        <!-- Loud / TikTok-style looks to the RIGHT -->
-        <button type="button" class="cap-look" data-look="pop"><span class="cap-look-prev"><b style="color:#FF5D8F;-webkit-text-stroke:1px #000">POP</b></span><span class="cap-look-name">Pop</span></button>
-        <button type="button" class="cap-look" data-look="beast"><span class="cap-look-prev"><b style="color:#15110d;background:#F5C542;padding:2px 6px;border-radius:5px">BEAST</b></span><span class="cap-look-name">Beast</span></button>
-        <button type="button" class="cap-look" data-look="beastblue"><span class="cap-look-prev"><b style="color:#fff;background:#5AA9FF;padding:2px 6px;border-radius:5px">BLUE</b></span><span class="cap-look-name">Beast Blue</span></button>
-        <button type="button" class="cap-look" data-look="boldyellow"><span class="cap-look-prev"><b style="color:#F5C542;-webkit-text-stroke:1px #000">BOLD</b></span><span class="cap-look-name">Bold Yellow</span></button>
-        <button type="button" class="cap-look" data-look="neon"><span class="cap-look-prev"><b style="color:#4ECB71;-webkit-text-stroke:1px #063">NEON</b></span><span class="cap-look-name">Neon</span></button>
-        <button type="button" class="cap-look" data-look="rainbow"><span class="cap-look-prev"><b><span style="color:#E2885F">a</span><span style="color:#5AA9FF">b</span><span style="color:#4ECB71">c</span></b></span><span class="cap-look-name">Rainbow</span></button>
-      </div>
-
       <div class="cap-sec-label">Style</div>
       <div class="cap-styles" id="capStyles">
         <!-- Professional / clean styles FIRST -->
@@ -3989,11 +3973,47 @@
           <div class="cap-style-desc">Letters fade in + rise, word by word — clean &amp; professional</div>
           <div class="cap-style-prev"><span>fade</span><span>up</span></div>
         </label>
+        <label class="cap-style" data-style="fadedown">
+          <input type="radio" name="capStyle" value="fadedown">
+          <div class="cap-style-name">Fade Down</div>
+          <div class="cap-style-desc">Letters fade in + drop, word by word</div>
+          <div class="cap-style-prev"><span>fade</span><span>down</span></div>
+        </label>
+        <label class="cap-style" data-style="fadeleft">
+          <input type="radio" name="capStyle" value="fadeleft">
+          <div class="cap-style-name">Fade Left</div>
+          <div class="cap-style-desc">Letters slide in from the left, word by word</div>
+          <div class="cap-style-prev"><span>fade</span><span>left</span></div>
+        </label>
+        <label class="cap-style" data-style="faderight">
+          <input type="radio" name="capStyle" value="faderight">
+          <div class="cap-style-name">Fade Right</div>
+          <div class="cap-style-desc">Letters slide in from the right, word by word</div>
+          <div class="cap-style-prev"><span>fade</span><span>right</span></div>
+        </label>
         <label class="cap-style" data-style="wordup">
           <input type="radio" name="capStyle" value="wordup">
           <div class="cap-style-name">Word by Word</div>
           <div class="cap-style-desc">Each word fades in + rises as it's spoken — clean &amp; professional</div>
           <div class="cap-style-prev"><span>word</span><span>by</span><span>word</span></div>
+        </label>
+        <label class="cap-style" data-style="worddown">
+          <input type="radio" name="capStyle" value="worddown">
+          <div class="cap-style-name">Word Down</div>
+          <div class="cap-style-desc">Each word fades in + drops as it's spoken</div>
+          <div class="cap-style-prev"><span>word</span><span>down</span></div>
+        </label>
+        <label class="cap-style" data-style="wordleft">
+          <input type="radio" name="capStyle" value="wordleft">
+          <div class="cap-style-name">Word Left</div>
+          <div class="cap-style-desc">Each word slides in from the left</div>
+          <div class="cap-style-prev"><span>word</span><span>left</span></div>
+        </label>
+        <label class="cap-style" data-style="wordright">
+          <input type="radio" name="capStyle" value="wordright">
+          <div class="cap-style-name">Word Right</div>
+          <div class="cap-style-desc">Each word slides in from the right</div>
+          <div class="cap-style-prev"><span>word</span><span>right</span></div>
         </label>
         <label class="cap-style" data-style="classic">
           <input type="radio" name="capStyle" value="classic">
@@ -4006,31 +4026,6 @@
           <div class="cap-style-name">Minimal</div>
           <div class="cap-style-desc">Understated, low-key</div>
           <div class="cap-style-prev"><span>minimal</span></div>
-        </label>
-        <!-- Highlight / loud styles to the RIGHT -->
-        <label class="cap-style" data-style="karaoke">
-          <input type="radio" name="capStyle" value="karaoke">
-          <div class="cap-style-name">Karaoke</div>
-          <div class="cap-style-desc">Active word highlights as it's spoken</div>
-          <div class="cap-style-prev"><span>the</span><b class="hot">word</b><span>now</span></div>
-        </label>
-        <label class="cap-style" data-style="hormozi">
-          <input type="radio" name="capStyle" value="hormozi">
-          <div class="cap-style-name">Hormozi</div>
-          <div class="cap-style-desc">Bold, active word in a color box</div>
-          <div class="cap-style-prev"><span>big</span><b style="background:var(--accent-2);color:#15110d;padding:0 4px;border-radius:4px">BOLD</b></div>
-        </label>
-        <label class="cap-style" data-style="reels">
-          <input type="radio" name="capStyle" value="reels">
-          <div class="cap-style-name">Big Bold</div>
-          <div class="cap-style-desc">Punchy spring pop, 1–3 words</div>
-          <div class="cap-style-prev"><b class="hot" style="font-size:13px">BOLD</b></div>
-        </label>
-        <label class="cap-style" data-style="tiktok">
-          <input type="radio" name="capStyle" value="tiktok">
-          <div class="cap-style-name">TikTok Pop</div>
-          <div class="cap-style-desc">Words type on with a little wobble</div>
-          <div class="cap-style-prev"><span>type</span><span>on</span><b class="hot">pop</b></div>
         </label>
       </div>
 
@@ -4459,8 +4454,9 @@
   <div class="input-wrap">
     <div class="ref-row">
       <div class="ref-bar" id="refBar"></div>
-      <div class="rmode-group" id="renderModeGroup" title="How hard Flimify works on the animation — Fast: quick template-based, ~1 min. Default: a real custom-built animation, no templates (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
-        <button class="rmode-pill" data-rmode="fast" type="button" title="Fast — quick template-based animation, ~1 min">Fast</button>
+      <div class="rmode-group" id="renderModeGroup" title="How hard Flimify works on the animation — Super Fast: instant prebuilt template (lower-third, title, list, stat, CTA), ~20s. Fast: quick custom animation, ~1 min. Default: a real custom-built animation (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
+        <button class="rmode-pill" data-rmode="superfast" type="button" title="Super Fast — instant prebuilt template filled with your text (lower-third, title, list, stat, subscribe), ~20s">Super&nbsp;Fast</button>
+        <button class="rmode-pill" data-rmode="fast" type="button" title="Fast — quick custom-built animation, ~1 min">Fast</button>
         <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
         <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Flimify takes its time, ~3-5 min">Slow</button>
       </div>
@@ -9067,20 +9063,27 @@ function capSyncZoneUI() { capSyncPosUI(); }   // back-compat name
 
 // Quick looks — one click applies a whole designed preset.
 const CAP_LOOKS = {
-  beast:     { style: 'hormozi', highlight: '#F5C542', uppercase: true,  fontWeight: 900, strokePx: 5, shadowPct: 55, vary: false, keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
-  beastblue: { style: 'hormozi', highlight: '#5AA9FF', uppercase: true,  fontWeight: 900, strokePx: 5, shadowPct: 55, vary: false, keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
-  pop:       { style: 'reels',   highlight: '#FF5D8F', uppercase: true,  fontWeight: 900, strokePx: 3, shadowPct: 55, vary: false, keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
-  highlight: { style: 'karaoke', highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 2, shadowPct: 55, vary: false, keywords: true,  box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
-  karaoke:   { style: 'karaoke', highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 2, shadowPct: 55, vary: false, keywords: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
-  boldyellow:{ style: 'reels',   highlight: '#F5C542', uppercase: true,  fontWeight: 900, strokePx: 3, shadowPct: 55, vary: false, keywords: true,  box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
-  rainbow:   { style: 'karaoke', highlight: '#E2885F', uppercase: true,  fontWeight: 800, strokePx: 2, shadowPct: 55, vary: true,  keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
-  tiktok:    { style: 'tiktok',  highlight: '#5AA9FF', uppercase: false, fontWeight: 800, strokePx: 2, shadowPct: 55, vary: false, keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#000000' },
-  minimalkw: { style: 'minimal', highlight: '#4ECB71', uppercase: false, fontWeight: 700, strokePx: 0, shadowPct: 40, vary: false, keywords: true,  box: false, maxWords: 5, align: 'center', strokeColor: '#000000' },
-  clean:     { style: 'minimal', highlight: '#FFFFFF', uppercase: false, fontWeight: 700, strokePx: 0, shadowPct: 40, vary: false, keywords: false, box: false, maxWords: 5, align: 'center', strokeColor: '#000000' },
-  editorial: { style: 'minimal', highlight: '#EDEAE3', uppercase: false, fontWeight: 700, strokePx: 0, shadowPct: 45, vary: false, keywords: false, box: false, maxWords: 5, align: 'center', strokeColor: '#000000', trackingPct: 2, lineHtPct: 116 },
-  fadeup:    { style: 'fadeup',  highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 0, shadowPct: 45, vary: false, keywords: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
-  wordup:    { style: 'wordup',  highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 0, shadowPct: 45, vary: false, keywords: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
-  neon:      { style: 'reels',   highlight: '#4ECB71', uppercase: true,  fontWeight: 900, strokePx: 3, shadowPct: 70, vary: false, keywords: false, box: false, maxWords: 3, align: 'center', strokeColor: '#063b1e' },
+  clean:     { style: 'minimal',   highlight: '#FFFFFF', uppercase: false, fontWeight: 700, strokePx: 0, shadowPct: 40, vary: false, keywords: false, box: false, maxWords: 5, align: 'center', strokeColor: '#000000' },
+  fadeup:    { style: 'fadeup',    highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 0, shadowPct: 45, vary: false, keywords: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
+  fadedown:  { style: 'fadedown',  highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 0, shadowPct: 45, vary: false, keywords: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
+  fadeleft:  { style: 'fadeleft',  highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 0, shadowPct: 45, vary: false, keywords: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
+  faderight: { style: 'faderight', highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 0, shadowPct: 45, vary: false, keywords: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
+  wordup:    { style: 'wordup',    highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 0, shadowPct: 45, vary: false, keywords: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
+  worddown:  { style: 'worddown',  highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 0, shadowPct: 45, vary: false, keywords: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
+  wordleft:  { style: 'wordleft',  highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 0, shadowPct: 45, vary: false, keywords: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
+  wordright: { style: 'wordright', highlight: '#E2885F', uppercase: false, fontWeight: 800, strokePx: 0, shadowPct: 45, vary: false, keywords: false, box: false, maxWords: 4, align: 'center', strokeColor: '#000000' },
+};
+
+// Directional fade presets for the live preview (mirrors FADE_DEFS in Captions.tsx).
+const CAP_FADE_DEFS = {
+  fadeup:    { axis: 'y', sign:  1, word: false },
+  fadedown:  { axis: 'y', sign: -1, word: false },
+  fadeleft:  { axis: 'x', sign: -1, word: false },
+  faderight: { axis: 'x', sign:  1, word: false },
+  wordup:    { axis: 'y', sign:  1, word: true  },
+  worddown:  { axis: 'y', sign: -1, word: true  },
+  wordleft:  { axis: 'x', sign: -1, word: true  },
+  wordright: { axis: 'x', sign:  1, word: true  },
 };
 function capApplyLook(name) {
   const o = CAP_LOOKS[name]; if (!o) return;
@@ -9216,7 +9219,7 @@ function capApplyPos(capEl) {
 function capBuildLine(capEl, line, idx) {
   const stage = capPreview.stage || document.getElementById('capStage');
   const stageH = (stage && stage.clientHeight) || 300;
-  const frac = { classic: 0.072, karaoke: 0.078, reels: 0.115, tiktok: 0.10, minimal: 0.066, hormozi: 0.108, fadeup: 0.078, wordup: 0.078 }[capState.style] || 0.08;
+  const frac = { classic: 0.072, karaoke: 0.078, reels: 0.115, tiktok: 0.10, minimal: 0.066, hormozi: 0.108, fadeup: 0.078, fadedown: 0.078, fadeleft: 0.078, faderight: 0.078, wordup: 0.078, worddown: 0.078, wordleft: 0.078, wordright: 0.078 }[capState.style] || 0.08;
   const fontPx = Math.max(11, Math.round(stageH * frac * (capState.fontPct / 100)));
   // per-line color + entrance when "vary per line" is on
   capPreview.lineColor = capState.vary ? CAP_PALETTE[idx % CAP_PALETTE.length] : capState.highlight;
@@ -9268,8 +9271,8 @@ function capBuildLine(capEl, line, idx) {
     const sp = document.createElement('span');
     sp.className = 'cap-cap-word';
     const wTxt = (capState.uppercase ? w.text.toUpperCase() : w.text);
-    if (capState.style === 'fadeup') {
-      // Per-letter spans so the preview can fade each character up (mirrors render).
+    if (CAP_FADE_DEFS[capState.style] && !CAP_FADE_DEFS[capState.style].word) {
+      // Per-letter spans so the preview can fade each character (mirrors render).
       sp.textContent = '';
       Array.from(wTxt).forEach(ch => {
         const cs = document.createElement('span');
@@ -9325,8 +9328,9 @@ function capStyleWord(sp, ms) {
   const baseColor = (capState.keywords && sp.dataset.kw === '1') ? hl : '#fff';
   let color = baseColor, opacity = 1, transform = '', background = '', padding = '', radius = '', stroke = '';
   const st = capState.style;
-  if (st === 'fadeup') {
-    // Letter-by-letter fade + rise (mirrors the Captions.tsx render).
+  const fdef = CAP_FADE_DEFS[st];
+  if (fdef && !fdef.word) {
+    // Letter-by-letter directional fade (mirrors the Captions.tsx render).
     // Clean white throughout; highlight only the keyword (KW looks), no active shift.
     sp.style.color = (sp.dataset.kw === '1') ? hl : '#fff';
     sp.style.opacity = '1'; sp.style.transform = ''; sp.style.background = ''; sp.style.padding = ''; sp.style.borderRadius = ''; sp.style.webkitTextStroke = '';
@@ -9336,20 +9340,22 @@ function capStyleWord(sp, ms) {
       const p = Math.max(0, Math.min(1, (ms - s - li * PER) / DUR));
       const ez = p < 1 ? (1 - Math.pow(1 - p, 3)) : 1;
       chs[li].style.opacity = String(ez);
-      chs[li].style.transform = 'translateY(' + ((1 - ez) * 0.5).toFixed(3) + 'em)';
+      const d = ((1 - ez) * fdef.sign * 0.5).toFixed(3);
+      chs[li].style.transform = (fdef.axis === 'x' ? 'translateX(' : 'translateY(') + d + 'em)';
       chs[li].style.webkitTextStroke = fadeStroke;
       chs[li].style.paintOrder = 'stroke fill';
     }
     return;
   }
-  if (st === 'wordup') {
-    // Word-by-word fade + rise (mirrors the Captions.tsx render).
+  if (fdef && fdef.word) {
+    // Word-by-word directional fade (mirrors the Captions.tsx render).
     // Clean white throughout; highlight only the keyword (KW looks), no active shift.
     const p = Math.max(0, Math.min(1, sinceWord / 300));
     const ez = p < 1 ? (1 - Math.pow(1 - p, 3)) : 1;
     color = (sp.dataset.kw === '1') ? hl : '#fff';
     opacity = ez;
-    transform = 'translateY(' + ((1 - ez) * 0.4).toFixed(3) + 'em)';
+    const d = ((1 - ez) * fdef.sign * 0.4).toFixed(3);
+    transform = (fdef.axis === 'x' ? 'translateX(' : 'translateY(') + d + 'em)';
   } else if (st === 'hormozi') {
     if (active) { color = '#15110d'; background = hl; padding = '0.02em 0.12em'; radius = '6px'; stroke = '0'; transform = 'scale(' + (1 + 0.05 * Math.sin(Math.min(1, sinceWord / Math.max(1, e - s)) * Math.PI)).toFixed(3) + ')'; }
     else color = baseColor;
@@ -9749,13 +9755,22 @@ function capNormalizeLookBadges() {
 function capWireHeaderHide() {
   const body = document.querySelector('.cap-body');
   const head = document.querySelector('.cap-head');
+  const foot = document.querySelector('.cap-footer');
   if (!body || !head || body._headHideWired) return;
   body._headHideWired = true;
   let last = 0;
   body.addEventListener('scroll', () => {
     const y = body.scrollTop;
+    // header: hide on scroll-DOWN, show on scroll-up / near the top.
     if (y > 52 && y > last + 3) head.classList.add('hide');
     else if (y < last - 3 || y < 20) head.classList.remove('hide');
+    // footer: the OPPOSITE — hide on scroll-UP, show on scroll-down / near the
+    // bottom (so Generate is always reachable at the end of the list).
+    if (foot) {
+      const maxY = body.scrollHeight - body.clientHeight;
+      if (y < last - 3 && y < maxY - 52) foot.classList.add('hide');
+      else if (y > last + 3 || y > maxY - 20) foot.classList.remove('hide');
+    }
     last = y;
   }, { passive: true });
 }
@@ -10015,7 +10030,7 @@ function addCaptionsResultCard(data) {
   const clips = (data.clips && data.clips.length) ? data.clips
     : (data.import ? [{ path: data.import, timelineSec: data.timelineStart || 0 }] : []);
   if (!clips.length) return;
-  const styleLabel = { karaoke: 'Karaoke', reels: 'Big Bold', tiktok: 'TikTok Pop', classic: 'Classic', minimal: 'Minimal', hormozi: 'Hormozi' }[data.style] || data.style;
+  const styleLabel = { karaoke: 'Karaoke', reels: 'Big Bold', tiktok: 'TikTok Pop', classic: 'Classic', minimal: 'Minimal', hormozi: 'Hormozi', fadeup: 'Fade Up', fadedown: 'Fade Down', fadeleft: 'Fade Left', faderight: 'Fade Right', wordup: 'Word by Word', worddown: 'Word Down', wordleft: 'Word Left', wordright: 'Word Right' }[data.style] || data.style;
   const dur = typeof data.durationSec === 'number' ? data.durationSec.toFixed(1) + 's' : '';
   const m = makeMsg('claude',
     'Captions ready - <b>' + escapeHTML(styleLabel) + '</b> &middot; ' + (data.wordCount || 0) + ' words &middot; '
