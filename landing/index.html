@@ -1368,7 +1368,7 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
   const panels = [].slice.call(root.querySelectorAll('.spanel'));
   const back = document.getElementById('iback'), next = document.getElementById('inext'), prog = document.getElementById('iprog');
   const total = panels.length;
-  let cur = 0, reached = 0;
+  let cur = 0, reached = 0, downloaded = false;
   function go(s) {
     s = Math.max(0, Math.min(total - 1, s));
     cur = s; reached = Math.max(reached, s);
@@ -1378,6 +1378,10 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
     back.disabled = s === 0;
     next.textContent = s === total - 1 ? 'Done ✓' : 'Continue →';
     prog.textContent = 'Step ' + (s + 1) + ' of ' + total;
+    // Gate: can't leave Step 1 until the extension has actually been downloaded.
+    const lock = (s === 0 && !downloaded);
+    next.disabled = lock;
+    next.title = lock ? 'Download the extension above first' : '';
   }
   /* confetti burst from an element, vanilla canvas, no deps */
   function confetti(originEl) {
@@ -1427,6 +1431,7 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
   root.querySelectorAll('.os button').forEach(b => b.addEventListener('click', () => setOS(b.closest('.spanel'), b.getAttribute('data-os'))));
   /* download buttons: pick the matching installer + jump to step 2 (the .zip still downloads via the href) */
   root.querySelectorAll('.dl[data-dlos]').forEach(b => b.addEventListener('click', () => {
+    downloaded = true;                 // unlocks Continue
     if (panels[1]) setOS(panels[1], b.getAttribute('data-dlos'));
     setTimeout(() => go(1), 350);
   }));
