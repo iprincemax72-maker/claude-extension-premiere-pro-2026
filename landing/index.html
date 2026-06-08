@@ -1520,5 +1520,23 @@ document.addEventListener('click', function (e) {
   window.addEventListener("pageshow", e => { if (e.persisted) resetCheckoutButtons(); });
 </script>
 
+<script>
+/* Reliable in-page anchor when arriving with a hash (e.g. dashboard "Upgrade plan"
+   → index.html#pricing). Native smooth-scroll-on-load is flaky — it animates from
+   the very top (looks like "it went to the top") and drifts as images/reveals
+   settle. So do an INSTANT jump, and re-assert once everything has loaded. */
+(function () {
+  var hash = location.hash;
+  if (!hash || hash.length < 2) return;
+  var el;
+  try { el = document.querySelector(hash); } catch (e) { return; }
+  if (!el) return;
+  function jump() { try { el.scrollIntoView({ behavior: 'auto', block: 'start' }); } catch (e) { el.scrollIntoView(); } }
+  jump();
+  requestAnimationFrame(jump);
+  window.addEventListener('load', function () { jump(); setTimeout(jump, 150); });
+})();
+</script>
+
 </body>
 </html>
