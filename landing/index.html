@@ -1440,6 +1440,8 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
     const code = btn.closest('.scode').querySelector('code').textContent;
     navigator.clipboard.writeText(code).then(() => { const t = btn.textContent; btn.textContent = 'Copied ✓'; setTimeout(() => btn.textContent = t, 1400); }).catch(() => {});
   }));
+  // Auth module calls this: signed out → re-lock Continue (can't download anyway).
+  window.__installAuth = function (signedIn) { if (!signedIn) downloaded = false; go(cur); };
   go(0);
 })();
 
@@ -1464,6 +1466,7 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
     if (dlReal) dlReal.style.display = on ? "flex" : "none";
     if (dlGate) dlGate.style.display = on ? "none" : "block";
     if (dlNote) dlNote.style.display = on ? "block" : "none";
+    if (window.__installAuth) window.__installAuth(on);   // signed out → re-lock Continue
   }
   sessionUser().then(apply);                                                    // fast first paint
   supabase.auth.onAuthStateChange((_event, session) => apply(session?.user ?? null));  // authoritative, uses the event's own session (no nested call = no deadlock)
