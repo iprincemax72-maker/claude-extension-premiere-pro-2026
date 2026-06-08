@@ -92,7 +92,7 @@
 
 <script src="config.js"></script>
 <script type="module">
-  import { getUser, getProfile, signOut } from "./auth.js";
+  import { getUser, getProfile, signOut, supabase } from "./auth.js";
   const $ = id => document.getElementById(id);
   const RING_C = 351.86;                       // 2π·56
   const PLAN_LABEL = { free: "Free", creator: "Creator", studio: "Studio" };
@@ -149,7 +149,26 @@
     $("planFeat").innerHTML = feats.map(f => "<li>" + tick + "<span>" + f + "</span></li>").join("");
     if (paid && !owner) $("upgrade").textContent = "Change plan";
     if (owner) { $("upgrade").style.display = "none"; }
-    $("billing").addEventListener("click", () => { $("note").textContent = "Billing portal connects once Stripe is set up (Phase 2)."; });
+    // Manage billing → Polar customer portal (manage/cancel sub, update card, invoices).
+    $("billing").addEventListener("click", async () => {
+      const btn = $("billing"), prev = btn.textContent;
+      $("note").textContent = "";
+      btn.disabled = true; btn.textContent = "Opening…";
+      try {
+        const { data } = await supabase.auth.getSession();
+        const tok = data?.session?.access_token;
+        if (!tok) { location.href = "login.html"; return; }
+        const r = await fetch("/api/portal", { headers: { Authorization: "Bearer " + tok } });
+        const j = await r.json().catch(() => ({}));
+        if (j.url) { location.href = j.url; return; }
+        if (j.error === "no_customer") $("note").textContent = "You're on the Free plan — upgrade first to manage billing.";
+        else $("note").textContent = j.error || "Couldn't open the billing portal. Try again.";
+      } catch {
+        $("note").textContent = "Couldn't open the billing portal. Try again.";
+      } finally {
+        btn.disabled = false; btn.textContent = prev;
+      }
+    });
 
     // ── live extension status (optional; localhost bridge, fails gracefully) ──
     (async () => {
