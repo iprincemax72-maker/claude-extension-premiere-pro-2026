@@ -12,6 +12,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="auth.css" />
+<!-- If we arrived here mid "sign-in-to-continue", don't flash the dashboard before bouncing back. -->
+<script>try{if(sessionStorage.getItem('flimify_next')){document.documentElement.style.visibility='hidden';setTimeout(function(){document.documentElement.style.visibility='';},6000);}}catch(e){}</script>
 </head>
 <body class="dash-body">
 <div class="auth-bg"></div>
@@ -96,9 +98,16 @@
   const PLAN_LABEL = { free: "Free", creator: "Creator", studio: "Studio" };
   $("signOut").addEventListener("click", signOut);
 
+  const _pendingNext = (() => { try { return sessionStorage.getItem('flimify_next'); } catch (e) { return null; } })();
   (async () => {
     const u = await getUser();
-    if (!u) { location.replace("login.html"); return; }
+    if (!u) { try { sessionStorage.removeItem('flimify_next'); } catch (e) {} document.documentElement.style.visibility = ''; location.replace("login.html"); return; }
+    // Signed in via a "sign in to continue" flow → return where they were, not the dashboard.
+    if (_pendingNext) {
+      try { sessionStorage.removeItem('flimify_next'); } catch (e) {}
+      try { if (new URL(_pendingNext, location.origin).origin === location.origin) { location.replace(_pendingNext); return; } } catch (e) {}
+      document.documentElement.style.visibility = '';   // invalid/cross-origin → just show the dashboard
+    }
 
     const name = u.user_metadata?.full_name || u.user_metadata?.name || u.email.split("@")[0];
     const first = name.split(" ")[0];

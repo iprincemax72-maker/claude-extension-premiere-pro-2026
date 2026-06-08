@@ -1445,6 +1445,16 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
   go(0);
 })();
 
+/* Sign-in links remember where you were, so after Google OAuth you come back HERE
+   (the install step) instead of being dumped on the dashboard. */
+document.addEventListener('click', function (e) {
+  const a = e.target && e.target.closest && e.target.closest('a[href]');
+  if (!a) return;
+  if (!/^login\.html(\?|#|$)/.test(a.getAttribute('href') || '')) return;
+  const dest = (a.id === 'dlGateBtn') ? (location.origin + location.pathname + '#install') : location.href;
+  try { sessionStorage.setItem('flimify_next', dest); } catch (e2) {}
+}, true);
+
 
 </script>
 

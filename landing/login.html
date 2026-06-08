@@ -51,8 +51,15 @@
     // success → redirects to Google, returns to APP_REDIRECT (account.html)
   });
 
-  // Already signed in → straight to the dashboard.
-  getUser().then(u => { if (u) location.replace("account.html"); });
+  // Already signed in → go back where they were (the install step), else the dashboard.
+  getUser().then(u => {
+    if (!u) return;
+    let n = null;
+    try { n = sessionStorage.getItem('flimify_next'); sessionStorage.removeItem('flimify_next'); } catch (e) {}
+    let dest = "account.html";
+    try { if (n && new URL(n, location.origin).origin === location.origin) dest = n; } catch (e) {}
+    location.replace(dest);
+  });
 </script>
 </body>
 </html>
