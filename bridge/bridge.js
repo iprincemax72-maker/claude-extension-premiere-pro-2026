@@ -770,70 +770,6 @@ function resolveRemotionCli(projDir) {
   return binLink;
 }
 
-// ───────────────────────── SUPER FAST (template engine) ─────────────────────
-// "Super Fast" render mode: instead of Claude hand-writing a component, a tiny
-// Haiku call maps the prompt to one of 5 prop-driven templates, which render
-// from a pre-bundled project in seconds (transparent ProRes 4444 overlays).
-const FAST_TEMPLATE_IDS = ['LowerThird', 'TitleCard', 'List', 'StatCallout', 'SubscribeCTA'];
-const FAST_SELECTOR_SYS = [
-  'You are a router for a video-graphics generator. Map the user request to exactly ONE template and fill its props. Reply with ONLY a single-line minified JSON object — no markdown, no prose.',
-  'Templates (id — use case — props):',
-  'LowerThird — name someone on screen — {name,title,accent,side:"left"|"right"}',
-  'TitleCard — a title/section card — {title,subtitle,accent}',
-  'List — a list of points/steps — {heading,items:[..],accent}',
-  'StatCallout — one big number/stat — {value,label,context,accent}',
-  'SubscribeCTA — a subscribe call-to-action — {label,handle,accent}',
-  'Rules: accent is hex; default "#dd8951" unless the user names a color (red->"#FF4D4D", blue->"#5AA9FF", green->"#4ECB71", yellow->"#F5C542", pink->"#FF5D8F"). Keep text short and punchy. Output: {"template":"<id>","props":{..},"seconds":<3-8>}',
-].join('\n');
-
-// Copy the prop-driven templates + render helper into the render project (like
-// ensureCaptionsComponent). Busts the bundle cache when a template changes.
-async function ensureFastTemplates(projDir) {
-  if (!LOCAL_SOURCE_DIR) throw new Error('Super Fast templates need the local source repo');
-  const srcBase = path.join(LOCAL_SOURCE_DIR, 'bridge', 'remotion-template');
-  const destDir = path.join(projDir, 'src', 'fast');
-  fs.mkdirSync(destDir, { recursive: true });
-  let changed = false;
-  for (const f of ['Templates.tsx', 'Root.tsx', 'index.ts']) {
-    let srcText = ''; try { srcText = fs.readFileSync(path.join(srcBase, 'src', 'fast', f), 'utf8'); } catch {}
-    if (!srcText) throw new Error('missing fast template ' + f);
-    const dest = path.join(destDir, f);
-    let cur = ''; try { cur = fs.readFileSync(dest, 'utf8'); } catch {}
-    if (cur !== srcText) { fs.writeFileSync(dest, srcText); changed = true; }
-  }
-  let helper = ''; try { helper = fs.readFileSync(path.join(srcBase, 'fast-render.mjs'), 'utf8'); } catch {}
-  if (helper) {
-    const hp = path.join(projDir, 'fast-render.mjs');
-    let cur = ''; try { cur = fs.readFileSync(hp, 'utf8'); } catch {}
-    if (cur !== helper) fs.writeFileSync(hp, helper);
-  }
-  if (changed) { try { fs.rmSync(path.join(projDir, '.fastbundle'), { recursive: true, force: true }); } catch {} }
-}
-
-// Tiny Haiku call: prompt -> {template, props, seconds}. ~5-9s.
-function runFastSelector(message) {
-  return new Promise((resolve, reject) => {
-    const args = ['-p', '--model', 'claude-haiku-4-5-20251001', '--permission-mode', 'bypassPermissions',
-      '--no-session-persistence', '--append-system-prompt', FAST_SELECTOR_SYS, message];
-    let proc;
-    try { proc = spawnClaude(args, { cwd: WORK_DIR, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] }); }
-    catch (e) { return reject(e); }
-    let out = '', err = '';
-    proc.stdout.on('data', (d) => { out += d.toString(); });
-    proc.stderr.on('data', (d) => { err += d.toString(); });
-    const to = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} reject(new Error('selector timeout')); }, 30000);
-    proc.on('close', () => {
-      clearTimeout(to);
-      const m = out.match(/\{[\s\S]*\}/);
-      if (!m) return reject(new Error('selector returned no JSON: ' + (out || err).slice(0, 160)));
-      let j; try { j = JSON.parse(m[0]); } catch { return reject(new Error('selector bad JSON: ' + m[0].slice(0, 160))); }
-      if (!j || typeof j.template !== 'string' || typeof j.props !== 'object') return reject(new Error('selector missing fields'));
-      if (!FAST_TEMPLATE_IDS.includes(j.template)) j.template = 'TitleCard';
-      resolve(j);
-    });
-  });
-}
-
 // Render the Captions composition to a transparent ProRes 4444 .mov overlay.
 // Driven entirely by `lines` (word-level) + style + options. Writes a unique
 // one-off entry file so concurrent caption/chat renders never collide on
@@ -3882,7 +3818,7 @@ const server = http.createServer((req, res) => {
       if (!renderMode) {
         renderMode = (payload.selfCritique === false) ? 'fast' : 'default';
       }
-      if (!['superfast', 'fast', 'default', 'slow'].includes(renderMode)) renderMode = 'default';
+      if (!['fast', 'default', 'slow'].includes(renderMode)) renderMode = 'default';
       if (!message) { res.writeHead(400); res.end('{"error":"empty message"}'); return; }
 
       // Multi-version fan-out — render N distinct takes of one prompt AT ONCE
@@ -3933,53 +3869,6 @@ const server = http.createServer((req, res) => {
         } catch (e) {
           // Fall back to OUTPUT_DIR silently
         }
-      }
-
-      // ── SUPER FAST: template engine. Skip Claude code-gen entirely — a tiny
-      // Haiku call picks a template + props, then we render from a pre-bundled
-      // project in seconds. Returns the same { reply, imports } shape. ──
-      if (tabMode === 'animation' && renderMode === 'superfast') {
-        const projDir = path.join(WORK_DIR, 'remotion-intro');
-        try {
-          broadcastProgress('Picking a template…', 12, reqId);
-          await ensureFastTemplates(projDir);
-          const sel = await runFastSelector(message);
-          broadcastProgress('Rendering ' + sel.template + '…', 45, reqId);
-          const w = Number(context && context.width) || 1920;
-          const h = Number(context && context.height) || 1080;
-          const fps = Number(context && context.fps) || 30;
-          const seconds = Math.max(2, Math.min(12, Number(sel.seconds) || 5));
-          const outFile = path.join(renderOutputDir, 'fast_' + sel.template + '_' + Date.now() + '.mov');
-          const helperArg = JSON.stringify({
-            entry: path.join(projDir, 'src', 'fast', 'index.ts'),
-            bundleDir: path.join(projDir, '.fastbundle'),
-            id: sel.template, props: sel.props, meta: { width: w, height: h, fps, seconds }, outFile,
-          });
-          await new Promise((resolve, reject) => {
-            const p = spawn(process.execPath, [path.join(projDir, 'fast-render.mjs'), helperArg],
-              { cwd: projDir, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
-            let e = '', o = '';
-            p.stdout.on('data', (d) => { o += d.toString(); });
-            p.stderr.on('data', (d) => { e += d.toString(); });
-            const to = setTimeout(() => { try { p.kill('SIGKILL'); } catch {} reject(new Error('render timeout')); }, 150000);
-            p.on('close', (c) => {
-              clearTimeout(to);
-              if (c === 0 && fs.existsSync(outFile)) resolve(o);
-              else reject(new Error('render failed: ' + (e || o).slice(-300)));
-            });
-          });
-          broadcastProgress('Importing…', 95, reqId);
-          broadcastProgressDone(reqId);
-          clog('bridge', 'info', 'superfast done', { template: sel.template, outFile }, reqId);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ reply: '⚡ Super Fast — ' + sel.template + ' ready.', imports: [outFile] }));
-        } catch (err) {
-          try { broadcastProgressDone(reqId); } catch {}
-          clog('bridge', 'error', 'superfast failed', { err: String((err && err.message) || err) }, reqId);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ reply: '⚡ Super Fast hit a snag: ' + String((err && err.message) || err) + '. Try **Default** mode.', imports: [] }));
-        }
-        return;
       }
 
       let fullMessage = message;

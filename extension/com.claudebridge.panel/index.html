@@ -4454,9 +4454,8 @@
   <div class="input-wrap">
     <div class="ref-row">
       <div class="ref-bar" id="refBar"></div>
-      <div class="rmode-group" id="renderModeGroup" title="How hard Flimify works on the animation — Super Fast: instant prebuilt template (lower-third, title, list, stat, CTA), ~20s. Fast: quick custom animation, ~1 min. Default: a real custom-built animation (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
-        <button class="rmode-pill" data-rmode="superfast" type="button" title="Super Fast — instant prebuilt template filled with your text (lower-third, title, list, stat, subscribe), ~20s">Super&nbsp;Fast</button>
-        <button class="rmode-pill" data-rmode="fast" type="button" title="Fast — quick custom-built animation, ~1 min">Fast</button>
+      <div class="rmode-group" id="renderModeGroup" title="How hard Flimify works on the animation — Fast: quick template-based, ~1 min. Default: a real custom-built animation, no templates (~2 min). Slow: best quality — explores options, critiques itself, polishes (~3-5 min).">
+        <button class="rmode-pill" data-rmode="fast" type="button" title="Fast — quick template-based animation, ~1 min">Fast</button>
         <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
         <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Flimify takes its time, ~3-5 min">Slow</button>
       </div>
@@ -8601,7 +8600,7 @@ function setMode(m) {
 // default new tabs start from. Sent with every /chat request from that tab.
 function setRenderMode(m) {
   if (m === 'mid') m = 'default';  // old name migration
-  if (!['superfast', 'fast', 'default', 'slow'].includes(m)) m = 'default';
+  if (!['fast', 'default', 'slow'].includes(m)) m = 'default';
   const t = tabs[activeTabIdx];
   if (t) t.renderMode = m;
   userSettings.renderMode = m;   // remembered as the default for the next new tab
