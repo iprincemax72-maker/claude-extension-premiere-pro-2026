@@ -3551,7 +3551,7 @@ const CONNECT_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"
 + 'var er=document.getElementById("er");function ee(m){er.textContent=m;er.style.display="block";}'
 + 'document.getElementById("g").onclick=async function(){var r=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+"/connect",queryParams:{prompt:"select_account"}}});if(r.error)ee(r.error.message);};'
 + '}'
-+ '(async function(){var res=await supabase.auth.getSession();var session=res.data.session;'
++ '(async function(){var Q=new URLSearchParams(location.search);if(Q.get("reauth")==="1"&&!Q.get("code")){try{await supabase.auth.signOut({scope:"local"});}catch(e){}signinView(false);return;}var res=await supabase.auth.getSession();var session=res.data.session;'
 + 'if(session){show(\'<p class="big">Connecting…</p>\');var ok=await pushToBridge(session);'
 + 'show(ok?\'<p class="big">&#10003; Connected</p><p class="sub">Your extension is signed in as <b>\'+(session.user.email||"")+\'</b>. Close this tab and head back to Premiere.</p>\':\'<p class="big">Almost there</p><p class="sub">Couldn&#39;t reach the local bridge. Make sure the Claude Bridge app is running, then reload this page.</p>\');return;}'
 + 'signinView(false);'

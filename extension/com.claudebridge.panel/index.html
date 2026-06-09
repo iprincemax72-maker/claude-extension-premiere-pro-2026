@@ -7572,7 +7572,10 @@ function openExternalURL(url) {
   }
 
   function startSignin() {
-    openExternalURL(BRIDGE + '/connect');
+    // reauth=1 → /connect clears any stale Supabase session in the browser
+    // first, so it doesn't silently reconnect the previous account. Lets the
+    // user actually pick an account (incl. a different one) on every sign-in.
+    openExternalURL(BRIDGE + '/connect?reauth=1');
     if (pollTimer) clearInterval(pollTimer);
     let tries = 0;
     pollTimer = setInterval(async () => {
