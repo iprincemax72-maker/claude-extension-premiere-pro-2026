@@ -3728,6 +3728,15 @@
   .history-change-txt {
     overflow: hidden;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    min-width: 0;
+  }
+  /* The file each change produced — names what's inside, not just what was asked */
+  .history-change-file {
+    flex-shrink: 1; margin-left: auto; padding-left: 8px;
+    max-width: 45%;
+    font-size: 10px; color: var(--text-dim); opacity: 0.75;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .history-copy {
     flex-shrink: 0;
@@ -6311,7 +6320,10 @@ function renderAutoEditCard(e, key) {
       const bits = [];
       if (it.type) bits.push(escapeHTML(String(it.type)));
       if (at) bits.push('@ ' + at);
-      return '<div class="ae-run-item" title="' + escapeHTML(String(it.file || '')) + '">'
+      // Per-graphic "Change" edits bump revs — surface that this one was revised.
+      if (it.revs > 1) bits.push('changed' + (it.revs > 2 ? ' ×' + (it.revs - 1) : ''));
+      const tip = String(it.file || '') + (it.change ? '\nLast change: ' + it.change : '');
+      return '<div class="ae-run-item" title="' + escapeHTML(tip) + '">'
         + '<span class="ae-run-idx">' + (i + 1) + '</span>'
         + '<span class="ae-run-name">' + escapeHTML(_aeItemName(it, i)) + '</span>'
         + '<span class="ae-run-meta">' + bits.join(' · ') + '</span>'
@@ -6397,13 +6409,18 @@ function renderHistory() {
     const countPill = changeItems.length
       ? '<span class="hist-count" title="' + changeItems.length + ' change' + (changeItems.length > 1 ? 's' : '') + ' in this conversation">+' + changeItems.length + ' change' + (changeItems.length > 1 ? 's' : '') + '</span>'
       : '';
-    // The list of changes the user gave, in order, so they can see what they asked for.
+    // The list of changes the user gave, in order — each with the FILE that
+    // change produced, so the row names what's inside, not just what was asked.
     const changesHTML = changeItems.length
       ? '<div class="history-changes">'
-        + changeItems.map((c, i) =>
-            '<div class="history-change"><span class="history-change-i">' + (i + 1) + '</span>'
-            + '<span class="history-change-txt">' + (c.prompt ? escapeHTML(c.prompt) : '<span style="opacity:.5">(tweak)</span>') + '</span></div>'
-          ).join('')
+        + changeItems.map((c, i) => {
+            const cf = c.path ? String(c.path).split('/').pop().split('\\').pop() : '';
+            return '<div class="history-change"' + (c.path ? ' title="' + escapeHTML(c.path) + '"' : '') + '>'
+              + '<span class="history-change-i">' + (i + 1) + '</span>'
+              + '<span class="history-change-txt">' + (c.prompt ? escapeHTML(c.prompt) : '<span style="opacity:.5">(tweak)</span>') + '</span>'
+              + (cf ? '<span class="history-change-file">' + escapeHTML(cf) + '</span>' : '')
+              + '</div>';
+          }).join('')
         + '</div>'
       : '';
     html += '<div class="history-item' + (visited ? ' visited' : '') + '" data-row-id="' + g.key + '" title="Click to reopen this whole conversation (original + all changes) in a new tab">'
@@ -10510,8 +10527,9 @@ function renderAeResultsCard(records, reqId) {
       } catch {}
     }
     if (rec && rec.file) {
-      try { await fetch(BRIDGE + '/delete-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: rec.file }) }); } catch {}
-      try { history = history.filter(x => x.path !== rec.file); } catch {}
+      try { await ccDeleteFile(rec.file); } catch {}
+      try { history = history.filter(x => !(x.path === rec.file && x.kind !== 'autoedit')); } catch {}
+      try { syncAeHistoryItem(rec.file, null); } catch {}   // drop it from the run's names list too
     }
   };
 
@@ -10571,6 +10589,35 @@ function renderAeResultsCard(records, reqId) {
   });
 }
 
+// Keep the Auto-Edit HISTORY entry in sync with per-graphic edits. The run's
+// summary entry stores items[] = what's on the timeline; when a graphic is
+// changed (new file swapped in) or deleted, the matching item must follow —
+// otherwise the expanded names list lies and Re-apply resurrects stale files.
+function syncAeHistoryItem(oldFile, patch) {
+  if (!oldFile) return;
+  let touched = false;
+  for (const e of history) {
+    if (!e || e.kind !== 'autoedit' || !Array.isArray(e.items)) continue;
+    const k = e.items.findIndex(it => it && it.file === oldFile);
+    if (k === -1) continue;
+    if (patch === null) {                       // graphic deleted → drop the item
+      e.items.splice(k, 1);
+      e.count = e.items.length;
+      e.prompt = 'Auto-Edit — ' + e.count + ' animation' + (e.count === 1 ? '' : 's');
+      if (e.path === oldFile) e.path = (e.items[0] && e.items[0].file) || '';
+    } else {                                    // graphic changed → swap file in place
+      Object.assign(e.items[k], patch);
+      e.items[k].revs = (e.items[k].revs || 1) + 1;
+      if (e.path === oldFile && patch.file) e.path = patch.file;
+    }
+    touched = true;
+    break;                                      // files are unique per run — done
+  }
+  if (touched) {
+    try { saveHistory(); if (historyPanel.classList.contains('show')) renderHistory(); } catch {}
+  }
+}
+
 // Re-render ONE Auto-Edit graphic with the user's change, then swap it on the
 // timeline in place (ccAutoEditReplace) — or, if we don't know its track, drop
 // the new version in as a fresh overlay (ccAutoEditApply).
@@ -10622,6 +10669,8 @@ async function applyAeChange(rec, change, els) {
       return;
     }
 
+    // Mirror the swap into the run's history entry (names list + Re-apply).
+    syncAeHistoryItem(rec.file, { file: newFile, durationSec: newDur, change });
     rec.file = newFile;
     rec.durationSec = newDur;
     statusEl.className = 'ae-row-status ok';
