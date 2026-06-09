@@ -12449,31 +12449,16 @@ async function sendMessage(presetMsg, sendOpts) {
       cancelLine.style.cssText = 'color:var(--text-dim);font-style:italic;margin:0 0 8px 0';
       cancelLine.textContent = 'Cancelled.' + (lastStatus ? ' Was at: ' + lastStatus : '');
       placeholder.body.appendChild(cancelLine);
-
-      const continueBtn = document.createElement('button');
-      continueBtn.type = 'button';
-      continueBtn.className = 'cc-btn-continue';
-      continueBtn.style.cssText =
-        'display:inline-flex;align-items:center;gap:6px;' +
-        'background:var(--accent-soft);color:var(--accent);' +
-        'border:1px solid var(--accent-line);border-radius:8px;' +
-        'padding:6px 12px;font-family:var(--font-ui);font-size:12px;' +
-        'font-weight:500;cursor:pointer;transition:background 0.12s var(--ease)';
-      continueBtn.innerHTML =
-        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>' +
-        '<span>Continue</span>';
-      continueBtn.addEventListener('mouseenter', () => continueBtn.style.background = 'var(--accent)');
-      continueBtn.addEventListener('mouseleave', () => continueBtn.style.background = 'var(--accent-soft)');
-      continueBtn.addEventListener('click', () => {
-        continueBtn.disabled = true;
-        continueBtn.style.opacity = '0.5';
-        continueBtn.style.cursor = 'wait';
-        sendContinuationChat(msg, lastStatus);
-      });
-      placeholder.body.appendChild(continueBtn);
+      addContinueBtn(placeholder.body, msg, lastStatus);
       cclog('info', 'chat cancelled by user', { lastStatus: (typeof lastStatus !== 'undefined' ? lastStatus : (typeof resumeStatus !== 'undefined' ? resumeStatus : '')) });
     } else {
-      placeholder.body.innerHTML = '<p>Error: ' + escapeHTML(err.message) + '</p><p style="color:var(--text-dim);font-size:11.5px">Is the bridge running?</p>';
+      // FAILED (bridge died, claude killed, network) — not user-cancelled.
+      // The work done so far is still on disk, so offer Continue here too
+      // instead of forcing a from-scratch re-run.
+      placeholder.body.innerHTML = '<p>Error: ' + escapeHTML(err.message) + '</p>'
+        + '<p style="color:var(--text-dim);font-size:11.5px">Is the bridge running?'
+        + (lastStatus ? ' Last status: ' + escapeHTML(lastStatus) : '') + '</p>';
+      try { addContinueBtn(placeholder.body, msg, lastStatus); } catch (e) {}
       cclog('error', 'chat send failed', { error: String(err && err.message || err) });
     }
   } finally {
@@ -12493,6 +12478,35 @@ async function sendMessage(presetMsg, sendOpts) {
     // Advance the per-tab queue (no-op if empty / user-cancelled / tab switched).
     try { _maybeDrainQueue(_sendTab, { userCancelled: _userCancelled }); } catch {}
   }
+}
+
+// One Continue button — appended after a CANCELLED **or FAILED** request.
+// A killed/failed render usually left its composition on disk under
+// remotion-intro/src/, so a continuation is cheap. Never strand the user
+// with a dead error bubble and no resume handle.
+function addContinueBtn(container, originalMsg, lastStatus) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'cc-btn-continue';
+  btn.style.cssText =
+    'display:inline-flex;align-items:center;gap:6px;' +
+    'background:var(--accent-soft);color:var(--accent);' +
+    'border:1px solid var(--accent-line);border-radius:8px;' +
+    'padding:6px 12px;font-family:var(--font-ui);font-size:12px;' +
+    'font-weight:500;cursor:pointer;transition:background 0.12s var(--ease);margin-top:8px';
+  btn.innerHTML =
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>' +
+    '<span>Continue</span>';
+  btn.addEventListener('mouseenter', () => btn.style.background = 'var(--accent)');
+  btn.addEventListener('mouseleave', () => btn.style.background = 'var(--accent-soft)');
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'wait';
+    sendContinuationChat(originalMsg, lastStatus);
+  });
+  container.appendChild(btn);
+  return btn;
 }
 
 // Resume a chat that was previously cancelled mid-flight. Sends a meta-prompt
@@ -12597,26 +12611,14 @@ async function sendContinuationChat(originalMsg, lastStatus) {
       cancelLine.style.cssText = 'color:var(--text-dim);font-style:italic;margin:0 0 8px 0';
       cancelLine.textContent = 'Cancelled.' + (resumeStatus ? ' Was at: ' + resumeStatus : '');
       placeholder.body.appendChild(cancelLine);
-      const continueBtn = document.createElement('button');
-      continueBtn.type = 'button';
-      continueBtn.style.cssText =
-        'display:inline-flex;align-items:center;gap:6px;' +
-        'background:var(--accent-soft);color:var(--accent);' +
-        'border:1px solid var(--accent-line);border-radius:8px;' +
-        'padding:6px 12px;font-family:var(--font-ui);font-size:12px;' +
-        'font-weight:500;cursor:pointer';
-      continueBtn.innerHTML =
-        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>' +
-        '<span>Continue</span>';
-      continueBtn.addEventListener('click', () => {
-        continueBtn.disabled = true;
-        continueBtn.style.opacity = '0.5';
-        sendContinuationChat(originalMsg, resumeStatus);
-      });
-      placeholder.body.appendChild(continueBtn);
+      addContinueBtn(placeholder.body, originalMsg, resumeStatus);
       cclog('info', 'chat cancelled by user', { lastStatus: (typeof lastStatus !== 'undefined' ? lastStatus : (typeof resumeStatus !== 'undefined' ? resumeStatus : '')) });
     } else {
-      placeholder.body.innerHTML = '<p>Error: ' + escapeHTML(err.message) + '</p><p style="color:var(--text-dim);font-size:11.5px">Is the bridge running?</p>';
+      // A FAILED continuation is still resumable — chain another Continue.
+      placeholder.body.innerHTML = '<p>Error: ' + escapeHTML(err.message) + '</p>'
+        + '<p style="color:var(--text-dim);font-size:11.5px">Is the bridge running?'
+        + (resumeStatus ? ' Last status: ' + escapeHTML(resumeStatus) : '') + '</p>';
+      try { addContinueBtn(placeholder.body, originalMsg, resumeStatus); } catch (e) {}
       cclog('error', 'chat send failed', { error: String(err && err.message || err) });
     }
   } finally {
