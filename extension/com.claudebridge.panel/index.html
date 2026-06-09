@@ -3844,7 +3844,10 @@
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
       </svg>
     </button>
-    <button class="icon-btn" id="logsBtn" type="button" title="Live logs — bridge stdout + active render" aria-label="Logs" style="margin-right:4px">
+    <!-- Logs are an internal/dev tool — hidden by default, revealed for the
+         OWNER only (or when auth is off entirely, i.e. local dev) by
+         syncPlanLocks(). Regular users should never see them. -->
+    <button class="icon-btn" id="logsBtn" type="button" title="Live logs — bridge stdout + active render" aria-label="Logs" style="margin-right:4px;display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="4 17 10 11 4 5"/>
         <line x1="12" y1="19" x2="20" y2="19"/>
@@ -4573,6 +4576,15 @@ function applyPlan(status) {
 }
 function syncPlanLocks() {
   const f = planFeats();
+  // Logs button — OWNER-only (visible in auth-off local dev). Hidden, not
+  // plan-locked: regular users shouldn't even know logs exist. Close the
+  // drawer too in case it was somehow open when the status flipped.
+  const lg = document.getElementById('logsBtn');
+  if (lg) {
+    const showLogs = !__authEnabled || __owner;
+    lg.style.display = showLogs ? '' : 'none';
+    if (!showLogs) { try { document.getElementById('logsPanel').classList.remove('show'); } catch (e) {} }
+  }
   const ae = document.getElementById('autoeditBtn');
   if (ae) ae.classList.toggle('plan-locked', __authEnabled && !f.autoedit);
   const cap = document.getElementById('captionsBtn');
