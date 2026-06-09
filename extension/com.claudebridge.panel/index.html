@@ -2552,6 +2552,19 @@
   .plan-card-locked button { cursor: default; }
 
   /* Minimized Auto-Edit chip — lets you work in Premiere while it transcribes */
+  /* Auto-Edit engine selector (Remotion / HyperFrames) */
+  .ae-engine-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .ae-engine-lbl { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+  .ae-engine-seg { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,0.03); }
+  .ae-eng-pill {
+    border: none; background: transparent; cursor: pointer;
+    font-family: var(--font-ui); font-size: 11.5px; font-weight: 600;
+    color: var(--text-dim); padding: 5px 12px; border-radius: 6px;
+    transition: background .12s var(--ease-out), color .12s var(--ease-out);
+  }
+  .ae-eng-pill:hover { color: var(--text); }
+  .ae-eng-pill.active { background: linear-gradient(135deg, var(--accent-2), var(--accent)); color: #fff; box-shadow: 0 2px 8px rgba(217,119,87,.25); }
+
   .ae-mini {
     position: fixed; right: 14px; bottom: 14px; z-index: 10000;
     display: flex; align-items: center; gap: 9px;
@@ -3961,6 +3974,15 @@
           <div class="autocut-opt-name">Voiceover only <span class="autocut-opt-desc" style="margin:0">· no face on screen → full-screen graphics</span></div>
         </div>
       </label>
+
+      <!-- Render engine for the generated graphics -->
+      <div class="ae-engine-row">
+        <span class="ae-engine-lbl">Engine</span>
+        <div class="ae-engine-seg" id="aeEngineSeg">
+          <button type="button" class="ae-eng-pill active" data-ae-engine="remotion" title="Remotion — React motion graphics">Remotion</button>
+          <button type="button" class="ae-eng-pill" data-ae-engine="hyperframes" title="HyperFrames — HTML/CSS/GSAP blocks (shaders, kinetic type)">HyperFrames</button>
+        </div>
+      </div>
 
       <div class="ae-err" id="aeOptionsErr"></div>
       <div class="autocut-modal-actions">
@@ -9118,14 +9140,20 @@ function aeRestore() {
 }
 async function openAutoeditModal() {
   if (__authEnabled && !planFeats().autoedit) { showUpsell('autoedit'); return; }   // Studio-only
+  let savedEngine = userSettings.engine || 'remotion';
   try {
     const saved = JSON.parse(localStorage.getItem('claudeBridge.autoedit.opts') || 'null');
     if (saved && saved.density) {
       const r = document.querySelector(`input[name="aeDensity"][value="${saved.density}"]`);
       if (r) r.checked = true;
     }
+    // Auto-Edit remembers its own engine; default to the composer's engine.
+    if (saved && (saved.engine === 'remotion' || saved.engine === 'hyperframes')) savedEngine = saved.engine;
   } catch {}
-  aeWizard = { reqId: null, density: 'moderate', selection: null, questions: [], answers: {}, abort: null, ticker: null };
+  // Reflect the engine in the segmented control.
+  document.querySelectorAll('#aeEngineSeg .ae-eng-pill').forEach(p =>
+    p.classList.toggle('active', p.dataset.aeEngine === savedEngine));
+  aeWizard = { reqId: null, density: 'moderate', engine: savedEngine, selection: null, questions: [], answers: {}, abort: null, ticker: null };
   const errEl = document.getElementById('aeOptionsErr'); if (errEl) errEl.textContent = '';
   aeShowStep('options');
   autoeditModal.classList.add('show');
@@ -10331,6 +10359,13 @@ document.addEventListener('keydown', (e) => {
 }, true);
 
 autoeditModal.addEventListener('click', (e) => {
+  // Engine segmented control — switch the active pill.
+  const engPill = e.target.closest && e.target.closest('.ae-eng-pill');
+  if (engPill) {
+    document.querySelectorAll('#aeEngineSeg .ae-eng-pill').forEach(p => p.classList.toggle('active', p === engPill));
+    if (aeWizard) aeWizard.engine = engPill.dataset.aeEngine;
+    return;
+  }
   if (e.target === autoeditModal) { aeCancelWizard(); return; }
   if (e.target.closest && e.target.closest('[data-ae-cancel]')) aeCancelWizard();
 });
@@ -10354,7 +10389,10 @@ if (aeStartBtn) aeStartBtn.addEventListener('click', analyzeAutoEdit);
 async function analyzeAutoEdit() {
   const density = (document.querySelector('input[name="aeDensity"]:checked') || {}).value || 'moderate';
   aeWizard.density = density;
-  try { localStorage.setItem('claudeBridge.autoedit.opts', JSON.stringify({ density })); } catch {}
+  const aeEng = (document.querySelector('#aeEngineSeg .ae-eng-pill.active') || {}).dataset?.aeEngine
+    || userSettings.engine || 'remotion';
+  aeWizard.engine = aeEng;
+  try { localStorage.setItem('claudeBridge.autoedit.opts', JSON.stringify({ density, engine: aeEng })); } catch {}
   const errEl = document.getElementById('aeOptionsErr');
   if (errEl) errEl.textContent = '';
 
@@ -10533,7 +10571,7 @@ async function runAutoEditV2(opts) {
     progressUI.text('Planning the edit…');
     const resp = await fetch(BRIDGE + '/autoedit/run', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reqId, density: opts.density, answers: opts.answers, refImages: opts.refImages || [] }),
+      body: JSON.stringify({ reqId, density: opts.density, answers: opts.answers, refImages: opts.refImages || [], engine: aeWizard.engine || userSettings.engine || 'remotion' }),
       signal: abort.signal,
     });
     if (!resp.ok) {

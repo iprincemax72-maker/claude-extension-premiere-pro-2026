@@ -2226,6 +2226,29 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
            + refImgs.map(p => '  ' + p).join('\n'))
         : '',
       '',
+      // ── HyperFrames engine: author an HTML/GSAP block + render with the
+      //    hyperframes CLI to the SAME alpha .mov path. The placement, timing,
+      //    transparent-overlay and output-path rules below still apply.
+      (opts && opts.engine === 'hyperframes')
+        ? [
+          'BUILD IT (HYPERFRAMES ENGINE):',
+          '- Author a self-contained HyperFrames HTML/GSAP block per your system',
+          '  prompt: ONE paused GSAP timeline registered at window.__timelines["main"],',
+          '  a #root with data-composition-id="main", data-duration="' + task.durationSec.toFixed(2) + '",',
+          '  data-width="' + vidW + '", data-height="' + vidH + '"; html/body/#root sized to ' + vidW + 'x' + vidH + '.',
+          (vo
+            ? '- FULL background: paint a full-bleed background on #root so it covers the footage.'
+            : '- TRANSPARENT: do NOT paint any background on html/body/#root — only the graphic'
+              + '\n  elements show. The render is alpha (MOV) so the speaker shows through.'),
+          '- WebGL/canvas shaders ARE allowed (drive them from the timeline) plus CSS',
+          '  effects (filter, blend modes, gradients, SVG filters) — use them for polish.',
+          '- Save the block as the index.html of a fresh scratch dir:',
+          '    ' + WORK_DIR + '/remotion-intro/.hf/ae_' + task.idx + '_' + Date.now() + '/index.html',
+          '- Render to EXACTLY this path, with alpha (ProRes 4444 MOV):',
+          '    cd "' + WORK_DIR + '/remotion-intro" && npx hyperframes render "<that scratch dir>" -o "' + task.outFile + '" --format mov --fps 30 --quality high',
+          '  The MOV is ProRes with a yuva444p alpha channel — exactly what the overlay needs.',
+        ].join('\n')
+        : [
       'BUILD IT:',
       '- Write a FRESH Remotion composition from scratch. Do NOT copy or import',
       '  a template from src/templates/. Build the animation yourself.',
@@ -2273,6 +2296,7 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
            + '  ffmpeg -an to strip the silent track entirely after render. After\n'
            + '  rendering, the file\'s pixel format must be yuva444p10le (alpha-\n'
            + '  capable) — verify with ffprobe if unsure and re-render if it is not.'),
+        ].join('\n'),
       placement,
       '- TIMING IS CRITICAL — the narration plays for the ENTIRE ' + task.durationSec.toFixed(1) + 's,',
       '  so the graphic MUST stay on screen and readable that whole time. Animate IN',
@@ -2308,12 +2332,13 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
   function runOne(task, isRetry) {
     return new Promise((resolve) => {
       const tag = `gen[${task.idx}]${isRetry ? ' (retry)' : ''}`;
+      const aeSys = (genOpts && genOpts.engine === 'hyperframes') ? HYPERFRAMES_SYSTEM_PROMPT : SYSTEM_PROMPT;
       const args = [
         '-p',
         '--output-format', 'stream-json',
         '--verbose',
         '--permission-mode', 'bypassPermissions',
-        '--append-system-prompt', SYSTEM_PROMPT,
+        '--append-system-prompt', aeSys,
         '--no-session-persistence',
         buildPrompt(task),
       ];
@@ -5720,7 +5745,8 @@ const server = http.createServer((req, res) => {
         const refImages = (Array.isArray(payload.refImages) ? payload.refImages : [])
           .filter(p => typeof p === 'string' && p && (() => { try { return fs.existsSync(p); } catch { return false; } })())
           .slice(0, 6);
-        const genOpts = { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames, userExtra, refImages };
+        const aeEngine = (payload.engine === 'hyperframes') ? 'hyperframes' : 'remotion';
+        const genOpts = { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames, userExtra, refImages, engine: aeEngine };
         // Persist the final plan + render options so a SINGLE graphic can be
         // re-rendered later (the per-graphic "Change" feature) without re-running
         // analyze. Keyed by reqId; merges over the analyze-time cache entry.
