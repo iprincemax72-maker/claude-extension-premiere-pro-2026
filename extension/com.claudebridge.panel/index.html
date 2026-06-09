@@ -3592,6 +3592,15 @@
   .history-filter-btn.sel { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
   .history-item.history-autoedit .autoedit-thumb { display: flex; align-items: center; justify-content: center; color: var(--accent); background: var(--accent-soft); }
   .history-item.history-autoedit .autoedit-thumb svg { width: 26px; height: 26px; }
+  /* Auto-Edit run — expandable list of the animations inside (click row) */
+  .ae-run-items { display: none; margin-top: 7px; border-top: 1px solid var(--line); padding-top: 6px; }
+  .history-autoedit.expanded .ae-run-items { display: block; }
+  .ae-run-item { display: flex; align-items: baseline; gap: 7px; padding: 2.5px 0; font-size: 11px; min-width: 0; }
+  .ae-run-idx { flex: 0 0 14px; color: var(--text-dim); font-variant-numeric: tabular-nums; text-align: right; }
+  .ae-run-name { color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .ae-run-meta { flex-shrink: 0; color: var(--text-dim); font-variant-numeric: tabular-nums; margin-left: auto; }
+  .ae-run-caret { display: inline-block; margin-left: 5px; color: var(--text-dim); font-size: 9px; transition: transform .15s var(--ease); }
+  .history-autoedit.expanded .ae-run-caret { transform: rotate(180deg); }
 
   .history-item {
     display: flex;
@@ -6271,18 +6280,52 @@ function addAutoEditHistory(info) {
 
 const ICON_AUTOEDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3"/></svg>';
 
-// One compact card for an Auto-Edit run.
+// One compact card for an Auto-Edit run. Click the row → expands an inline
+// list naming every animation in the run (label or filename), its type and
+// where it landed on the timeline.
+function _aeItemName(it, i) {
+  let nm = (it && it.label && String(it.label).trim()) || '';
+  if (!nm && it && it.file) {
+    nm = String(it.file).split('/').pop().split('\\').pop()
+      .replace(/\.[^.]+$/, '')                 // drop extension
+      .replace(/_v\d+(_[a-z0-9]{3,6})?$/i, '') // drop version/seed suffix
+      .replace(/[_-]+/g, ' ').trim();
+  }
+  return nm || ('Animation ' + (i + 1));
+}
+function _aeFmtSec(s) {
+  if (typeof s !== 'number' || !isFinite(s)) return '';
+  const m = Math.floor(s / 60), ss = Math.floor(s % 60);
+  return m + ':' + String(ss).padStart(2, '0');
+}
 function renderAutoEditCard(e, key) {
   const visited = _historyVisited.has(key);
-  const cnt = e.count || (e.items ? e.items.length : 0);
+  const its = Array.isArray(e.items) ? e.items : [];
+  const cnt = e.count || its.length;
   const meta = relTime(e.t) + ' · ' + cnt + ' animation' + (cnt === 1 ? '' : 's')
     + (e.style ? ' · ' + escapeHTML(e.style) : '') + (e.source ? ' · ' + escapeHTML(e.source) : '');
-  return '<div class="history-item history-autoedit' + (visited ? ' visited' : '') + '" data-row-id="' + key + '" title="Auto-Edit run">'
+  let listHTML = '';
+  if (its.length) {
+    listHTML = '<div class="ae-run-items">' + its.map((it, i) => {
+      const at = _aeFmtSec(typeof it.timelineSec === 'number' ? it.timelineSec : it.atSec);
+      const bits = [];
+      if (it.type) bits.push(escapeHTML(String(it.type)));
+      if (at) bits.push('@ ' + at);
+      return '<div class="ae-run-item" title="' + escapeHTML(String(it.file || '')) + '">'
+        + '<span class="ae-run-idx">' + (i + 1) + '</span>'
+        + '<span class="ae-run-name">' + escapeHTML(_aeItemName(it, i)) + '</span>'
+        + '<span class="ae-run-meta">' + bits.join(' · ') + '</span>'
+        + '</div>';
+    }).join('') + '</div>';
+  }
+  return '<div class="history-item history-autoedit' + (visited ? ' visited' : '') + '" data-row-id="' + key + '" title="Click to see the animations in this run">'
     + '<div class="history-thumb autoedit-thumb">' + ICON_AUTOEDIT + '</div>'
     + '<div class="history-body">'
-    +   '<div class="history-prompt-row"><div class="history-prompt">' + escapeHTML(e.prompt || 'Auto-Edit run') + '</div>'
+    +   '<div class="history-prompt-row"><div class="history-prompt">' + escapeHTML(e.prompt || 'Auto-Edit run')
+    +     (its.length ? '<span class="ae-run-caret">▾</span>' : '') + '</div>'
     +     '<span class="hist-count" style="background:var(--accent-soft);color:var(--accent)">Auto-Edit</span></div>'
     +   '<div class="history-meta">' + meta + '</div>'
+    +   listHTML
     +   '<div class="history-actions">'
     +     '<button data-act="reapply-ae" data-id="' + e.id + '">Re-apply</button>'
     +     '<button class="danger" data-act="delete" data-id="' + e.id + '">Delete</button>'
@@ -6536,6 +6579,13 @@ function renderHistory() {
       const t = ev.target;
       if (!t || t.closest('button') || t.closest('.history-thumb') || t.closest('.history-copy')) return;
       const key = row.getAttribute('data-row-id');           // thread key
+      // Auto-Edit run rows expand in place to NAME the animations inside —
+      // there's no conversation to reopen for a run summary.
+      if (row.classList.contains('history-autoedit')) {
+        markHistoryVisited(key); row.classList.add('visited');
+        row.classList.toggle('expanded');
+        return;
+      }
       const items = history.filter(x => (x.thread || x.id) === key).sort((a, b) => (a.t || 0) - (b.t || 0));
       if (items.length) { markHistoryVisited(key); row.classList.add('visited'); reopenConversation(items); }
     });
