@@ -5438,6 +5438,40 @@ log.addEventListener('keydown', (e) => {
 /* Reusable in-panel confirm modal — replaces window.confirm() which CEP
    renders with the ugly "JavaScript Confirm - file://…" native sheet.
    Returns Promise<boolean>. Esc / outside-click = cancel; Enter = OK. */
+// Small global toast — same look as the update button's toast (reuses its
+// .update-toast CSS). For brief non-blocking notices like "2 files couldn't
+// be deleted". isErr=true → red tint + longer linger.
+function ccToast(msg, isErr) {
+  const t = document.createElement('div');
+  t.className = 'update-toast' + (isErr ? ' err' : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => { try { t.remove(); } catch {} }, 250);
+  }, isErr ? 5500 : 3500);
+}
+
+// Delete one file via the bridge and report honestly. Returns true only when
+// the bridge confirmed the file is gone (deleted or already-gone) — every
+// caller that clears UI/history MUST gate on this, never fire-and-forget.
+async function ccDeleteFile(p) {
+  try {
+    const resp = await fetch(BRIDGE + '/delete-file', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: p }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (resp.ok && data.ok) return true;
+    try { cclog('error', 'delete-file failed', { path: p, status: resp.status, error: data.error || null }); } catch {}
+    return false;
+  } catch (e) {
+    try { cclog('error', 'delete-file failed', { path: p, error: String(e && e.message || e) }); } catch {}
+    return false;
+  }
+}
+
 function ccConfirm({ title, message, okLabel = 'OK', cancelLabel = 'Cancel', danger = false } = {}) {
   return new Promise((resolve) => {
     // If a confirm is already open, dismiss it (rapid-click guard) so we
@@ -6476,8 +6510,17 @@ function renderHistory() {
           okLabel: 'Delete', cancelLabel: 'Keep', danger: true,
         });
         if (!ok) return;
+        // Delete each file and CHECK the result — previously this was
+        // fire-and-forget, so a failed delete (bridge 403/500, bridge down)
+        // still removed the history entry: file stranded on disk with no
+        // UI breadcrumb left to retry from.
+        let failed = 0;
         for (const f of uniqFiles) {
-          try { await fetch(BRIDGE + '/delete-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: f }) }); } catch {}
+          if (!(await ccDeleteFile(f))) failed++;
+        }
+        if (failed) {
+          ccToast(failed + ' of ' + uniqFiles.length + " file" + (uniqFiles.length === 1 ? '' : 's') + " couldn't be deleted — entry kept so you can retry.", true);
+          return;   // keep the history entry as the retry handle
         }
         history = history.filter(x => (x.thread || x.id) !== th);
         saveHistory();
@@ -11239,12 +11282,7 @@ function addRenderPreview(msgWrap, absPath, prompt, reply) {
     if (!ok) return;
     deleteBtn.disabled = true; deleteBtn.textContent = 'Deleting…';
     try {
-      const resp = await fetch(BRIDGE + '/delete-file', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: absPath }),
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (resp.ok && data.ok) {
+      if (await ccDeleteFile(absPath)) {
         // Drop the matching history entry so it doesn't linger as a dead row.
         try { history = history.filter(x => x.path !== absPath); saveHistory(); renderHistory(); } catch {}
         try { cclog('info', 'deleted render from panel', { path: absPath }); } catch {}
@@ -11281,13 +11319,20 @@ async function deleteAllRendersInTab(idx) {
     okLabel: 'Delete ' + paths.length, cancelLabel: 'Keep', danger: true,
   });
   if (!ok) return;
+  // Delete per-file and verify — only clear the cards/history rows whose file
+  // is ACTUALLY gone. Previously failures were swallowed and every card was
+  // removed anyway, stranding files on disk with nothing left to retry from.
+  let deleted = 0, failed = 0;
   for (const p of paths) {
-    try { await fetch(BRIDGE + '/delete-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: p }) }); } catch {}
-    try { history = history.filter(x => x.path !== p); } catch {}
+    if (await ccDeleteFile(p)) {
+      deleted++;
+      try { history = history.filter(x => x.path !== p); } catch {}
+      cards.forEach(c => { if (c.dataset.renderPath === p) { try { c.remove(); } catch {} } });
+    } else failed++;
   }
   try { saveHistory(); renderHistory(); } catch {}
-  cards.forEach(c => { try { c.remove(); } catch {} });
-  try { cclog('info', 'deleted all renders in tab', { count: paths.length }); } catch {}
+  if (failed) ccToast(failed + ' file' + (failed === 1 ? '' : 's') + " couldn't be deleted — kept in the tab so you can retry.", true);
+  try { cclog('info', 'deleted all renders in tab', { requested: paths.length, deleted, failed }); } catch {}
   try { renderTabStrip(); } catch {}
 }
 

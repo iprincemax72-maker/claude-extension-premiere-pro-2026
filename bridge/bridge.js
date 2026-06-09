@@ -5631,15 +5631,22 @@ const server = http.createServer((req, res) => {
         // bridge-owned folder name + the media-extension gate below are the
         // safety boundary: we only delete media that sits directly in that folder.
         const inProjectRender = path.basename(path.dirname(resolved)) === 'Claude Animations';
-        if (!MEDIA.test(resolved)) { res.writeHead(403); res.end(JSON.stringify({ error: 'not a media file' })); return; }
-        if (!(inOutput || inProjectOutput || inProjectRender)) { res.writeHead(403); res.end(JSON.stringify({ error: 'file is outside the render output folder' })); return; }
+        // Log every refusal — silent 403s here previously made "delete didn't
+        // work" undiagnosable (the log only recorded successes).
+        const refuse = (why) => {
+          clog('bridge', 'warn', 'delete-file refused', { path: resolved, why });
+          res.writeHead(403); res.end(JSON.stringify({ error: why }));
+        };
+        if (!MEDIA.test(resolved)) { refuse('not a media file'); return; }
+        if (!(inOutput || inProjectOutput || inProjectRender)) { refuse('file is outside the render output folder'); return; }
         if (!fs.existsSync(resolved)) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, alreadyGone: true })); return; }
-        if (!fs.statSync(resolved).isFile()) { res.writeHead(403); res.end(JSON.stringify({ error: 'not a file' })); return; }
+        if (!fs.statSync(resolved).isFile()) { refuse('not a file'); return; }
         fs.unlinkSync(resolved);
         clog('bridge', 'info', 'deleted render file', { path: resolved });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, deleted: resolved }));
       } catch (e) {
+        clog('bridge', 'error', 'delete-file errored', { path: raw, error: e.message || String(e) });
         res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e) }));
       }
     });
