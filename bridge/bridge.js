@@ -2701,6 +2701,13 @@ then write code that follows the pattern.
     rules/3d.md                   3D content via React Three Fiber.
     rules/measuring-text.md       Text-fitting / overflow checking.
     rules/light-leaks.md          @remotion/light-leaks overlay effects.
+    rules/google-fonts.md  rules/local-fonts.md
+                                  Official font-loading patterns.
+    rules/silence-detection.md    Detect/trim silence in audio.
+    rules/html-in-canvas.md       Render HTML inside <Canvas>.
+    rules/maplibre.md             Animated map scenes via MapLibre.
+    (This skill auto-syncs weekly from the official remotion-dev/skills repo —
+    if a rule file you expect is missing, ls the rules/ dir for what exists.)
 
   remotion-transitions/           If the user asks for "cinematic", "high-
                                   energy", "glitch", "striped", "punch",
@@ -5661,6 +5668,79 @@ const server = http.createServer((req, res) => {
   res.writeHead(404); res.end();
 });
 
+// ── Official Remotion AI skills sync (remotion.dev/docs/ai/skills) ─────────
+// SYSTEM_PROMPT points claude at ~/.claude/skills/remotion-best-practices/.
+// This syncs that skill from the OFFICIAL remotion-dev/skills repo — the same
+// source `npx skills add remotion-dev/skills` pulls — so fresh installs HAVE
+// the skill (the installers never set it up) and existing ones track
+// Remotion's best-practice updates.
+//
+// 3-way merge via a hash manifest (.official-sync.json):
+//   • official file missing locally        → install it
+//   • local file == what we last installed → refresh to new official version
+//   • local file edited by hand            → NEVER touched (our sfx.md import
+//     fix, custom rules like charts.md / motion-design.md stay intact)
+const BP_SKILL_DIR = path.join(os.homedir(), '.claude', 'skills', 'remotion-best-practices');
+const BP_MANIFEST = path.join(BP_SKILL_DIR, '.official-sync.json');
+const BP_SYNC_MAX_AGE = 7 * 24 * 3600 * 1000;          // re-check weekly
+
+async function ensureRemotionSkills() {
+  try {
+    let manifest = {};
+    try { manifest = JSON.parse(fs.readFileSync(BP_MANIFEST, 'utf8')); } catch {}
+    if (manifest._t && Date.now() - manifest._t < BP_SYNC_MAX_AGE) return;   // fresh enough
+    if (typeof fetch !== 'function') return;            // Node <18 — skip quietly
+    const sha = (buf) => require('crypto').createHash('sha256').update(buf).digest('hex');
+
+    const resp = await fetch('https://codeload.github.com/remotion-dev/skills/tar.gz/refs/heads/main');
+    if (!resp.ok) throw new Error('download HTTP ' + resp.status);
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'remotion-skills-'));
+    const tarball = path.join(tmp, 'skills.tgz');
+    fs.writeFileSync(tarball, Buffer.from(await resp.arrayBuffer()));
+    await new Promise((resolve, reject) => {
+      // bsdtar ships with macOS and Windows 10 1803+ — no extra deps.
+      const p = spawn('tar', ['-xzf', tarball, '-C', tmp]);
+      p.on('error', reject);
+      p.on('close', (c) => (c === 0 ? resolve() : reject(new Error('tar exit ' + c))));
+    });
+    const src = path.join(tmp, 'skills-main', 'skills', 'remotion');
+    if (!fs.existsSync(path.join(src, 'SKILL.md'))) throw new Error('unexpected tarball layout');
+
+    // Collect official files (SKILL.md + rules/** incl. assets), then merge.
+    const files = ['SKILL.md'];
+    const walk = (rel) => {
+      for (const ent of fs.readdirSync(path.join(src, rel), { withFileTypes: true })) {
+        const r = rel + '/' + ent.name;
+        if (ent.isDirectory()) walk(r); else files.push(r);
+      }
+    };
+    walk('rules');
+    let added = 0, updated = 0, keptLocal = 0;
+    for (const rel of files) {
+      const offBuf = fs.readFileSync(path.join(src, rel));
+      const offSha = sha(offBuf);
+      const dest = path.join(BP_SKILL_DIR, rel);
+      if (!fs.existsSync(dest)) {
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.writeFileSync(dest, offBuf); manifest[rel] = offSha; added++;
+      } else {
+        const localSha = sha(fs.readFileSync(dest));
+        if (localSha === offSha) { manifest[rel] = offSha; }            // already in sync — track it
+        else if (manifest[rel] === localSha) {                          // ours, unedited → safe refresh
+          fs.writeFileSync(dest, offBuf); manifest[rel] = offSha; updated++;
+        } else keptLocal++;                                             // hand-edited → preserve
+      }
+    }
+    manifest._t = Date.now();
+    fs.writeFileSync(BP_MANIFEST, JSON.stringify(manifest));
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+    clog('bridge', 'info', 'remotion skills synced from remotion-dev/skills', { added, updated, keptLocal });
+  } catch (e) {
+    // Non-fatal — renders still work, just without the freshest guidance.
+    clog('bridge', 'warn', 'remotion skills sync failed (retries next launch)', { error: e.message || String(e) });
+  }
+}
+
 // Auto-update — on launch, the bridge pulls the latest panel + bridge files
 // from a SOURCE and diffs against on-disk; rewrite only if changed.
 //
@@ -5968,6 +6048,10 @@ function _tryListen() {
         .then((r) => _applyUpdateResult(r, 'launch update'))
         .catch(e => { clog('bridge', 'error', 'update check threw', { error: e.message }); console.error('Update check error:', e.message); });
     }
+
+    // Sync the official Remotion AI skill (remotion.dev/docs/ai/skills) —
+    // non-blocking, weekly cadence, see ensureRemotionSkills().
+    ensureRemotionSkills();
 
     // PERIODIC auto-update — re-check every 3 min so a long-running bridge
     // actually picks up new code without a manual restart. This is the piece
