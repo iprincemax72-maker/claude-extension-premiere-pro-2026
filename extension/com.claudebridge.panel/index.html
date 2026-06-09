@@ -6307,7 +6307,7 @@ const ICON_AUTOEDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 function _aeItemName(it, i) {
   let nm = (it && it.label && String(it.label).trim()) || '';
   if (!nm && it && it.file) {
-    nm = String(it.file).split('/').pop().split('\\').pop()
+    nm = _aeBaseName(String(it.file))          // hoisted helper, defined below
       .replace(/\.[^.]+$/, '')                 // drop extension
       .replace(/_v\d+(_[a-z0-9]{3,6})?$/i, '') // drop version/seed suffix
       .replace(/[_-]+/g, ' ').trim();
@@ -6592,6 +6592,9 @@ function renderHistory() {
         }
         if (failed) {
           ccToast(failed + ' of ' + uniqFiles.length + " file" + (uniqFiles.length === 1 ? '' : 's') + " couldn't be deleted — entry kept so you can retry.", true);
+          // Re-render so the entry's existence checks ('missing' markers,
+          // hidden Preview) reflect the files that DID get deleted.
+          try { renderHistory(); } catch {}
           return;   // keep the history entry as the retry handle
         }
         history = history.filter(x => (x.thread || x.id) !== th);
@@ -8756,17 +8759,7 @@ function syncRenderModeUI() {
 (function initUpdateBtn() {
   const btn = document.getElementById('updateBtn');
   if (!btn) return;
-  function toast(msg, isErr) {
-    const t = document.createElement('div');
-    t.className = 'update-toast' + (isErr ? ' err' : '');
-    t.textContent = msg;
-    document.body.appendChild(t);
-    requestAnimationFrame(() => t.classList.add('show'));
-    setTimeout(() => {
-      t.classList.remove('show');
-      setTimeout(() => t.remove(), 250);
-    }, isErr ? 5500 : 3500);
-  }
+  const toast = ccToast;   // global helper — was a byte-identical private copy
   // CRITICAL: never reload the panel mid-chat / mid-autocut / mid-autoedit.
   // A 5-minute render gets nuked if location.reload() fires while the fetch
   // is in flight — the response never arrives, the import card never builds,
@@ -10531,6 +10524,11 @@ function renderAeResultsCard(records, reqId) {
   (getActiveLogContent() || log).appendChild(card);
 
   // Remove ONE graphic: lift it off the timeline (if placed) + delete its file.
+  // Returns true only when the graphic's FILE is confirmed gone (the timeline
+  // lift is best-effort either way). Callers MUST gate row/card removal on
+  // this — a failed disk delete with the row gone strands the file with no
+  // UI handle left to retry from (same silent-failure class as the history/
+  // tab deletes, fixed the same way).
   const deleteAeGraphic = async (rec) => {
     if (rec && rec.track && typeof rec.placedAtSec === 'number') {
       try {
@@ -10538,11 +10536,13 @@ function renderAeResultsCard(records, reqId) {
         await evalES('ccAutoEditRemove("' + esc + '")');
       } catch {}
     }
-    if (rec && rec.file) {
-      try { await ccDeleteFile(rec.file); } catch {}
-      try { history = history.filter(x => !(x.path === rec.file && x.kind !== 'autoedit')); } catch {}
-      try { syncAeHistoryItem(rec.file, null); } catch {}   // drop it from the run's names list too
-    }
+    if (!(rec && rec.file)) return true;
+    let gone = false;
+    try { gone = await ccDeleteFile(rec.file); } catch {}
+    if (!gone) return false;
+    try { history = history.filter(x => !(x.path === rec.file && x.kind !== 'autoedit')); } catch {}
+    try { syncAeHistoryItem(rec.file, null); } catch {}   // drop it from the run's names list too
+    return true;
   };
 
   records.forEach((rec, i) => {
@@ -10577,7 +10577,12 @@ function renderAeResultsCard(records, reqId) {
       if (!ok) return;
       changeBtn.disabled = true; delBtn.disabled = true;
       statusEl.className = 'ae-row-status'; statusEl.textContent = 'Deleting…';
-      await deleteAeGraphic(rec);
+      if (!(await deleteAeGraphic(rec))) {
+        statusEl.className = 'ae-row-status err';
+        statusEl.textContent = "✗ couldn't delete — try again";
+        changeBtn.disabled = false; delBtn.disabled = false;
+        return;                              // keep the row as the retry handle
+      }
       try { saveHistory(); renderHistory(); } catch {}
       editEl.remove();
       rowEl.style.transition = 'opacity .2s var(--ease)'; rowEl.style.opacity = '0';
@@ -10594,8 +10599,22 @@ function renderAeResultsCard(records, reqId) {
     });
     if (!ok) return;
     delAllBtn.disabled = true; delAllBtn.textContent = 'Deleting…';
-    for (const rec of records) { await deleteAeGraphic(rec); }
+    // Per-graphic verification: remove only the rows whose file is confirmed
+    // gone; failed ones stay visible as the retry handle.
+    let failed = 0;
+    for (let i = 0; i < records.length; i++) {
+      if (await deleteAeGraphic(records[i])) {
+        const rEl = card.querySelector('.ae-row[data-i="' + i + '"]');
+        const eEl = card.querySelector('.ae-edit[data-i="' + i + '"]');
+        try { if (eEl) eEl.remove(); if (rEl) rEl.remove(); } catch {}
+      } else failed++;
+    }
     try { saveHistory(); renderHistory(); } catch {}
+    if (failed) {
+      ccToast(failed + ' graphic' + (failed === 1 ? '' : 's') + " couldn't be deleted — kept so you can retry.", true);
+      delAllBtn.disabled = false; delAllBtn.textContent = 'Delete all';
+      return;
+    }
     card.style.transition = 'opacity .2s var(--ease)'; card.style.opacity = '0';
     setTimeout(() => { try { card.remove(); } catch {} }, 200);
   });

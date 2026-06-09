@@ -15,6 +15,11 @@ const SESSION_ID = crypto.randomUUID();
 // need to point it somewhere else.
 const WORK_DIR = process.env.CLAUDE_BRIDGE_WORK_DIR || __dirname;
 const OUTPUT_DIR = path.join(WORK_DIR, 'output');
+// Folder name for project-colocated renders (created next to the open
+// .prproj by /chat). The /delete-file allowlist matches on this SAME name —
+// always use the constant in both places: renaming one without the other
+// silently 403s every project-render delete.
+const PROJECT_RENDER_DIRNAME = 'Claude Animations';
 const PANEL_DIR = (process.platform === 'win32')
   ? path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Adobe', 'CEP', 'extensions', 'com.claudebridge.panel')
   : path.join(os.homedir(), 'Library', 'Application Support', 'Adobe', 'CEP', 'extensions', 'com.claudebridge.panel');
@@ -3911,7 +3916,7 @@ const server = http.createServer((req, res) => {
           const projectFolder = path.dirname(context.projectPath);
           // Sanity check: the parent must exist (project file is on disk)
           if (fs.existsSync(projectFolder)) {
-            const candidate = path.join(projectFolder, 'Claude Animations');
+            const candidate = path.join(projectFolder, PROJECT_RENDER_DIRNAME);
             fs.mkdirSync(candidate, { recursive: true });
             renderOutputDir = candidate;
             renderOutputNote = ' (next to the open project — easy to delete with the project later)';
@@ -5625,12 +5630,12 @@ const server = http.createServer((req, res) => {
         const home = os.homedir();
         const inOutput = resolved === OUTPUT_DIR || resolved.startsWith(OUTPUT_DIR + path.sep);
         const inProjectOutput = resolved.startsWith(home + path.sep) && /[/\\]output[/\\]/i.test(resolved);
-        // Project-colocated renders land in a "Claude Animations" folder next to
-        // the open .prproj (see /chat renderOutputDir) — which can sit on ANY
+        // Project-colocated renders land in a PROJECT_RENDER_DIRNAME folder next
+        // to the open .prproj (see /chat renderOutputDir) — which can sit on ANY
         // volume, incl. external drives, so we can't require it under $HOME. The
         // bridge-owned folder name + the media-extension gate below are the
         // safety boundary: we only delete media that sits directly in that folder.
-        const inProjectRender = path.basename(path.dirname(resolved)) === 'Claude Animations';
+        const inProjectRender = path.basename(path.dirname(resolved)) === PROJECT_RENDER_DIRNAME;
         // Log every refusal — silent 403s here previously made "delete didn't
         // work" undiagnosable (the log only recorded successes).
         const refuse = (why) => {
