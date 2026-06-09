@@ -2036,6 +2036,47 @@
   }
   .rmode-pill:active { transform: scale(0.94); transition-duration: 0.1s; }
 
+  /* ───── Engine selector (Remotion ⇄ HyperFrames) ───── */
+  .eng-group { position: relative; display: inline-flex; flex: 0 0 auto; }
+  .eng-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 24px; padding: 0 8px;
+    border: 1px solid var(--line); border-radius: 7px;
+    background: var(--surface-2, rgba(255,255,255,0.03));
+    color: var(--text-dim); font-family: var(--font-ui);
+    font-size: 10.5px; font-weight: 600; cursor: pointer;
+    transition: color .12s var(--ease-out), border-color .12s var(--ease-out), background .12s var(--ease-out);
+    white-space: nowrap; user-select: none;
+  }
+  .eng-btn:hover { color: var(--text); border-color: var(--accent-line); }
+  .eng-btn svg { width: 12px; height: 12px; flex: 0 0 auto; }
+  .eng-btn .eng-caret { width: 10px; height: 10px; opacity: .7; transition: transform .15s var(--ease-out); }
+  .eng-group.open .eng-btn { border-color: var(--accent-line); color: var(--text); }
+  .eng-group.open .eng-btn .eng-caret { transform: rotate(180deg); }
+  /* HyperFrames active → tint the pill so the switch is obvious */
+  .eng-btn.hf-active { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+  .eng-menu {
+    position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 80;
+    min-width: 230px; padding: 5px;
+    background: var(--surface, #15171c); border: 1px solid var(--line);
+    border-radius: 10px; box-shadow: 0 10px 30px -8px rgba(0,0,0,.55);
+    display: none; flex-direction: column; gap: 2px;
+  }
+  .eng-group.open .eng-menu { display: flex; }
+  .eng-opt {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 9px; border: none; border-radius: 7px; cursor: pointer;
+    background: transparent; color: var(--text); text-align: left;
+    font-family: var(--font-ui); transition: background .1s var(--ease-out);
+  }
+  .eng-opt:hover { background: rgba(255,255,255,0.05); }
+  .eng-opt-main { display: flex; flex-direction: column; gap: 1px; flex: 1 1 auto; min-width: 0; }
+  .eng-opt-main b { font-size: 12px; font-weight: 600; }
+  .eng-opt-main span { font-size: 10.5px; color: var(--text-dim); }
+  .eng-tick { width: 14px; height: 14px; flex: 0 0 auto; color: var(--accent); opacity: 0; }
+  .eng-opt.sel .eng-tick { opacity: 1; }
+  .input-toolbar .eng-btn { font-size: 10px; height: 22px; }
+
   /* ───── Outputs selector (generate N versions from one prompt) ───── */
   .out-group { position: relative; display: inline-flex; flex: 0 0 auto; }
   .out-btn {
@@ -4480,6 +4521,24 @@
         <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
         <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Flimify takes its time, ~3-5 min">Slow</button>
       </div>
+      <!-- Render ENGINE — Remotion (React) ⇄ HyperFrames (HTML/GSAP). -->
+      <div class="eng-group" id="engineGroup" title="Render engine — Remotion builds React animations; HyperFrames builds HTML/CSS/GSAP blocks (great for shader looks, kinetic type, code reveals).">
+        <button class="eng-btn" id="engineBtn" type="button" aria-haspopup="true" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span id="engineLabel">Remotion</span>
+          <svg class="eng-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="eng-menu" id="engineMenu" role="menu">
+          <button class="eng-opt" data-engine="remotion" role="menuitemradio" type="button">
+            <span class="eng-opt-main"><b>Remotion</b><span>React motion graphics — the default</span></span>
+            <svg class="eng-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="eng-opt" data-engine="hyperframes" role="menuitemradio" type="button">
+            <span class="eng-opt-main"><b>HyperFrames</b><span>HTML/CSS/GSAP blocks — shaders, kinetic type, code</span></span>
+            <svg class="eng-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+        </div>
+      </div>
       <div class="out-group" id="outputGroup" title="How many different versions to generate from one prompt. They render all at once (in parallel) so you can pick the best.">
         <button class="out-btn" id="outputBtn" type="button" aria-haspopup="true" aria-expanded="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
@@ -4802,6 +4861,7 @@ function newTab(opts) {
     // Per-tab controls — each tab keeps its own render mode + Ask-Questions
     // state. New tabs inherit the last-used values as their starting point.
     renderMode: userSettings.renderMode || 'default',
+    engine: userSettings.engine || 'remotion',
     planMode: !!userSettings.planMode,
     outputs: 1,   // how many versions one prompt generates (1-10)
     threadKeys: [],   // history threads whose renders live in this tab (select-clip → reopen)
@@ -4880,8 +4940,9 @@ function applyActiveTabState() {
   try { setBusy && setBusy(!!activeChatAbort); } catch {}
   try { updateEscHint && updateEscHint(); } catch {}
   try { syncExpandEnabled && syncExpandEnabled(); updateExpandRecommendation && updateExpandRecommendation(); } catch {}
-  // Per-tab controls — reflect THIS tab's render mode + Ask-Questions state.
+  // Per-tab controls — reflect THIS tab's render mode + engine + Ask-Questions state.
   try { syncRenderModeUI && syncRenderModeUI(); } catch {}
+  try { syncEngineUI && syncEngineUI(); } catch {}
   try { syncPlanBtn && syncPlanBtn(); } catch {}
   try { syncOutputUI && syncOutputUI(); } catch {}
   // Show this tab's queue; if it has items, is idle, and wasn't paused by a
@@ -7628,6 +7689,7 @@ const SETTINGS_DEFAULTS = {
   expand: 'light',
   autoUpdate: true,
   renderMode: 'default',  // fast | default | slow — speed/quality dial for renders
+  engine: 'remotion',     // remotion | hyperframes — which render engine to use
   aspect: 'auto',         // auto | 9:16 | 16:9 | 1:1 — prepended to every prompt
   duration: 'auto',       // auto | 3 | 5 | 10 | 15 | 30 — prepended when prompt doesn't specify
   confirmImport: false,   // when true, render cards ask before auto-placing on timeline
@@ -8750,6 +8812,51 @@ function syncRenderModeUI() {
     const btn = e.target.closest('.rmode-pill');
     if (btn) setRenderMode(btn.dataset.rmode);
   });
+})();
+
+// Render ENGINE (Remotion / HyperFrames) — same per-tab + default pattern as
+// render mode. Remotion = React motion graphics; HyperFrames = HTML/CSS/GSAP
+// blocks rendered by the real hyperframes CLI (good for shaders / kinetic type).
+const ENGINE_LABELS = { remotion: 'Remotion', hyperframes: 'HyperFrames' };
+function setEngine(e) {
+  if (e !== 'hyperframes') e = 'remotion';
+  const t = tabs[activeTabIdx];
+  if (t) t.engine = e;
+  userSettings.engine = e;            // default for the next new tab
+  try { saveSettings(); } catch (err) {}
+  syncEngineUI();
+}
+function syncEngineUI() {
+  const t = tabs[activeTabIdx];
+  const e = (t && t.engine) || userSettings.engine || 'remotion';
+  const lbl = document.getElementById('engineLabel');
+  const btn = document.getElementById('engineBtn');
+  if (lbl) lbl.textContent = ENGINE_LABELS[e] || 'Remotion';
+  if (btn) btn.classList.toggle('hf-active', e === 'hyperframes');
+  document.querySelectorAll('.eng-opt').forEach(o =>
+    o.classList.toggle('sel', o.dataset.engine === e));
+}
+(function initEngine() {
+  const group = document.getElementById('engineGroup');
+  const btn = document.getElementById('engineBtn');
+  const menu = document.getElementById('engineMenu');
+  if (!group || !btn || !menu) return;
+  if (!userSettings.engine) userSettings.engine = 'remotion';
+  syncEngineUI();
+  const close = () => { group.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); };
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = group.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  menu.addEventListener('click', (e) => {
+    const opt = e.target.closest('.eng-opt');
+    if (!opt) return;
+    setEngine(opt.dataset.engine);
+    close();
+  });
+  document.addEventListener('click', (e) => { if (!group.contains(e.target)) close(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 })();
 
 // Update button — pulls latest panel + bridge files from GitHub on demand.
@@ -12400,6 +12507,7 @@ async function sendMessage(presetMsg, sendOpts) {
       body: JSON.stringify({
         reqId, message: outboundMsg, context,
         renderMode: (_sendTab && _sendTab.renderMode) || userSettings.renderMode || 'default',
+        engine: (_sendTab && _sendTab.engine) || userSettings.engine || 'remotion',
         mode: activeTabType,
         planMode: outboundPlanMode,
         versions: _multiN,        // >1 → bridge fans out into N parallel renders
@@ -12579,6 +12687,7 @@ async function sendContinuationChat(originalMsg, lastStatus) {
       body: JSON.stringify({
         reqId, message: outboundMsg, context,
         renderMode: (_sendTab && _sendTab.renderMode) || userSettings.renderMode || 'default',
+        engine: (_sendTab && _sendTab.engine) || userSettings.engine || 'remotion',
       }),
       signal: activeChatAbort.signal,
     });

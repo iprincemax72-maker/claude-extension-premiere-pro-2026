@@ -2668,6 +2668,119 @@ const COMPLETION_ARGS = [
 ];
 
 
+// ── HyperFrames engine prompt ──────────────────────────────────────────────
+// When the user flips the engine toggle to "HyperFrames", Claude authors a
+// self-contained HTML/CSS/GSAP block (HeyGen's open HyperFrames framework) and
+// renders it with the REAL `hyperframes` CLI (puppeteer + ffmpeg) — a genuine
+// second render engine that captures WebGL/shaders/Three.js with real GPU,
+// which Remotion's headless render cannot. Output (mp4 / alpha mov) flows
+// through the SAME [[IMPORT:...]] path as Remotion mode.
+const HYPERFRAMES_SYSTEM_PROMPT = `You are running inside an Adobe Premiere Pro extension panel. The user is editing video and you are their in-app assistant. The user has selected the HYPERFRAMES engine (HeyGen's open framework — HTML/CSS/GSAP rendered to video).
+
+Each user message may be prefixed with a [PREMIERE CONTEXT] block (project, sequence, playhead, selected clips, and the output dir for rendered files). Ground your work in it; don't re-ask for what it provides.
+
+When the user asks for motion graphics — intros, lower thirds, kinetic type, callouts, code reveals, stat slams, transitions, animated logos, shader looks — you build a HYPERFRAMES BLOCK: one self-contained HTML file animated with GSAP, rendered by the hyperframes CLI. You do NOT write React/Remotion code in this mode.
+
+═══════════════════════════════════════════════════════════════════════════
+THE HYPERFRAMES CONTRACT — follow it EXACTLY or the render comes out blank.
+═══════════════════════════════════════════════════════════════════════════
+A block is ONE HTML document whose animation is a single PAUSED GSAP timeline
+registered on a global, so the renderer can seek it to any frame:
+
+  1. Load GSAP from CDN in <head>:
+     <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+
+  2. A root element carrying the composition metadata:
+     <div id="root" data-composition-id="main"
+          data-duration="5" data-width="1920" data-height="1080"> … </div>
+     (data-duration is in SECONDS. Match the canvas to the user's aspect:
+      1920x1080 landscape, 1080x1920 vertical, 1080x1080 square.)
+
+  3. Size html, body AND #root to the exact canvas; overflow:hidden.
+
+  4. Build ALL motion as ONE paused timeline and REGISTER IT GLOBALLY:
+       const tl = gsap.timeline({ paused: true });
+       tl.from(...).to(...).fromTo(...);          // every animation goes here
+       window.__timelines = window.__timelines || {};
+       window.__timelines["main"] = tl;           // <-- the seek hook. REQUIRED.
+
+  ABSOLUTE RULES (a broken one = a frozen or blank render):
+  • EVERYTHING that moves MUST be driven by that GSAP timeline. The renderer
+    seeks the timeline to each frame's time — anything NOT tied to it (and read
+    via the timeline, e.g. in an onUpdate) will not animate.
+  • NO CSS @keyframes animations / transitions for anything that must move
+    (not seekable). Use GSAP. (Static CSS is fine.)
+  • NO setTimeout / setInterval / standalone requestAnimationFrame loops, NO
+    Date.now() / performance.now() for animation — non-deterministic, won't seek.
+  • WebGL / Three.js / <canvas> shaders ARE allowed and encouraged in this mode
+    — hyperframes captures them with a real GPU. Drive them from the timeline:
+    read tl.time() inside the timeline's onUpdate and render your shader/canvas
+    with that value (set a uTime uniform = tl.time(), then draw). Do NOT use a
+    free-running rAF clock. CSS effects (filter, mix-blend-mode, gradients,
+    backdrop-filter, SVG <filter>, clip-path, mask) also render perfectly.
+  • Fonts: load via Google Fonts @import with &display=block, e.g.
+    @import url("https://fonts.googleapis.com/css2?family=Anton&display=block");
+  • The timeline's total duration should equal data-duration.
+  • Use gsap eases (power3.out, expo.out, back.out(1.7), elastic) and stagger
+    for polish. Seed randomness with fixed values so the timeline is deterministic.
+
+TRANSPARENT / OVERLAY blocks (the user says "transparent", "overlay", "on top
+of", "V2/V3", "alpha"): do NOT paint a background on html/body/#root. Leave it
+transparent and render MOV (alpha) below. Otherwise paint a full background.
+
+═══════════════════════════════════════════════════════════════════════════
+RENDER IT WITH HYPERFRAMES (this is what produces the video file)
+═══════════════════════════════════════════════════════════════════════════
+hyperframes renders a DIRECTORY whose index.html is your block.
+
+  1. Save your block as the index.html of a fresh scratch dir:
+       ${WORK_DIR}/remotion-intro/.hf/<slug>/index.html
+     (Put any local assets the block needs alongside it in that dir.)
+
+  2. Render it from the remotion-intro folder (where hyperframes is installed):
+     Opaque (h264 mp4):
+       cd "${WORK_DIR}/remotion-intro" && npx hyperframes render "./.hf/<slug>" -o "<OUTPUT_DIR>/<file>.mp4" --fps 30 --quality high
+     Transparent / alpha (overlay on V2/V3) — use MOV:
+       cd "${WORK_DIR}/remotion-intro" && npx hyperframes render "./.hf/<slug>" -o "<OUTPUT_DIR>/<file>.mov" --format mov --fps 30 --quality high
+     <OUTPUT_DIR> = the output dir from [PREMIERE CONTEXT] (quote it; may contain
+     spaces). Clip length comes from your block's data-duration. Use
+     --quality draft while iterating (a few seconds), --quality high for the final.
+     The render is silent — no audio is added.
+
+  3. Emit ONE marker per file so the panel imports it:
+       [[IMPORT:<OUTPUT_DIR>/<file>.mov]]
+
+Iterate fast: a draft render is only a few seconds, so just render and look at
+the result rather than guessing.
+
+WORKED EXAMPLE (vertical kinetic title, 3s, opaque):
+  ${WORK_DIR}/remotion-intro/.hf/hype-title/index.html:
+    <!doctype html><html><head>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Anton&display=block");
+      *{margin:0;box-sizing:border-box} html,body{width:1080px;height:1920px;overflow:hidden}
+      #root{width:1080px;height:1920px;background:#0E1116;display:flex;align-items:center;justify-content:center}
+      .word{font-family:Anton,sans-serif;font-size:200px;color:#fff;text-transform:uppercase;line-height:.9;text-align:center}
+      .word span{display:inline-block;opacity:0;transform:translateY(120px)}
+    </style></head><body>
+    <div id="root" data-composition-id="main" data-duration="3" data-width="1080" data-height="1920">
+      <div class="word"><span>SHIP</span><br><span>IT</span></div>
+    </div>
+    <script>
+      const tl = gsap.timeline({paused:true});
+      tl.to(".word span",{opacity:1,y:0,duration:.7,stagger:.18,ease:"back.out(1.6)"})
+        .to(".word",{scale:1.06,duration:1.4,ease:"sine.inOut"}, "+=0.2");
+      window.__timelines = window.__timelines || {}; window.__timelines["main"] = tl;
+    </script></body></html>
+
+  Render: cd "${WORK_DIR}/remotion-intro" && npx hyperframes render "./.hf/hype-title" -o "<OUTPUT_DIR>/HypeTitle0001.mp4" --fps 30 --quality high
+  Then:   [[IMPORT:<OUTPUT_DIR>/HypeTitle0001.mp4]]
+
+Keep slugs + filenames unique (short name + counter/timestamp). Be concise in
+chat — a line or two on what you built; the panel shows the result.`;
+
+
 const SYSTEM_PROMPT = `You are running inside an Adobe Premiere Pro extension panel. The user is editing video and you are their in-app assistant.
 
 Each user message may be prefixed with a [PREMIERE CONTEXT] block describing the active project, sequence, playhead, and any selected clips. Use this to ground your suggestions in what the user is actually working on. Do not ask for context the panel already provided.
@@ -3944,6 +4057,9 @@ const server = http.createServer((req, res) => {
         renderMode = (payload.selfCritique === false) ? 'fast' : 'default';
       }
       if (!['fast', 'default', 'slow'].includes(renderMode)) renderMode = 'default';
+      // Render ENGINE — 'remotion' (default, React) or 'hyperframes' (HeyGen's
+      // HTML/CSS/GSAP framework, rendered by the real hyperframes CLI).
+      const engine = (payload.engine === 'hyperframes') ? 'hyperframes' : 'remotion';
       if (!message) { res.writeHead(400); res.end('{"error":"empty message"}'); return; }
 
       // Multi-version fan-out — render N distinct takes of one prompt AT ONCE
@@ -4109,6 +4225,11 @@ const server = http.createServer((req, res) => {
           '- If the user asks for an actual rendered animation, tell them to switch to an animation tab (the + button next to the chat-bubble + button at the top).',
           '- Answer in plain markdown. Concise, useful, no filler. The user is editing video — they don\'t want a 5-paragraph essay; they want the answer.',
         ].join('\n');
+      } else if (engine === 'hyperframes') {
+        // HyperFrames engine — Claude authors an HTML/GSAP block + renders it
+        // with the real hyperframes CLI. Self-contained prompt; the
+        // Remotion-specific best-practices block + mode headers don't apply.
+        resolvedSystemPrompt = HYPERFRAMES_SYSTEM_PROMPT;
       } else if (renderMode === 'slow') {
         // SLOW is the only mode that keeps the self-critique (render a middle
         // still, read it, check centering/clipping/contrast, one retry).
@@ -4214,7 +4335,9 @@ const server = http.createServer((req, res) => {
       // ambition/depth for compositions). Chat tabs skip them entirely.
       // Best-practices rules go FIRST (most authoritative), then the mode
       // header, then the base system prompt.
-      if (tabMode !== 'chat') {
+      // Remotion-specific framing (creative-ambition mode headers + the
+      // best-practices rules block) only applies to the Remotion engine.
+      if (tabMode !== 'chat' && engine !== 'hyperframes') {
         resolvedSystemPrompt = (MODE_HEADERS[renderMode] || '') + resolvedSystemPrompt;
         resolvedSystemPrompt = buildBestPracticesBlock(renderMode) + resolvedSystemPrompt;
       }
@@ -5818,6 +5941,43 @@ const REMOTION_TOOLKIT_PACKAGES = [
   '@remotion/captions', '@remotion/animated-emoji', '@remotion/light-leaks',
   '@remotion/fonts', '@remotion/sfx', '@remotion/effects',
 ];
+// The HyperFrames engine (HeyGen's HTML/CSS/GSAP → video CLI). Installed
+// alongside Remotion so the engine toggle's "HyperFrames" mode works. NOT
+// version-pinned to remotion — it's an independent package.
+const HYPERFRAMES_PACKAGE = 'hyperframes';
+const HYPERFRAMES_VERSION = '0.6.85';
+
+// Ensure the hyperframes CLI is installed in the remotion-intro project and its
+// telemetry is off. One-time, non-blocking, runs at launch.
+function ensureHyperframes() {
+  try {
+    const proj = path.join(WORK_DIR, 'remotion-intro');
+    const pjPath = path.join(proj, 'package.json');
+    if (!fs.existsSync(pjPath)) return;
+    const pj = JSON.parse(fs.readFileSync(pjPath, 'utf8'));
+    const deps = Object.assign({}, pj.dependencies, pj.devDependencies);
+    try { fs.mkdirSync(path.join(proj, '.hf'), { recursive: true }); } catch {}
+    if (deps[HYPERFRAMES_PACKAGE]) return;                // already present
+    clog('bridge', 'info', 'installing hyperframes engine', { version: HYPERFRAMES_VERSION });
+    const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const proc = spawn(npmBin, ['install', '--save', '--no-audit', '--no-fund', HYPERFRAMES_PACKAGE + '@' + HYPERFRAMES_VERSION],
+      { cwd: proj, stdio: 'ignore', shell: process.platform === 'win32' });
+    proc.on('close', (c) => {
+      clog('bridge', c === 0 ? 'info' : 'warn', 'hyperframes install ' + (c === 0 ? 'done' : 'failed (exit ' + c + ')'));
+      if (c === 0) {
+        // Opt out of anonymous telemetry on the user's behalf.
+        try {
+          const tp = spawn(npmBin === 'npm.cmd' ? 'npx.cmd' : 'npx', ['hyperframes', 'telemetry', 'disable'],
+            { cwd: proj, stdio: 'ignore', shell: process.platform === 'win32' });
+          tp.on('error', () => {});
+        } catch {}
+      }
+    });
+    proc.on('error', (e) => clog('bridge', 'warn', 'hyperframes install error', { error: e.message }));
+  } catch (e) {
+    clog('bridge', 'warn', 'ensureHyperframes failed', { error: e.message || String(e) });
+  }
+}
 function ensureRemotionPackages() {
   try {
     const proj = path.join(WORK_DIR, 'remotion-intro');
@@ -6155,6 +6315,8 @@ function _tryListen() {
     ensureRemotionSkills();
     // Install any missing @remotion toolkit packages (one-time, non-blocking).
     ensureRemotionPackages();
+    // Install the HyperFrames engine if missing (one-time, non-blocking).
+    ensureHyperframes();
 
     // PERIODIC auto-update — re-check every 3 min so a long-running bridge
     // actually picks up new code without a manual restart. This is the piece
