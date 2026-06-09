@@ -345,13 +345,61 @@ function detectSilences(clipPath, clipDuration, onProgress) {
   });
 }
 
+// Some cameras (Sony etc.) embed a start TIMECODE (e.g. 12:02:20:17 = time of
+// day ≈ 43340s). Premiere then reports a clip's in/out RELATIVE TO that timecode,
+// so the seconds land tens-of-thousands of seconds past the file → ffmpeg -ss
+// seeks past EOF → a silent/empty wav → "couldn't hear speech" on a clip that's
+// full of it. If the in-point exceeds the media duration, subtract the source's
+// start timecode so the seek lands in the actual media.
+function _tcToSeconds(tc, fps) {
+  const m = String(tc || '').match(/(\d+):(\d+):(\d+)[:;](\d+)/);
+  if (!m) return 0;
+  return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + (fps > 0 ? (+m[4]) / fps : 0);
+}
+function fixSourceTimecodeOffset(clipPath, inSec, outSec) {
+  inSec = Number(inSec) || 0; outSec = Number(outSec) || 0;
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (a, b) => { if (!done) { done = true; resolve([a, b]); } };
+    let proc;
+    try {
+      proc = spawn(FFMPEG_BIN.replace(/ffmpeg(\.exe)?$/, 'ffprobe$1'),
+        ['-v', 'error', '-of', 'json', '-show_entries',
+         'format=duration:format_tags=timecode:stream=r_frame_rate:stream_tags=timecode', clipPath]);
+    } catch { return finish(inSec, outSec); }
+    let out = '';
+    proc.stdout.on('data', d => out += d.toString());
+    proc.on('error', () => finish(inSec, outSec));
+    const k = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} finish(inSec, outSec); }, 8000);
+    proc.on('close', () => {
+      clearTimeout(k);
+      try {
+        const j = JSON.parse(out || '{}');
+        const dur = Number(j.format && j.format.duration) || 0;
+        if (!dur || inSec < dur) return finish(inSec, outSec);   // already in range → leave it
+        let tc = j.format && j.format.tags && j.format.tags.timecode, fps = 0;
+        for (const s of (j.streams || [])) {
+          if (!tc && s.tags && s.tags.timecode) tc = s.tags.timecode;
+          if (!fps && s.r_frame_rate) { const p = String(s.r_frame_rate).split('/'); if (+p[0] && +p[1]) fps = (+p[0]) / (+p[1]); }
+        }
+        if (!tc) return finish(inSec, outSec);
+        const tcSec = _tcToSeconds(tc, fps || 30);
+        const ni = inSec - tcSec, no = outSec - tcSec;
+        if (ni >= -0.5 && ni < dur + 1) return finish(Math.max(0, ni), Math.min(dur, Math.max(ni + 0.05, no)));
+        finish(inSec, outSec);
+      } catch { finish(inSec, outSec); }
+    });
+  });
+}
+
 // Extract clip audio to a 16kHz mono WAV (what parakeet-mlx ingests), trimmed
 // to [inP, outP] of the source. Returns path to the temp wav.
-function extractAudioForTranscription(clipPath, inP, outP) {
+async function extractAudioForTranscription(clipPath, inP, outP) {
+  const [fixIn, fixOut] = await fixSourceTimecodeOffset(clipPath, inP, outP);
   return new Promise((resolve, reject) => {
     const outPath = path.join(OUTPUT_DIR, '_autocut_audio_' + Date.now() + '.wav');
     const args = [
-      '-y', '-ss', String(inP), '-to', String(outP),
+      '-y', '-ss', String(fixIn), '-to', String(fixOut),
       '-i', clipPath,
       '-ac', '1', '-ar', '16000',
       outPath,
@@ -1791,11 +1839,12 @@ async function extractConcatAudio(segments, reqId, log) {
   let cum = 0;
   for (let i = 0; i < segments.length; i++) {
     const s = segments[i];
-    const dur = Math.max(0, (Number(s.outSec) || 0) - (Number(s.inSec) || 0));
+    const [segIn, segOut] = await fixSourceTimecodeOffset(s.path, s.inSec, s.outSec);
+    const dur = Math.max(0, segOut - segIn);
     if (dur < 0.05) continue;
     const out = `${tmpBase}_part${i}.wav`;
     await new Promise((res, rej) => {
-      const args = ['-y', '-ss', String(s.inSec), '-to', String(s.outSec), '-i', s.path, '-ac', '1', '-ar', '16000', out];
+      const args = ['-y', '-ss', String(segIn), '-to', String(segOut), '-i', s.path, '-ac', '1', '-ar', '16000', out];
       const ff = spawn(FFMPEG_BIN, args);
       let er = '';
       ff.stderr.on('data', d => er += d.toString().slice(-1500));
