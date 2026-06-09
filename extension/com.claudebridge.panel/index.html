@@ -3975,8 +3975,9 @@
         </div>
       </label>
 
-      <!-- Render engine for the generated graphics -->
-      <div class="ae-engine-row">
+      <!-- Render engine for the generated graphics — OWNER-only (revealed on
+           modal open / by syncPlanLocks). -->
+      <div class="ae-engine-row" style="display:none">
         <span class="ae-engine-lbl">Engine</span>
         <div class="ae-engine-seg" id="aeEngineSeg">
           <button type="button" class="ae-eng-pill active" data-ae-engine="remotion" title="Remotion — React motion graphics">Remotion</button>
@@ -4543,8 +4544,9 @@
         <button class="rmode-pill active" data-rmode="default" type="button" title="Default — a real custom-built animation, written from scratch, ~2 min">Default</button>
         <button class="rmode-pill" data-rmode="slow" type="button" title="Slow — best quality, Flimify takes its time, ~3-5 min">Slow</button>
       </div>
-      <!-- Render ENGINE — Remotion (React) ⇄ HyperFrames (HTML/GSAP). -->
-      <div class="eng-group" id="engineGroup" title="Render engine — Remotion builds React animations; HyperFrames builds HTML/CSS/GSAP blocks (great for shader looks, kinetic type, code reveals).">
+      <!-- Render ENGINE — Remotion (React) ⇄ HyperFrames (HTML/GSAP). OWNER-only;
+           hidden by default, syncPlanLocks() reveals it for the owner. -->
+      <div class="eng-group" id="engineGroup" style="display:none" title="Render engine — Remotion builds React animations; HyperFrames builds HTML/CSS/GSAP blocks (great for shader looks, kinetic type, code reveals).">
         <button class="eng-btn" id="engineBtn" type="button" aria-haspopup="true" aria-expanded="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           <span id="engineLabel">Remotion</span>
@@ -4648,6 +4650,11 @@ function planMaxVersions() { return __authEnabled ? planFeats().maxVersions : 10
 // Captions are in early access — owner-only for now. (When auth is off entirely,
 // e.g. local dev, treat as unlocked.)
 function captionsAllowed() { return !__authEnabled || __owner; }
+// Engine switching (Remotion / HyperFrames) is OWNER-only (and on in auth-off
+// local dev). Everyone else is silently pinned to Remotion.
+function engineAllowed() { return !__authEnabled || __owner; }
+// The engine value to actually send: the chosen one for owners, else Remotion.
+function effectiveEngine(chosen) { return engineAllowed() ? (chosen || 'remotion') : 'remotion'; }
 function applyPlan(status) {
   __authEnabled = !!(status && status.enabled);
   __planSignedIn = !!(status && status.signedIn);
@@ -4665,6 +4672,21 @@ function syncPlanLocks() {
     const showLogs = !__authEnabled || __owner;
     lg.style.display = showLogs ? '' : 'none';
     if (!showLogs) { try { document.getElementById('logsPanel').classList.remove('show'); } catch (e) {} }
+  }
+  // Engine toggle (composer pill + Auto-Edit selector) — OWNER-only. Hide both
+  // and pin everyone else to Remotion so a stale saved 'hyperframes' can't leak.
+  {
+    const allowed = engineAllowed();
+    const eg = document.getElementById('engineGroup');
+    if (eg) eg.style.display = allowed ? '' : 'none';
+    const aeSeg = document.getElementById('aeEngineSeg');
+    const aeRow = aeSeg && aeSeg.closest('.ae-engine-row');
+    if (aeRow) aeRow.style.display = allowed ? '' : 'none';
+    if (!allowed) {
+      if (userSettings.engine !== 'remotion') { userSettings.engine = 'remotion'; try { saveSettings(); } catch (e) {} }
+      try { const t = tabs[activeTabIdx]; if (t) t.engine = 'remotion'; } catch (e) {}
+      try { syncEngineUI(); } catch (e) {}
+    }
   }
   const ae = document.getElementById('autoeditBtn');
   if (ae) ae.classList.toggle('plan-locked', __authEnabled && !f.autoedit);
@@ -8842,6 +8864,7 @@ function syncRenderModeUI() {
 const ENGINE_LABELS = { remotion: 'Remotion', hyperframes: 'HyperFrames' };
 function setEngine(e) {
   if (e !== 'hyperframes') e = 'remotion';
+  if (!engineAllowed()) e = 'remotion';   // non-owners are pinned to Remotion
   const t = tabs[activeTabIdx];
   if (t) t.engine = e;
   userSettings.engine = e;            // default for the next new tab
@@ -9140,7 +9163,7 @@ function aeRestore() {
 }
 async function openAutoeditModal() {
   if (__authEnabled && !planFeats().autoedit) { showUpsell('autoedit'); return; }   // Studio-only
-  let savedEngine = userSettings.engine || 'remotion';
+  let savedEngine = engineAllowed() ? (userSettings.engine || 'remotion') : 'remotion';
   try {
     const saved = JSON.parse(localStorage.getItem('claudeBridge.autoedit.opts') || 'null');
     if (saved && saved.density) {
@@ -9148,11 +9171,16 @@ async function openAutoeditModal() {
       if (r) r.checked = true;
     }
     // Auto-Edit remembers its own engine; default to the composer's engine.
-    if (saved && (saved.engine === 'remotion' || saved.engine === 'hyperframes')) savedEngine = saved.engine;
+    // Owner-only — non-owners stay on Remotion regardless of what was saved.
+    if (engineAllowed() && saved && (saved.engine === 'remotion' || saved.engine === 'hyperframes')) savedEngine = saved.engine;
   } catch {}
-  // Reflect the engine in the segmented control.
+  // Reflect the engine in the segmented control; show the row only for owners.
   document.querySelectorAll('#aeEngineSeg .ae-eng-pill').forEach(p =>
     p.classList.toggle('active', p.dataset.aeEngine === savedEngine));
+  try {
+    const aeRow = document.querySelector('.ae-engine-row');
+    if (aeRow) aeRow.style.display = engineAllowed() ? '' : 'none';
+  } catch (e) {}
   aeWizard = { reqId: null, density: 'moderate', engine: savedEngine, selection: null, questions: [], answers: {}, abort: null, ticker: null };
   const errEl = document.getElementById('aeOptionsErr'); if (errEl) errEl.textContent = '';
   aeShowStep('options');
@@ -10571,7 +10599,7 @@ async function runAutoEditV2(opts) {
     progressUI.text('Planning the edit…');
     const resp = await fetch(BRIDGE + '/autoedit/run', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reqId, density: opts.density, answers: opts.answers, refImages: opts.refImages || [], engine: aeWizard.engine || userSettings.engine || 'remotion' }),
+      body: JSON.stringify({ reqId, density: opts.density, answers: opts.answers, refImages: opts.refImages || [], engine: effectiveEngine(aeWizard.engine || userSettings.engine) }),
       signal: abort.signal,
     });
     if (!resp.ok) {
@@ -12545,7 +12573,7 @@ async function sendMessage(presetMsg, sendOpts) {
       body: JSON.stringify({
         reqId, message: outboundMsg, context,
         renderMode: (_sendTab && _sendTab.renderMode) || userSettings.renderMode || 'default',
-        engine: (_sendTab && _sendTab.engine) || userSettings.engine || 'remotion',
+        engine: effectiveEngine((_sendTab && _sendTab.engine) || userSettings.engine),
         mode: activeTabType,
         planMode: outboundPlanMode,
         versions: _multiN,        // >1 → bridge fans out into N parallel renders
@@ -12725,7 +12753,7 @@ async function sendContinuationChat(originalMsg, lastStatus) {
       body: JSON.stringify({
         reqId, message: outboundMsg, context,
         renderMode: (_sendTab && _sendTab.renderMode) || userSettings.renderMode || 'default',
-        engine: (_sendTab && _sendTab.engine) || userSettings.engine || 'remotion',
+        engine: effectiveEngine((_sendTab && _sendTab.engine) || userSettings.engine),
       }),
       signal: activeChatAbort.signal,
     });
