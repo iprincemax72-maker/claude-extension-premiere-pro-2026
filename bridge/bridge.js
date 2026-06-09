@@ -1840,6 +1840,7 @@ async function extractConcatAudio(segments, reqId, log) {
   for (let i = 0; i < segments.length; i++) {
     const s = segments[i];
     const [segIn, segOut] = await fixSourceTimecodeOffset(s.path, s.inSec, s.outSec);
+    log && log(`seg ${i} DIAG: raw in/out=${s.inSec}/${s.outSec} fixed=${segIn.toFixed(2)}/${segOut.toFixed(2)} path=${path.basename(String(s.path || ''))}`);
     const dur = Math.max(0, segOut - segIn);
     if (dur < 0.05) continue;
     const out = `${tmpBase}_part${i}.wav`;
@@ -5624,8 +5625,14 @@ const server = http.createServer((req, res) => {
         const home = os.homedir();
         const inOutput = resolved === OUTPUT_DIR || resolved.startsWith(OUTPUT_DIR + path.sep);
         const inProjectOutput = resolved.startsWith(home + path.sep) && /[/\\]output[/\\]/i.test(resolved);
+        // Project-colocated renders land in a "Claude Animations" folder next to
+        // the open .prproj (see /chat renderOutputDir) — which can sit on ANY
+        // volume, incl. external drives, so we can't require it under $HOME. The
+        // bridge-owned folder name + the media-extension gate below are the
+        // safety boundary: we only delete media that sits directly in that folder.
+        const inProjectRender = path.basename(path.dirname(resolved)) === 'Claude Animations';
         if (!MEDIA.test(resolved)) { res.writeHead(403); res.end(JSON.stringify({ error: 'not a media file' })); return; }
-        if (!(inOutput || inProjectOutput)) { res.writeHead(403); res.end(JSON.stringify({ error: 'file is outside the render output folder' })); return; }
+        if (!(inOutput || inProjectOutput || inProjectRender)) { res.writeHead(403); res.end(JSON.stringify({ error: 'file is outside the render output folder' })); return; }
         if (!fs.existsSync(resolved)) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, alreadyGone: true })); return; }
         if (!fs.statSync(resolved).isFile()) { res.writeHead(403); res.end(JSON.stringify({ error: 'not a file' })); return; }
         fs.unlinkSync(resolved);
