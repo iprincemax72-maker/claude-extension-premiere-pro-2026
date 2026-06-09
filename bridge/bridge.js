@@ -879,6 +879,8 @@ async function renderCaptions(opts) {
     '--image-format', 'png', '--pixel-format', 'yuva444p10le',
     '--mute',   // captions are silent — don't let Remotion add a silent stereo track
     '--concurrency=' + concurrency,
+    // VideoToolbox ProRes encode on Macs (v4.0.236+); silent no-op on Windows.
+    '--hardware-acceleration=if-possible',
     '--props=' + propsFile, '--log', 'error'];
   const env = { ...process.env };
   env.PATH = path.dirname(nodeBin) + path.delimiter + (env.PATH || '');
@@ -2675,6 +2677,67 @@ When the user asks for motion graphics, intros, outros, lower thirds, transition
 2. Render the final file into ${OUTPUT_DIR}.
 
 ═══════════════════════════════════════════════════════════════════════════
+REMOTION TOOLKIT (remotion 4.0.474) — these packages are INSTALLED in the
+project. Import them instead of hand-rolling the same thing badly:
+
+  @remotion/layout-utils   fitText({text, withinWidth, fontFamily, fontWeight})
+                           → the fontSize that FITS. Also measureText,
+                           fitTextOnNLines, fillTextBox. USE fitText FOR EVERY
+                           HEADLINE — never guess a font size and let text
+                           overflow or wrap unexpectedly.
+  @remotion/transitions    <TransitionSeries> with presentations: fade, slide,
+                           wipe, flip, clockWipe, iris, cube, plus GL ones —
+                           crossZoom, dreamyZoom, filmBurn, ripple, zoomBlur,
+                           linearBlur, bookFlip, dissolve, crosswarp, swap,
+                           zoomInOut (import from '@remotion/transitions/<name>').
+                           Timings: springTiming(), linearTiming().
+  @remotion/shapes         <Circle/Rect/Triangle/Star/Heart/Pie/Ellipse/Polygon/
+                           Arrow> + make*() path versions — procedural SVG shapes.
+  @remotion/paths          evolvePath(progress, d) → animated line drawing;
+                           getPointAtLength, warpPath, cutPath, extendViewBox.
+  @remotion/noise          noise2D/3D/4D(seed, x, y…) → organic wobble, particle
+                           drift, hand-held camera shake.
+  @remotion/motion-blur    <Trail> (echo trails) and <CameraMotionBlur> — wrap
+                           fast-moving elements for true per-frame motion blur.
+  @remotion/animation-utils makeTransform([translateX(…), scale(…), rotate(…)]),
+                           interpolateStyles — composable transform strings.
+  @remotion/effects        Canvas effect functions (blur, glow, vignette,
+                           brightness, contrast, chromaticAberration,
+                           barrelDistortion, colorKey, duotone, halftone,
+                           scanlines, dotGrid, rings, zigzag, …) applied via the
+                           \`effects\` prop on <Img>, <CanvasImage>, <Gif>, shapes.
+  @remotion/light-leaks    <LightLeak durationInFrames seed hueShift> — cinematic
+                           WebGL light-leak overlays; also lightLeak() effect.
+  @remotion/gif            <Gif src> — frame-synced GIFs (NEVER <img> for gifs).
+  @remotion/lottie         <Lottie animationData> for Lottie JSON files.
+  @remotion/animated-emoji <AnimatedEmoji emoji="…"> Google animated emojis.
+  @remotion/captions       createTikTokStyleCaptions() word-page grouping.
+  @remotion/fonts          loadFont({family, url: staticFile(…)}) for local font
+                           files (Google fonts: @remotion/google-fonts as usual —
+                           but pass {weights: ['700'], subsets: ['latin']} to
+                           loadFont() so it doesn't fetch 25 weights per font).
+  @remotion/sfx            sound-effect URL constants on the remotion.media CDN
+                           (whoosh, whip, ding, pop…) — audio policy still applies.
+  @remotion/three          React Three Fiber <ThreeCanvas> for 3D.
+
+V4 API RULES (a model with older knowledge writes these WRONG):
+- spring() recipes: snappy pop = {damping: 200}; bouncy = {damping: 10};
+  exact length via durationInFrames; measureSpring({fps, config}) for the true
+  settle time. ALWAYS pass fps from useVideoConfig().
+- <Sequence premountFor={30}> pre-mounts heavy children (images/video/3D)
+  before they appear — kills first-frame jank/flicker.
+- interpolate() accepts an ARRAY of easings (one per segment) and can
+  interpolate CSS transform strings directly; interpolateColors supports
+  oklch()/lab() for perceptually-even color ramps.
+- trimBefore/trimAfter (in FRAMES) on <OffthreadVideo>/<Audio>. startFrom/endAt
+  are DEPRECATED — never use them.
+- Deterministic randomness ONLY via random('seed-string') — Math.random()
+  breaks multi-threaded rendering. No CSS animations/transitions EVER (threads
+  don't share state — animate with interpolate/spring off useCurrentFrame()).
+- Default to extrapolateLeft/Right: 'clamp' on interpolate unless overshoot is
+  the intent.
+
+═══════════════════════════════════════════════════════════════════════════
 INSTALLED SKILLS — load these before writing Remotion code, they have
 battle-tested patterns that will dramatically improve output quality.
 Skills live in ~/.claude/skills/. Read the relevant rule file(s) first,
@@ -2878,7 +2941,7 @@ animation), THEN start blank and use the library directly.
 PRE-SCAFFOLDED REMOTION PROJECT:
 - A Remotion project is already installed at ${WORK_DIR}/remotion-intro/ with node_modules ready.
 - Add new compositions as TSX files in ${WORK_DIR}/remotion-intro/src/ and register them in src/Root.tsx with a unique <Composition id="..."> entry.
-- Render with: \`cd ${WORK_DIR}/remotion-intro && npx remotion render src/index.ts <CompositionId> "<OUTPUT_DIR>/<filename>.mp4" --codec=h264 --mute\` — \`--mute\` is REQUIRED unless the composition actually has <Audio> elements; it silences any audio track Remotion would otherwise add. (NOTE: \`--audio-codec=no-audio\` does NOT exist as a flag and errors out — use \`--mute\` instead. The bridge also post-strips audio with ffmpeg -an, so the final file Premiere sees has no audio stream at all.) <OUTPUT_DIR> = the "Output dir for any rendered files" path from the [PREMIERE CONTEXT] block at the top of the user's message (NOT the global default). If no context is provided fall back to ${OUTPUT_DIR}. Quote the path because it may contain spaces (e.g. "Vera Vid 13/Claude Animations/...").
+- Render with: \`cd ${WORK_DIR}/remotion-intro && npx remotion render src/index.ts <CompositionId> "<OUTPUT_DIR>/<filename>.mp4" --codec=h264 --mute --hardware-acceleration=if-possible\` — \`--hardware-acceleration=if-possible\` uses the Mac's VideoToolbox encoder (much faster; silently falls back to software on Windows — always include it). \`--mute\` is REQUIRED unless the composition actually has <Audio> elements; it silences any audio track Remotion would otherwise add. (NOTE: \`--audio-codec=no-audio\` does NOT exist as a flag and errors out — use \`--mute\` instead. The bridge also post-strips audio with ffmpeg -an, so the final file Premiere sees has no audio stream at all.) <OUTPUT_DIR> = the "Output dir for any rendered files" path from the [PREMIERE CONTEXT] block at the top of the user's message (NOT the global default). If no context is provided fall back to ${OUTPUT_DIR}. Quote the path because it may contain spaces (e.g. "Vera Vid 13/Claude Animations/...").
 - Do NOT scaffold a new Remotion project; do NOT run \`npx create-video\`. Reuse the existing one.
 - NEVER run \`remotion --help\`, \`npx remotion render --help\`, or ANY \`--help\` on the remotion CLI. The exact render command is written right above — use it verbatim. Running \`--help\` spins up an esbuild service that HANGS in this environment (it never returns from its ping), which stalls the entire render indefinitely. If you're unsure of a flag, use only the flags shown above; do not probe the CLI.
 - If node_modules is somehow missing (\`ls ${WORK_DIR}/remotion-intro/node_modules\` is empty), run \`cd ${WORK_DIR}/remotion-intro && npm install\` first — but this should already be done from the installer.
@@ -5741,6 +5804,44 @@ async function ensureRemotionSkills() {
   }
 }
 
+// ── Remotion creative-package ensure (one-time per missing package) ────────
+// The SYSTEM_PROMPT teaches claude to import @remotion/transitions, shapes,
+// paths, noise, layout-utils (fitText), effects, etc. Fresh installs get them
+// via bridge/remotion-template/package.json; EXISTING installs get them here:
+// at launch, install any missing toolkit packages pinned to the project's own
+// remotion version (all @remotion/* must be version-aligned). Runs detached
+// and immediately at launch — never mid-render.
+const REMOTION_TOOLKIT_PACKAGES = [
+  '@remotion/transitions', '@remotion/shapes', '@remotion/paths',
+  '@remotion/noise', '@remotion/motion-blur', '@remotion/layout-utils',
+  '@remotion/animation-utils', '@remotion/gif', '@remotion/lottie',
+  '@remotion/captions', '@remotion/animated-emoji', '@remotion/light-leaks',
+  '@remotion/fonts', '@remotion/sfx', '@remotion/effects',
+];
+function ensureRemotionPackages() {
+  try {
+    const proj = path.join(WORK_DIR, 'remotion-intro');
+    const pjPath = path.join(proj, 'package.json');
+    if (!fs.existsSync(pjPath)) return;                  // project not scaffolded yet
+    const pj = JSON.parse(fs.readFileSync(pjPath, 'utf8'));
+    const deps = Object.assign({}, pj.dependencies, pj.devDependencies);
+    const missing = REMOTION_TOOLKIT_PACKAGES.filter(p => !deps[p]);
+    if (!missing.length) return;
+    let ver = '';
+    try { ver = JSON.parse(fs.readFileSync(path.join(proj, 'node_modules', 'remotion', 'package.json'), 'utf8')).version; } catch {}
+    const specs = missing.map(p => p + (ver ? '@' + ver : ''));
+    clog('bridge', 'info', 'installing missing remotion toolkit packages', { missing, pinnedTo: ver || 'latest' });
+    const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const proc = spawn(npmBin, ['install', '--save', '--no-audit', '--no-fund', ...specs],
+      { cwd: proj, stdio: 'ignore', shell: process.platform === 'win32' });
+    proc.on('close', (c) => clog('bridge', c === 0 ? 'info' : 'warn',
+      'remotion toolkit install ' + (c === 0 ? 'done' : 'failed (exit ' + c + ')'), { count: missing.length }));
+    proc.on('error', (e) => clog('bridge', 'warn', 'remotion toolkit install error', { error: e.message }));
+  } catch (e) {
+    clog('bridge', 'warn', 'ensureRemotionPackages failed', { error: e.message || String(e) });
+  }
+}
+
 // Auto-update — on launch, the bridge pulls the latest panel + bridge files
 // from a SOURCE and diffs against on-disk; rewrite only if changed.
 //
@@ -6052,6 +6153,8 @@ function _tryListen() {
     // Sync the official Remotion AI skill (remotion.dev/docs/ai/skills) —
     // non-blocking, weekly cadence, see ensureRemotionSkills().
     ensureRemotionSkills();
+    // Install any missing @remotion toolkit packages (one-time, non-blocking).
+    ensureRemotionPackages();
 
     // PERIODIC auto-update — re-check every 3 min so a long-running bridge
     // actually picks up new code without a manual restart. This is the piece
