@@ -3064,8 +3064,8 @@ How to use a template:
   1. cp src/templates/StatSlam.tsx src/<NewUniqueName>.tsx
   2. Edit the "EDIT THESE" block at the top of the file.
   3. Rename the component export from StatSlam to NewUniqueName.
-  4. Register in src/Root.tsx with a unique <Composition id="..."/> entry.
-  5. Render. Run self-critique. Ship.
+  4. Write a one-composition entry src/<NewUniqueName>.entry.tsx that registers ONLY this composition (see "RENDER IN ISOLATION" below). Do NOT touch src/Root.tsx.
+  5. Render that entry. Run self-critique. Ship.
 
 DON'T copy a template AND add 4 other library components on top. The
 template is already restrained — adding more breaks the balance. The single
@@ -3078,8 +3078,17 @@ animation), THEN start blank and use the library directly.
 
 PRE-SCAFFOLDED REMOTION PROJECT:
 - A Remotion project is already installed at ${WORK_DIR}/remotion-intro/ with node_modules ready.
-- Add new compositions as TSX files in ${WORK_DIR}/remotion-intro/src/ and register them in src/Root.tsx with a unique <Composition id="..."> entry.
-- Render with: \`cd ${WORK_DIR}/remotion-intro && npx remotion render src/index.ts <CompositionId> "<OUTPUT_DIR>/<filename>.mp4" --codec=h264 --mute --hardware-acceleration=if-possible\` — \`--hardware-acceleration=if-possible\` uses the Mac's VideoToolbox encoder (much faster; silently falls back to software on Windows — always include it). \`--mute\` is REQUIRED unless the composition actually has <Audio> elements; it silences any audio track Remotion would otherwise add. (NOTE: \`--audio-codec=no-audio\` does NOT exist as a flag and errors out — use \`--mute\` instead. The bridge also post-strips audio with ffmpeg -an, so the final file Premiere sees has no audio stream at all.) <OUTPUT_DIR> = the "Output dir for any rendered files" path from the [PREMIERE CONTEXT] block at the top of the user's message (NOT the global default). If no context is provided fall back to ${OUTPUT_DIR}. Quote the path because it may contain spaces (e.g. "Vera Vid 13/Claude Animations/...").
+- Write your composition as a uniquely-named TSX file in ${WORK_DIR}/remotion-intro/src/ (include a short timestamp suffix so it never collides, e.g. src/MyThing0611t1530.tsx).
+- ⚡ RENDER IN ISOLATION — the single most important rule for render speed. NEVER render src/index.ts or src/Root.tsx. That entry imports EVERY past composition (hundreds of them), and each one runs its own top-level loadFont() at bundle time → THOUSANDS of Google-Fonts network requests on EVERY render → the render takes 20-40 minutes or stalls and gets killed, and the user sees "none rendered". Instead render a tiny standalone entry that imports ONLY your one composition:
+    1. Write src/<Name>.tsx — your component (named export <Name>).
+    2. Write src/<Name>.entry.tsx — a one-composition root (put in your REAL durationInFrames / width / height):
+         import { registerRoot, Composition } from 'remotion';
+         import { <Name> } from './<Name>';
+         registerRoot(() => ( <Composition id="<Name>" component={<Name>} durationInFrames={<frames>} fps={30} width={<W>} height={<H>} /> ));
+    3. Render THAT entry (never src/index.ts) with the command below.
+  The bundle then contains ONLY your composition → it renders in SECONDS, and a broken or slow older composition can never make your render fail. Do NOT open or edit src/Root.tsx — it is not used for rendering.
+- FONTS — if you use @remotion/google-fonts, load ONLY the weights you actually use and silence the warning, e.g. loadFont("normal", { weights: ["400","700"], subsets: ["latin"], ignoreTooManyRequestsWarning: true }). Loading a whole family fires 50-120 network requests and slows the render; a plain CSS font-family (system font) needs ZERO network — prefer it unless a specific Google font is required.
+- Render with: \`cd ${WORK_DIR}/remotion-intro && npx remotion render src/<Name>.entry.tsx <Name> "<OUTPUT_DIR>/<filename>.mp4" --codec=h264 --mute --hardware-acceleration=if-possible\` — \`--hardware-acceleration=if-possible\` uses the Mac's VideoToolbox encoder (much faster; silently falls back to software on Windows — always include it). \`--mute\` is REQUIRED unless the composition actually has <Audio> elements; it silences any audio track Remotion would otherwise add. (NOTE: \`--audio-codec=no-audio\` does NOT exist as a flag and errors out — use \`--mute\` instead. The bridge also post-strips audio with ffmpeg -an, so the final file Premiere sees has no audio stream at all.) <OUTPUT_DIR> = the "Output dir for any rendered files" path from the [PREMIERE CONTEXT] block at the top of the user's message (NOT the global default). If no context is provided fall back to ${OUTPUT_DIR}. Quote the path because it may contain spaces (e.g. "Vera Vid 13/Claude Animations/...").
 - Do NOT scaffold a new Remotion project; do NOT run \`npx create-video\`. Reuse the existing one.
 - NEVER run \`remotion --help\`, \`npx remotion render --help\`, or ANY \`--help\` on the remotion CLI. The exact render command is written right above — use it verbatim. Running \`--help\` spins up an esbuild service that HANGS in this environment (it never returns from its ping), which stalls the entire render indefinitely. If you're unsure of a flag, use only the flags shown above; do not probe the CLI.
 - If node_modules is somehow missing (\`ls ${WORK_DIR}/remotion-intro/node_modules\` is empty), run \`cd ${WORK_DIR}/remotion-intro && npm install\` first — but this should already be done from the installer.
@@ -3098,7 +3107,7 @@ The flow:
 
   2. Render a single still frame at the middle of the composition. Run:
        cd ${WORK_DIR}/remotion-intro && \\
-       npx remotion still src/index.ts <CompositionId> ${OUTPUT_DIR}/_check_<id>.png --frame=<frameAtMiddle>
+       npx remotion still src/<Name>.entry.tsx <Name> ${OUTPUT_DIR}/_check_<id>.png --frame=<frameAtMiddle>
      where <frameAtMiddle> is roughly durationInFrames / 2.
 
   3. Use the Read tool to view that PNG. Look at it like a human would.
@@ -3143,7 +3152,7 @@ __SELF_CRITIQUE_END__
 PROJECT REUSE POLICY:
 - You MAY reuse the existing Remotion project shell (package.json, node_modules, render config, fonts).
 - You MUST NOT reuse existing components, styles, or design choices from prior renders. The user expects a FRESH design every prompt — different colors, layout, typography, motion. Treat every prompt as a clean creative slate even if a similar-named component already exists on disk.
-- Create a new component file with a unique name (e.g. include a short timestamp or descriptive suffix) so you do not collide with previous renders. Register it in src/Root.tsx with a matching unique composition id.
+- Create a new component file with a unique name (e.g. include a short timestamp or descriptive suffix) so you do not collide with previous renders, plus its OWN one-composition entry file (src/<Name>.entry.tsx) that imports only it. Do NOT register in or edit src/Root.tsx — renders use the per-composition entry (see "RENDER IN ISOLATION").
 - ONLY exception — when the user message begins with "Make a new version of a previous render." they are explicitly iterating. In that case: read the named "Previous file", find the matching component, and modify it minimally to apply the requested change while preserving every other styling decision.
 
 STYLE LIBRARY — at ${WORK_DIR}/remotion-intro/src/lib/. Import from here,
