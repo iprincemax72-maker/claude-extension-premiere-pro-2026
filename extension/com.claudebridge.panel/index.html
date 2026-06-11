@@ -11565,7 +11565,9 @@ function addRenderPreview(msgWrap, absPath, prompt, reply) {
       const r = await previewInSource(absPath);
       if (!r || !r.ok) {
         previewBtn.textContent = 'Preview failed';
-        setTimeout(() => { previewBtn.textContent = orig; previewBtn.disabled = false; }, 2000);
+        // surface the REAL reason in the card status line, not just "failed"
+        try { const mp = card.querySelector('.render-preview-meta'); const ss = mp && mp.querySelectorAll('span')[1]; if (ss && r && r.error) ss.textContent = r.error; } catch {}
+        setTimeout(() => { previewBtn.textContent = orig; previewBtn.disabled = false; }, 2500);
       } else {
         previewBtn.textContent = orig;
         previewBtn.disabled = false;

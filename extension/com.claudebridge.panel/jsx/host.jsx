@@ -162,11 +162,18 @@ function ccImportToTimeline(path, mode, atSec) {
         if (!path) { result.error = "no path"; return JSON.stringify(result); }
         mode = (mode === "insert" || mode === "overwrite" || mode === "overlay") ? mode : "overlay";
 
-        // 1. Import
-        var importedOk = _ccSafe(function () {
-            return app.project.importFiles([path], true, (_ccEnsureBin(CC_BIN_NAME) || app.project.rootItem), false);
-        });
-        if (!importedOk) { result.error = "import failed"; return JSON.stringify(result); }
+        // 1. Import — try the Flimify bin, then fall back to the project ROOT if
+        //    that fails, and CAPTURE the real Premiere error (instead of letting
+        //    _ccSafe swallow it) so a refused import surfaces WHY.
+        var _bin = _ccEnsureBin(CC_BIN_NAME);
+        var importedOk = false, _impErr = "";
+        try { importedOk = app.project.importFiles([path], true, (_bin || app.project.rootItem), false); }
+        catch (e1) { _impErr = String(e1); }
+        if (!importedOk) {
+            try { importedOk = app.project.importFiles([path], true, app.project.rootItem, false); }
+            catch (e2) { if (!_impErr) _impErr = String(e2); }
+        }
+        if (!importedOk) { result.error = "import failed" + (_impErr ? ": " + _impErr : " (Premiere refused the file)"); return JSON.stringify(result); }
         result.imported = true;
 
         // 2. Find the new item
@@ -444,12 +451,18 @@ function ccOpenInSource(path) {
             return JSON.stringify({ ok: false, error: "no project open" });
         }
         var item = _ccFindItemByPath(app.project.rootItem, path, 0);
+        var _ioErr = "";
         if (!item) {
-            // Last-ditch attempt: import it first, then locate
-            try { app.project.importFiles([path], true, (_ccEnsureBin(CC_BIN_NAME) || app.project.rootItem), false); } catch (e) {}
+            // import into the Flimify bin, then locate
+            try { app.project.importFiles([path], true, (_ccEnsureBin(CC_BIN_NAME) || app.project.rootItem), false); } catch (e) { _ioErr = String(e); }
             item = _ccFindItemByPath(app.project.rootItem, path, 0);
         }
-        if (!item) return JSON.stringify({ ok: false, error: "file not in project" });
+        if (!item) {
+            // fall back to importing straight into the project root
+            try { app.project.importFiles([path], true, app.project.rootItem, false); } catch (e) { if (!_ioErr) _ioErr = String(e); }
+            item = _ccFindItemByPath(app.project.rootItem, path, 0);
+        }
+        if (!item) return JSON.stringify({ ok: false, error: "could not import file" + (_ioErr ? ": " + _ioErr : " (Premiere refused the file)"), path: path });
 
         if (app.sourceMonitor && app.sourceMonitor.openProjectItem) {
             app.sourceMonitor.openProjectItem(item);
