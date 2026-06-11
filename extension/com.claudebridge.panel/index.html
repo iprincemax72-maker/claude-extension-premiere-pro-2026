@@ -2058,8 +2058,14 @@
   .eng-menu {
     position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 80;
     min-width: 230px; padding: 5px;
-    background: var(--surface, #15171c); border: 1px solid var(--line);
-    border-radius: 10px; box-shadow: 0 10px 30px -8px rgba(0,0,0,.55);
+    /* OPAQUE — the --surface token is translucent (0.65), which let the chips
+       behind the menu bleed through. Stack the tint over a solid base so it's
+       fully opaque (no backdrop-filter — that crashes PPro). */
+    background: #14141a;
+    background: linear-gradient(var(--surface), var(--surface)), #14141a;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    box-shadow: 0 16px 40px -12px rgba(0,0,0,.75), 0 1px 0 rgba(255,255,255,.05) inset;
     display: none; flex-direction: column; gap: 2px;
   }
   .eng-group.open .eng-menu { display: flex; }
