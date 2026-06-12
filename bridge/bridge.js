@@ -4597,6 +4597,23 @@ const server = http.createServer((req, res) => {
 
         const wsPaths = [];
         let doneCount = 0;
+        // Pre-assigned, ORTHOGONAL art directions. The parallel builds can't see each
+        // other, so "be different from the others" doesn't work — they converge on the
+        // same obvious idea. Instead steer each version down a DISTINCT lane so they
+        // diverge by construction. Every lane still honours the brief's explicit
+        // text/colors/aspect/vibe; it only varies what the prompt left open.
+        const DIRECTIONS = [
+          'Center-stage & symmetric — the main element owns the middle; snappy overshoot entrances that settle hard; minimal extra decoration.',
+          'Asymmetric & airy — push the focus off-center with generous negative space; slow smooth eases; one quiet accent element.',
+          'Playful & springy — bouncy spring physics, a little wiggle/overshoot, rounded characterful shapes and cheerful secondary bits.',
+          'Cinematic depth — layered parallax and scale-depth, a slow weighty build, soft glow/vignette atmosphere.',
+          'Kinetic typography — let the text drive it: stagger, break or rotate words on a rhythmic beat; grid-aligned.',
+          'Organic flow — curves and soft gradients, continuous drifting/floating motion, gentle particles throughout.',
+          'Bold graphic — flat color blocks and geometric shapes, big confident type, stamp/marquee-style motion.',
+          'Stagger cascade — elements arrive one-by-one in a clear readable sequence; clean restrained styling so the timing reads.',
+          'Dense & energetic — lots of motion: quick zoom-punches, flashes and shake accents, a packed frame.',
+          'Dreamy & soft — blur/bokeh, light leaks, slow fades, an airy feel.',
+        ];
         const thunks = [];
         for (let i = 1; i <= N; i++) {
           const idx = i;
@@ -4606,12 +4623,15 @@ const server = http.createServer((req, res) => {
             catch (e) { return { ok: false, error: 'workspace setup failed: ' + e.message }; }
             const vSys = resolvedSystemPrompt.split(REMOTION_BASE).join(ws);
             const seed = Math.random().toString(36).slice(2, 6);
+            const direction = DIRECTIONS[(idx - 1) % DIRECTIONS.length];
             const vMsg =
-                '[VERSION ' + idx + ' OF ' + N + ' — the user wants ' + N + ' DIFFERENT versions of this to '
-              + 'choose from. Make THIS one a distinct take: a different composition, layout, motion feel and '
-              + 'detailing from the other versions. Commit to one strong direction. Keep whatever the prompt '
-              + 'explicitly specified (text, colors, ratio); vary everything it left open. Variation seed '
-              + idx + '/' + N + '-' + seed + '.]\n'
+                '[VERSION ' + idx + ' OF ' + N + ' — the user wants ' + N + ' DIFFERENT versions to choose from. '
+              + 'These builds run in PARALLEL and CANNOT see each other, so commit FULLY to your assigned '
+              + 'direction below — do not hedge toward a generic safe version, or every version comes out the same.\n'
+              + 'YOUR DIRECTION for this version: ' + direction + '\n'
+              + 'Honour everything the prompt states explicitly — exact text, colors, aspect ratio and overall '
+              + 'vibe — and apply this direction to everything it leaves open (composition, layout, motion feel, '
+              + 'pacing, secondary detail). Variation seed ' + idx + '/' + N + '-' + seed + '.]\n'
               + '[OUTPUT FILENAME: end the rendered file name with "_v' + idx + '_' + seed + '" so it does not '
               + 'collide with the other versions rendering at the same time.]\n'
               + fullMessage;
