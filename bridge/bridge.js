@@ -4162,6 +4162,14 @@ const server = http.createServer((req, res) => {
         if (context.selectedClips && context.selectedClips.length) {
           ctxLines.push('Selected clips: ' + context.selectedClips.join(', '));
         }
+        if (context.selectedClipPath) {
+          let clipLine = 'Selected clip file (you CAN analyze this directly with ffmpeg / ffprobe / transcription): ' + context.selectedClipPath;
+          if (typeof context.selectedClipInSec === 'number' && typeof context.selectedClipOutSec === 'number')
+            clipLine += '  [used in/out on the timeline: ' + context.selectedClipInSec.toFixed(2) + 's–' + context.selectedClipOutSec.toFixed(2) + 's]';
+          else if (typeof context.selectedClipDuration === 'number')
+            clipLine += '  [duration: ' + context.selectedClipDuration.toFixed(2) + 's]';
+          ctxLines.push(clipLine);
+        }
         ctxLines.push('Output dir for any rendered files: ' + renderOutputDir + renderOutputNote);
         ctxLines.push('IMPORTANT: render the final file into THE FOLDER ABOVE, not the global PremiereClaude/output. The user wants renders colocated with the open project.');
         ctxLines.push('');
@@ -4264,10 +4272,13 @@ const server = http.createServer((req, res) => {
           'Each user message MAY be prefixed with a [PREMIERE CONTEXT] block describing the active project, sequence, playhead, and any selected clips. Use that context to give grounded answers when it\'s relevant; ignore it when the question is general.',
           '',
           'Hard rules:',
-          '- DO NOT write Remotion compositions, DO NOT emit [[IMPORT:...]] markers, DO NOT render any files. Those belong in animation tabs.',
-          '- DO NOT spawn rendering tools or write .tsx files. Just answer.',
+          '- DO NOT write Remotion compositions, DO NOT emit [[IMPORT:...]] markers, DO NOT render any animation/video files. Those belong in animation tabs.',
+          '- You CAN and SHOULD use the terminal to ANALYZE the user\'s footage when they ask about its content. ffmpeg + ffprobe are on PATH, and you can transcribe audio: prefer the asr-transcribe-to-text skill if installed, else whisper-cli / faster-whisper, else ffmpeg-extract the audio (e.g. -ac 1 -ar 16000 wav) and run an STT. Use this to answer asks like "what are the key points / keypoints", "summarize this clip", "where are the highlights", "find the silences/filler", "what\'s the audio level", "what\'s said around 1:30".',
+          '- The SELECTED CLIP\'s real file path (and its used in/out range) is in the [PREMIERE CONTEXT] block — analyze THAT file. If you only need a portion, use the in/out range. If nothing is selected and you need a clip, ask the user to select one in the timeline.',
+          '- For a "key points / summary" ask: transcribe the clip (or just its in/out range), then reply with a TIGHT bulleted summary, each bullet timestamped to the main moments. Keep it short.',
+          '- You may read/inspect files and run analysis commands, but do NOT modify the user\'s project, media, or write .tsx/render files.',
           '- If the user asks for an actual rendered animation, tell them to switch to an animation tab (the + button next to the chat-bubble + button at the top).',
-          '- Answer in plain markdown. Concise, useful, no filler. The user is editing video — they don\'t want a 5-paragraph essay; they want the answer.',
+          '- Answer in plain markdown. Concise, useful, no filler — they want the answer, not an essay.',
         ].join('\n');
       } else if (engine === 'hyperframes') {
         // HyperFrames engine — Claude authors an HTML/GSAP block + renders it

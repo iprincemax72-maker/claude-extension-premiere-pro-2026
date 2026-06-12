@@ -5744,7 +5744,22 @@ function evalES(script) {
 async function getPremiereContext() {
   const raw = await evalES('ccGetContext()');
   if (!raw) return null;
-  try { return JSON.parse(raw); } catch { return null; }
+  let ctx;
+  try { ctx = JSON.parse(raw); } catch { return null; }
+  // Attach the SELECTED CLIP's media path (+ used in/out/duration) so Flimify can
+  // actually analyze the footage with ffmpeg / transcription — ccGetContext only
+  // carries clip names. Best-effort: no selection or an old host just skips it.
+  try {
+    const sel = JSON.parse(await evalES('ccGetSelectedClip()'));
+    if (sel && sel.ok && sel.path) {
+      ctx.selectedClipPath = sel.path;
+      if (sel.name) ctx.selectedClipName = sel.name;
+      if (typeof sel.inPoint === 'number') ctx.selectedClipInSec = sel.inPoint;
+      if (typeof sel.outPoint === 'number') ctx.selectedClipOutSec = sel.outPoint;
+      if (typeof sel.duration === 'number') ctx.selectedClipDuration = sel.duration;
+    }
+  } catch (e) { /* no selection / old host — fine */ }
+  return ctx;
 }
 async function importIntoPremiere(absPath, mode, atSec) {
   const escapedPath = absPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
