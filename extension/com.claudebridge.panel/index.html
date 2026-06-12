@@ -4909,9 +4909,10 @@ function newTab(opts) {
     expanding: false,
     queue: [],          // pending prompts: [{ id, msg, refs, iterCtx }]
     // Per-tab controls — each tab keeps its own render mode + Ask-Questions
-    // state. New tabs inherit the last-used values as their starting point.
+    // state. New tabs inherit the last-used render mode, but the ENGINE always
+    // resets to Remotion (never inherit a previous HyperFrames pick).
     renderMode: userSettings.renderMode || 'default',
-    engine: userSettings.engine || 'remotion',
+    engine: 'remotion',
     planMode: !!userSettings.planMode,
     outputs: 1,   // how many versions one prompt generates (1-10)
     threadKeys: [],   // history threads whose renders live in this tab (select-clip → reopen)
