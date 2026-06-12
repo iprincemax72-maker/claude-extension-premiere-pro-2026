@@ -8876,14 +8876,12 @@ function setEngine(e) {
   if (e !== 'hyperframes') e = 'remotion';
   if (!engineAllowed()) e = 'remotion';   // non-owners are pinned to Remotion
   const t = tabs[activeTabIdx];
-  if (t) t.engine = e;
-  userSettings.engine = e;            // default for the next new tab
-  try { saveSettings(); } catch (err) {}
-  syncEngineUI();
+  if (t) t.engine = e;                // per-tab only — do NOT persist a global engine
+  syncEngineUI();                     // (Remotion stays the default for every new tab / reload)
 }
 function syncEngineUI() {
   const t = tabs[activeTabIdx];
-  const e = (t && t.engine) || userSettings.engine || 'remotion';
+  const e = (t && t.engine) || 'remotion';   // never fall back to a saved global — Remotion is the default
   const lbl = document.getElementById('engineLabel');
   const btn = document.getElementById('engineBtn');
   if (lbl) lbl.textContent = ENGINE_LABELS[e] || 'Remotion';
