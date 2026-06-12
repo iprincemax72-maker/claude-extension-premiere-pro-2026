@@ -2288,14 +2288,19 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
         : ('- TRANSPARENT background — this is CRITICAL. The composition root must\n'
            + '  have NO opaque background (no solid-color AbsoluteFill behind it).\n'
            + '  Render with EXACTLY this codec config so the alpha channel survives:\n'
-           + '      --codec prores --prores-profile 4444 --mute\n'
-           + '  ProRes 422 (the default) has NO alpha and will black out the video.\n'
-           + '  You MUST pass --prores-profile 4444. The --mute flag silences any\n'
-           + '  audio track (without it Remotion adds silent stereo and Premiere\n'
-           + '  shows an empty waveform). The bridge ALSO post-processes with\n'
-           + '  ffmpeg -an to strip the silent track entirely after render. After\n'
-           + '  rendering, the file\'s pixel format must be yuva444p10le (alpha-\n'
-           + '  capable) — verify with ffprobe if unsure and re-render if it is not.'),
+           + '      --codec prores --prores-profile 4444 --image-format png --pixel-format yuva444p10le --mute\n'
+           + '  ⚠ --image-format png is MANDATORY. This project defaults to JPEG frames\n'
+           + '  (remotion.config.ts) and JPEG has NO alpha — so WITHOUT --image-format\n'
+           + '  png you get a .mov whose pixel format is yuva444p10le but whose alpha is\n'
+           + '  FULLY OPAQUE (a solid background that is NOT removed), which is the #1\n'
+           + '  cause of "it still has a background". ProRes 422 (the default codec) also\n'
+           + '  has no alpha. --mute silences audio (the bridge also strips it with\n'
+           + '  ffmpeg -an).\n'
+           + '  VERIFY FOR REAL — do NOT just trust the pixel format. Extract a corner\n'
+           + '  pixel and confirm its alpha is ~0:\n'
+           + '      ffmpeg -y -i OUT.mov -vf "format=rgba,crop=2:2:0:0" -frames:v 1 -f rawvideo /tmp/a.raw && python3 -c "d=open(\'/tmp/a.raw\',\'rb\').read(); print(\'corner alpha:\', d[3])"\n'
+           + '  If the corner alpha is not ~0, the background is still there — re-render\n'
+           + '  WITH --image-format png. A yuva pixel format alone does NOT prove the bg is gone.'),
         ].join('\n'),
       placement,
       '- TIMING IS CRITICAL — the narration plays for the ENTIRE ' + task.durationSec.toFixed(1) + 's,',
@@ -4170,9 +4175,14 @@ const server = http.createServer((req, res) => {
         fullMessage = '[TRANSPARENCY REQUIRED] This output must have a real transparent '
           + 'background. (1) The Remotion composition root must NOT paint any '
           + 'background — no backgroundColor, no solid AbsoluteFill behind the '
-          + 'content. (2) Render with --codec prores --prores-profile 4444 to a '
-          + '.mov file. H.264/.mp4 CANNOT be transparent and will come out black. '
-          + 'The final .mov pixel format must be yuva444p10le.\n\n'
+          + 'content. (2) Render to a .mov with EXACTLY: --codec prores '
+          + '--prores-profile 4444 --image-format png --pixel-format yuva444p10le --mute. '
+          + '--image-format png is MANDATORY — without it the alpha comes out FULLY '
+          + 'OPAQUE (this project defaults to JPEG frames, which have no alpha), so the '
+          + 'background stays even though ffprobe shows yuva444p10le. H.264/.mp4 CANNOT '
+          + 'be transparent. (3) VERIFY a corner pixel\'s alpha is ~0 (extract it with '
+          + 'ffmpeg format=rgba,crop=2:2:0:0) — do NOT just trust the pixel format; '
+          + 're-render with --image-format png if it is not transparent.\n\n'
           + fullMessage;
       }
 
