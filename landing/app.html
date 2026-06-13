@@ -160,7 +160,7 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
 
       <button class="btn btn-primary" id="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 6.3L21 11l-6.6 1.7L12 19l-2.4-6.3L3 11l6.6-1.7z"/></svg><span id="goTxt">Generate motion graphic</span></button>
       <div class="err" id="err"></div>
-      <p class="hint">Previews live in your browser. To render a transparent MP4 for your timeline, use the Flimify panel in Premiere.</p>
+      <p class="hint">Previews live in your browser. To render a transparent MP4 for your timeline, use the Flimify Studio desktop app.</p>
     </aside>
 
     <section class="preview">
@@ -211,7 +211,7 @@ let bridgeUp = false, progressES = null, lastBridgeURL = '', lastBridgeFile = ''
     document.getElementById('keyField').style.display = 'none';
   } else {
     el.className = 'bstat down';
-    el.innerHTML = '<span>No local bridge found. Install the Premiere panel to use your own Claude, or paste an API key below.</span>';
+    el.innerHTML = '<span>No local bridge found. Install Flimify Studio to use your own Claude, or paste an API key below.</span>';
   }
 })();
 
