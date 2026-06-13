@@ -19,7 +19,7 @@
 <div class="auth-bg"></div>
 
 <header class="dash-top">
-  <a href="index.html" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Studio</small></span></a>
+  <a href="index.html" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>for Premiere Pro</small></span></a>
   <div class="dash-top-right">
     <span class="dash-chip"><span class="ci" id="chipAva">·</span><span id="chipName">…</span></span>
     <button class="btn-text" id="signOut">Sign out</button>
@@ -80,8 +80,8 @@
     <section class="dcard span2">
       <span class="dcard-eyebrow">Getting started</span>
       <ol class="steps">
-        <li><span><b>Install Flimify Studio</b>, download for your OS and run the one-step installer. <a href="index.html#download" style="color:var(--coral);text-decoration:underline;text-underline-offset:2px">Download →</a></span></li>
-        <li><span><b>Open Flimify Studio</b>, click the account icon → <b>Sign in with Google</b> (same account as here).</span></li>
+        <li><span><b>Install the extension</b>, download for your OS and run the one-step installer. <a href="index.html#install" style="color:var(--coral);text-decoration:underline;text-underline-offset:2px">Install guide →</a></span></li>
+        <li><span><b>Sign in inside Premiere</b>, open the panel, click the account icon → <b>Sign in with Google</b> (same account as here).</span></li>
         <li><span><b>Start rendering</b>, type something like <code>a 3-second logo intro</code> and hit ↵. Each render counts against your monthly quota above.</span></li>
       </ol>
     </section>
@@ -178,8 +178,8 @@
         clearTimeout(t);
         const st = await r.json();
         $("extStatus").classList.add("on");
-        if (st.signedIn) { $("extLabel").textContent = "Connected on this device"; $("extHint").textContent = "Signed in as " + (st.email || "this account") + ". You're ready to render in Flimify Studio."; }
-        else { $("extLabel").textContent = "Bridge running, not signed in"; $("extHint").textContent = "Open Flimify Studio → account icon → Sign in with Google."; }
+        if (st.signedIn) { $("extLabel").textContent = "Connected on this device"; $("extHint").textContent = "Signed in as " + (st.email || "this account") + ". You're ready to render in Premiere."; }
+        else { $("extLabel").textContent = "Bridge running, not signed in"; $("extHint").textContent = "Open the panel in Premiere → account icon → Sign in with Google."; }
       } catch {
         $("extStatus").classList.remove("on");
         $("extLabel").textContent = "Not detected on this device";
