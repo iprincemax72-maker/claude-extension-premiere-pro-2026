@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Flimify: motion graphics by just asking</title>
-<meta name="description" content="Flimify lives inside Adobe Premiere Pro. Describe a title, lower third, or full animation, it writes the code, renders it, and drops it on your timeline." />
+<meta name="description" content="Flimify is an AI motion-graphics and video editor — a standalone Mac &amp; Windows app, plus a Premiere Pro panel. Describe a title, lower third, or animation; it writes the code, renders it, and drops it on your timeline. Runs on your own Claude, no API key." />
 <meta name="theme-color" content="#09090b" />
 <meta property="og:title" content="Flimify: motion graphics by just asking" />
 <meta property="og:description" content="Describe it. Flimify builds it. It's on your timeline. Runs on your Claude plan, no API key." />
@@ -26,7 +26,7 @@
   "name": "Flimify",
   "applicationCategory": "DesignApplication",
   "operatingSystem": "macOS, Windows",
-  "description": "Flimify lives inside Adobe Premiere Pro. Describe a title, lower third, or full animation and it writes the code, renders it, and drops it on your timeline. Runs on your own Claude plan, no API key.",
+  "description": "Flimify is an AI motion-graphics and video editor — a standalone Mac & Windows app and a Premiere Pro panel. Describe it; it writes the code, renders it, and drops it on your timeline. Runs on your own Claude, no API key.",
   "url": "https://www.flimify.com/",
   "image": "https://www.flimify.com/og.png",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
@@ -717,7 +717,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <!-- HERO -->
 <section class="hero">
   <div class="wrap">
-    <p class="eyebrow load-up l1">Premiere Pro extension</p>
+    <p class="eyebrow load-up l1">AI motion graphics</p>
     <h1 class="hero-h1">
       <span class="w" style="animation-delay:.12s">Motion</span>
       <span class="w" style="animation-delay:.2s">graphics,</span><br>
@@ -734,7 +734,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 
     <div class="hero-stage load-up l6">
       <div class="glass glow" id="heroPanel">
-        <div class="mock-bar"><span class="lights"><i></i><i></i><i></i></span><span class="title">Flimify, Adobe Premiere Pro</span><span class="ver">short 2 · 1 sel</span></div>
+        <div class="mock-bar"><span class="lights"><i></i><i></i><i></i></span><span class="title">Flimify</span><span class="ver">short 2 · 1 sel</span></div>
         <div class="mock-body">
           <div class="mrow"><div class="mav you">Y</div><div class="txt">Make a glassy subscribe button, vertical, 4s, calm, not flashy. Soft tap + ripple.</div></div>
           <div class="mrow"><div class="mav cla"></div><div style="flex:1">
@@ -991,18 +991,6 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   </div>
 </section>
 
-<!-- CTA -->
-<section class="section" style="padding-top:0;">
-  <div class="wrap">
-    <div class="cta-panel reveal">
-      <span class="lamp"></span>
-      <p class="eyebrow">Ready when you are</p>
-      <h2>Stop leaving Premiere to make graphics.</h2>
-      <a href="#pricing" class="btn btn-primary btn-lg magnetic" data-buy>Get it, <span data-price-inline>$19</span></a>
-      <p class="small">5 free renders · No API key · Mac &amp; Windows</p>
-    </div>
-  </div>
-</section>
 
 </main>
 
@@ -1015,7 +1003,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
       <div><h4>Support</h4><ul><li><a href="#faq">FAQ</a></li><li><a href="#install">Install steps</a></li><li><a href="#">Contact</a></li><li><a href="#">Changelog</a></li></ul></div>
       <div><h4>Legal</h4><ul><li><a href="#">Terms</a></li><li><a href="#">Privacy</a></li><li><a href="#">Refunds</a></li><li><a href="#">License</a></li></ul></div>
     </div>
-    <div class="footer-bottom"><p>© <span id="year">2026</span> Flimify</p><p class="credit">Made by <a href="https://github.com/iprincemax72-maker" target="_blank" rel="noopener">iprincemax72-maker</a> <span class="heart">♥</span> Premiere Pro</p></div>
+    <div class="footer-bottom"><p>© <span id="year">2026</span> Flimify</p><p class="credit">Made by <a href="https://github.com/iprincemax72-maker" target="_blank" rel="noopener">iprincemax72-maker</a> <span class="heart">♥</span> for editors</p></div>
     <p class="disclaimer">Independent third-party extension. Not affiliated with, endorsed by, or sponsored by Adobe Inc. or Anthropic. “Adobe”, “Premiere Pro”, and “Claude” are trademarks of their respective owners.</p>
   </div>
 </footer>
@@ -1434,7 +1422,8 @@ document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventL
       if (alive) requestAnimationFrame(tick); else cv.remove();
     })();
   }
-  next.addEventListener('click', () => { if (cur === total - 1) { confetti(next); return; } go(cur + 1); });
+  let confettiFired = false;
+  next.addEventListener('click', () => { if (cur === total - 1) { if (!confettiFired) { confettiFired = true; confetti(next); } return; } go(cur + 1); });
   back.addEventListener('click', () => go(cur - 1));
   dots.forEach((d, i) => d.addEventListener('click', () => { if (i <= reached) go(i); }));
   /* OS toggle inside a step */
