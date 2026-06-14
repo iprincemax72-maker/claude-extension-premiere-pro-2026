@@ -52,7 +52,7 @@ Supabase: **Authentication → URL Configuration**:
 ## 6. Test it
 1. Run the preview server: `python3 landing/serve.py`
 2. Open <http://localhost:8899> → click **Sign in** (top-right) → **Continue with Google**.
-3. After Google, you land on **/account.html** showing your name, avatar, and **0 / 5 renders**.
+3. After Google, you land on **/account.html** showing your name, avatar, and **0 / 10 renders**.
 4. A row should appear in Supabase → **Table editor → profiles**.
 
 ---

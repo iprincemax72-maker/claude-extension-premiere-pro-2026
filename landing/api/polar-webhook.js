@@ -21,7 +21,7 @@
 
 export const config = { runtime: 'edge' };
 
-const PLAN_LIMITS = { creator: 50, studio: 250, free: 5 };
+const PLAN_LIMITS = { creator: 50, studio: 250, free: 10 };
 
 function b64ToBytes(b64) {
   const bin = atob(b64);

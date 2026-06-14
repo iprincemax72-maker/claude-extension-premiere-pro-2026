@@ -47,7 +47,7 @@
           <div class="rc"><b id="ringNum">0</b><span>used</span></div>
         </div>
         <div class="usage-info">
-          <div class="big"><b id="used">0</b> <span id="limit">/ 5 renders</span></div>
+          <div class="big"><b id="used">0</b> <span id="limit">/ 10 renders</span></div>
           <div class="bar"><i id="barFill"></i></div>
           <p class="reset" id="reset"></p>
         </div>
@@ -121,7 +121,7 @@
     const OWNER = ["iprincemax72@gmail.com", "anshdhakad9@gmail.com"];
     const owner = OWNER.includes((u.email || "").toLowerCase());
     let p = await getProfile();
-    if (!p) p = { plan: "free", renders_used: 0, renders_limit: 5 };
+    if (!p) p = { plan: "free", renders_used: 0, renders_limit: 10 };
     if (owner) p = Object.assign({}, p, { plan: "studio" });
     const unlimited = owner;
     const used = p.renders_used ?? 0, limit = p.renders_limit ?? 5;

@@ -12,7 +12,7 @@ create table if not exists public.profiles (
   avatar_url             text,
   plan                   text        not null default 'free',   -- 'free' | 'creator' | 'studio'
   renders_used           int         not null default 0,
-  renders_limit          int         not null default 5,        -- monthly quota for this plan
+  renders_limit          int         not null default 10,       -- monthly quota for this plan
   period_start           timestamptz not null default date_trunc('month', now()),
   polar_customer_id      text,
   polar_subscription_id  text,
@@ -24,6 +24,11 @@ create table if not exists public.profiles (
 -- Add the Polar columns if an older schema (with stripe_* columns) already exists.
 alter table public.profiles add column if not exists polar_customer_id     text;
 alter table public.profiles add column if not exists polar_subscription_id text;
+
+-- Free render quota raised from 5 → 10. Re-running this updates existing installs:
+-- change the column default for new signups, and bump current free accounts.
+alter table public.profiles alter column renders_limit set default 10;
+update public.profiles set renders_limit = 10 where plan = 'free' and renders_limit = 5;
 
 alter table public.profiles enable row level security;
 

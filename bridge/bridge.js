@@ -3523,7 +3523,7 @@ async function authStatus() {
     usageKnown: owner ? true : !!u,                         // false when the lookup failed — UI shows "—" not a fake 0
     plan,
     renders_used: (u && u.renders_used != null) ? u.renders_used : 0,
-    renders_limit: owner ? 999999 : ((u && u.renders_limit != null) ? u.renders_limit : 5),
+    renders_limit: owner ? 999999 : ((u && u.renders_limit != null) ? u.renders_limit : 10),
   };
 }
 
@@ -3561,7 +3561,7 @@ const CONNECT_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"
 + 'var GSVG=\'<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.11a6.6 6.6 0 0 1 0-4.22V7.05H2.18a11 11 0 0 0 0 9.9z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.05l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z"/></svg>\';'
 + 'async function pushToBridge(s){var body=JSON.stringify({access_token:s.access_token,refresh_token:s.refresh_token,expires_at:s.expires_at,user:s.user});try{var r=await fetch("/auth/session",{method:"POST",headers:{"Content-Type":"application/json"},body:body});return r.ok;}catch(e){return false;}}'
 + 'function signinView(){'
-+ 'show(\'<p class="big">Connect your extension</p><p class="sub">Sign in with Google to link this device. Free plan includes 5 renders a month.</p><button id="g" class="gbtn">\'+GSVG+\' Continue with Google</button><div id="er" class="e" style="display:none;margin-top:12px"></div>\');'
++ 'show(\'<p class="big">Connect your extension</p><p class="sub">Sign in with Google to link this device. Free plan includes 10 renders a month.</p><button id="g" class="gbtn">\'+GSVG+\' Continue with Google</button><div id="er" class="e" style="display:none;margin-top:12px"></div>\');'
 + 'var er=document.getElementById("er");function ee(m){er.textContent=m;er.style.display="block";}'
 + 'document.getElementById("g").onclick=async function(){var r=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+"/connect",queryParams:{prompt:"select_account"}}});if(r.error)ee(r.error.message);};'
 + '}'

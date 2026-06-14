@@ -7544,7 +7544,7 @@ function openExternalURL(url) {
     pop.classList.remove('full');
     if (!status || !status.signedIn) {
       pop.innerHTML = '<div class="ap-h">Sign in</div>'
-        + '<p class="ap-sub">Link your account to render. Free plan includes 5 renders a month.</p>'
+        + '<p class="ap-sub">Link your account to render. Free plan includes 10 renders a month.</p>'
         + '<button class="ap-btn ap-primary" id="apSignin">Sign in with Google</button>'
         + '<button class="ap-btn ap-ghost" id="apBrowser2" style="width:100%;margin-top:8px">Open in browser ↗</button>';
       pop.querySelector('#apSignin').onclick = startSignin;
@@ -7553,7 +7553,7 @@ function openExternalURL(url) {
       const owner = !!status.owner, unlimited = !!status.unlimited;
       const known = status.usageKnown !== false;
       const used = (status.renders_used != null) ? status.renders_used : 0;
-      const lim = (status.renders_limit != null) ? status.renders_limit : 5;
+      const lim = (status.renders_limit != null) ? status.renders_limit : 10;
       const pct = unlimited ? 0 : ((known && lim > 0) ? Math.min(100, Math.round(used / lim * 100)) : 0);
       const usageText = unlimited ? '∞' : (known ? (used + ' / ' + lim) : '—');
       const outOfRenders = !unlimited && known && used >= lim;
