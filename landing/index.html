@@ -3,1512 +3,320 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Flimify: motion graphics by just asking</title>
-<meta name="description" content="Flimify is an AI motion-graphics and video editor — a standalone Mac &amp; Windows app, plus a Premiere Pro panel. Describe a title, lower third, or animation; it writes the code, renders it, and drops it on your timeline. Runs on your own Claude, no API key." />
+<title>Flimify Studio, the AI video editor that runs on your own Claude</title>
+<meta name="description" content="Flimify Studio is a full AI video editor for Mac and Windows. Generate motion graphics, edit on a pro timeline, caption, auto-edit, and export to mp4. The AI runs on your own Claude, so there is no API key and nothing to pay per render." />
 <meta name="theme-color" content="#09090b" />
-<meta property="og:title" content="Flimify: motion graphics by just asking" />
-<meta property="og:description" content="Describe it. Flimify builds it. It's on your timeline. Runs on your Claude plan, no API key." />
-<meta property="og:type" content="website" />
-<meta property="og:url" content="https://www.flimify.com/" />
-<meta property="og:site_name" content="Flimify" />
-<meta property="og:image" content="https://www.flimify.com/og.png" />
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="Flimify: motion graphics by just asking" />
-<meta name="twitter:description" content="Describe it. Flimify builds it. It's on your timeline. Runs on your Claude plan, no API key." />
-<meta name="twitter:image" content="https://www.flimify.com/og.png" />
-<link rel="canonical" href="https://www.flimify.com/" />
 <link rel="icon" type="image/png" href="flimify-favicon.png" />
 <link rel="apple-touch-icon" href="flimify-icon.png" />
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "Flimify",
-  "applicationCategory": "DesignApplication",
-  "operatingSystem": "macOS, Windows",
-  "description": "Flimify is an AI motion-graphics and video editor — a standalone Mac & Windows app and a Premiere Pro panel. Describe it; it writes the code, renders it, and drops it on your timeline. Runs on your own Claude, no API key.",
-  "url": "https://www.flimify.com/",
-  "image": "https://www.flimify.com/og.png",
-  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
-}
-</script>
-<script>document.documentElement.classList.add('js');</script>
+<meta property="og:title" content="Flimify Studio, AI video editor" />
+<meta property="og:description" content="Generate, edit, caption, and export. The AI runs on your own Claude, no API key." />
+<meta property="og:image" content="https://www.flimify.com/og.png" />
+<meta property="og:url" content="https://www.flimify.com/" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://www.flimify.com/og.png" />
+<link rel="canonical" href="https://www.flimify.com/" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
-/* ═══════════════════════════════════════════════════════════════════════════
-   Flimify, landing
-   Style: precise dark (Ramp's flat layered surfaces) + one Raycast-style
-   atmospheric glow, white CTAs, coral as the lone accent. Schibsted Grotesk +
-   JetBrains Mono. Dark only. Single self-contained file, set CONFIG at bottom.
-═══════════════════════════════════════════════════════════════════════════ */
+  :root{
+    --bg:#09090b; --bg-soft:#0b0b0e; --s1s:#121215; --s2:#1a1a1e; --s3:#232329;
+    --text:#FAFAFA; --text-2:#9a9aa1; --text-3:#7c7d87;
+    --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.14); --hi:rgba(255,255,255,0.05);
+    --coral:#E2885F; --coral-2:#F0A87E; --coral-press:#cc6f44; --btn:#F4F4F5; --btn-ink:#0a0a0b; --indigo:#6d6ae0;
+    --maxw:1140px; --gutter:clamp(20px,5vw,44px);
+    --sans:"Schibsted Grotesk",system-ui,-apple-system,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+    --ease:cubic-bezier(0.22,1,0.36,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:16.5px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:clip}
+  a{color:inherit;text-decoration:none}
+  img{max-width:100%;display:block}
+  :focus-visible{outline:2px solid var(--coral);outline-offset:3px;border-radius:6px}
+  .wrap{width:100%;max-width:var(--maxw);margin:0 auto;padding-inline:var(--gutter)}
 
-:root {
-  --bg:      #09090b;
-  --bg-soft: #0b0b0e;
-  --s1:      #1212159e;   /* card (translucent for depth over glow) */
-  --s1s:     #121215;     /* solid card */
-  --s2:      #1a1a1e;     /* elevated */
-  --s3:      #232329;     /* input / hover */
-  --text:    #FAFAFA;
-  --text-2:  #9a9aa1;
-  --text-3:  #7c7d87;   /* AA-compliant muted (~4.6:1 on bg) for small labels */
-  --line:    rgba(255,255,255,0.08);
-  --line-2:  rgba(255,255,255,0.14);
-  --hi:      rgba(255,255,255,0.05);   /* top-edge highlight */
-  --coral:   #E2885F;
-  --coral-2: #F0A87E;
-  --coral-press: #cc6f44;
-  --btn:     #F4F4F5;
-  --btn-ink: #0a0a0b;
-  --indigo:  #6d6ae0;     /* faint secondary atmosphere only */
+  h1,h2,h3{font-weight:600;line-height:1.04;letter-spacing:-0.03em;color:var(--text)}
+  h1{font-size:clamp(2.7rem,6.6vw,4.7rem);letter-spacing:-0.04em;font-weight:700}
+  h2{font-size:clamp(1.9rem,4.2vw,3.1rem)}
+  h3{font-size:1.18rem;letter-spacing:-0.02em}
+  .eyebrow{font-family:var(--mono);font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--coral);font-weight:500}
+  .lede{font-size:clamp(1.02rem,1.8vw,1.22rem);color:var(--text-2);line-height:1.55;max-width:58ch}
+  .coral{color:var(--coral)}
 
-  --maxw: 1140px;
-  --gutter: clamp(20px, 5vw, 44px);
-  --sans: "Schibsted Grotesk", system-ui, -apple-system, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
-}
+  /* atmosphere */
+  .grid-bg{position:fixed;inset:0;z-index:-3;pointer-events:none;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:58px 58px;
+    -webkit-mask-image:radial-gradient(ellipse 75% 55% at 50% 0%,#000 25%,transparent 72%);
+            mask-image:radial-gradient(ellipse 75% 55% at 50% 0%,#000 25%,transparent 72%);opacity:0.6}
+  .atmos{position:fixed;inset:0;z-index:-2;pointer-events:none;overflow:hidden}
+  .atmos b{position:absolute;border-radius:50%;filter:blur(10px);opacity:0.5}
+  .atmos .b1{top:-16%;left:50%;width:75vw;height:55vw;max-width:1000px;max-height:720px;transform:translateX(-50%);background:radial-gradient(circle,rgba(226,136,95,0.20),transparent 60%)}
+  .atmos .b2{top:24%;right:-10%;width:50vw;height:50vw;max-width:620px;background:radial-gradient(circle,rgba(109,106,224,0.10),transparent 62%)}
+  body::after{content:"";position:fixed;inset:0;z-index:9999;pointer-events:none;opacity:0.025;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:0.5em;font-family:var(--sans);font-weight:600;font-size:0.95rem;line-height:1;padding:0.82em 1.35em;border-radius:9px;cursor:pointer;border:1px solid transparent;transition:background 0.16s var(--ease),color 0.16s var(--ease),border-color 0.16s var(--ease),box-shadow 0.16s var(--ease),filter 0.16s var(--ease),transform 0.2s var(--ease);white-space:nowrap}
+  .btn svg{width:1.05em;height:1.05em}
+  .btn-primary{background:var(--btn);color:var(--btn-ink);box-shadow:0 1px 0 rgba(255,255,255,0.4) inset,0 6px 20px -10px rgba(0,0,0,0.8)}
+  .btn-primary:hover{filter:brightness(1.06);transform:translateY(-2px)}
+  .btn-ghost{background:var(--s2);color:var(--text);border-color:var(--line-2)}
+  .btn-ghost:hover{background:var(--s3);border-color:rgba(255,255,255,0.22);transform:translateY(-2px)}
+  .btn-lg{font-size:1rem;padding:0.95em 1.55em}
 
-body {
-  font-family: var(--sans);
-  background: var(--bg);
-  color: var(--text);
-  font-size: 16.5px; line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  overflow-x: clip;
-}
-a { color: inherit; text-decoration: none; }
-img { max-width: 100%; display: block; }
-:focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; border-radius: 6px; }
-.wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding-inline: var(--gutter); }
+  /* nav */
+  .nav{position:sticky;top:0;z-index:100;padding:20px clamp(12px,3vw,26px) 0}
+  .nav-in{max-width:var(--maxw);margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:58px;padding:0 10px 0 16px;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:saturate(1.4) blur(14px);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 0 var(--hi) inset,0 14px 34px -18px rgba(0,0,0,0.7);transition:border-color 0.25s var(--ease),box-shadow 0.25s var(--ease)}
+  .nav.scrolled .nav-in{border-color:var(--line-2)}
+  .brand{display:flex;align-items:center;gap:0.6em;font-weight:600;font-size:1.04rem;letter-spacing:-0.02em}
+  .brand .glyph{width:28px;height:28px;flex:0 0 auto;object-fit:contain;filter:drop-shadow(0 0 8px rgba(226,136,95,.45))}
+  .brand small{font-family:var(--mono);font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--coral);display:block;margin-top:1px;font-weight:400}
+  .nav-links{display:flex;align-items:center;gap:1.7rem}
+  .nav-links a{font-size:0.9rem;font-weight:500;color:var(--text-2);transition:color 0.18s}
+  .nav-links a:hover{color:var(--text)}
+  .nav-cta{display:flex;align-items:center;gap:10px}
+  @media (max-width:740px){.nav-links{display:none}}
 
-/* ── Typography ── */
-h1, h2, h3 { font-weight: 600; line-height: 1.04; letter-spacing: -0.03em; color: var(--text); }
-h1 { font-size: clamp(2.7rem, 6.6vw, 5rem); letter-spacing: -0.04em; font-weight: 700; }
-h2 { font-size: clamp(1.9rem, 4.2vw, 3.1rem); }
-h3 { font-size: 1.18rem; letter-spacing: -0.02em; }
-.eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--coral); font-weight: 500; }
-.lede { font-size: clamp(1.02rem, 1.8vw, 1.22rem); color: var(--text-2); line-height: 1.55; max-width: 54ch; }
-.coral { color: var(--coral); }
+  /* sections */
+  .section{padding:clamp(60px,9vw,118px) 0;position:relative;scroll-margin-top:40px}
+  .section-head{max-width:60ch;margin-bottom:clamp(26px,4vw,44px)}
+  .section-head.center{text-align:center;margin-inline:auto}
+  .section-head h2{margin-top:0.7rem}
+  .section-head .lede{margin-top:1rem}
+  .section-head.center .lede{margin-inline:auto}
 
-/* ── Buttons ── */
-.btn {
-  display: inline-flex; align-items: center; gap: 0.5em;
-  font-family: var(--sans); font-weight: 600; font-size: 0.95rem; line-height: 1;
-  padding: 0.82em 1.35em; border-radius: 9px; cursor: pointer; border: 1px solid transparent;
-  transition: background 0.16s var(--ease), color 0.16s var(--ease), border-color 0.16s var(--ease), box-shadow 0.16s var(--ease), filter 0.16s var(--ease);
-  white-space: nowrap;
-}
-.btn svg { width: 1.05em; height: 1.05em; }
-.btn-primary { background: var(--btn); color: var(--btn-ink); box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset, 0 6px 20px -10px rgba(0,0,0,0.8); }
-.btn-primary:hover { filter: brightness(1.06); box-shadow: 0 1px 0 rgba(255,255,255,0.5) inset, 0 10px 26px -10px rgba(0,0,0,0.9); }
-.btn-ghost { background: var(--s2); color: var(--text); border-color: var(--line-2); }
-.btn-ghost:hover { background: var(--s3); border-color: rgba(255,255,255,0.22); }
-.btn-lg { font-size: 1rem; padding: 0.95em 1.55em; }
-.btn-block { width: 100%; justify-content: center; }
-.magnetic { transition: transform 0.2s var(--ease), background 0.16s var(--ease), filter 0.16s var(--ease), box-shadow 0.16s var(--ease); }
-.magnetic:hover { transform: translateY(-2px); }
-.link-arrow { display: inline-flex; align-items: center; gap: 0.4em; font-weight: 500; color: var(--text); font-size: 0.95rem; }
-.link-arrow .a { transition: transform 0.2s var(--ease); }
-.link-arrow:hover { color: var(--coral); } .link-arrow:hover .a { transform: translateX(4px); }
+  /* hero */
+  .hero{text-align:center;padding:clamp(40px,6vw,76px) 0 clamp(14px,3vw,30px)}
+  .hero .eyebrow{display:inline-block}
+  .hero h1{margin:1.1rem auto 0;max-width:17ch}
+  .hero .lede{margin:1.4rem auto 0;text-align:center}
+  .hero-cta{display:inline-flex;align-items:center;gap:0.9rem;margin-top:2.1rem;flex-wrap:wrap;justify-content:center}
+  .trust{margin-top:1.6rem;font-family:var(--mono);font-size:0.74rem;color:var(--text-3);display:flex;align-items:center;gap:0.55em;flex-wrap:wrap;justify-content:center}
+  .trust .dot{width:3px;height:3px;border-radius:50%;background:var(--line-2)}
+  .os-note{margin-top:0.9rem;font-size:0.82rem;color:var(--text-3)}
+  .os-note a{color:var(--coral)}
 
-/* ── Nav ── */
-.nav { position: sticky; top: 0; z-index: 100; padding: 20px clamp(12px, 3vw, 26px) 0; }
-.nav-in { max-width: var(--maxw); margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 58px; padding: 0 10px 0 16px; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: saturate(1.4) blur(14px); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 1px 0 var(--hi) inset, 0 14px 34px -18px rgba(0,0,0,0.7); transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease); }
-.nav.scrolled .nav-in { border-color: var(--line-2); box-shadow: 0 1px 0 var(--hi) inset, 0 18px 40px -16px rgba(0,0,0,0.85); }
-.brand { display: flex; align-items: center; gap: 0.6em; font-weight: 600; font-size: 1.04rem; letter-spacing: -0.02em; }
-.brand .glyph { width: 28px; height: 28px; flex: 0 0 auto; object-fit: contain; display: inline-block; vertical-align: middle; filter: drop-shadow(0 0 8px rgba(226,136,95,.45)); }
-.brand small { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); display: block; margin-top: 1px; font-weight: 400; }
-.nav-links { display: flex; align-items: center; gap: 1.9rem; }
-.nav-links a { font-size: 0.9rem; font-weight: 500; color: var(--text-2); transition: color 0.18s; position: relative; }
-.nav-links a:hover { color: var(--text); }
-/* simple underline that draws in on hover */
-.nav-links a::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; border-radius: 2px; background: var(--coral); transform: scaleX(0); transform-origin: left; transition: transform 0.28s var(--ease); }
-.nav-links a:hover::after { transform: scaleX(1); }
-.nav-acct .acct-chip { display: inline-flex; padding: 0; border: 0; background: none; border-radius: 50%; line-height: 0; }
-.nav-acct .acct-chip img, .nav-acct .acct-chip .acct-i { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; border: 2px solid var(--line-2); transition: border-color 0.15s var(--ease), transform 0.15s var(--ease); }
-.nav-acct .acct-chip:hover img, .nav-acct .acct-chip:hover .acct-i { border-color: var(--coral); transform: translateY(-1px); }
-.nav-acct .acct-chip .acct-i { display: grid; place-items: center; background: var(--coral); color: #15110d; font-size: 0.92rem; font-weight: 700; }
-.nav-acct { position: relative; }
-.nav-acct .acct-chip { cursor: pointer; padding: 0; }
-.acct-menu { position: absolute; top: calc(100% + 10px); right: 0; min-width: 184px; background: var(--s1s); border: 1px solid var(--line-2); border-radius: 13px; padding: 6px; z-index: 300; box-shadow: 0 1px 0 var(--hi) inset, 0 22px 46px -22px rgba(0,0,0,0.85); display: flex; flex-direction: column; gap: 2px; animation: acctIn 0.16s var(--ease); }
-.acct-menu[hidden] { display: none; }
-@keyframes acctIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
-.acct-menu .acct-who { padding: 8px 10px 9px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
-.acct-menu .acct-who b { display: block; font-size: 0.88rem; font-weight: 600; color: var(--text); }
-.acct-menu .acct-who span { display: block; font-size: 0.74rem; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.acct-menu a, .acct-menu button { display: flex; align-items: center; gap: 10px; font: 500 0.9rem var(--sans); color: var(--text); background: none; border: 0; border-radius: 8px; padding: 9px 10px; cursor: pointer; text-align: left; width: 100%; text-decoration: none; }
-.acct-menu a:hover, .acct-menu button:hover { background: var(--s2); }
-.acct-menu svg { width: 16px; height: 16px; color: var(--text-3); flex: 0 0 auto; }
-.acct-menu #acctSignout, .acct-menu #acctSignout svg { color: var(--coral-2); }
-.nav-cta { display: flex; align-items: center; gap: 0.8rem; }
-.nav-builder { display: inline-flex; align-items: center; gap: 0.4em; font-size: 0.84rem; font-weight: 600; color: var(--text); border: 1px solid var(--line-2); border-radius: 99px; padding: 7px 13px; transition: color 0.15s, border-color 0.15s; }
-.nav-builder svg { color: var(--coral); }
-.nav-builder:hover { color: var(--coral); border-color: rgba(226,136,95,0.5); }
-.nav-toggle { display: none; background: none; border: none; cursor: pointer; padding: 8px; color: var(--text); }
-.nav-toggle svg { width: 24px; height: 24px; }
+  /* hero screenshot */
+  .stage{margin-top:clamp(34px,5vw,60px);position:relative;perspective:1600px}
+  .stage::before{content:"";position:absolute;left:50%;top:4%;width:74%;height:90%;transform:translateX(-50%);background:radial-gradient(ellipse,rgba(226,136,95,0.22),transparent 65%);filter:blur(24px);z-index:-1}
+  .stage .frame{max-width:1000px;margin:0 auto;border-radius:16px;overflow:hidden;border:1px solid var(--line-2);box-shadow:0 50px 100px -34px rgba(0,0,0,0.85),0 1px 0 var(--hi) inset}
+  .stage .frame img{width:100%;display:block}
 
-/* ── Atmosphere, a living aurora gradient (drifting, screen-blended orbs) ── */
-.atmos { position: fixed; inset: 0; z-index: -2; pointer-events: none; overflow: hidden; }
-.atmos b { position: absolute; border-radius: 50%; filter: blur(10px); opacity: 0.5; }
-.atmos .b1 { top: -16%; left: 50%; width: 75vw; height: 55vw; max-width: 1000px; max-height: 720px; transform: translateX(-50%); background: radial-gradient(circle, rgba(226,136,95,0.20), transparent 60%); animation: drift1 20s ease-in-out infinite alternate; }
-.atmos .b2 { top: 24%; right: -10%; width: 50vw; height: 50vw; max-width: 620px; background: radial-gradient(circle, rgba(109,106,224,0.10), transparent 62%); animation: drift2 26s ease-in-out infinite alternate; }
-@keyframes drift1 { from { transform: translateX(-50%) translateY(0) scale(1); } to { transform: translateX(-54%) translateY(36px) scale(1.12); } }
-@keyframes drift2 { from { transform: translateY(0) scale(1); opacity: 0.1; } to { transform: translateY(-50px) scale(1.18); opacity: 0.16; } }
+  /* features */
+  .fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .fcard{background:var(--s1s);border:1px solid var(--line);border-radius:14px;padding:24px;transition:border-color 0.2s var(--ease),transform 0.2s var(--ease)}
+  .fcard:hover{border-color:var(--line-2);transform:translateY(-2px)}
+  .fcard .ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:20px;background:rgba(226,136,95,0.13);margin-bottom:14px}
+  .fcard h3{margin:0 0 6px;font-size:1.06rem}
+  .fcard p{margin:0;color:var(--text-2);font-size:0.92rem;line-height:1.5}
+  @media (max-width:820px){.fgrid{grid-template-columns:1fr 1fr}}
+  @media (max-width:520px){.fgrid{grid-template-columns:1fr}}
 
-/* ── Cursor, a soft light that follows you + a trailing dot/ring ── */
+  /* compare */
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .compare .col{border-radius:16px;padding:clamp(24px,3vw,34px);border:1px solid var(--line);background:var(--s1s);position:relative;overflow:hidden}
+  .compare .new{border-color:var(--coral);box-shadow:0 0 40px -20px var(--coral),0 1px 0 var(--hi) inset}
+  .compare .tag{font-family:var(--mono);font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-3)}
+  .compare .new .tag{color:var(--coral)}
+  .compare .ctime{font-size:clamp(2.4rem,5vw,3.4rem);font-weight:700;letter-spacing:-0.03em;line-height:1;margin:14px 0 2px;color:var(--text-3);font-variant-numeric:tabular-nums}
+  .compare .ctime span{font-size:0.38em;font-weight:500;margin-left:3px;letter-spacing:0}
+  .compare .new .ctime{color:var(--coral)}
+  .compare h3{margin:6px 0 18px;font-size:1.25rem;color:var(--text-2);font-weight:600}
+  .compare .new h3{color:var(--text)}
+  .compare ul{list-style:none;display:flex;flex-direction:column;gap:12px}
+  .compare li{display:flex;gap:11px;font-size:0.94rem;color:var(--text-2)}
+  .compare li svg{width:18px;height:18px;flex:0 0 auto;margin-top:2px}
+  .compare .old li svg{color:var(--text-3)} .compare .new li svg{color:var(--coral)}
+  @media (max-width:760px){.compare{grid-template-columns:1fr}}
 
-/* ── React Bits-style rotating text (coral pill, per-character slide) ── */
-.rotate { display: inline-flex; align-items: center; justify-content: center; overflow: hidden; vertical-align: -0.2em; height: 1.5em; width: 7.4em; padding: 0 0.4em; border-radius: 0.5em; background: linear-gradient(180deg, var(--coral-2), var(--coral-press)); color: #1a1109; font-weight: 700; letter-spacing: -0.01em; box-shadow: 0 8px 24px -8px var(--coral); }
-.rotate .ch { display: inline-block; white-space: pre; animation: rtIn 0.5s var(--ease) both; }
-@keyframes rtIn { from { transform: translateY(118%); opacity: 0; } to { transform: none; opacity: 1; } }
-.rotate.out .ch { animation: rtOut 0.42s var(--ease) both; }
-@keyframes rtOut { from { transform: none; opacity: 1; } to { transform: translateY(-118%); opacity: 0; } }
+  /* download */
+  .dlbox{text-align:center;background:color-mix(in srgb,var(--s1s) 70%,transparent);border:1px solid var(--line);border-radius:20px;padding:clamp(34px,5vw,56px) 24px;position:relative;overflow:hidden}
+  .dlbox::before{content:"";position:absolute;left:50%;top:-30%;width:60%;height:90%;transform:translateX(-50%);background:radial-gradient(ellipse,rgba(226,136,95,0.14),transparent 62%);filter:blur(20px);pointer-events:none}
+  .dlbox > *{position:relative;z-index:1}
+  .dlrow{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:24px}
+  .dl{display:inline-flex;align-items:center;gap:0.6em;font-weight:600;font-size:1rem;padding:0.95em 1.5em;border-radius:11px;cursor:pointer;border:1px solid transparent;transition:filter 0.15s var(--ease),background 0.15s var(--ease),transform 0.2s var(--ease)}
+  .dl:hover{transform:translateY(-2px)}
+  .dl.mac{background:var(--btn);color:var(--btn-ink);box-shadow:0 1px 0 rgba(255,255,255,0.4) inset}
+  .dl.mac:hover{filter:brightness(1.06)}
+  .dl.win{background:var(--s2);color:var(--text);border-color:var(--line-2)}
+  .dl.win:hover{background:var(--s3)}
+  .dl svg{width:1.2em;height:1.2em}
+  .dlnote{margin-top:18px;font-size:0.84rem;color:var(--text-3)}
+  .dlnote code{font-family:var(--mono);font-size:0.92em;color:var(--text-2)}
 
-/* ── React Bits-style gradual blur, content dissolves into the bottom edge ── */
+  /* footer */
+  .footer{padding:clamp(44px,6vw,72px) 0 40px;border-top:1px solid var(--line)}
+  .footer-top{display:flex;align-items:flex-start;justify-content:space-between;gap:30px;flex-wrap:wrap}
+  .footer .blurb{color:var(--text-2);font-size:0.9rem;max-width:34ch;margin-top:12px}
+  .footer-links{display:flex;gap:40px;flex-wrap:wrap}
+  .footer h4{font-family:var(--mono);font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:14px;font-weight:500}
+  .footer ul{list-style:none;display:flex;flex-direction:column;gap:10px}
+  .footer ul a{font-size:0.9rem;color:var(--text-2);transition:color 0.15s}
+  .footer ul a:hover{color:var(--coral)}
+  .footer-bottom{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:44px;padding-top:22px;border-top:1px solid var(--line);flex-wrap:wrap}
+  .footer-bottom p{font-family:var(--mono);font-size:0.7rem;color:var(--text-3)}
 
-/* grain */
-body::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none; opacity: 0.025; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-
-/* ── Hero ── */
-.hero { text-align: center; padding: clamp(38px, 6vw, 72px) 0 clamp(14px, 3vw, 34px); }
-.hero .eyebrow { display: inline-block; }
-.hero h1 { margin: 1.1rem auto 0; max-width: 16ch; }
-.hero .lede { margin: 1.4rem auto 0; text-align: center; }
-.hero-cta { display: inline-flex; align-items: center; gap: 0.9rem; margin-top: 2.1rem; flex-wrap: wrap; justify-content: center; }
-.trust { margin-top: 1.5rem; font-family: var(--mono); font-size: 0.74rem; color: var(--text-3); display: flex; align-items: center; gap: 0.55em; flex-wrap: wrap; justify-content: center; }
-.trust .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--line-2); }
-
-/* hero product panel */
-.hero-stage { margin-top: clamp(28px, 4vw, 52px); position: relative; perspective: 1600px; }
-.hero-stage::before { content: ""; position: absolute; left: 50%; top: 6%; width: 72%; height: 88%; transform: translateX(-50%); background: radial-gradient(ellipse, rgba(226,136,95,0.22), transparent 65%); filter: blur(20px); z-index: -1; }
-
-/* scroll progress bar */
-.progress { position: fixed; top: 0; left: 0; height: 2px; width: 0; z-index: 200; background: linear-gradient(90deg, var(--coral), var(--coral-2)); box-shadow: 0 0 12px var(--coral); transition: width 0.08s linear; }
-
-/* ── Stats, editorial spec line, not a boxed dashboard grid ── */
-.stats-wrap { margin-top: clamp(26px, 4vw, 46px); }
-.claimline { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px 24px; max-width: 900px; margin: 0 auto; }
-.claimline .cl { display: inline-flex; align-items: baseline; gap: 9px; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.01em; color: var(--text-3); text-transform: lowercase; }
-.claimline .cl b { font-family: var(--sans); font-weight: 700; font-size: clamp(1.7rem, 2.6vw, 2.3rem); line-height: 1; letter-spacing: -0.035em; color: var(--text); font-variant-numeric: tabular-nums; }
-.claimline .cl b .u { color: var(--coral); }
-.claimline .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--coral); opacity: 0.7; flex: 0 0 auto; align-self: center; }
-
-/* ── Sections ── */
-.section { padding: clamp(64px, 9vw, 120px) 0; position: relative; scroll-margin-top: 40px; }
-#top { scroll-margin-top: 80px; }
-.section-head { max-width: 56ch; margin-bottom: clamp(26px, 4vw, 44px); }
-.section-head.center { text-align: center; margin-inline: auto; }
-.section-head h2 { margin-top: 0.7rem; }
-.section-head .lede { margin-top: 1rem; }
-.section-head.center .lede { margin-inline: auto; }
-
-/* ── How it works, a timeline-thread flow (on-theme for an editor) ── */
-.flow { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-.flow-rail { position: absolute; top: 15px; left: 16.6%; right: 16.6%; height: 2px; background: linear-gradient(90deg, transparent, var(--coral) 14%, var(--coral) 86%, transparent); opacity: 0.35; pointer-events: none; }
-.flow-rail::after { content: ""; position: absolute; top: -2.5px; left: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--coral); box-shadow: 0 0 12px 2px var(--coral); animation: rail 4.8s var(--ease) infinite; }
-@keyframes rail { 0% { left: 0; opacity: 0; } 10%, 90% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
-html.js .flow-rail { transform: scaleX(0); transform-origin: left center; transition: transform 1.1s var(--ease) 0.15s; }
-html.js .flow.drawn .flow-rail { transform: scaleX(1); }
-.fstep { position: relative; text-align: center; }
-.fnode { width: 30px; height: 30px; margin: 0 auto; border-radius: 9px; background: var(--bg); border: 1px solid var(--coral); color: var(--coral); display: grid; place-items: center; font-family: var(--mono); font-size: 0.72rem; font-weight: 500; position: relative; z-index: 2; box-shadow: 0 0 0 6px var(--bg), 0 0 22px -4px var(--coral); }
-.fstep h3 { margin: 20px 0 0; }
-.fstep > p { color: var(--text-2); font-size: 0.95rem; margin: 8px 0 0; }
-.fviz { margin-top: 22px; aspect-ratio: 16/10; border-radius: 13px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--s1s), var(--bg-soft)); display: grid; place-items: center; overflow: hidden; box-shadow: 0 1px 0 var(--hi) inset, 0 24px 50px -34px rgba(0,0,0,0.8); }
-/* viz 1, prompt bar */
-.viz-prompt { width: 80%; font-family: var(--mono); font-size: 0.78rem; color: var(--text); background: var(--bg); border: 1px solid var(--line-2); border-radius: 9px; padding: 11px 13px; display: flex; align-items: center; gap: 8px; box-shadow: 0 8px 20px -12px rgba(0,0,0,0.8); }
-.viz-prompt .vp-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--coral); flex: 0 0 auto; box-shadow: 0 0 8px var(--coral); }
-.viz-prompt .vp-caret { width: 2px; height: 1em; background: var(--coral); margin-left: 1px; animation: caret 1.1s steps(1) infinite; }
-/* viz 2, render progress */
-.viz-render { width: 76%; }
-.viz-render .vr-line { height: 7px; border-radius: 4px; background: var(--s3); margin-bottom: 7px; }
-.viz-render .vr-line.s { width: 58%; }
-.viz-render .vr-bar { height: 7px; border-radius: 4px; background: var(--s2); margin-top: 13px; overflow: hidden; }
-.viz-render .vr-bar i { display: block; height: 100%; width: 8%; background: linear-gradient(90deg, var(--coral), var(--coral-2)); border-radius: 4px; animation: fill 2.8s var(--ease) infinite; }
-@keyframes fill { 0% { width: 8%; } 65%, 100% { width: 94%; } }
-.viz-render .vr-label { font-family: var(--mono); font-size: 0.62rem; color: var(--coral); margin-top: 10px; }
-/* viz 3, timeline */
-.viz-tl { width: 82%; position: relative; }
-.viz-tl .vt-track { height: 16px; border-radius: 4px; background: var(--s2); border: 1px solid var(--line); position: relative; margin-bottom: 7px; }
-.viz-tl .clip { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; }
-.viz-tl .clip.a { left: 6%; width: 54%; background: var(--s3); }
-.viz-tl .clip.b { left: 34%; width: 30%; background: linear-gradient(90deg, var(--coral), var(--coral-press)); box-shadow: 0 0 14px -3px var(--coral); animation: drop 3.2s var(--ease) infinite; }
-@keyframes drop { 0% { transform: translateY(-9px); opacity: 0; } 18%, 100% { transform: none; opacity: 1; } }
-.viz-tl .vt-play { position: absolute; top: -5px; bottom: -5px; left: 48%; width: 2px; background: var(--coral); box-shadow: 0 0 10px var(--coral); }
-.viz-tl .vt-play::before { content: ""; position: absolute; top: -1px; left: -3px; width: 8px; height: 6px; border-radius: 2px; background: var(--coral); }
-
-/* ── Features, three tools, each with a real mini-visual ── */
-.tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 820px; margin-inline: auto; }
-.tool { background: var(--s1s); border: 1px solid var(--line); border-radius: 18px; padding: 24px; box-shadow: 0 1px 0 var(--hi) inset; position: relative; overflow: hidden; transition: transform 0.25s var(--ease), border-color 0.25s var(--ease); }
-.tool > * { position: relative; z-index: 1; }
-.tool::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: radial-gradient(260px circle at var(--mx,50%) var(--my,50%), rgba(226,136,95,0.12), transparent 60%); opacity: 0; transition: opacity 0.35s var(--ease); }
-.tool:hover { transform: translateY(-3px); border-color: var(--line-2); }
-.tool:hover::before { opacity: 1; }
-.tool .tlabel { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.14em; color: var(--coral); }
-.tool h3 { margin: 11px 0 7px; display: flex; align-items: center; gap: 9px; font-size: 1.12rem; }
-.tool h3 svg { width: 19px; height: 19px; color: var(--coral); flex: 0 0 auto; }
-.tool p { color: var(--text-2); font-size: 0.9rem; }
-.tviz { margin-top: 20px; aspect-ratio: 16/9; border-radius: 12px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--bg-soft), var(--bg)); overflow: hidden; position: relative; display: grid; place-items: center; box-shadow: 0 1px 0 var(--hi) inset; }
-/* tool 01, generate: a lower-third rendering in */
-.gen-frame { position: absolute; inset: 0; }
-.gen-frame::after { content: "1080×1920"; position: absolute; top: 8px; right: 10px; font-family: var(--mono); font-size: 0.52rem; color: var(--text-3); }
-.gen-frame .lt { position: absolute; left: 13%; bottom: 24%; display: flex; flex-direction: column; gap: 5px; animation: ltin 3.6s var(--ease) infinite; }
-@keyframes ltin { 0% { transform: translateX(-16px); opacity: 0; } 16%, 100% { transform: none; opacity: 1; } }
-.gen-frame .lt-bar { width: 26px; height: 4px; border-radius: 2px; background: var(--coral); box-shadow: 0 0 10px var(--coral); }
-.gen-frame .lt-t1 { width: 84px; height: 9px; border-radius: 3px; background: var(--text); opacity: 0.92; }
-.gen-frame .lt-t2 { width: 56px; height: 7px; border-radius: 3px; background: var(--text-3); }
-/* tool 02, auto-edit: transcript drives graphic markers onto a track */
-.ae { width: 78%; }
-.ae .ae-line { height: 6px; border-radius: 3px; background: var(--s3); margin-bottom: 6px; }
-.ae .ae-line.s { width: 60%; }
-.ae .ae-track { margin-top: 15px; height: 14px; border-radius: 4px; background: var(--s2); border: 1px solid var(--line); position: relative; }
-.ae .ae-track .m { position: absolute; top: 2px; bottom: 2px; width: 12px; border-radius: 2px; background: var(--coral); box-shadow: 0 0 8px -1px var(--coral); transform-origin: bottom; animation: mPop 3s var(--ease) infinite; }
-.ae .ae-track .m:nth-child(2) { animation-delay: 0.25s; } .ae .ae-track .m:nth-child(3) { animation-delay: 0.5s; }
-@keyframes mPop { 0%, 10% { transform: scaleY(0); opacity: 0; } 32%, 100% { transform: none; opacity: 1; } }
-/* capability strip */
-.caps { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
-.caps span { display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-2); background: var(--s1s); border: 1px solid var(--line); border-radius: 99px; padding: 9px 15px; transition: transform 0.2s var(--ease), border-color 0.2s var(--ease), color 0.2s var(--ease); }
-.caps span:hover { transform: translateY(-2px); border-color: var(--line-2); color: var(--text); }
-.caps span svg { width: 15px; height: 15px; color: var(--coral); flex: 0 0 auto; }
-
-/* ── Demo ── */
-.video-frame { margin-top: clamp(32px, 5vw, 50px); border-radius: 16px; overflow: hidden; border: 1px solid var(--line-2); background: radial-gradient(125% 90% at 50% 0%, #16121c, #0a0a0d); aspect-ratio: 16/9; position: relative; display: grid; place-items: center; box-shadow: 0 1px 0 var(--hi) inset, 0 50px 100px -45px rgba(0,0,0,0.85); }
-.video-frame::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 44px 44px; -webkit-mask-image: radial-gradient(ellipse 62% 60% at 50% 46%, #000, transparent 78%); mask-image: radial-gradient(ellipse 62% 60% at 50% 46%, #000, transparent 78%); opacity: 0.55; }
-.video-frame::after { content: ""; position: absolute; left: 50%; top: 46%; width: 300px; height: 300px; transform: translate(-50%,-50%); background: radial-gradient(circle, rgba(226,136,95,0.16), transparent 66%); pointer-events: none; }
-.video-frame .play, .video-frame .cap { z-index: 2; }
-.video-frame .play { position: relative; width: 80px; height: 80px; border-radius: 50%; background: var(--btn); color: var(--btn-ink); display: grid; place-items: center; cursor: pointer; transition: transform 0.2s var(--ease); }
-.video-frame .play::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 0 rgba(226,136,95,0.5); animation: playPulse 2.6s ease-out infinite; }
-@keyframes playPulse { 0% { box-shadow: 0 0 0 0 rgba(226,136,95,0.5); } 70%, 100% { box-shadow: 0 0 0 26px rgba(226,136,95,0); } }
-.video-frame .play:hover { transform: scale(1.06); box-shadow: 0 0 0 16px rgba(255,255,255,0.06); }
-.video-frame .play svg { width: 28px; height: 28px; margin-left: 3px; }
-.video-frame .cap { position: absolute; top: 15px; left: 16px; z-index: 2; font-family: var(--mono); font-size: 0.66rem; color: var(--text-2); background: rgba(0,0,0,0.35); border: 1px solid var(--line); border-radius: 7px; padding: 5px 9px; backdrop-filter: blur(4px); transition: opacity 0.3s var(--ease); }
-.video-frame .vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; background: #000; display: block; }
-.video-frame.playing .play, .video-frame.playing .cap { opacity: 0; pointer-events: none; }
-.video-frame.playing .vid { cursor: default; }
-.video-frame .unmute { position: absolute; top: 15px; right: 16px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; font-family: var(--sans); font-size: 0.74rem; font-weight: 600; color: var(--text); background: rgba(0,0,0,0.55); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 12px 6px 10px; cursor: pointer; backdrop-filter: blur(6px); box-shadow: 0 6px 18px -8px rgba(0,0,0,0.7); transition: background 0.15s var(--ease), transform 0.15s var(--ease); }
-.video-frame .unmute:hover { background: rgba(0,0,0,0.72); transform: translateY(-1px); }
-.video-frame .unmute svg { width: 14px; height: 14px; }
-/* Electric border, vanilla port of React Bits ElectricBorder, coral to match */
-.electric-border { --eb-color: var(--coral); position: relative; margin-top: clamp(32px, 5vw, 50px); border-radius: 16px; isolation: isolate; }
-.electric-border .video-frame { margin-top: 0; }
-.eb-canvas-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; }
-.eb-canvas { display: block; }
-.electric-border .eb-content { position: relative; z-index: 1; border-radius: inherit; }
-.eb-layers { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0; }
-.eb-glow-1, .eb-glow-2, .eb-background-glow { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-sizing: border-box; }
-.eb-glow-1 { border: 2px solid color-mix(in srgb, var(--eb-color) 60%, transparent); filter: blur(1px); }
-.eb-glow-2 { border: 2px solid var(--eb-color); filter: blur(4px); }
-.eb-background-glow { z-index: -1; transform: scale(1.06); filter: blur(28px); opacity: 0.24; background: linear-gradient(-30deg, var(--eb-color), transparent, var(--eb-color)); }
-@media (prefers-reduced-motion: reduce) { .eb-canvas-container { display: none; } }
-.vplayer { position: absolute; left: 16px; right: 16px; bottom: 15px; z-index: 2; display: flex; align-items: center; gap: 12px; }
-.vplayer .vscrub { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.16); position: relative; }
-.vplayer .vscrub i { position: absolute; left: 0; top: 0; bottom: 0; width: 22%; background: linear-gradient(90deg, var(--coral), var(--coral-2)); border-radius: 2px; }
-.vplayer .vscrub::after { content: ""; position: absolute; left: 22%; top: 50%; width: 11px; height: 11px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(0,0,0,0.6); }
-.vplayer .vtime { font-family: var(--mono); font-size: 0.64rem; color: var(--text-2); flex: 0 0 auto; }
-/* elastic volume slider (React Bits) */
-.evol { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; }
-.evol .vicon { width: 15px; height: 15px; color: var(--text-2); flex: 0 0 auto; }
-.eslider { position: relative; width: 64px; height: 16px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
-.eslider .etrack { position: relative; width: 100%; height: 4px; border-radius: 99px; background: rgba(255,255,255,0.22); transform-origin: center; }
-.eslider .efill { position: absolute; left: 0; top: 0; bottom: 0; width: 65%; border-radius: 99px; background: #fff; }
-.eslider .ehandle { position: absolute; top: 50%; left: 65%; width: 11px; height: 11px; border-radius: 50%; background: #fff; transform: translate(-50%,-50%); box-shadow: 0 1px 4px rgba(0,0,0,0.5); transition: width 0.14s var(--ease), height 0.14s var(--ease); }
-.eslider.grab .ehandle { width: 14px; height: 14px; }
-
-/* ── Compare ── */
-.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-.compare .col { border-radius: 16px; padding: clamp(24px, 3vw, 34px); border: 1px solid var(--line); background: var(--s1s); position: relative; overflow: hidden; }
-.compare .col > * { position: relative; z-index: 1; }
-.compare .col::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 0.35s var(--ease); }
-.compare .old::before { background: radial-gradient(300px circle at var(--mx,50%) var(--my,50%), rgba(126,98,232,0.18), transparent 62%); }
-.compare .new::before { background: radial-gradient(300px circle at var(--mx,50%) var(--my,50%), rgba(226,136,95,0.22), transparent 62%); }
-.compare .col:hover::before { opacity: 1; }
-.compare .new { border-color: var(--coral); box-shadow: 0 0 40px -20px var(--coral), 0 1px 0 var(--hi) inset; }
-.compare .tag { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
-.compare .new .tag { color: var(--coral); }
-.compare .ctime { font-size: clamp(2.4rem, 5vw, 3.4rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1; margin: 14px 0 2px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-.compare .ctime span { font-size: 0.38em; font-weight: 500; margin-left: 3px; letter-spacing: 0; }
-.compare .new .ctime { color: var(--coral); }
-.compare h3 { margin: 6px 0 18px; font-size: 1.25rem; color: var(--text-2); font-weight: 600; }
-.compare .new h3 { color: var(--text); }
-.compare ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
-.compare li { display: flex; gap: 11px; font-size: 0.94rem; color: var(--text-2); }
-.compare li svg { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 2px; }
-.compare .old li svg { color: var(--text-3); } .compare .new li svg { color: var(--coral); }
-
-/* ── Pricing ── */
-.toggle { display: inline-flex; align-items: center; gap: 10px; margin: 22px auto 0; font-family: var(--mono); font-size: 0.76rem; color: var(--text-3); }
-.toggle b { color: var(--text); } .toggle .save { color: var(--coral); }
-.toggle .sw { width: 46px; height: 26px; border-radius: 99px; background: var(--s3); border: 1px solid var(--line-2); position: relative; cursor: pointer; transition: background 0.2s var(--ease); }
-.toggle .sw i { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--text); transition: transform 0.22s var(--ease); }
-.toggle .sw.on { background: var(--coral); } .toggle .sw.on i { transform: translateX(20px); background: #15110d; }
-.tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 44px; align-items: start; }
-.tier { border: 1px solid var(--line); border-radius: 18px; padding: 30px; background: var(--s1s); position: relative; box-shadow: 0 1px 0 var(--hi) inset; }
-.tier.featured { border-color: transparent; box-shadow: 0 0 55px -24px var(--coral), 0 1px 0 var(--hi) inset; }
-.tier.featured > * { position: relative; z-index: 1; }
-/* Aceternity-style moving border, a coral beam travelling the card edge */
-@property --beam { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
-.tier.featured::before {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 0; pointer-events: none; padding: 1.5px;
-  background: conic-gradient(from var(--beam), rgba(226,136,95,0.22) 0 232deg, var(--coral) 292deg, var(--coral-2) 316deg, var(--coral) 338deg, rgba(226,136,95,0.22) 360deg);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude;
-  animation: beamSpin 4.6s linear infinite;
-}
-@keyframes beamSpin { to { --beam: 360deg; } }
-.tier.featured::after { content: "Most popular"; position: absolute; top: -11px; left: 30px; z-index: 2; background: var(--coral); color: #15110d; font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 11px; border-radius: 99px; font-weight: 500; }
-.tier .name { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
-.tier .price { font-size: 2.9rem; font-weight: 700; letter-spacing: -0.03em; margin: 16px 0 4px; display: flex; align-items: baseline; gap: 3px; font-variant-numeric: tabular-nums; }
-.tier .price .cur { font-size: 1.5rem; color: var(--text-2); }
-.tier .price .per { font-size: 0.88rem; font-weight: 500; color: var(--text-3); align-self: flex-end; margin-bottom: 8px; }
-.tier .desc { color: var(--text-2); font-size: 0.92rem; }
-.tier ul { list-style: none; display: flex; flex-direction: column; gap: 11px; margin: 22px 0; }
-.tier li { display: flex; gap: 10px; font-size: 0.92rem; color: var(--text); align-items: flex-start; }
-.tier li svg { width: 17px; height: 17px; color: var(--coral); flex: 0 0 auto; margin-top: 2px; }
-.pay-note { text-align: center; margin-top: 24px; font-family: var(--mono); font-size: 0.72rem; color: var(--text-3); }
-.pay-note .nokey { color: var(--coral); font-weight: 600; }
-
-/* ── FAQ ── */
-.faq { max-width: 760px; margin-inline: auto; }
-.qa { border-bottom: 1px solid var(--line); }
-.qa button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 4px; background: none; border: none; cursor: pointer; text-align: left; font-family: var(--sans); font-size: 1.08rem; font-weight: 500; color: var(--text); letter-spacing: -0.01em; transition: color 0.18s var(--ease); }
-.qa button:hover { color: var(--coral); }
-.qa .pm { width: 20px; height: 20px; flex: 0 0 auto; position: relative; color: var(--coral); }
-.qa .pm::before, .qa .pm::after { content: ""; position: absolute; background: currentColor; border-radius: 2px; transition: transform 0.25s var(--ease); }
-.qa .pm::before { top: 9px; left: 1px; width: 18px; height: 2px; }
-.qa .pm::after { top: 1px; left: 9px; width: 2px; height: 18px; }
-.qa.open .pm::after { transform: scaleY(0); }
-.qa .ans { max-height: 0; overflow: hidden; transition: max-height 0.32s var(--ease); }
-.qa .ans p { padding: 0 4px 22px; color: var(--text-2); font-size: 0.98rem; max-width: 64ch; }
-.qa .ans a { color: var(--coral); text-decoration: underline; text-underline-offset: 2px; }
-
-/* ── Install stepper ── */
-.stepper { max-width: 700px; margin: 0 auto; }
-.dlrow { display: flex; flex-wrap: wrap; gap: 12px; margin: 4px 0 8px; }
-.dl { display: inline-flex; align-items: center; gap: 0.6em; font-weight: 600; font-size: 0.97rem; padding: 0.9em 1.3em; border-radius: 11px; cursor: pointer; border: 1px solid transparent; transition: filter 0.15s var(--ease), background 0.15s var(--ease); }
-.dl.mac { background: var(--btn); color: var(--btn-ink); box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset; }
-.dl.mac:hover { filter: brightness(1.06); }
-.dl.win { background: var(--s2); color: var(--text); border-color: var(--line-2); }
-.dl.win:hover { background: var(--s3); }
-.dl svg { width: 1.15em; height: 1.15em; }
-.steps-ind { display: flex; align-items: center; margin: clamp(26px, 4vw, 40px) 0; }
-.sdot { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line-2); color: var(--text-3); display: grid; place-items: center; font-family: var(--mono); font-size: 0.8rem; font-weight: 500; flex: 0 0 auto; background: var(--bg); cursor: pointer; transition: border-color 0.3s var(--ease), color 0.3s var(--ease), background 0.3s var(--ease), box-shadow 0.3s var(--ease); }
-.sdot.active { border-color: var(--coral); color: var(--coral); box-shadow: 0 0 0 4px rgba(226,136,95,0.13); }
-.sdot.done { border-color: var(--coral); background: var(--coral); color: #15110d; }
-.sdot.done .n { display: none; }
-.sdot .ck { display: none; width: 16px; height: 16px; }
-.sdot.done .ck { display: block; }
-.sline { flex: 1; height: 2px; background: var(--line-2); position: relative; margin: 0 4px; border-radius: 2px; overflow: hidden; }
-.sline::after { content: ""; position: absolute; inset: 0; width: 0; background: var(--coral); transition: width 0.45s var(--ease); }
-.sline.filled::after { width: 100%; }
-.spanel { display: none; text-align: left; animation: slideIn 0.4s var(--ease); }
-.spanel.show { display: block; }
-@keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-.spanel .pn { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--coral); }
-.spanel h3 { font-size: clamp(1.4rem, 3vw, 1.8rem); font-weight: 700; letter-spacing: -0.03em; margin: 8px 0 12px; }
-.spanel .lead { color: var(--text-2); max-width: 54ch; margin-bottom: 18px; font-size: 1rem; }
-.spanel ul { list-style: none; display: flex; flex-direction: column; gap: 11px; margin: 14px 0 0; }
-.spanel li { display: flex; gap: 10px; color: var(--text-2); font-size: 0.96rem; }
-.spanel li svg { width: 17px; height: 17px; color: var(--coral); flex: 0 0 auto; margin-top: 3px; }
-.spanel li b { color: var(--text); font-weight: 600; }
-.spanel code { font-family: var(--mono); font-size: 0.86em; background: var(--s2); border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px; color: var(--coral-2); }
-.scode { position: relative; background: #0c0c10; border: 1px solid var(--line-2); border-radius: 12px; overflow: hidden; margin: 6px 0 0; box-shadow: 0 1px 0 var(--hi) inset; }
-.scode-bar { display: flex; align-items: center; gap: 8px; padding: 9px 13px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.02); }
-.scode-bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--s3); }
-.scode-bar .lab { margin-left: 4px; font-family: var(--mono); font-size: 0.66rem; color: var(--text-3); }
-.scode-bar .copy { margin-left: auto; font-family: var(--mono); font-size: 0.66rem; color: var(--text-2); background: var(--s2); border: 1px solid var(--line-2); border-radius: 7px; padding: 5px 10px; cursor: pointer; }
-.scode-bar .copy:hover { background: var(--s3); color: var(--text); }
-.scode pre { margin: 0; padding: 14px 16px; overflow-x: auto; }
-.scode code { font-family: var(--mono); font-size: 0.82rem; color: #e9e3da; white-space: pre; }
-.os { display: inline-flex; gap: 4px; padding: 4px; background: var(--s1s); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 14px; }
-.os button { font-family: var(--sans); font-size: 0.84rem; font-weight: 600; color: var(--text-2); background: none; border: none; cursor: pointer; padding: 7px 15px; border-radius: 7px; transition: 0.15s; }
-.os button.on { background: var(--s3); color: var(--text); }
-.os-pane { display: none; } .os-pane.on { display: block; }
-.icallout { display: flex; gap: 11px; background: var(--s1s); border: 1px solid var(--line); border-left: 2px solid var(--coral); border-radius: 11px; padding: 14px 16px; margin: 20px 0 0; text-align: left; }
-.icallout svg { width: 17px; height: 17px; color: var(--coral); flex: 0 0 auto; margin-top: 3px; }
-.icallout p { color: var(--text-2); font-size: 0.92rem; margin: 0; } .icallout b { color: var(--text); }
-.snav { display: flex; align-items: center; gap: 12px; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
-.snav .grow { flex: 1; } .snav .prog { font-family: var(--mono); font-size: 0.72rem; color: var(--text-3); }
-.snav .btn:disabled { opacity: 0.32; pointer-events: none; }
-
-/* ── Final CTA ── */
-.cta-panel { position: relative; border: 1px solid var(--line-2); border-radius: 22px; background: linear-gradient(180deg, var(--s2), #0d0d10); padding: clamp(44px, 6vw, 78px) var(--gutter); text-align: center; overflow: hidden; box-shadow: 0 1px 0 var(--hi) inset; }
-.cta-panel::before { content: ""; position: absolute; left: 50%; top: -30%; width: 70%; height: 120%; transform: translateX(-50%); background: radial-gradient(ellipse, rgba(226,136,95,0.12), transparent 62%); filter: blur(10px); pointer-events: none; }
-/* lamp beam (Aceternity-style), a crisp glowing line that lamp-lights the heading */
-.cta-panel .lamp { position: absolute; top: 0; left: 0; right: 0; height: 1px; pointer-events: none; }
-.cta-panel .lamp::before { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 58%; height: 2px; background: linear-gradient(90deg, transparent, var(--coral) 22%, var(--coral-2) 50%, var(--coral) 78%, transparent); box-shadow: 0 0 24px 4px rgba(226,136,95,0.55); border-radius: 99px; }
-.cta-panel .lamp::after { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 56%; height: 230px; background: radial-gradient(ellipse 50% 100% at 50% 0%, rgba(226,136,95,0.30), transparent 72%); filter: blur(7px); }
-.cta-panel > *:not(.lamp) { position: relative; }
-.cta-panel .eyebrow { display: block; margin-bottom: 14px; }
-.cta-panel h2 { max-width: 20ch; margin: 0 auto 26px; }
-.cta-panel .small { margin-top: 16px; font-family: var(--mono); font-size: 0.72rem; color: var(--text-3); }
-
-/* ── Footer ── */
-.footer { padding: clamp(48px, 6vw, 76px) 0 40px; border-top: 1px solid var(--line); }
-.footer-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 32px; }
-.footer .brand { margin-bottom: 14px; }
-.footer .blurb { color: var(--text-2); font-size: 0.9rem; max-width: 30ch; }
-.footer h4 { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 15px; font-weight: 500; }
-.footer ul { list-style: none; display: flex; flex-direction: column; gap: 11px; }
-.footer ul a { font-size: 0.9rem; color: var(--text-2); transition: color 0.15s; }
-.footer ul a:hover { color: var(--coral); }
-.footer-bottom { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 46px; padding-top: 22px; border-top: 1px solid var(--line); flex-wrap: wrap; }
-.footer-bottom p { font-family: var(--mono); font-size: 0.7rem; color: var(--text-3); }
-.footer-bottom .credit a { color: var(--coral); font-weight: 600; transition: color 0.15s var(--ease); }
-.footer-bottom .credit a:hover { color: var(--coral-2); text-decoration: underline; text-underline-offset: 2px; }
-.footer-bottom .credit .heart { color: #ff5a5a; }
-.disclaimer { font-family: var(--mono); font-size: 0.66rem; color: var(--text-3); line-height: 1.55; margin-top: 14px; max-width: 82ch; }
-
-/* ── Reveal (richer: blur + rise, staggered) ── */
-html.js .reveal { opacity: 0; transform: translateY(26px); filter: blur(6px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease), filter 0.7s var(--ease); }
-html.js .reveal.in { opacity: 1; transform: none; filter: none; }
-.reveal.d1 { transition-delay: 0.07s; } .reveal.d2 { transition-delay: 0.14s; } .reveal.d3 { transition-delay: 0.21s; } .reveal.d4 { transition-delay: 0.28s; }
-
-/* hero load-in */
-.load-up { opacity: 0; transform: translateY(18px); animation: up 0.85s var(--ease) forwards; }
-.l1{animation-delay:.05s} .l2{animation-delay:.14s} .l3{animation-delay:.5s} .l4{animation-delay:.62s} .l5{animation-delay:.74s} .l6{animation-delay:.4s}
-@keyframes up { to { opacity: 1; transform: none; } }
-.hero-h1 .w { display: inline-block; opacity: 0; filter: blur(14px); transform: translateY(20px); animation: wordIn 0.85s var(--ease) forwards; }
-@keyframes wordIn { to { opacity: 1; filter: blur(0); transform: none; } }
-
-/* border-glow on step cards */
-@property --glow-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
-.glow { position: relative; }
-.glow::after {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px; z-index: 2; pointer-events: none;
-  background: conic-gradient(from var(--glow-angle), transparent 0 232deg, var(--coral) 296deg, var(--coral-2) 316deg, var(--coral) 336deg, transparent 360deg);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude;
-  animation: glowSpin 5.5s linear infinite;
-}
-@keyframes glowSpin { to { --glow-angle: 360deg; } }
-
-@media (prefers-reduced-motion: reduce) {
-  .load-up, .hero-h1 .w { opacity: 1; filter: none; transform: none; animation: none; }
-  html.js .reveal { opacity: 1; transform: none; filter: none; transition: none; }
-  .atmos b, .glow::after, .flow-rail::after, .viz-prompt .vp-caret, .viz-render .vr-bar i,
-  .viz-tl .clip.b, .gen-frame .lt, .ae .ae-track .m, .ac span.cut, .pv-arrow,
-  .mock-composer .field::after, .video-frame .play::after { animation: none; }
-  .viz-render .vr-bar i { width: 72%; }
-  .viz-tl .clip.b, .gen-frame .lt, .ae .ae-track .m { opacity: 1; transform: none; }
-  html.js .flow-rail { transform: none; transition: none; }
-  .rotate .ch { animation: none !important; opacity: 1; transform: none; }
-}
-
-/* ── Aceternity-style grid backdrop (fades from top) ── */
-.grid-bg { position: fixed; inset: 0; z-index: -3; pointer-events: none;
-  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
-  background-size: 58px 58px;
-  -webkit-mask-image: radial-gradient(ellipse 75% 55% at 50% 0%, #000 25%, transparent 72%);
-          mask-image: radial-gradient(ellipse 75% 55% at 50% 0%, #000 25%, transparent 72%);
-  opacity: 0.6;
-}
-/* gradient accent on the hero words */
-.hero-h1 .coral { background: linear-gradient(180deg, var(--coral-2), var(--coral-press)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; padding-bottom: 0.16em; }
-
-/* ── Hero chat-output mockup, the panel showing what Claude returns ── */
-.glass {
-  max-width: 600px; margin: 0 auto; text-align: left;
-  border: 1px solid var(--line-2); border-radius: 18px; overflow: hidden;
-  background: linear-gradient(180deg, #141019, #0c0a11);
-  box-shadow: 0 1px 0 var(--hi) inset, 0 60px 120px -42px rgba(0,0,0,0.9), 0 0 100px -34px rgba(226,136,95,0.28);
-  will-change: transform; transition: transform 0.3s var(--ease);
-}
-.mock-bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.02); }
-.mock-bar .lights { display: flex; gap: 6px; }
-.mock-bar .lights i { width: 11px; height: 11px; border-radius: 50%; }
-.mock-bar .lights i:nth-child(1){ background:#e1664f; } .mock-bar .lights i:nth-child(2){ background:#e0b04a; } .mock-bar .lights i:nth-child(3){ background:#6cbf7a; }
-.mock-bar .title { font-family: var(--mono); font-size: 0.7rem; color: var(--text-3); margin-left: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.mock-bar .ver { margin-left: auto; flex: 0 0 auto; font-family: var(--mono); font-size: 0.62rem; color: var(--text-3); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; white-space: nowrap; }
-.mock-body { padding: 22px 20px; display: flex; flex-direction: column; gap: 18px; }
-.mrow { display: flex; gap: 12px; align-items: flex-start; }
-.mav { width: 26px; height: 26px; border-radius: 7px; flex: 0 0 auto; display: grid; place-items: center; font-size: 0.72rem; font-weight: 700; }
-.mav.you { background: var(--s3); color: var(--text-2); }
-.mav.cla { background: url('flimify-logo.png') center/contain no-repeat; filter: drop-shadow(0 0 8px rgba(226,136,95,.5)); }
-.mname { font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.14em; color: var(--coral); margin-bottom: 5px; }
-.mrow .txt { font-size: 0.9rem; line-height: 1.5; color: var(--text-2); }
-.mrow .txt b { color: var(--text); font-weight: 600; }
-.rendercard { margin-top: 14px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--bg-soft); overflow: hidden; box-shadow: 0 0 34px -18px var(--coral); }
-.rendercard .file { display: flex; align-items: center; gap: 9px; padding: 12px 14px; font-family: var(--mono); font-size: 0.74rem; color: var(--text); border-bottom: 1px solid var(--line); }
-.rendercard .file svg { width: 16px; height: 16px; color: var(--coral); flex: 0 0 auto; }
-.rendercard .file .meta { margin-left: auto; color: var(--text-3); font-size: 0.62rem; letter-spacing: 0.02em; }
-.rendercard .acts { display: flex; gap: 8px; padding: 12px 14px; flex-wrap: wrap; }
-.see-output { display: inline-flex; align-items: center; gap: 7px; margin-top: 13px; font-family: var(--sans); font-size: 0.82rem; font-weight: 700; color: #15110d; background: linear-gradient(135deg, var(--coral-2) 0%, var(--coral) 100%); border: 0; border-radius: 999px; padding: 8px 16px; cursor: pointer; transition: filter 0.15s var(--ease), box-shadow 0.2s var(--ease); animation: seeOutputPulse 2.6s ease-in-out infinite; }
-.see-output:hover { filter: brightness(1.06); animation: none; box-shadow: 0 0 24px -2px color-mix(in srgb, var(--coral) 60%, transparent); }
-.see-output .ar { transition: transform 0.18s var(--ease); animation: seeOutputArrow 2.6s ease-in-out infinite; }
-.see-output:hover .ar { transform: translateX(3px); animation: none; }
-@keyframes seeOutputPulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--coral) 42%, transparent), 0 0 12px -2px color-mix(in srgb, var(--coral) 30%, transparent); }
-  60%      { box-shadow: 0 0 0 7px color-mix(in srgb, var(--coral) 0%, transparent), 0 0 22px 1px color-mix(in srgb, var(--coral) 34%, transparent); }
-}
-@keyframes seeOutputArrow { 0%, 100% { transform: translateX(0); } 55% { transform: translateX(3px); } }
-/* fake demo cursor that drifts in and "taps" the button, synced to its 2.6s glow
-   pulse so the press lands as the button flashes — a strong "click me" cue. */
-.see-output-wrap { position: relative; display: inline-block; }
-.see-cursor { position: absolute; right: 2px; bottom: -9px; width: 19px; height: 19px; pointer-events: none; z-index: 3; transform-origin: top left; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); animation: seeCursorTap 2.6s ease-in-out infinite; }
-.see-cursor svg { width: 100%; height: 100%; display: block; }
-@keyframes seeCursorTap {
-  0%, 100% { transform: translate(7px, 7px) scale(1); }
-  46%      { transform: translate(0, 0) scale(1); }
-  56%      { transform: translate(0, 0) scale(0.8); }
-  66%      { transform: translate(0, 0) scale(1); }
-}
-.see-output-wrap:hover .see-cursor,
-.see-output-wrap.clicked .see-cursor { animation: none; opacity: 0; transition: opacity 0.2s; }
-@media (prefers-reduced-motion: reduce) { .see-output, .see-output .ar, .see-cursor { animation: none; } }
-/* ── Output preview: the mockup shrinks + slides left (JS), and the real render
-      fades UP beside it as a GIF-like 3D card with the SAME spinning neon-corner
-      glow as the mockup. Everything stays on the page, just movement. ── */
-.hero-stage { position: relative; }
-.preview {
-  position: absolute; top: 50%; right: clamp(-16px, 0.5vw, 18px);
-  width: clamp(232px, 29vw, 350px);
-  transform: translateY(calc(-50% + 48px)) scale(0.95);
-  opacity: 0; visibility: hidden;
-  /* this (base) transition is the OUT animation, keep it SNAPPY, no delay */
-  transition: transform 0.32s var(--ease), opacity 0.28s var(--ease), visibility 0s 0.32s;
-  perspective: 1100px; z-index: 4;   /* gives the 3D card its depth */
-}
-.hero-stage.previewing .preview {
-  transform: translateY(-50%) scale(1);
-  opacity: 1; visibility: visible;
-  transition: transform 0.7s var(--ease) 0.34s, opacity 0.6s var(--ease) 0.34s, visibility 0s;
-}
-/* coral arrow in the gap, flows from the prompt into the render */
-.pv-arrow { position: absolute; top: 50%; left: -52px; color: var(--coral); display: grid; place-items: center; pointer-events: none; animation: pvArrowNudge 1.6s var(--ease) infinite; }
-.pv-arrow svg { width: 34px; height: 34px; filter: drop-shadow(0 0 7px rgba(226,136,95,0.55)); }
-@keyframes pvArrowNudge { 0%, 100% { transform: translateY(-50%) translateX(0); } 50% { transform: translateY(-50%) translateX(6px); } }
-/* same glass shell + shadow as the mockup so it reads as a sibling render card */
-.pv-card {
-  position: relative; border-radius: 16px; overflow: hidden;
-  border: 1px solid var(--line-2);
-  background: linear-gradient(180deg, #141019, #0c0a11);
-  box-shadow: 0 1px 0 var(--hi) inset, 0 50px 110px -40px rgba(0,0,0,0.9), 0 0 90px -28px rgba(226,136,95,0.36);
-  transform: rotateY(-14deg);   /* the 3D angle, in the .preview perspective */
-  transform-origin: center; transition: transform 0.3s var(--ease);   /* smooth cursor tilt */
-}
-.pv-out video { width: 100%; display: block; border-radius: inherit; }
-.preview-x { position: absolute; top: 8px; right: 8px; z-index: 6; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.5); border: 1px solid var(--line-2); color: var(--text); display: grid; place-items: center; cursor: pointer; font-size: 0.85rem; backdrop-filter: blur(4px); }
-.preview-x:hover { background: rgba(0,0,0,0.78); }
-@media (max-width: 860px) {
-  /* no room beside the mockup, stack the render under it, flat (no 3D angle) */
-  .preview { position: relative; top: auto; right: auto; width: min(86vw, 380px); margin: 26px auto 0; transform: translateY(28px) scale(0.98); perspective: none; }
-  .hero-stage.previewing .preview { transform: translateY(0) scale(1); }
-  .pv-card { transform: none; }
-  .pv-arrow { left: 50%; top: -34px; animation: none; transform: translateX(-50%) rotate(90deg); }
-}
-.chip { font-family: var(--sans); font-size: 0.76rem; font-weight: 600; padding: 7px 12px; border-radius: 8px; cursor: default; transition: filter 0.15s var(--ease); }
-.chip.solid { background: var(--btn); color: var(--btn-ink); box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset; }
-.chip.outline { background: var(--s2); color: var(--text); border: 1px solid var(--line-2); }
-.mock-composer { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--line); background: rgba(255,255,255,0.015); }
-.mock-composer .field { flex: 1; font-family: var(--sans); font-size: 0.84rem; color: var(--text-3); padding: 9px 12px; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 9px; position: relative; }
-.mock-composer .field::after { content: ""; display: inline-block; width: 1.5px; height: 0.95em; background: var(--coral); margin-left: 2px; vertical-align: -2px; animation: caret 1.1s steps(1) infinite; }
-@keyframes caret { 50% { opacity: 0; } }
-.mock-composer .send { width: 34px; height: 34px; border-radius: 8px; background: var(--coral); color: #15110d; display: grid; place-items: center; flex: 0 0 auto; box-shadow: 0 0 18px -6px var(--coral); }
-.mock-composer .send svg { width: 16px; height: 16px; }
-/* tilted-card glare (React Bits), a highlight that tracks the cursor */
-.glass .shine { position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: inherit; opacity: 0; transition: opacity 0.3s var(--ease); background: radial-gradient(380px circle at var(--gx,50%) var(--gy,50%), rgba(255,255,255,0.16), transparent 45%); mix-blend-mode: overlay; }
-
-/* ── Responsive ── */
-@media (max-width: 860px) {
-  .nav-links, .nav-cta .btn-ghost, .nav-builder { display: none; }
-  .nav-toggle { display: inline-flex; }
-  .claimline { gap: 16px 22px; } .claimline .dot { display: none; }
-  .flow { grid-template-columns: 1fr; gap: 14px; } .flow-rail { display: none; }
-  .fstep { padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--s1s); }
-  .fstep .fviz { aspect-ratio: 16/7; }
-  .tools { grid-template-columns: 1fr; } .tviz { aspect-ratio: auto; height: 148px; }
-  .compare { grid-template-columns: 1fr; }
-  .tiers { grid-template-columns: 1fr; max-width: 420px; margin-inline: auto; } .tier.featured { order: -1; }
-  .footer-grid { grid-template-columns: 1fr 1fr; gap: 34px 22px; } .footer-grid .footer-about { grid-column: 1 / -1; }
-}
-@media (max-width: 480px) { .claimline { flex-direction: column; gap: 14px; } .footer-grid { grid-template-columns: 1fr; } }
-
-/* mobile menu */
-.mobile-menu { position: fixed; inset: 0; z-index: 200; background: var(--bg); padding: 22px var(--gutter); transform: translateY(-100%); transition: transform 0.32s var(--ease); display: flex; flex-direction: column; }
-.mobile-menu.open { transform: none; }
-.mobile-menu .mm-top { display: flex; align-items: center; justify-content: space-between; height: 44px; }
-.mobile-menu nav { display: flex; flex-direction: column; gap: 2px; margin-top: 36px; }
-.mobile-menu nav a { font-size: 1.7rem; font-weight: 600; letter-spacing: -0.02em; padding: 12px 0; border-bottom: 1px solid var(--line); }
-.mobile-menu .btn { margin-top: 30px; }
+  /* reveal */
+  html.js .reveal{opacity:0;transform:translateY(26px);filter:blur(6px);transition:opacity 0.7s var(--ease),transform 0.7s var(--ease),filter 0.7s var(--ease)}
+  html.js .reveal.in{opacity:1;transform:none;filter:none}
+  .reveal.d1{transition-delay:0.07s}.reveal.d2{transition-delay:0.14s}.reveal.d3{transition-delay:0.21s}
+  @media (prefers-reduced-motion:reduce){html.js .reveal{opacity:1;transform:none;filter:none;transition:none}}
 </style>
+<script>document.documentElement.className+=' js';</script>
 </head>
 <body>
 
-<div class="progress" id="progress"></div>
 <div class="grid-bg"></div>
 <div class="atmos"><b class="b1"></b><b class="b2"></b></div>
+
 <!-- NAV -->
 <header class="nav" id="nav">
   <div class="nav-in">
-    <a href="#top" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify</span></a>
+    <a href="#top" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Studio</small></span></a>
     <nav class="nav-links">
-      <a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#studio">Desktop app</a><a href="#faq">FAQ</a>
+      <a href="#features">Features</a><a href="#how">Before &amp; after</a><a href="#download">Download</a><a href="premiere.html">Premiere&nbsp;extension</a>
     </nav>
     <div class="nav-cta">
-      <a href="login.html" class="btn btn-ghost nav-signin" id="navSignin">Sign in</a>
-      <a href="#pricing" class="btn btn-primary magnetic" id="navCta" data-buy>Get it</a>
-      <div class="nav-acct" id="navAcct" hidden></div>
-      <button class="nav-toggle" id="navToggle" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+      <a href="/studio/" class="btn btn-ghost">Open in browser</a>
+      <a href="#download" class="btn btn-primary">Download</a>
     </div>
   </div>
 </header>
 
-<div class="mobile-menu" id="mobileMenu">
-  <div class="mm-top"><span class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"> Flimify</span>
-    <button class="nav-toggle" id="navClose" aria-label="Close menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-  </div>
-  <nav><a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#studio">Desktop app</a><a href="#faq">FAQ</a><a href="login.html" id="mmSignin">Sign in</a></nav>
-  <a href="#pricing" class="btn btn-primary btn-block btn-lg" data-buy>Get it</a>
-</div>
-
-<script>
-/* Anti-flash: synchronously reflect the persisted session BEFORE supabase-js
-   loads over the network, so the nav never flashes "Sign in" on refresh.
-   auth.js then re-renders the same chip with its dropdown + reconciles. */
-(function () {
-  try {
-    var KEY = 'sb-hwsyaqmkwitxprtnrzkj-auth-token';
-    var raw = localStorage.getItem(KEY);
-    if (raw == null && localStorage.getItem(KEY + '.0') != null) {       // chunked storage
-      raw = ''; for (var i = 0; localStorage.getItem(KEY + '.' + i) != null; i++) raw += localStorage.getItem(KEY + '.' + i);
-    }
-    if (!raw) return;
-    var user = null, expired = false;
-    try {
-      var t = raw;
-      if (t.slice(0, 7) === 'base64-') t = atob(t.slice(7).replace(/-/g, '+').replace(/_/g, '/'));
-      var s = JSON.parse(t);
-      var sess = s.currentSession || s.session || s;
-      user = sess && sess.user;
-      if (sess && sess.expires_at && sess.expires_at * 1000 < Date.now()) expired = true;
-    } catch (_) {}
-    if (expired) return;                                                 // let auth.js refresh/decide
-    var signin = document.getElementById('navSignin');
-    var navCta = document.getElementById('navCta');
-    var acct = document.getElementById('navAcct');
-    var mm = document.getElementById('mmSignin');
-    if (signin) signin.style.display = 'none';
-    if (navCta) navCta.textContent = 'Upgrade';
-    if (mm) { mm.textContent = 'Your account'; mm.setAttribute('href', 'account.html'); }
-    if (acct) {
-      var meta = (user && user.user_metadata) || {};
-      var name = meta.full_name || meta.name || (user && user.email) || 'Account';
-      var avatar = meta.avatar_url;
-      var initial = (name.trim()[0] || 'U').toUpperCase();
-      acct.innerHTML = '<button class="acct-chip" id="acctBtn" type="button" title="' + name + '">' +
-        (avatar ? '<img src="' + avatar + '" alt="" referrerpolicy="no-referrer">' : '<span class="acct-i">' + initial + '</span>') + '</button>';
-      acct.removeAttribute('hidden'); acct.style.display = '';
-    }
-  } catch (e) {}
-})();
-</script>
-
-<main id="top">
+<a id="top"></a>
 
 <!-- HERO -->
 <section class="hero">
   <div class="wrap">
-    <p class="eyebrow load-up l1">AI motion graphics</p>
-    <h1 class="hero-h1">
-      <span class="w" style="animation-delay:.12s">Motion</span>
-      <span class="w" style="animation-delay:.2s">graphics,</span><br>
-      <span class="w" style="animation-delay:.32s">by</span>
-      <span class="w coral" style="animation-delay:.42s">just</span>
-      <span class="w coral" style="animation-delay:.52s">asking.</span>
-    </h1>
-    <p class="lede load-up l3">Make the <span class="rotate" id="rotate" aria-label="title, lower third, caption, countdown and more">title</span>. Just describe it.</p>
-    <div class="hero-cta load-up l4">
-      <a href="#pricing" class="btn btn-primary btn-lg magnetic" data-buy>Get it, <span data-price-inline>$19</span></a>
-      <a href="#demo" class="link-arrow">Watch the demo <span class="a">→</span></a>
+    <p class="eyebrow reveal">Desktop app · macOS &amp; Windows</p>
+    <h1 class="reveal d1">Your whole video editor,<br><span class="coral">by just asking.</span></h1>
+    <p class="lede reveal d2">Flimify Studio is a full AI video editor for Mac &amp; Windows. Generate motion graphics, edit on a pro timeline, caption, auto-edit, and export to mp4, all in one app. The AI runs on your own Claude, so there's no API key and nothing to pay per render.</p>
+    <div class="hero-cta reveal d3">
+      <a class="btn btn-primary btn-lg" id="primaryDl" href="#download">Download for desktop</a>
+      <a class="btn btn-ghost btn-lg" href="/studio/">Open in browser →</a>
     </div>
-    <p class="trust load-up l5"><span>Runs on your Claude plan</span><span class="dot"></span><span>No API key</span><span class="dot"></span><span>macOS &amp; Windows</span></p>
-
-    <div class="hero-stage load-up l6">
-      <div class="glass glow" id="heroPanel">
-        <div class="mock-bar"><span class="lights"><i></i><i></i><i></i></span><span class="title">Flimify</span><span class="ver">short 2 · 1 sel</span></div>
-        <div class="mock-body">
-          <div class="mrow"><div class="mav you">Y</div><div class="txt">Make a glassy subscribe button, vertical, 4s, calm, not flashy. Soft tap + ripple.</div></div>
-          <div class="mrow"><div class="mav cla"></div><div style="flex:1">
-            <div class="mname">FLIMIFY</div>
-            <div class="txt"><b>Done.</b> A frosted-glass subscribe pill that springs in, with a cursor tap and a soft ripple. Rendered transparent so it drops over your footage, 1080×1920, 4s.</div>
-            <div class="rendercard">
-              <div class="file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg> SubscribePill_v3.mov <span class="meta">imported · V2 @ 0:14</span></div>
-              <div class="acts"><span class="chip solid">Import to timeline</span><span class="chip outline">Preview</span><span class="chip outline">Changes</span></div>
-            </div>
-            <div class="see-output-wrap"><button class="see-output" id="seeOutput" type="button">See what it actually built <span class="ar">→</span></button><span class="see-cursor" aria-hidden="true"><svg viewBox="0 0 18 18"><path d="M2 1.4l11.4 9.6-4.7.5 2.75 5.1-2.1 1.1-2.75-5.15L2.6 15.3z" fill="#fff" stroke="#0a0a0b" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round"/></svg></span></div>
-          </div></div>
-        </div>
-        <div class="mock-composer"><span class="field">Ask Claude…</span><span class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
-        <div class="shine" aria-hidden="true"></div>
-      </div>
-      <!-- Output preview, the real render as a GIF-like 3D card with the same
-           neon-corner glow as the mockup; fades up on the right -->
-      <div class="preview" id="outBox">
-        <span class="pv-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg></span>
-        <div class="pv-card pv-out glow">
-          <button class="preview-x" id="outClose" aria-label="Hide preview">✕</button>
-          <video id="outVideo" src="output-preview.mp4" playsinline muted loop preload="auto"></video>
-        </div>
-      </div>
+    <p class="os-note" id="osNote"></p>
+    <div class="trust reveal d3">
+      <span>Runs on your own Claude</span><span class="dot"></span><span>No API key</span><span class="dot"></span><span>No per-render cost</span>
     </div>
 
+    <div class="stage reveal d2">
+      <div class="frame"><img src="studio-shot.png" alt="Flimify Studio, timeline, live preview, and the AI copilot" /></div>
+    </div>
   </div>
 </section>
 
-<!-- Flimify Studio — the app, now the lead product -->
-<section class="section" id="studio" style="padding-top:clamp(40px,6vw,72px)">
+<!-- FEATURES -->
+<section class="section" id="features">
   <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">Desktop app</p><h2>Get the app.</h2><p class="lead" style="max-width:460px;margin:14px auto 0">The whole editor on your Mac or Windows. Runs on your own Claude — so it's free to run.</p></div>
-    <div class="dlrow reveal d1" style="justify-content:center;display:flex;flex-wrap:wrap;gap:12px">
-      <a class="dl mac" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.5-.4 6.1 1 8.1.7 1 1.4 2.1 2.4 2 1-.04 1.3-.6 2.5-.6s1.5.6 2.6.6c1.1-.02 1.7-1 2.4-2 .8-1.2 1.1-2.3 1.1-2.3-.02-.01-2.1-.8-2.1-3.2zM14.5 6.1c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.5.9.07 1.8-.5 2.4-1.1z"/></svg> Download for macOS</a>
-      <a class="dl win" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio.Setup.0.1.0.exe"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.5 10.5 4.4v7.1H3zM11.4 4.3 21 3v8.5h-9.6zM3 12.5h7.5v7.1L3 18.5zM11.4 12.5H21V21l-9.6-1.3z"/></svg> Download for Windows</a>
+    <div class="section-head center reveal"><p class="eyebrow">What's inside</p><h2>One app, the whole pipeline.</h2><p class="lede">From the first idea to the exported mp4, generate, edit, caption, and ship without leaving Flimify Studio.</p></div>
+    <div class="fgrid">
+      <div class="fcard reveal"><div class="ic">✨</div><h3>AI motion graphics</h3><p>Describe an intro, lower-third, or overlay, it renders and lands right on your timeline.</p></div>
+      <div class="fcard reveal d1"><div class="ic">🎞️</div><h3>A pro timeline</h3><p>Snapping, undo/redo, split, ripple delete, fades, markers, track mute/solo/lock, zoom &amp; pan.</p></div>
+      <div class="fcard reveal d2"><div class="ic">💬</div><h3>Captions &amp; auto-edit</h3><p>Auto-caption your footage, and let it find the key moments and cut the dead air for you.</p></div>
+      <div class="fcard reveal"><div class="ic">🔑</div><h3>No API key</h3><p>Generation runs on the Claude you already pay for, so there are no keys to paste and no per-render fees.</p></div>
+      <div class="fcard reveal d1"><div class="ic">🖥️</div><h3>Mac, Windows &amp; web</h3><p>A native desktop app for both platforms, plus the full editor in your browser.</p></div>
+      <div class="fcard reveal d2"><div class="ic">⬇️</div><h3>Export to mp4</h3><p>The timeline <i>is</i> the composition, what you preview is exactly what you export.</p></div>
     </div>
-    <p style="text-align:center;color:var(--text-3);font-size:0.84rem;margin-top:14px">Free. Mac (Apple&nbsp;Silicon) or Windows — one click.</p>
-    <p style="text-align:center;margin-top:16px"><a href="/studio/" class="link-arrow">Open Flimify in browser <span class="a">→</span></a></p>
   </div>
 </section>
 
-<!-- HOW -->
+<!-- BEFORE / AFTER -->
 <section class="section" id="how">
-  <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">How it works</p><h2>Prompt to timeline in three.</h2></div>
-    <div class="flow">
-      <div class="flow-rail"></div>
-      <div class="fstep reveal">
-        <div class="fnode">01</div>
-        <h3>Describe it</h3>
-        <p>Type it in plain words.</p>
-        <div class="fviz"><div class="viz-prompt"><span class="vp-dot"></span>make a 3-step checklist<span class="vp-caret"></span></div></div>
-      </div>
-      <div class="fstep reveal d1">
-        <div class="fnode">02</div>
-        <h3>Flimify builds it</h3>
-        <p>Writes the code, renders it.</p>
-        <div class="fviz"><div class="viz-render"><div class="vr-line"></div><div class="vr-line s"></div><div class="vr-bar"><i></i></div><div class="vr-label">rendering · subscribe_v3</div></div></div>
-      </div>
-      <div class="fstep reveal d2">
-        <div class="fnode">03</div>
-        <h3>On your timeline</h3>
-        <p>One click. Ready to play.</p>
-        <div class="fviz"><div class="viz-tl"><div class="vt-track"><span class="clip a"></span></div><div class="vt-track"><span class="clip b"></span></div><div class="vt-play"></div></div></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-
-<!-- DEMO -->
-<section class="section" id="demo">
-  <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">See it</p><h2>Under a minute, start to finish.</h2></div>
-    <div class="electric-border reveal d1" id="demoEB">
-      <div class="eb-canvas-container"><canvas class="eb-canvas" id="ebCanvas"></canvas></div>
-      <div class="eb-layers"><span class="eb-glow-1"></span><span class="eb-glow-2"></span><span class="eb-background-glow"></span></div>
-      <div class="video-frame eb-content" id="demoFrame">
-        <video id="demoVideo" class="vid" poster="demo-poster.jpg" preload="metadata" playsinline>
-          <source src="demo.mp4" type="video/mp4">
-        </video>
-        <button class="play magnetic" id="playDemo" aria-label="Play demo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
-        <span class="cap">38-second walkthrough</span>
-        <button class="unmute" id="demoUnmute" hidden></button>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- COMPARE -->
-<section class="section">
   <div class="wrap">
     <div class="section-head center reveal"><p class="eyebrow">The difference</p><h2>Before &amp; after.</h2></div>
     <div class="compare">
       <div class="col old reveal"><span class="tag">Without</span><div class="ctime">~2<span>hrs</span></div><h3>The usual way</h3><ul>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Open a heavy editor</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Keyframe by keyframe</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Export, import, hope it fits</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Cut &amp; keyframe by hand</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Export, re-import, hope it fits</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> A change? Start over</li>
       </ul></div>
-      <div class="col new reveal d1"><span class="tag">With Flimify</span><div class="ctime">~90<span>sec</span></div><h3>The new way</h3><ul>
+      <div class="col new reveal d1"><span class="tag">With Flimify Studio</span><div class="ctime">~90<span>sec</span></div><h3>The new way</h3><ul>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Type one sentence</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> On your timeline in ~90s</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Fitted, ready to play</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Caption &amp; export in the same app</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> A change? Just say so</li>
       </ul></div>
     </div>
   </div>
 </section>
 
-<!-- PRICING -->
-<section class="section" id="pricing">
+<!-- DOWNLOAD -->
+<section class="section" id="download">
   <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">Pricing</p><h2>Start free.</h2>
-      <div class="toggle"><span data-bill><b>Monthly</b></span><button class="sw" id="billToggle" aria-label="Toggle annual"><i></i></button><span>Annual <span class="save">- 2 months free</span></span></div>
-    </div>
-    <div class="tiers">
-      <div class="tier reveal"><div class="name">Trial</div><div class="price"><span class="cur">$</span><span>0</span></div><div class="desc">5 renders. No card.</div>
-        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 5 renders</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Mac &amp; Windows</li></ul>
-        <a href="#install" class="btn btn-ghost btn-block">Try it free</a></div>
-      <div class="tier featured reveal d1"><div class="name">Creator</div><div class="price"><span class="cur">$</span><span data-amt-m="19" data-amt-a="15">19</span><span class="per">/ mo</span></div><div class="desc">For working editors.</div>
-        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 50 renders / month</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Reference images &amp; video</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> All updates</li></ul>
-        <a href="#" class="btn btn-primary btn-block magnetic" data-plan="creator">Get Creator</a></div>
-      <div class="tier reveal d2"><div class="name">Studio</div><div class="price"><span class="cur">$</span><span data-amt-m="49" data-amt-a="39">49</span><span class="per">/ mo</span></div><div class="desc">For teams.</div>
-        <ul><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 250 renders / month</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Up to 5 seats</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Priority support</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Auto-Edit feature</li></ul>
-        <a href="#" class="btn btn-ghost btn-block" data-plan="studio">Get Studio</a></div>
-    </div>
-    <!-- Wire your real checkout in the CONFIG block at the very bottom (checkoutUrl). -->
-    <p class="pay-note"><span class="nokey">No API key needed, every plan runs on your own Claude plan</span> · Secure checkout · Cancel anytime · 14-day money-back</p>
-  </div>
-</section>
-
-<!-- INSTALL -->
-<section class="section" id="install">
-  <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">Get started</p><h2>Install it in four steps.</h2></div>
-    <div class="stepper reveal d1">
-      <div class="steps-ind">
-        <div class="sdot active" data-step="0"><span class="n">1</span><svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-        <div class="sline"></div>
-        <div class="sdot" data-step="1"><span class="n">2</span><svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-        <div class="sline"></div>
-        <div class="sdot" data-step="2"><span class="n">3</span><svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-        <div class="sline"></div>
-        <div class="sdot" data-step="3"><span class="n">4</span><svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+    <div class="dlbox reveal">
+      <p class="eyebrow">Get the app</p>
+      <h2 style="margin-top:10px">Download Flimify&nbsp;Studio.</h2>
+      <p class="lede" style="margin:14px auto 0;max-width:48ch">Free to download. Bring your own Claude, and start editing.</p>
+      <div class="dlrow">
+        <a class="dl mac" id="dlMac" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.5-.4 6.1 1 8.1.7 1 1.4 2.1 2.4 2 1-.04 1.3-.6 2.5-.6s1.5.6 2.6.6c1.1-.02 1.7-1 2.4-2 .8-1.2 1.1-2.3 1.1-2.3-.02-.01-2.1-.8-2.1-3.2zM14.5 6.1c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.5.9.07 1.8-.5 2.4-1.1z"/></svg> Download for macOS</a>
+        <a class="dl win" id="dlWin" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio.Setup.0.1.0.exe"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.5 10.5 4.4v7.1H3zM11.4 4.3 21 3v8.5h-9.6zM3 12.5h7.5v7.1L3 18.5zM11.4 12.5H21V21l-9.6-1.3z"/></svg> Download for Windows</a>
       </div>
-
-      <div class="spanel show" data-spanel="0">
-        <div class="pn">Step 1</div>
-        <h3>Download the extension</h3>
-        <p class="lead">It runs on your account, sign in, then grab it for your computer.</p>
-        <div class="dlrow" id="dlReal" style="display:none">
-          <a class="dl mac" data-dlos="mac" href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/latest/download/flimify-macos.zip"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.5-.4 6.1 1 8.1.7 1 1.4 2.1 2.4 2 1-.04 1.3-.6 2.5-.6s1.5.6 2.6.6c1.1-.02 1.7-1 2.4-2 .8-1.2 1.1-2.3 1.1-2.3-.02-.01-2.1-.8-2.1-3.2zM14.5 6.1c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.5.9.07 1.8-.5 2.4-1.1z"/></svg> Download for macOS</a>
-          <a class="dl win" data-dlos="win" href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/latest/download/Flimify-Setup.exe"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.5 10.5 4.4v7.1H3zM11.4 4.3 21 3v8.5h-9.6zM3 12.5h7.5v7.1L3 18.5zM11.4 12.5H21V21l-9.6-1.3z"/></svg> Download for Windows</a>
-        </div>
-        <div id="dlGate" class="dlgate">
-          <a class="btn btn-primary" id="dlGateBtn" href="login.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Sign in to download</a>
-          <p style="color:var(--text-3);font-size:0.84rem;margin-top:8px">Creating an account is free. The download unlocks once you're signed in, and you sign in inside the panel too, to render.</p>
-        </div>
-        <p id="dlNote" style="color:var(--text-3);font-size:0.84rem;margin-top:8px;display:none">Same panel, cross-platform, Windows is a one-click <code>.exe</code> installer; macOS is a zip.</p>
-      </div>
-
-      <div class="spanel" data-spanel="1">
-        <div class="pn">Step 2</div>
-        <h3>Run the one-step installer</h3>
-        <p class="lead">It sets up everything (Node, the Claude CLI, and ffmpeg) and adds the panel to Premiere. ~3 minutes.</p>
-        <div class="os">
-          <button class="on" data-os="mac">macOS</button>
-          <button data-os="win">Windows</button>
-        </div>
-        <div class="os-pane on" data-os="mac"><div class="scode"><div class="scode-bar"><i></i><i></i><i></i><span class="lab">Terminal, macOS</span><button class="copy">Copy</button></div><pre><code>bash install.sh</code></pre></div></div>
-        <div class="os-pane" data-os="win">
-          <div class="icallout" style="margin-top:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 4H8zM7 7h10l-1 12.5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 8 19.5z"/></svg><p>Just <b>double-click <code>Flimify-Setup.exe</code></b> and follow the wizard. No terminal, no commands.<br><span style="color:var(--text-3)">It's not code-signed yet, so if you see a blue <b>"Windows protected your PC"</b> screen, click <b>More info → Run anyway</b>.</span></p></div>
-          <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--text-3);font-size:0.84rem">Prefer the zip / a command?</summary><div style="margin-top:8px;color:var(--text-2);font-size:0.86rem">Grab <code>flimify-windows.zip</code> from the <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026/releases/latest" target="_blank" style="color:var(--coral)">releases page</a>, extract it, then double-click <code>INSTALL.bat</code>, or run <code>powershell -ExecutionPolicy Bypass -File install.ps1</code>.</div></details>
-        </div>
-        <div class="icallout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><p><b>Close Premiere Pro first</b> so it picks up the panel when you reopen it.</p></div>
-      </div>
-
-      <div class="spanel" data-spanel="2">
-        <div class="pn">Step 3</div>
-        <h3>Connect your Claude</h3>
-        <p class="lead">Log in once. It runs on your own Claude plan, so there's no API key to paste.</p>
-        <div class="scode"><div class="scode-bar"><i></i><i></i><i></i><span class="lab">Terminal</span><button class="copy">Copy</button></div><pre><code>claude /login</code></pre></div>
-        <div class="icallout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><p>A browser tab opens, click <b>Allow</b>. <span style="color:var(--text-3)">(Skip if you're already logged into Claude Code.)</span></p></div>
-      </div>
-
-      <div class="spanel" data-spanel="3">
-        <div class="pn">Step 4</div>
-        <h3>Open it in Premiere</h3>
-        <p class="lead">Launch Premiere Pro and open the panel:</p>
-        <ul>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span><b>Window → Extensions → Flimify</b></span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>The status dot turns <b style="color:#6cbf7a">green</b> in a second or two.</span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Type something like <code>a 3-second logo intro that says HELLO</code> and hit ↵.</span></li>
-        </ul>
-        <div class="icallout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 6.3L21 11l-6.6 1.7L12 19l-2.4-6.3L3 11l6.6-1.7z"/></svg><p><b>You're done.</b> First render takes about a minute, then it's on your timeline. 🎬</p></div>
-      </div>
-
-      <div class="snav">
-        <button class="btn btn-ghost" id="iback" disabled>Back</button>
-        <span class="grow"></span>
-        <span class="prog" id="iprog">Step 1 of 4</span>
-        <button class="btn btn-primary" id="inext">Continue →</button>
-      </div>
+      <p class="dlnote">macOS is Apple&nbsp;Silicon (<code>.dmg</code>); Windows is a one-click installer (<code>.exe</code>). Prefer no install? <a href="/studio/" style="color:var(--coral)">Open it in your browser →</a></p>
     </div>
   </div>
 </section>
-
-
-<!-- FAQ -->
-<section class="section" id="faq">
-  <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">Questions</p><h2>Good to know.</h2></div>
-    <div class="faq reveal d1">
-      <div class="qa"><button>What do I need?<span class="pm"></span></button><div class="ans"><p>Premiere Pro 2023+, a Claude Pro or Max plan, and Mac or Windows. <a href="#install">See the install steps →</a></p></div></div>
-      <div class="qa"><button>Is my footage uploaded?<span class="pm"></span></button><div class="ans"><p>No. Everything runs locally. Your media never leaves your machine.</p></div></div>
-      <div class="qa"><button>How fast is a render?<span class="pm"></span></button><div class="ans"><p>Around 90 seconds, once it's warmed up.</p></div></div>
-      <div class="qa"><button>Can I edit what it makes?<span class="pm"></span></button><div class="ans"><p>Yes, it's a real clip. Hit Changes to adjust it.</p></div></div>
-      <div class="qa"><button>How does billing work?<span class="pm"></span></button><div class="ans"><p>Monthly or annual, cancel anytime, secure checkout, no lock-in. You pay for the extension; the AI itself runs on your own Claude plan, so there's no usage metering on top.</p></div></div>
-      <div class="qa"><button>Made by Adobe or Anthropic?<span class="pm"></span></button><div class="ans"><p>No, independent extension, not affiliated with either.</p></div></div>
-    </div>
-  </div>
-</section>
-
-
-</main>
 
 <!-- FOOTER -->
 <footer class="footer">
   <div class="wrap">
-    <div class="footer-grid">
-      <div class="footer-about"><a href="#top" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify</span></a><p class="blurb">An AI motion-graphics and video-editing copilot — a standalone Mac &amp; Windows app, and a Premiere&nbsp;Pro panel.</p></div>
-      <div><h4>Product</h4><ul><li><a href="#how">How it works</a></li><li><a href="#pricing">Pricing</a></li><li><a href="#install">Install</a></li></ul></div>
-      <div><h4>Support</h4><ul><li><a href="#faq">FAQ</a></li><li><a href="#install">Install steps</a></li><li><a href="#">Contact</a></li><li><a href="#">Changelog</a></li></ul></div>
-      <div><h4>Legal</h4><ul><li><a href="#">Terms</a></li><li><a href="#">Privacy</a></li><li><a href="#">Refunds</a></li><li><a href="#">License</a></li></ul></div>
+    <div class="footer-top">
+      <div>
+        <a href="#top" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Studio</small></span></a>
+        <p class="blurb">An AI video editor that runs on your own Claude, generate, edit, caption, and export, all in one app.</p>
+      </div>
+      <div class="footer-links">
+        <div>
+          <h4>App</h4>
+          <ul>
+            <li><a href="#download">Download</a></li>
+            <li><a href="/studio/">Open in browser</a></li>
+            <li><a href="#features">Features</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Flimify</h4>
+          <ul>
+            <li><a href="premiere.html">Premiere extension</a></li>
+            <li><a href="premiere.html#pricing">Pricing</a></li>
+            <li><a href="account.html">Account</a></li>
+          </ul>
+        </div>
+      </div>
     </div>
-    <div class="footer-bottom"><p>© <span id="year">2026</span> Flimify</p><p class="credit">Made by <a href="https://github.com/iprincemax72-maker" target="_blank" rel="noopener">iprincemax72-maker</a> <span class="heart">♥</span> for editors</p></div>
-    <p class="disclaimer">Independent third-party extension. Not affiliated with, endorsed by, or sponsored by Adobe Inc. or Anthropic. “Adobe”, “Premiere Pro”, and “Claude” are trademarks of their respective owners.</p>
+    <div class="footer-bottom">
+      <p>© Flimify</p>
+      <p>Runs on your own Claude</p>
+    </div>
   </div>
 </footer>
 
 <script>
-/* ═══════════════ CONFIG, edit these ═══════════════ */
-const CONFIG = {
-  checkoutUrl: "#",          // your Stripe / Gumroad / LemonSqueezy / Paddle link
-  headlinePrice: "$19",      // price shown in hero + CTA buttons
-};
-(function () {
-  document.querySelectorAll('[data-buy]').forEach(el => { if (CONFIG.checkoutUrl && CONFIG.checkoutUrl !== "#") el.setAttribute('href', CONFIG.checkoutUrl); });
-  document.querySelectorAll('[data-price-inline]').forEach(el => { el.textContent = CONFIG.headlinePrice; });
-  document.getElementById('year').textContent = new Date().getFullYear();
-})();
+  // nav shadow on scroll
+  var nav = document.getElementById('nav');
+  addEventListener('scroll', function(){ nav.classList.toggle('scrolled', scrollY > 8); }, {passive:true});
 
-/* nav shadow + scroll progress bar */
-const nav = document.getElementById('nav');
-const bar = document.getElementById('progress');
-const onScroll = () => {
-  nav.classList.toggle('scrolled', window.scrollY > 8);
-  const h = document.documentElement.scrollHeight - window.innerHeight;
-  bar.style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + '%';
-};
-onScroll(); window.addEventListener('scroll', onScroll, { passive: true }); window.addEventListener('resize', onScroll, { passive: true });
-
-/* mobile menu */
-const mm = document.getElementById('mobileMenu');
-document.getElementById('navToggle').addEventListener('click', () => mm.classList.add('open'));
-document.getElementById('navClose').addEventListener('click', () => mm.classList.remove('open'));
-mm.querySelectorAll('a').forEach(a => a.addEventListener('click', () => mm.classList.remove('open')));
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && mm.classList.contains('open')) mm.classList.remove('open'); });
-
-/* FAQ accordion */
-document.querySelectorAll('.qa button').forEach(btn => {
-  btn.setAttribute('aria-expanded', 'false');
-  btn.addEventListener('click', () => {
-    const qa = btn.parentElement, ans = qa.querySelector('.ans'), open = qa.classList.contains('open');
-    document.querySelectorAll('.qa.open').forEach(o => { o.classList.remove('open'); o.querySelector('.ans').style.maxHeight = null; o.querySelector('button').setAttribute('aria-expanded', 'false'); });
-    if (!open) { qa.classList.add('open'); ans.style.maxHeight = ans.scrollHeight + 'px'; btn.setAttribute('aria-expanded', 'true'); }
-  });
-});
-
-/* pricing toggle */
-const billToggle = document.getElementById('billToggle');
-billToggle.addEventListener('click', () => {
-  const annual = billToggle.classList.toggle('on');
-  document.querySelectorAll('[data-amt-m]').forEach(el => { el.textContent = annual ? el.getAttribute('data-amt-a') : el.getAttribute('data-amt-m'); });
-  document.querySelectorAll('.tier .per').forEach(el => { el.textContent = annual ? '/ mo, billed yearly' : '/ mo'; });
-});
-
-
-/* demo video, autoplays MUTED when scrolled into view (browsers block sound-on
-   autoplay); the pill toggles sound on/off. Click the poster to play with sound. */
-(function () {
-  const frame = document.getElementById('demoFrame');
-  const v = document.getElementById('demoVideo');
-  const play = document.getElementById('playDemo');
-  const pill = document.getElementById('demoUnmute');
-  if (!frame || !v) return;
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const SND_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg><span>Tap for sound</span>';
-  const SND_ON  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg><span>Mute</span>';
-  const syncPill = () => {
-    if (!pill) return;
-    const playing = !v.paused && !v.ended;
-    pill.hidden = !playing;
-    if (playing) pill.innerHTML = v.muted ? SND_OFF : SND_ON;
-  };
-  const reveal = () => { frame.classList.add('playing'); v.controls = true; };
-  const playLoud = () => { v.muted = false; reveal(); v.play().catch(() => {}); };
-
-  if (play) play.addEventListener('click', playLoud);
-  v.addEventListener('click', () => { if (!frame.classList.contains('playing')) playLoud(); });
-  if (pill) pill.addEventListener('click', e => { e.stopPropagation(); v.muted = !v.muted; if (!v.muted) v.play().catch(() => {}); });
-  v.addEventListener('volumechange', syncPill);
-  v.addEventListener('play', syncPill);
-  v.addEventListener('pause', syncPill);
-  v.addEventListener('ended', () => { frame.classList.remove('playing'); v.controls = false; v.currentTime = 0; if (pill) pill.hidden = true; });
-
-  if (!reduce && 'IntersectionObserver' in window) {
-    let everPlayed = false;
-    const io = new IntersectionObserver(es => es.forEach(e => {
-      if (e.intersectionRatio >= 0.5) {
-        if (v.paused && !v.ended) { if (!everPlayed) v.muted = true; v.play().then(() => { reveal(); syncPill(); }).catch(() => {}); everPlayed = true; }
-      } else if (e.intersectionRatio < 0.25 && !v.paused && !v.ended) {
-        v.pause();   // scrolled mostly out of view (up or down) → pause
-      }
-    }), { threshold: [0, 0.25, 0.5, 0.75, 1] });
-    io.observe(frame);
-  }
-})();
-
-
-/* Electric border around the demo, vanilla port of React Bits ElectricBorder.
-   Animates only while on-screen; respects prefers-reduced-motion. */
-(function () {
-  const canvas = document.getElementById('ebCanvas');
-  const container = document.getElementById('demoFrame');
-  if (!canvas || !container) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-
-  const color = (getComputedStyle(document.documentElement).getPropertyValue('--coral') || '#E2885F').trim();
-  const speed = 1, chaos = 0.03, borderRadius = 16;
-  const octaves = 10, lacunarity = 1.6, gain = 0.7, frequency = 10, baseFlatness = 0, displacement = 60, borderOffset = 60;
-
-  const random = x => { const v = Math.sin(x * 12.9898) * 43758.5453; return v - Math.floor(v); };
-  const noise2D = (x, y) => {
-    const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
-    const a = random(i + j * 57), b = random(i + 1 + j * 57), c = random(i + (j + 1) * 57), d = random(i + 1 + (j + 1) * 57);
-    const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
-    return a * (1 - ux) * (1 - uy) + b * ux * (1 - uy) + c * (1 - ux) * uy + d * ux * uy;
-  };
-  const octavedNoise = (x, time, seed) => {
-    let y = 0, amp = chaos, freq = frequency;
-    for (let i = 0; i < octaves; i++) {
-      let oa = amp; if (i === 0) oa *= baseFlatness;
-      y += oa * noise2D(freq * x + seed * 100, time * freq * 0.3);
-      freq *= lacunarity; amp *= gain;
-    }
-    return y;
-  };
-  const corner = (cx, cy, r, start, arc, p) => ({ x: cx + r * Math.cos(start + p * arc), y: cy + r * Math.sin(start + p * arc) });
-  const rrPoint = (t, left, top, w, h, r) => {
-    const sw = w - 2 * r, sh = h - 2 * r, ca = Math.PI * r / 2;
-    let d = t * (2 * sw + 2 * sh + 4 * ca);
-    if (d <= sw) return { x: left + r + d, y: top }; d -= sw;
-    if (d <= ca) return corner(left + w - r, top + r, r, -Math.PI / 2, Math.PI / 2, d / ca); d -= ca;
-    if (d <= sh) return { x: left + w, y: top + r + d }; d -= sh;
-    if (d <= ca) return corner(left + w - r, top + h - r, r, 0, Math.PI / 2, d / ca); d -= ca;
-    if (d <= sw) return { x: left + w - r - d, y: top + h }; d -= sw;
-    if (d <= ca) return corner(left + r, top + h - r, r, Math.PI / 2, Math.PI / 2, d / ca); d -= ca;
-    if (d <= sh) return { x: left, y: top + h - r - d }; d -= sh;
-    return corner(left + r, top + r, r, Math.PI, Math.PI / 2, Math.min(1, d / ca));
-  };
-
-  let W = 0, H = 0, dpr = 1, time = 0, lastT = 0, raf = 0, visible = false;
-  function size() {
-    const rect = container.getBoundingClientRect();
-    if (!rect.width) return;
-    W = rect.width + borderOffset * 2; H = rect.height + borderOffset * 2;
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-  }
-  size();
-
-  function draw(t) {
-    const dt = (t - lastT) / 1000; lastT = t;
-    time += (dt > 0 && dt < 0.1 ? dt : 0.016) * speed;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, W, H);
-    ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    const bw = W - 2 * borderOffset, bh = H - 2 * borderOffset;
-    const r = Math.min(borderRadius, Math.min(bw, bh) / 2);
-    const samples = Math.max(64, Math.floor((2 * (bw + bh) + 2 * Math.PI * r) / 2));
-    ctx.beginPath();
-    for (let i = 0; i <= samples; i++) {
-      const p = i / samples, pt = rrPoint(p, borderOffset, borderOffset, bw, bh, r);
-      const dx = pt.x + octavedNoise(p * 8, time, 0) * displacement;
-      const dy = pt.y + octavedNoise(p * 8, time, 1) * displacement;
-      if (i === 0) ctx.moveTo(dx, dy); else ctx.lineTo(dx, dy);
-    }
-    ctx.closePath(); ctx.stroke();
-    if (visible) raf = requestAnimationFrame(draw);
-  }
-
-  if ('ResizeObserver' in window) new ResizeObserver(size).observe(container);
-  const io = new IntersectionObserver(es => es.forEach(e => {
-    if (e.isIntersecting && !visible) { visible = true; lastT = performance.now(); raf = requestAnimationFrame(draw); }
-    else if (!e.isIntersecting && visible) { visible = false; cancelAnimationFrame(raf); }
-  }), { threshold: 0 });
-  io.observe(container);
-})();
-
-/* elastic volume slider, rubber-bands when dragged past the ends */
-(function () {
-  const s = document.getElementById('evol'); if (!s) return;
-  const track = s.querySelector('.etrack'), fill = s.querySelector('.efill'), handle = s.querySelector('.ehandle');
-  let v = 0.65, dragging = false;
-  const setV = val => { v = Math.max(0, Math.min(1, val)); fill.style.width = (v * 100) + '%'; handle.style.left = (v * 100) + '%'; /* wire to your <video>: video.volume = v */ };
-  const rawV = x => { const r = track.getBoundingClientRect(); return (x - r.left) / r.width; };
-  function move(e){
-    const raw = rawV(e.clientX); setV(raw);
-    const over = raw < 0 ? raw : raw > 1 ? raw - 1 : 0;
-    if (over){ track.style.transition = 'none'; track.style.transform = 'scaleX(' + (1 + Math.min(0.28, Math.abs(over) * 0.4)) + ')'; track.style.transformOrigin = over < 0 ? 'right' : 'left'; }
-    else { track.style.transition = ''; track.style.transform = ''; }
-  }
-  s.addEventListener('pointerdown', e => { dragging = true; s.classList.add('grab'); try { s.setPointerCapture(e.pointerId); } catch(_){} move(e); });
-  s.addEventListener('pointermove', e => { if (dragging) move(e); });
-  const end = () => { if (!dragging) return; dragging = false; s.classList.remove('grab'); track.style.transition = 'transform 0.45s cubic-bezier(0.34,1.56,0.64,1)'; track.style.transform = ''; };
-  s.addEventListener('pointerup', end); s.addEventListener('pointercancel', end);
-  setV(v);
-})();
-
-/* scroll reveal */
-(function () {
-  let reveals = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
-  function check() { const h = window.innerHeight || document.documentElement.clientHeight;
-    for (let i = reveals.length - 1; i >= 0; i--) { if (reveals[i].getBoundingClientRect().top < h - 60) { reveals[i].classList.add('in'); reveals.splice(i, 1); } } }
-  check(); window.addEventListener('scroll', check, { passive: true }); window.addEventListener('resize', check, { passive: true }); window.addEventListener('load', check);
-  window.addEventListener('load', () => setTimeout(() => document.querySelectorAll('.reveal:not(.in)').forEach(el => el.classList.add('in')), 2500));
-})();
-
-/* draw the timeline rail when "how it works" scrolls into view */
-(function () {
-  const flow = document.querySelector('.flow'); if (!flow) return;
-  const draw = () => flow.classList.add('drawn');
+  // reveal on scroll
   if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver((es, o) => es.forEach(e => { if (e.isIntersecting) { draw(); o.disconnect(); } }), { threshold: 0.25 });
-    io.observe(flow);
-  } else draw();
-  window.addEventListener('load', () => setTimeout(draw, 2600)); // failsafe so it can never stay hidden
-})();
+    var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); }, {threshold:0.12, rootMargin:'0px 0px -8% 0px'});
+    document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+  } else { document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); }); }
 
-/* count-up */
-(function () {
-  const nums = document.querySelectorAll('.cnt'); if (!nums.length) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    nums.forEach(el => el.textContent = (el.getAttribute('data-prefix') || '') + (el.getAttribute('data-to') || ''));
-    return;
-  }
-  const run = el => { const to = parseInt(el.getAttribute('data-to'),10)||0, pre = el.getAttribute('data-prefix')||'', t0 = performance.now();
-    (function tick(t){ const p = Math.min(1,(t-t0)/1100), e = 1-Math.pow(1-p,3); el.textContent = pre+Math.round(to*e); if (p<1) requestAnimationFrame(tick); })(t0); };
-  if ('IntersectionObserver' in window) { const io = new IntersectionObserver((es,o)=>es.forEach(e=>{ if(e.isIntersecting){run(e.target);o.unobserve(e.target);} }),{threshold:0.6}); nums.forEach(n=>io.observe(n)); } else nums.forEach(run);
-})();
-
-/* cursor spotlight / chroma reveal on cards */
-document.querySelectorAll('.tool, .compare .col').forEach(card => card.addEventListener('pointermove', e => {
-  const r = card.getBoundingClientRect();
-  card.style.setProperty('--mx', (e.clientX - r.left) + 'px'); card.style.setProperty('--my', (e.clientY - r.top) + 'px');
-}));
-
-/* hero panel, tilted card (3D tilt toward cursor + tracking glare).
-   Stays LIVE during preview too: tilts the shrunk mockup AND the render card
-   together, so the whole scene reacts to the cursor in 3D. */
-(function () {
-  const panel = document.getElementById('heroPanel'), hero = document.querySelector('.hero');
-  if (!panel || !hero || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const stage = panel.closest('.hero-stage') || hero;
-  const shine = panel.querySelector('.shine');
-  let raf = 0;
-  hero.addEventListener('pointermove', e => {
-    const previewing = window.__previewOn;
-    if (previewing && !window.__pvTilt) return;   // sliding-in or closing, let the animation run
-    const r = (previewing ? stage : panel).getBoundingClientRect();
-    const px = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-    const py = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
-    cancelAnimationFrame(raf); raf = requestAnimationFrame(() => {
-      if (window.__previewOn) {
-        if (!window.__pvTilt) return;   // a stray queued frame must not clobber the slide/return
-        const rx = ((0.5 - py) * 9).toFixed(2), ry = ((px - 0.5) * 11).toFixed(2);
-        panel.style.transform = (window.__pvShift || '') + ' rotateX(' + rx + 'deg) rotateY(' + ry + 'deg)';
-        const card = window.__pvCard;
-        if (card) card.style.transform = 'rotateX(' + rx + 'deg) rotateY(' + (-14 + Number(ry)).toFixed(2) + 'deg)';
-        if (shine) { shine.style.setProperty('--gx', (px * 100) + '%'); shine.style.setProperty('--gy', (py * 100) + '%'); shine.style.opacity = '1'; }
-      } else {
-        panel.style.transform = 'rotateX(' + ((0.5 - py) * 16).toFixed(2) + 'deg) rotateY(' + ((px - 0.5) * 16).toFixed(2) + 'deg) scale(1.02)';
-        if (shine) { shine.style.setProperty('--gx', (px * 100) + '%'); shine.style.setProperty('--gy', (py * 100) + '%'); shine.style.opacity = '1'; }
-      }
-    });
-  });
-  hero.addEventListener('pointerleave', () => {
-    if (window.__previewOn) {
-      if (!window.__pvTilt) return;
-      panel.style.transform = (window.__pvShift || '');   // settle to the resting preview pose
-      const card = window.__pvCard; if (card) card.style.transform = '';
-      if (shine) shine.style.opacity = '0';
-      return;
-    }
-    panel.style.transform = ''; if (shine) shine.style.opacity = '0';
-  });
-})();
-
-
-/* output preview, keep the hero mockup, nudge it LEFT, fade the real render
-   UP on the right beside it. (#outBox markup is parsed after this script runs) */
-(function () {
-  const btn = document.getElementById('seeOutput');
-  if (!btn) return;
-  const panel = document.getElementById('heroPanel');
-  const stage = panel && panel.closest('.hero-stage');
-  if (!stage) return;
-  let open = false, _playTimer = null, _settleTimer = null;
-  // shrink the mockup AND slide it left, smoothly, to free space (+ an arrow)
-  // for the render, origin pinned left so it shrinks toward its own left edge.
-  const SHIFT = 'translateX(-17%) scale(0.8)';
-  window.__pvShift = SHIFT;                   // shared with the cursor-tilt handler
-
-  const sideBySide = () => !window.matchMedia('(max-width: 860px)').matches;
-  const show = () => {
-    if (open) return; open = true;
-    const __w = btn.closest('.see-output-wrap'); if (__w) __w.classList.add('clicked');   // stop the nudging cursor once they engage
-    window.__previewOn = true;
-    window.__pvTilt = false;                  // tilt OFF until the slide settles (don't fight it)
-    window.__pvCard = document.querySelector('.pv-card');
-    if (sideBySide()) {                       // wide screens: shrink + slide left to make room beside it
-      panel.style.transformOrigin = 'left center';
-      panel.style.transition = 'transform 0.7s var(--ease)';
-      panel.style.transform = SHIFT;
-      // once the shrink+slide settles, hand transform back to the CSS 0.3s
-      // transition and switch the live 3D cursor-tilt ON for BOTH cards
-      _settleTimer = setTimeout(() => { panel.style.transition = ''; window.__pvTilt = true; }, 720);
-    } else {
-      window.__pvTilt = false;                // no side-by-side tilt on stacked mobile
-    }
-    stage.classList.add('previewing');        // render fades up (right on wide, below on narrow)
-    const vid = document.getElementById('outVideo');
-    if (vid) { vid.currentTime = 0; _playTimer = setTimeout(() => { vid.play().catch(() => {}); }, 520); }
-  };
-  const close = () => {
-    if (!open) return; open = false;
-    window.__pvTilt = false;                   // stop tilt at once so it can't fight the quick return
-    if (_playTimer) { clearTimeout(_playTimer); _playTimer = null; }
-    if (_settleTimer) { clearTimeout(_settleTimer); _settleTimer = null; }
-    stage.classList.remove('previewing');      // render fades back down, fast (base transition)
-    const card = window.__pvCard; if (card) card.style.transform = '';
-    window.__pvCard = null;
-    panel.style.transition = 'transform 0.36s var(--ease)';   // quick glide back to full size
-    panel.style.transform = '';
-    const vid = document.getElementById('outVideo');
-    if (vid) try { vid.pause(); } catch {}
-    setTimeout(() => { if (!open) { panel.style.transition = ''; panel.style.transformOrigin = ''; window.__previewOn = false; } }, 430);
-  };
-
-  btn.addEventListener('click', show);
-  document.addEventListener('click', e => {
-    if (open && e.target.closest && e.target.closest('#outClose')) close();
-  });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && open) close(); });
-})();
-
-/* rotating text, cycles through what the panel makes */
-(function () {
-  const el = document.getElementById('rotate'); if (!el) return;
-  const words = ['title', 'lower third', 'callout', 'caption', 'countdown', 'intro', 'end card'];
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let i = 0;
-  function render(w) {
-    el.innerHTML = '';
-    [].forEach.call(w, (c, k) => {
-      const s = document.createElement('span'); s.className = 'ch'; s.textContent = c;
-      s.style.animationDelay = (k * 0.028) + 's';
-      el.appendChild(s);
-    });
-    el.setAttribute('aria-label', w);
-  }
-  render(words[0]);
-  setInterval(() => {
-    if (reduce) { i = (i + 1) % words.length; render(words[i]); return; }
-    el.classList.add('out');
-    setTimeout(() => { i = (i + 1) % words.length; render(words[i]); el.classList.remove('out'); }, 420);
-  }, 2400);
-})();
-
-
-/* install stepper */
-(function () {
-  const root = document.getElementById('install'); if (!root) return;
-  const dots = [].slice.call(root.querySelectorAll('.sdot'));
-  const lines = [].slice.call(root.querySelectorAll('.sline'));
-  const panels = [].slice.call(root.querySelectorAll('.spanel'));
-  const back = document.getElementById('iback'), next = document.getElementById('inext'), prog = document.getElementById('iprog');
-  const total = panels.length;
-  let cur = 0, reached = 0, downloaded = false;
-  function go(s) {
-    s = Math.max(0, Math.min(total - 1, s));
-    cur = s; reached = Math.max(reached, s);
-    dots.forEach((d, i) => { d.classList.toggle('active', i === s); d.classList.toggle('done', i < s); });
-    lines.forEach((l, i) => l.classList.toggle('filled', i < s));
-    panels.forEach((p, i) => p.classList.toggle('show', i === s));
-    back.disabled = s === 0;
-    next.textContent = s === total - 1 ? 'Done ✓' : 'Continue →';
-    prog.textContent = 'Step ' + (s + 1) + ' of ' + total;
-    // Gate: can't leave Step 1 until the extension has actually been downloaded.
-    const lock = (s === 0 && !downloaded);
-    next.disabled = lock;
-    next.title = lock ? 'Download the extension above first' : '';
-  }
-  /* confetti burst from an element, vanilla canvas, no deps */
-  function confetti(originEl) {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const rect = originEl.getBoundingClientRect();
-    const ox = rect.left + rect.width / 2, oy = rect.top + rect.height / 2;
-    const cv = document.createElement('canvas');
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    cv.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9999';
-    cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
-    document.body.appendChild(cv);
-    const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
-    const colors = ['#E2885F', '#F4F4F5', '#f0b38f', '#6cbf7a', '#caa46a', '#cf6f4a'];
-    const N = 150, parts = [];
-    for (let i = 0; i < N; i++) {
-      const angle = -Math.PI / 2 + (Math.random() - 0.5) * (Math.PI * 1.15);  // fan upward
-      const speed = 6 + Math.random() * 11;
-      parts.push({ x: ox, y: oy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-        w: 5 + Math.random() * 6, h: 8 + Math.random() * 7, rot: Math.random() * Math.PI,
-        vr: (Math.random() - 0.5) * 0.4, color: colors[i % colors.length], alpha: 1 });
-    }
-    let frame = 0;
-    (function tick() {
-      ctx.clearRect(0, 0, innerWidth, innerHeight);
-      frame++; let alive = false;
-      for (const p of parts) {
-        p.vy += 0.32; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
-        if (frame > 55) p.alpha -= 0.013;
-        if (p.alpha <= 0 || p.y > innerHeight + 40) continue;
-        alive = true;
-        ctx.save(); ctx.globalAlpha = Math.max(0, p.alpha);
-        ctx.translate(p.x, p.y); ctx.rotate(p.rot);
-        ctx.fillStyle = p.color; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-        ctx.restore();
-      }
-      if (alive) requestAnimationFrame(tick); else cv.remove();
-    })();
-  }
-  let confettiFired = false;
-  next.addEventListener('click', () => { if (cur === total - 1) { if (!confettiFired) { confettiFired = true; confetti(next); } return; } go(cur + 1); });
-  back.addEventListener('click', () => go(cur - 1));
-  dots.forEach((d, i) => d.addEventListener('click', () => { if (i <= reached) go(i); }));
-  /* OS toggle inside a step */
-  function setOS(panel, os) {
-    panel.querySelectorAll('.os button').forEach(x => x.classList.toggle('on', x.getAttribute('data-os') === os));
-    panel.querySelectorAll('.os-pane').forEach(p => p.classList.toggle('on', p.getAttribute('data-os') === os));
-  }
-  root.querySelectorAll('.os button').forEach(b => b.addEventListener('click', () => setOS(b.closest('.spanel'), b.getAttribute('data-os'))));
-  /* download buttons: pick the matching installer + jump to step 2 (the .zip still downloads via the href) */
-  root.querySelectorAll('.dl[data-dlos]').forEach(b => b.addEventListener('click', () => {
-    downloaded = true;                 // unlocks Continue
-    if (panels[1]) setOS(panels[1], b.getAttribute('data-dlos'));
-    setTimeout(() => go(1), 350);
-  }));
-  /* copy buttons */
-  root.querySelectorAll('.scode .copy').forEach(btn => btn.addEventListener('click', () => {
-    const code = btn.closest('.scode').querySelector('code').textContent;
-    navigator.clipboard.writeText(code).then(() => { const t = btn.textContent; btn.textContent = 'Copied ✓'; setTimeout(() => btn.textContent = t, 1400); }).catch(() => {});
-  }));
-  // Auth module calls this: signed out → re-lock Continue (can't download anyway).
-  window.__installAuth = function (signedIn) { if (!signedIn) downloaded = false; go(cur); };
-  go(0);
-})();
-
-/* Sign-in links remember where you were, so after Google OAuth you come back HERE
-   (the install step) instead of being dumped on the dashboard. */
-document.addEventListener('click', function (e) {
-  const a = e.target && e.target.closest && e.target.closest('a[href]');
-  if (!a) return;
-  if (!/^login\.html(\?|#|$)/.test(a.getAttribute('href') || '')) return;
-  const dest = (a.id === 'dlGateBtn') ? (location.origin + location.pathname + '#install') : location.href;
-  try { sessionStorage.setItem('flimify_next', dest); } catch (e2) {}
-}, true);
-
-
+  // OS-detected primary download
+  (function(){
+    var p = navigator.platform || '', ua = navigator.userAgent || '';
+    var isMac = /Mac/i.test(p) && !/iPhone|iPad/i.test(ua), isWin = /Win/i.test(p);
+    var MAC = document.getElementById('dlMac').href, WIN = document.getElementById('dlWin').href;
+    var btn = document.getElementById('primaryDl'), note = document.getElementById('osNote');
+    if (isMac){ btn.href = MAC; btn.innerHTML = 'Download for macOS'; note.innerHTML = 'On Windows? <a href="'+WIN+'">Get the Windows version</a> · or <a href="/studio/">use it in your browser</a>.'; }
+    else if (isWin){ btn.href = WIN; btn.innerHTML = 'Download for Windows'; note.innerHTML = 'On a Mac? <a href="'+MAC+'">Get the Mac version</a> · or <a href="/studio/">use it in your browser</a>.'; }
+    else { btn.href = '/studio/'; btn.innerHTML = 'Open in browser →'; note.innerHTML = 'Desktop apps for <a href="'+MAC+'">Mac</a> and <a href="'+WIN+'">Windows</a>.'; }
+  })();
 </script>
-
-<!-- Supabase auth: reflect signed-in state in the nav -->
-<script src="config.js"></script>
-<script type="module">
-  import { renderNav, supabase, sessionUser } from "./auth.js";
-  const mm = document.getElementById("mmSignin");
-  const navCta = document.getElementById("navCta");
-  function apply(u) {
-    renderNav(u);
-    if (navCta) navCta.textContent = u ? "Upgrade" : "Get it";   // logged in → Upgrade
-    if (mm) { if (u) { mm.textContent = "Your account"; mm.setAttribute("href", "account.html"); } else { mm.textContent = "Sign in"; mm.setAttribute("href", "login.html"); } }
-    // Download gate, only signed-in accounts see the download buttons.
-    const on = !!u;
-    const dlReal = document.getElementById("dlReal");
-    const dlGate = document.getElementById("dlGate");
-    const dlNote = document.getElementById("dlNote");
-    if (dlReal) dlReal.style.display = on ? "flex" : "none";
-    if (dlGate) dlGate.style.display = on ? "none" : "block";
-    if (dlNote) dlNote.style.display = on ? "block" : "none";
-    if (window.__installAuth) window.__installAuth(on);   // signed out → re-lock Continue
-  }
-  sessionUser().then(apply);                                                    // fast first paint
-  supabase.auth.onAuthStateChange((_event, session) => apply(session?.user ?? null));  // authoritative, uses the event's own session (no nested call = no deadlock)
-
-  // ── Checkout: "Get Creator" / "Get Studio" → Polar, via our server endpoint ──
-  // The plan is determined server-side from the verified session; the purchase is
-  // tied to the user's id so the webhook upgrades the right account.
-  async function startCheckout(plan, btn) {
-    const { data } = await supabase.auth.getSession();
-    const session = data && data.session;
-    if (!session) { location.href = "login.html"; return; }            // must be signed in
-    const label = btn ? btn.textContent : "";
-    if (btn) { btn.textContent = "Starting checkout…"; btn.style.pointerEvents = "none"; }
-    const annual = document.getElementById("billToggle")?.classList.contains("on");
-    const cycle = annual ? "yearly" : "monthly";
-    try {
-      const r = await fetch("/api/checkout?plan=" + encodeURIComponent(plan) + "&cycle=" + cycle, {
-        headers: { Authorization: "Bearer " + session.access_token },
-      });
-      const j = await r.json().catch(() => ({}));
-      if (r.ok && j.url) { location.href = j.url; return; }             // → Polar checkout
-      const detail = j.detail ? ("\n\n" + (typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail)).slice(0, 400)) : "";
-      alert((j.error || "Couldn't start checkout. Please try again.") + detail);
-    } catch {
-      alert("Couldn't reach checkout. Check your connection and try again.");
-    }
-    if (btn) { btn.textContent = label; btn.style.pointerEvents = ""; }
-  }
-  function resetCheckoutButtons() {
-    document.querySelectorAll("[data-plan]").forEach(b => {
-      if (b.dataset.origLabel != null) b.textContent = b.dataset.origLabel;
-      b.style.pointerEvents = "";
-    });
-  }
-  document.querySelectorAll("[data-plan]").forEach(b => {
-    b.dataset.origLabel = b.textContent;                 // remember "Get Creator" / "Get Studio"
-    b.addEventListener("click", e => { e.preventDefault(); startCheckout(b.getAttribute("data-plan"), b); });
-  });
-  // Hitting Back from Polar restores the page from bfcache with the button still
-  // frozen on "Starting checkout…". Reset it whenever the page is shown again.
-  window.addEventListener("pageshow", e => { if (e.persisted) resetCheckoutButtons(); });
-</script>
-
-<script>
-/* Reliable in-page anchor when arriving with a hash (e.g. dashboard "Upgrade plan"
-   → index.html#pricing). Native smooth-scroll-on-load is flaky — it animates from
-   the very top (looks like "it went to the top") and drifts as images/reveals
-   settle. So do an INSTANT jump, and re-assert once everything has loaded. */
-(function () {
-  var hash = location.hash;
-  if (!hash || hash.length < 2) return;
-  var el;
-  try { el = document.querySelector(hash); } catch (e) { return; }
-  if (!el) return;
-  function jump() { try { el.scrollIntoView({ behavior: 'auto', block: 'start' }); } catch (e) { el.scrollIntoView(); } }
-  jump();
-  requestAnimationFrame(jump);
-  window.addEventListener('load', function () { jump(); setTimeout(jump, 150); });
-})();
-</script>
-
 </body>
 </html>
