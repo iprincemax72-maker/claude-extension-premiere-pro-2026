@@ -176,123 +176,41 @@
 <!-- NAV -->
 <header class="nav" id="nav">
   <div class="nav-in">
-    <a href="#top" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Studio</small></span></a>
-    <nav class="nav-links">
-      <a href="#features">Features</a><a href="#how">Before &amp; after</a><a href="#download">Download</a><a href="premiere.html">Premiere&nbsp;extension</a>
-    </nav>
+    <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Studio</small></span></a>
     <div class="nav-cta">
+      <a href="premiere.html" style="font-size:.92rem;color:var(--text-2);align-self:center;margin-right:4px">Premiere&nbsp;extension</a>
       <a href="/studio/" class="btn btn-ghost">Open in browser</a>
-      <a href="#download" class="btn btn-primary">Download</a>
+      <a href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg" class="btn btn-primary">Download</a>
     </div>
   </div>
 </header>
 
 <a id="top"></a>
 
-<!-- HERO -->
+<!-- HERO + DOWNLOAD (the only section) -->
 <section class="hero">
   <div class="wrap">
-    <p class="eyebrow reveal">Desktop app · macOS &amp; Windows</p>
+    <p class="eyebrow reveal">Desktop app</p>
     <h1 class="reveal d1">Your whole video editor,<br><span class="coral">by just asking.</span></h1>
-    <p class="lede reveal d2">Flimify Studio is a full AI video editor for Mac &amp; Windows. Generate motion graphics, edit on a pro timeline, caption, auto-edit, and export to mp4, all in one app. The AI runs on your own Claude, so there's no API key and nothing to pay per render.</p>
-    <div class="hero-cta reveal d3">
-      <a class="btn btn-primary btn-lg" id="primaryDl" href="#download">Download for desktop</a>
-      <a class="btn btn-ghost btn-lg" href="/studio/">Open in browser →</a>
+    <p class="lede reveal d2" style="margin:1.2rem auto 0;max-width:42ch">The whole editor on your Mac or Windows. Runs on your own Claude, so it's free to run.</p>
+    <div class="hero-cta reveal d3" style="margin-top:2rem">
+      <a class="dl mac" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.5-.4 6.1 1 8.1.7 1 1.4 2.1 2.4 2 1-.04 1.3-.6 2.5-.6s1.5.6 2.6.6c1.1-.02 1.7-1 2.4-2 .8-1.2 1.1-2.3 1.1-2.3-.02-.01-2.1-.8-2.1-3.2zM14.5 6.1c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.5.9.07 1.8-.5 2.4-1.1z"/></svg> Download for macOS</a>
+      <a class="dl win" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio.Setup.0.1.0.exe"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.5 10.5 4.4v7.1H3zM11.4 4.3 21 3v8.5h-9.6zM3 12.5h7.5v7.1L3 18.5zM11.4 12.5H21V21l-9.6-1.3z"/></svg> Download for Windows</a>
     </div>
-    <p class="os-note" id="osNote"></p>
-    <div class="trust reveal d3">
-      <span>Runs on your own Claude</span><span class="dot"></span><span>No API key</span><span class="dot"></span><span>No per-render cost</span>
-    </div>
-
-    <div class="stage reveal d2">
-      <div class="frame"><img src="studio-shot.png" alt="Flimify Studio, timeline, live preview, and the AI copilot" /></div>
-    </div>
-  </div>
-</section>
-
-<!-- FEATURES -->
-<section class="section" id="features">
-  <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">What's inside</p><h2>One app, the whole pipeline.</h2><p class="lede">From the first idea to the exported mp4, generate, edit, caption, and ship without leaving Flimify Studio.</p></div>
-    <div class="fgrid">
-      <div class="fcard reveal"><div class="ic">✨</div><h3>AI motion graphics</h3><p>Describe an intro, lower-third, or overlay, it renders and lands right on your timeline.</p></div>
-      <div class="fcard reveal d1"><div class="ic">🎞️</div><h3>A pro timeline</h3><p>Snapping, undo/redo, split, ripple delete, fades, markers, track mute/solo/lock, zoom &amp; pan.</p></div>
-      <div class="fcard reveal d2"><div class="ic">💬</div><h3>Captions &amp; auto-edit</h3><p>Auto-caption your footage, and let it find the key moments and cut the dead air for you.</p></div>
-      <div class="fcard reveal"><div class="ic">🔑</div><h3>No API key</h3><p>Generation runs on the Claude you already pay for, so there are no keys to paste and no per-render fees.</p></div>
-      <div class="fcard reveal d1"><div class="ic">🖥️</div><h3>Mac, Windows &amp; web</h3><p>A native desktop app for both platforms, plus the full editor in your browser.</p></div>
-      <div class="fcard reveal d2"><div class="ic">⬇️</div><h3>Export to mp4</h3><p>The timeline <i>is</i> the composition, what you preview is exactly what you export.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- BEFORE / AFTER -->
-<section class="section" id="how">
-  <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">The difference</p><h2>Before &amp; after.</h2></div>
-    <div class="compare">
-      <div class="col old reveal"><span class="tag">Without</span><div class="ctime">~2<span>hrs</span></div><h3>The usual way</h3><ul>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Open a heavy editor</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Cut &amp; keyframe by hand</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> Export, re-import, hope it fits</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> A change? Start over</li>
-      </ul></div>
-      <div class="col new reveal d1"><span class="tag">With Flimify Studio</span><div class="ctime">~90<span>sec</span></div><h3>The new way</h3><ul>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Type one sentence</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> On your timeline in ~90s</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Caption &amp; export in the same app</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> A change? Just say so</li>
-      </ul></div>
-    </div>
-  </div>
-</section>
-
-<!-- DOWNLOAD -->
-<section class="section" id="download">
-  <div class="wrap">
-    <div class="dlbox reveal">
-      <p class="eyebrow">Get the app</p>
-      <h2 style="margin-top:10px">Download Flimify&nbsp;Studio.</h2>
-      <p class="lede" style="margin:14px auto 0;max-width:48ch">Free to download. Bring your own Claude, and start editing.</p>
-      <div class="dlrow">
-        <a class="dl mac" id="dlMac" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.5-.4 6.1 1 8.1.7 1 1.4 2.1 2.4 2 1-.04 1.3-.6 2.5-.6s1.5.6 2.6.6c1.1-.02 1.7-1 2.4-2 .8-1.2 1.1-2.3 1.1-2.3-.02-.01-2.1-.8-2.1-3.2zM14.5 6.1c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.5.9.07 1.8-.5 2.4-1.1z"/></svg> Download for macOS</a>
-        <a class="dl win" id="dlWin" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio.Setup.0.1.0.exe"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.5 10.5 4.4v7.1H3zM11.4 4.3 21 3v8.5h-9.6zM3 12.5h7.5v7.1L3 18.5zM11.4 12.5H21V21l-9.6-1.3z"/></svg> Download for Windows</a>
-      </div>
-      <p class="dlnote">macOS is Apple&nbsp;Silicon (<code>.dmg</code>); Windows is a one-click installer (<code>.exe</code>). Prefer no install? <a href="/studio/" style="color:var(--coral)">Open it in your browser →</a></p>
-    </div>
+    <p class="os-note reveal d3">Free. Mac (Apple&nbsp;Silicon) or Windows, one click. <a href="/studio/">Open Flimify in browser →</a></p>
   </div>
 </section>
 
 <!-- FOOTER -->
 <footer class="footer">
-  <div class="wrap">
-    <div class="footer-top">
-      <div>
-        <a href="#top" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Studio</small></span></a>
-        <p class="blurb">An AI video editor that runs on your own Claude, generate, edit, caption, and export, all in one app.</p>
-      </div>
-      <div class="footer-links">
-        <div>
-          <h4>App</h4>
-          <ul>
-            <li><a href="#download">Download</a></li>
-            <li><a href="/studio/">Open in browser</a></li>
-            <li><a href="#features">Features</a></li>
-          </ul>
-        </div>
-        <div>
-          <h4>Flimify</h4>
-          <ul>
-            <li><a href="premiere.html">Premiere extension</a></li>
-            <li><a href="premiere.html#pricing">Pricing</a></li>
-            <li><a href="account.html">Account</a></li>
-          </ul>
-        </div>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <p>© Flimify</p>
-      <p>Runs on your own Claude</p>
-    </div>
+  <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:30px 0">
+    <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Studio</small></span></a>
+    <nav style="display:flex;gap:20px;font-size:.9rem;flex-wrap:wrap">
+      <a href="premiere.html">Premiere extension</a>
+      <a href="/studio/">Web app</a>
+      <a href="account.html">Account</a>
+    </nav>
+    <span style="font-size:.85rem;color:var(--text-3)">© Flimify · Runs on your own Claude</span>
   </div>
 </footer>
 
@@ -306,17 +224,6 @@
     var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); }, {threshold:0.12, rootMargin:'0px 0px -8% 0px'});
     document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
   } else { document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); }); }
-
-  // OS-detected primary download
-  (function(){
-    var p = navigator.platform || '', ua = navigator.userAgent || '';
-    var isMac = /Mac/i.test(p) && !/iPhone|iPad/i.test(ua), isWin = /Win/i.test(p);
-    var MAC = document.getElementById('dlMac').href, WIN = document.getElementById('dlWin').href;
-    var btn = document.getElementById('primaryDl'), note = document.getElementById('osNote');
-    if (isMac){ btn.href = MAC; btn.innerHTML = 'Download for macOS'; note.innerHTML = 'On Windows? <a href="'+WIN+'">Get the Windows version</a> · or <a href="/studio/">use it in your browser</a>.'; }
-    else if (isWin){ btn.href = WIN; btn.innerHTML = 'Download for Windows'; note.innerHTML = 'On a Mac? <a href="'+MAC+'">Get the Mac version</a> · or <a href="/studio/">use it in your browser</a>.'; }
-    else { btn.href = '/studio/'; btn.innerHTML = 'Open in browser →'; note.innerHTML = 'Desktop apps for <a href="'+MAC+'">Mac</a> and <a href="'+WIN+'">Windows</a>.'; }
-  })();
 </script>
 </body>
 </html>
