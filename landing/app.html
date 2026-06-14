@@ -130,7 +130,7 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
     <aside class="controls">
       <div class="bstat" id="bstat">Looking for your local Claude bridge…</div>
       <div class="field" id="keyField">
-        <label>Anthropic API key <span class="req" id="keyReq">*</span></label>
+        <label for="key">Anthropic API key <span class="req" id="keyReq">*</span></label>
         <div class="key-row">
           <input id="key" class="inp" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
           <button class="icon-btn" id="eye" title="Show / hide" aria-label="Show or hide key"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
@@ -139,7 +139,7 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
       </div>
 
       <div class="field">
-        <label>Model</label>
+        <label for="model">Model</label>
         <select id="model" class="sel">
           <option value="claude-sonnet-4-6">Claude Sonnet 4.6 · fast</option>
           <option value="claude-opus-4-8">Claude Opus 4.8 · best quality</option>
@@ -148,7 +148,7 @@ header.bar{display:flex;align-items:center;justify-content:space-between;gap:14p
       </div>
 
       <div class="field">
-        <label>Describe the motion graphic <span class="req">*</span></label>
+        <label for="prompt">Describe the motion graphic <span class="req">*</span></label>
         <textarea id="prompt" class="ta" placeholder="e.g. A glassy subscribe button, vertical 1080×1920, that springs in with a soft cursor tap and a ripple. Calm, not flashy."></textarea>
         <div class="chips" id="chips">
           <span class="chip">Glassy subscribe button, vertical</span>

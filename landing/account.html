@@ -19,7 +19,7 @@
 <div class="auth-bg"></div>
 
 <header class="dash-top">
-  <a href="index.html" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>for Premiere Pro</small></span></a>
+  <a href="index.html" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify</span></a>
   <div class="dash-top-right">
     <span class="dash-chip"><span class="ci" id="chipAva">·</span><span id="chipName">…</span></span>
     <button class="btn-text" id="signOut">Sign out</button>
@@ -109,7 +109,7 @@
       document.documentElement.style.visibility = '';   // invalid/cross-origin → just show the dashboard
     }
 
-    const name = u.user_metadata?.full_name || u.user_metadata?.name || u.email.split("@")[0];
+    const name = u.user_metadata?.full_name || u.user_metadata?.name || (u.email ? u.email.split("@")[0] : "there");
     const first = name.split(" ")[0];
     const avatar = u.user_metadata?.avatar_url;
     $("hello").textContent = "Welcome back, " + first;
