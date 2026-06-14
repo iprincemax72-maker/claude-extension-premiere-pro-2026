@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Flimify Studio — AI video editor that runs on your own Claude</title>
+<meta name="description" content="Flimify Studio is an AI-native video editor for Mac, Windows, and the browser. Generate motion graphics, edit on a pro timeline, auto-edit, caption, and export — the AI runs on your own Claude, no API key, no per-render cost." />
+<link rel="icon" href="/favicon.png" />
+<meta property="og:title" content="Flimify Studio — AI video editor" />
+<meta property="og:description" content="Generate, edit, caption, and export. The AI runs on your own Claude — no API key." />
+<style>
+  :root{
+    --bg:#0a0a0c; --panel:#141418; --line:#26262e; --text:#f3f3f5; --dim:#9a9aa5;
+    --accent:#d97757; --accent-rgb:217,119,87; --violet:#8b6dd9;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(900px 520px at 78% -8%, rgba(var(--accent-rgb),.16), transparent 60%),
+      radial-gradient(720px 480px at 12% 4%, rgba(139,109,217,.12), transparent 60%);
+  }
+  a{color:inherit}
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px}
+
+  nav{display:flex; align-items:center; gap:14px; padding:20px 0}
+  .logo{width:36px; height:36px; border-radius:10px; background:linear-gradient(150deg,#f0a07e,var(--accent)); color:#1a0f0a; display:grid; place-items:center; font-weight:800; font-size:20px; box-shadow:0 8px 24px -8px rgba(var(--accent-rgb),.6)}
+  nav b{font-size:17px; letter-spacing:-.01em}
+  nav b span{color:var(--dim); font-weight:600}
+  nav .spacer{flex:1}
+  nav a.ghost{color:var(--dim); text-decoration:none; font-size:14px; padding:8px 14px; border-radius:9px; border:1px solid var(--line)}
+  nav a.ghost:hover{color:var(--text); border-color:rgba(var(--accent-rgb),.45)}
+
+  .hero{padding:64px 0 40px; text-align:center}
+  .badge{display:inline-flex; align-items:center; gap:8px; font-size:12.5px; color:var(--dim); border:1px solid var(--line); border-radius:999px; padding:6px 14px; margin-bottom:26px}
+  .badge .dot{width:7px; height:7px; border-radius:50%; background:#46d27a; box-shadow:0 0 8px #46d27a}
+  h1{font-size:clamp(34px,6vw,62px); line-height:1.05; letter-spacing:-.03em; margin:0 0 18px; font-weight:800}
+  h1 .grad{background:linear-gradient(120deg,var(--accent),var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .sub{font-size:clamp(16px,2.2vw,20px); color:var(--dim); max-width:660px; margin:0 auto 34px}
+  .cta-row{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; align-items:center}
+  .btn{display:inline-flex; align-items:center; gap:10px; text-decoration:none; font-weight:600; font-size:15px; padding:14px 24px; border-radius:12px; cursor:pointer; border:0; transition:transform .12s ease, box-shadow .12s ease}
+  .btn.primary{background:linear-gradient(180deg,#e08a66,var(--accent)); color:#fff; box-shadow:0 12px 30px -8px rgba(var(--accent-rgb),.55)}
+  .btn.primary:hover{transform:translateY(-1px); box-shadow:0 16px 38px -8px rgba(var(--accent-rgb),.7)}
+  .btn.ghost{background:rgba(255,255,255,.03); color:var(--text); border:1px solid var(--line)}
+  .btn.ghost:hover{border-color:rgba(var(--accent-rgb),.5)}
+  .btn small{opacity:.65; font-weight:500}
+  .os-note{margin-top:14px; font-size:12.5px; color:var(--dim)}
+  .os-note a{color:rgb(var(--accent-rgb)); text-decoration:none}
+
+  .shot{margin:54px auto 0; max-width:980px; border-radius:16px; overflow:hidden; border:1px solid var(--line); box-shadow:0 40px 90px -30px rgba(0,0,0,.8); background:#0d0d10}
+  .shot img{display:block; width:100%}
+  .shot-fallback{aspect-ratio:16/9; display:grid; place-items:center; color:var(--dim); font-size:14px; background:
+    radial-gradient(600px 300px at 70% 0%, rgba(var(--accent-rgb),.12), transparent 60%), #0d0d10}
+
+  .features{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; padding:72px 0 16px}
+  .feat{background:color-mix(in srgb, var(--panel) 70%, transparent); border:1px solid var(--line); border-radius:14px; padding:22px}
+  .feat .ic{width:36px; height:36px; border-radius:9px; display:grid; place-items:center; font-size:18px; background:rgba(var(--accent-rgb),.14); margin-bottom:12px}
+  .feat h3{margin:0 0 6px; font-size:15.5px}
+  .feat p{margin:0; color:var(--dim); font-size:13.5px}
+
+  .download{margin:64px 0; text-align:center; background:color-mix(in srgb, var(--panel) 60%, transparent); border:1px solid var(--line); border-radius:18px; padding:48px 24px}
+  .download h2{font-size:30px; letter-spacing:-.02em; margin:0 0 8px}
+  .download p{color:var(--dim); margin:0 0 28px}
+  .dl-grid{display:flex; gap:14px; justify-content:center; flex-wrap:wrap}
+  .dl{display:flex; align-items:center; gap:14px; text-decoration:none; background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:14px; padding:16px 22px; min-width:230px; transition:border-color .12s ease, transform .12s ease}
+  .dl:hover{border-color:rgba(var(--accent-rgb),.5); transform:translateY(-1px)}
+  .dl .glyph{font-size:26px}
+  .dl .t b{display:block; font-size:15px}
+  .dl .t span{font-size:12px; color:var(--dim)}
+
+  footer{border-top:1px solid var(--line); padding:30px 0 50px; color:var(--dim); font-size:13px; display:flex; gap:16px; align-items:center; flex-wrap:wrap}
+  footer .spacer{flex:1}
+  footer a{color:var(--dim); text-decoration:none}
+  footer a:hover{color:var(--text)}
+  @media (max-width:760px){ .features{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <nav>
+      <span class="logo">F</span>
+      <b>Flimify <span>Studio</span></b>
+      <span class="spacer"></span>
+      <a class="ghost" href="#download">Download</a>
+      <a class="ghost" href="/app">Open editor →</a>
+    </nav>
+
+    <section class="hero">
+      <div class="badge"><span class="dot"></span> Runs on your own Claude · no API key</div>
+      <h1>The AI video editor that<br><span class="grad">costs nothing to run.</span></h1>
+      <p class="sub">Generate motion graphics, edit on a pro timeline, auto-edit, caption, and export to mp4 — all in one app. The AI runs on <b>your own Claude subscription</b>, so there's no API key and no per-render cost.</p>
+      <div class="cta-row">
+        <a class="btn primary" id="primaryDl" href="#download">Download <small>·</small></a>
+        <a class="btn ghost" href="/app">Open in browser →</a>
+      </div>
+      <div class="os-note" id="osNote"></div>
+
+      <div class="shot">
+        <div class="shot-fallback" id="shotFallback">Flimify Studio — timeline + AI copilot</div>
+        <img id="shot" src="/screenshot.png" alt="Flimify Studio editor" style="display:none" onload="this.style.display='block';document.getElementById('shotFallback').style.display='none'" />
+      </div>
+    </section>
+
+    <section class="features">
+      <div class="feat"><div class="ic">✨</div><h3>AI motion graphics</h3><p>Describe an intro, lower-third, or overlay — it renders and drops onto your timeline.</p></div>
+      <div class="feat"><div class="ic">🎞️</div><h3>Pro timeline</h3><p>Snapping, undo/redo, split, ripple delete, fades, markers, track mute/solo/lock, zoom.</p></div>
+      <div class="feat"><div class="ic">💬</div><h3>Captions + auto-edit</h3><p>Auto-caption your footage and let it find the key moments and cut the dead air.</p></div>
+      <div class="feat"><div class="ic">🔑</div><h3>No API key</h3><p>Generation runs on the Claude you already pay for — no extra keys, no per-render fees.</p></div>
+      <div class="feat"><div class="ic">🖥️</div><h3>Mac, Windows &amp; web</h3><p>A native desktop app for Mac and Windows, plus a full browser version.</p></div>
+      <div class="feat"><div class="ic">⬇️</div><h3>Export to mp4</h3><p>The timeline IS the composition — what you preview is exactly what you export.</p></div>
+    </section>
+
+    <section class="download" id="download">
+      <h2>Download Flimify Studio</h2>
+      <p>Free to download. Bring your own Claude.</p>
+      <div class="dl-grid">
+        <a class="dl" href="/download/mac"><span class="glyph"></span><span class="t"><b>Download for Mac</b><span>Apple Silicon · .dmg</span></span></a>
+        <a class="dl" href="/download/win"><span class="glyph">⊞</span><span class="t"><b>Download for Windows</b><span>64-bit · installer</span></span></a>
+        <a class="dl" href="/app"><span class="glyph">🌐</span><span class="t"><b>Open in browser</b><span>No install · use it now</span></span></a>
+      </div>
+    </section>
+
+    <footer>
+      <span class="logo" style="width:26px;height:26px;font-size:14px;border-radius:7px">F</span>
+      <span>Flimify Studio</span>
+      <span class="spacer"></span>
+      <a href="/app">Web editor</a>
+      <a href="#download">Download</a>
+    </footer>
+  </div>
+
+<script>
+  // highlight the visitor's platform on the primary button
+  (function(){
+    var p = navigator.platform || '', ua = navigator.userAgent || '';
+    var isMac = /Mac/i.test(p) && !/iPhone|iPad/i.test(ua);
+    var isWin = /Win/i.test(p);
+    var btn = document.getElementById('primaryDl'), note = document.getElementById('osNote');
+    if (isMac) { btn.href = '/download/mac'; btn.innerHTML = 'Download for Mac <small>· Apple Silicon</small>'; note.innerHTML = 'On Windows? <a href="/download/win">Get the Windows version</a> · or <a href="/app">use it in your browser</a>.'; }
+    else if (isWin) { btn.href = '/download/win'; btn.innerHTML = 'Download for Windows <small>· 64-bit</small>'; note.innerHTML = 'On a Mac? <a href="/download/mac">Get the Mac version</a> · or <a href="/app">use it in your browser</a>.'; }
+    else { btn.href = '/app'; btn.innerHTML = 'Open in browser →'; note.innerHTML = 'Desktop apps available for <a href="/download/mac">Mac</a> and <a href="/download/win">Windows</a>.'; }
+  })();
+</script>
+</body>
+</html>

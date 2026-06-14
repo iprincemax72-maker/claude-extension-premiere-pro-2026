@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Open Flimify Studio</title>
+<meta name="description" content="Launch the Flimify Studio editor — generate, edit, and export video without Premiere." />
+<!-- ┌──────────────────────────────────────────────────────────────────────┐
+     │  WHERE THE EDITOR LIVES.  Point this at your deployed bridge.         │
+     │  e.g. https://app.flimify.com/app  (subdomain — recommended)         │
+     │  or   https://flimify.com/editor   (path reverse-proxied to /app)    │
+     │  See DEPLOY-WEB.md. Drop this file on flimify.com as /launch.html and │
+     │  link your "Open editor →" button to it (or skip it and link the URL │
+     │  below directly).                                                     │
+     └──────────────────────────────────────────────────────────────────────┘ -->
+<script>
+  var EDITOR_URL = "https://app.flimify.com/app";   // ← change to your editor host
+  var AUTO_FORWARD_MS = 1100;                        // set 0 to disable auto-forward
+</script>
+<style>
+  :root{
+    --bg:#0a0a0c; --panel:#141418; --line:#26262e; --text:#f3f3f5; --dim:#9a9aa5;
+    --accent:#d97757; --accent-rgb:217,119,87;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:radial-gradient(1100px 700px at 50% -10%, rgba(var(--accent-rgb),.10), transparent 60%), var(--bg);
+    color:var(--text); font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+    display:grid; place-items:center; min-height:100%; -webkit-font-smoothing:antialiased;
+  }
+  .card{ text-align:center; padding:40px 28px; max-width:440px; animation:rise .5s cubic-bezier(.16,1,.3,1) both; }
+  @keyframes rise{from{opacity:0; transform:translateY(10px) scale(.98)}to{opacity:1; transform:none}}
+  .logo{
+    width:72px; height:72px; margin:0 auto 22px; border-radius:18px;
+    background:linear-gradient(150deg, #f0a07e, var(--accent)); color:#1a0f0a;
+    display:grid; place-items:center; font-weight:800; font-size:38px; letter-spacing:-1px;
+    box-shadow:0 14px 40px -10px rgba(var(--accent-rgb),.6);
+  }
+  h1{ margin:0 0 6px; font-size:26px; letter-spacing:-.02em; }
+  h1 .dim{ color:var(--dim); font-weight:600; }
+  p{ margin:0 0 26px; color:var(--dim); }
+  .cta{
+    display:inline-flex; align-items:center; gap:9px; text-decoration:none;
+    background:linear-gradient(180deg, #e08a66, var(--accent)); color:#fff; font-weight:600; font-size:15px;
+    padding:13px 26px; border-radius:11px; border:0; cursor:pointer;
+    box-shadow:0 10px 28px -8px rgba(var(--accent-rgb),.55); transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .cta:hover{ transform:translateY(-1px); box-shadow:0 14px 34px -8px rgba(var(--accent-rgb),.7); }
+  .cta:active{ transform:translateY(0) scale(.985); }
+  .arrow{ transition:transform .15s ease; }
+  .cta:hover .arrow{ transform:translateX(3px); }
+  .sub{ margin-top:18px; font-size:12.5px; color:var(--dim); }
+  .sub a{ color:rgb(var(--accent-rgb)); text-decoration:none; }
+  .spark{ display:inline-block; width:6px; height:6px; border-radius:50%; background:rgb(var(--accent-rgb)); margin-right:7px; vertical-align:middle; animation:pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse{0%,100%{opacity:.4; transform:scale(.8)}50%{opacity:1; transform:scale(1.1)}}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">F</div>
+    <h1>Flimify <span class="dim">Studio</span></h1>
+    <p>Your AI video editor — generate motion graphics, auto-edit, and caption, right in the browser.</p>
+    <a id="go" class="cta" href="#">Open the editor <span class="arrow">→</span></a>
+    <div class="sub"><span class="spark"></span>Opening automatically…</div>
+  </div>
+<script>
+  (function(){
+    var a = document.getElementById('go');
+    a.href = EDITOR_URL;
+    if (AUTO_FORWARD_MS > 0) setTimeout(function(){ location.href = EDITOR_URL; }, AUTO_FORWARD_MS);
+  })();
+</script>
+</body>
+</html>
