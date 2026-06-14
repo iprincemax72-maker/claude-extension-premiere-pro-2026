@@ -165,6 +165,22 @@
   html.js .reveal.in{opacity:1;transform:none;filter:none}
   .reveal.d1{transition-delay:0.07s}.reveal.d2{transition-delay:0.14s}.reveal.d3{transition-delay:0.21s}
   @media (prefers-reduced-motion:reduce){html.js .reveal{opacity:1;transform:none;filter:none;transition:none}}
+/* account chip + dropdown — same login UI as the Premiere page */
+.nav-acct { position: relative; }
+.nav-acct .acct-chip { display: inline-flex; padding: 0; border: 0; background: none; border-radius: 50%; line-height: 0; cursor: pointer; }
+.nav-acct .acct-chip img, .nav-acct .acct-chip .acct-i { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; border: 2px solid var(--line-2); transition: border-color .15s var(--ease), transform .15s var(--ease); }
+.nav-acct .acct-chip:hover img, .nav-acct .acct-chip:hover .acct-i { border-color: var(--coral); transform: translateY(-1px); }
+.nav-acct .acct-chip .acct-i { display: grid; place-items: center; background: var(--coral); color: #15110d; font-size: .92rem; font-weight: 700; }
+.acct-menu { position: absolute; top: calc(100% + 10px); right: 0; min-width: 184px; background: var(--s1s); border: 1px solid var(--line-2); border-radius: 13px; padding: 6px; z-index: 300; box-shadow: 0 1px 0 var(--hi) inset, 0 22px 46px -22px rgba(0,0,0,.85); display: flex; flex-direction: column; gap: 2px; animation: acctIn .16s var(--ease); }
+.acct-menu[hidden] { display: none; }
+@keyframes acctIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.acct-menu .acct-who { padding: 8px 10px 9px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.acct-menu .acct-who b { display: block; font-size: .88rem; font-weight: 600; color: var(--text); }
+.acct-menu .acct-who span { display: block; font-size: .74rem; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct-menu a, .acct-menu button { display: flex; align-items: center; gap: 10px; font: 500 .9rem var(--sans); color: var(--text); background: none; border: 0; border-radius: 8px; padding: 9px 10px; cursor: pointer; text-align: left; width: 100%; text-decoration: none; }
+.acct-menu a:hover, .acct-menu button:hover { background: var(--s2); }
+.acct-menu svg { width: 16px; height: 16px; color: var(--text-3); flex: 0 0 auto; }
+.acct-menu #acctSignout, .acct-menu #acctSignout svg { color: var(--coral-2); }
 </style>
 <script>document.documentElement.className+=' js';</script>
 </head>
@@ -181,9 +197,42 @@
       <a href="premiere.html" style="font-size:.92rem;color:var(--text-2);align-self:center;margin-right:4px">Premiere&nbsp;extension</a>
       <a href="/studio/" class="btn btn-ghost">Open in browser</a>
       <a href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg" class="btn btn-primary">Download</a>
+      <a href="login.html" class="btn btn-ghost nav-signin" id="navSignin">Sign in</a>
+      <div class="nav-acct" id="navAcct" hidden></div>
     </div>
   </div>
 </header>
+
+<script>
+/* Anti-flash: reflect the persisted Supabase session before supabase-js loads,
+   so the nav never flashes "Sign in" on refresh. auth.js then reconciles. */
+(function () {
+  try {
+    var KEY = 'sb-hwsyaqmkwitxprtnrzkj-auth-token';
+    var raw = localStorage.getItem(KEY);
+    if (raw == null && localStorage.getItem(KEY + '.0') != null) { raw = ''; for (var i = 0; localStorage.getItem(KEY + '.' + i) != null; i++) raw += localStorage.getItem(KEY + '.' + i); }
+    if (!raw) return;
+    var user = null, expired = false;
+    try {
+      var t = raw;
+      if (t.slice(0, 7) === 'base64-') t = atob(t.slice(7).replace(/-/g, '+').replace(/_/g, '/'));
+      var s = JSON.parse(t); var sess = s.currentSession || s.session || s; user = sess && sess.user;
+      if (sess && sess.expires_at && sess.expires_at * 1000 < Date.now()) expired = true;
+    } catch (_) {}
+    if (expired) return;
+    var signin = document.getElementById('navSignin'), acct = document.getElementById('navAcct');
+    if (signin) signin.style.display = 'none';
+    if (acct) {
+      var meta = (user && user.user_metadata) || {};
+      var name = meta.full_name || meta.name || (user && user.email) || 'Account';
+      var avatar = meta.avatar_url, initial = (name.trim()[0] || 'U').toUpperCase();
+      acct.innerHTML = '<button class="acct-chip" id="acctBtn" type="button" title="' + name + '">' +
+        (avatar ? '<img src="' + avatar + '" alt="" referrerpolicy="no-referrer">' : '<span class="acct-i">' + initial + '</span>') + '</button>';
+      acct.removeAttribute('hidden'); acct.style.display = '';
+    }
+  } catch (e) {}
+})();
+</script>
 
 <a id="top"></a>
 
@@ -224,6 +273,14 @@
     var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); }, {threshold:0.12, rootMargin:'0px 0px -8% 0px'});
     document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
   } else { document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); }); }
+</script>
+
+<!-- same Supabase login as the rest of the site -->
+<script src="config.js"></script>
+<script type="module">
+  import { renderNav, sessionUser, supabase } from "./auth.js";
+  sessionUser().then(renderNav);
+  supabase.auth.onAuthStateChange((_e, s) => renderNav(s?.user ?? null));
 </script>
 </body>
 </html>
