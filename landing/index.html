@@ -76,8 +76,10 @@
   .brand .glyph{width:28px;height:28px;flex:0 0 auto;object-fit:contain;filter:drop-shadow(0 0 8px rgba(226,136,95,.45))}
   .brand small{font-family:var(--mono);font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--coral);display:block;margin-top:1px;font-weight:400}
   .nav-links{display:flex;align-items:center;gap:1.7rem}
-  .nav-links a{font-size:0.9rem;font-weight:500;color:var(--text-2);transition:color 0.18s}
+  .nav-links a{position:relative;font-size:0.9rem;font-weight:500;color:var(--text-2);transition:color 0.18s}
   .nav-links a:hover{color:var(--text)}
+  .nav-links a::after{content:"";position:absolute;left:0;right:0;bottom:-7px;height:2px;border-radius:2px;background:var(--coral);transform:scaleX(0);transform-origin:left center;transition:transform 0.24s var(--ease)}
+  .nav-links a:hover::after{transform:scaleX(1)}
   .nav-cta{display:flex;align-items:center;gap:10px}
   @media (max-width:740px){.nav-links{display:none}}
 
@@ -273,7 +275,7 @@
   }
 
   /* compact nav on phones (secondary items live in the hero + footer) */
-  @media (max-width:640px){.nav-pre,.nav-browser{display:none}.nav-cta{gap:8px}.nav-cta .btn{padding:.7em 1em;font-size:.88rem}}
+  @media (max-width:640px){.nav-browser{display:none}.nav-cta{gap:8px}.nav-cta .btn{padding:.7em 1em;font-size:.88rem}}
 
   /* ════ split hero: tagline left, screenshot right (contained) ════ */
   .hero-split{position:relative;max-width:var(--maxw);margin-inline:auto;display:grid;grid-template-columns:minmax(0,540px) minmax(0,1fr);align-items:center;gap:clamp(26px,4vw,54px);padding:clamp(20px,3vw,46px) var(--gutter) clamp(38px,5vw,70px)}
@@ -305,10 +307,9 @@
   <div class="nav-in">
     <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Studio</small></span></a>
     <nav class="nav-links">
-      <a href="#features">Features</a><a href="#how">How it works</a><a href="#faq">FAQ</a>
+      <a href="#features">Features</a><a href="#how">How it works</a><a href="#faq">FAQ</a><a href="premiere.html">Premiere&nbsp;extension</a>
     </nav>
     <div class="nav-cta">
-      <a href="premiere.html" class="nav-pre" style="font-size:.92rem;color:var(--text-2);align-self:center;margin-right:4px">Premiere&nbsp;extension</a>
       <a href="/studio/" class="btn btn-ghost nav-browser">Open in browser</a>
       <a href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg" class="btn btn-primary">Download</a>
       <a href="login.html" class="btn btn-ghost nav-signin" id="navSignin">Sign in</a>
