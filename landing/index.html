@@ -243,15 +243,15 @@
   /* faq (native details) */
   .faq{max-width:760px;margin-inline:auto}
   .faq .qa{border-bottom:1px solid var(--line)}
-  .faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:20px;padding:22px 4px;font-family:var(--sans);font-size:1.08rem;font-weight:500;color:var(--text);transition:color .18s var(--ease)}
-  .faq summary::-webkit-details-marker{display:none}
-  .faq summary:hover{color:var(--coral)}
+  .faq .qa button{width:100%;display:flex;justify-content:space-between;align-items:center;gap:20px;padding:22px 4px;background:none;border:0;cursor:pointer;text-align:left;font-family:var(--sans);font-size:1.08rem;font-weight:500;color:var(--text);transition:color .18s var(--ease)}
+  .faq .qa button:hover{color:var(--coral)}
   .faq .pm{width:20px;height:20px;position:relative;color:var(--coral);flex:0 0 auto}
   .faq .pm::before,.faq .pm::after{content:"";position:absolute;background:currentColor;border-radius:2px;transition:transform .25s var(--ease)}
   .faq .pm::before{top:9px;left:1px;width:18px;height:2px}
   .faq .pm::after{top:1px;left:9px;width:2px;height:18px}
-  .faq .qa[open] .pm::after{transform:scaleY(0)}
-  .faq .ans{padding:0 4px 22px;color:var(--text-2);font-size:.98rem;line-height:1.6;max-width:66ch}
+  .faq .qa.open .pm::after{transform:scaleY(0)}
+  .faq .ans{max-height:0;overflow:hidden;transition:max-height .34s var(--ease)}
+  .faq .ans p{padding:0 4px 22px;margin:0;color:var(--text-2);font-size:.98rem;line-height:1.6;max-width:66ch}
   .faq .ans a{color:var(--coral)}
 
   /* cta lamp beam on the download band */
@@ -457,9 +457,9 @@
   <div class="wrap">
     <div class="section-head center reveal"><p class="eyebrow">Questions</p><h2>Good to know.</h2></div>
     <div class="faq reveal d1">
-      <details class="qa"><summary>Do I need an API key or pay per render?<span class="pm"></span></summary><div class="ans">No. Generation runs on the Claude CLI already installed on your machine, so there is no API key to set up and no per-render fee. If you already have a Claude subscription, it is free to run on it.</div></details>
-      <details class="qa"><summary>What can the AI actually do?<span class="pm"></span></summary><div class="ans">You describe motion graphics like intros, lower thirds, and animated overlays, and Flimify builds, renders, and drops them onto your timeline. You can request several versions of one prompt, ask for changes on any render, and queue prompts to run in sequence.</div></details>
-      <details class="qa"><summary>What does the free plan include?<span class="pm"></span></summary><div class="ans">The free plan lets you edit on the full timeline and export, with a limit of 10 renders per month. Auto-Edit and auto-captions are part of the Studio plan.</div></details>
+      <div class="qa"><button type="button">Do I need an API key or pay per render?<span class="pm"></span></button><div class="ans"><p>No. Generation runs on the Claude CLI already installed on your machine, so there is no API key to set up and no per-render fee. If you already have a Claude subscription, it is free to run on it.</p></div></div>
+      <div class="qa"><button type="button">What can the AI actually do?<span class="pm"></span></button><div class="ans"><p>You describe motion graphics like intros, lower thirds, and animated overlays, and Flimify builds, renders, and drops them onto your timeline. You can request several versions of one prompt, ask for changes on any render, and queue prompts to run in sequence.</p></div></div>
+      <div class="qa"><button type="button">What does the free plan include?<span class="pm"></span></button><div class="ans"><p>The free plan lets you edit on the full timeline and export, with a limit of 10 renders per month. Auto-Edit and auto-captions are part of the Studio plan.</p></div></div>
     </div>
   </div>
 </section>
@@ -502,6 +502,18 @@
       });
     });
   })();
+
+  // FAQ accordion: smooth open/close (single-open), animates max-height
+  document.querySelectorAll('.faq .qa button').forEach(function(btn){
+    btn.setAttribute('aria-expanded', 'false');
+    btn.addEventListener('click', function(){
+      var qa = btn.parentElement, ans = qa.querySelector('.ans'), isOpen = qa.classList.contains('open');
+      document.querySelectorAll('.faq .qa.open').forEach(function(o){
+        o.classList.remove('open'); o.querySelector('.ans').style.maxHeight = null; o.querySelector('button').setAttribute('aria-expanded', 'false');
+      });
+      if (!isOpen){ qa.classList.add('open'); ans.style.maxHeight = ans.scrollHeight + 'px'; btn.setAttribute('aria-expanded', 'true'); }
+    });
+  });
 </script>
 
 <!-- same Supabase login as the rest of the site -->
