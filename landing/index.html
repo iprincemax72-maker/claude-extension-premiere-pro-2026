@@ -56,7 +56,6 @@
   .atmos{position:fixed;inset:0;z-index:-2;pointer-events:none;overflow:hidden}
   .atmos b{position:absolute;border-radius:50%;filter:blur(10px);opacity:0.5}
   .atmos .b1{top:-16%;left:50%;width:75vw;height:55vw;max-width:1000px;max-height:720px;transform:translateX(-50%);background:radial-gradient(circle,rgba(226,136,95,0.20),transparent 60%)}
-  .atmos .b2{top:24%;right:-10%;width:50vw;height:50vw;max-width:620px;background:radial-gradient(circle,rgba(109,106,224,0.10),transparent 62%)}
   body::after{content:"";position:fixed;inset:0;z-index:9999;pointer-events:none;opacity:0.025;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 
   /* buttons */
@@ -325,11 +324,171 @@
   }
 </style>
 <script>document.documentElement.className+=' js';try{if(sessionStorage.getItem('pgx')){document.documentElement.classList.add('pgx-arriving');sessionStorage.removeItem('pgx');}}catch(e){}</script>
+<style>
+/* ════════════════════════════════════════════════════════════════
+   FX · Swiss editorial motion layer (additive, fx- prefixed)
+   Rides the EXISTING html.js .reveal -> .in IntersectionObserver
+   (adds no second observer). Animates transform / opacity / filter /
+   clip-path ONLY (zero reflow). One house ease (--ease, already in
+   the file) for soft fades + one crisp accent ease (--fx-sharp) for
+   typographic wipes/draws. Real motion blur on entrance. Full
+   prefers-reduced-motion off switch at the bottom (also disables the
+   two legacy unguarded anims: .vz-caret blink + .acct-menu slide).
+   ════════════════════════════════════════════════════════════════ */
+:root{ --fx-sharp:cubic-bezier(0.16,1,0.3,1); --fx-line-blur:14px; }
+
+/* 1 · HERO HEADLINE — line-by-line clip wipe + real motion blur.
+   JS wraps each line as .fx-line > .fx-line__i. The H1 is held hidden
+   until that runs so raw text never flashes; .fx-shown is the JS
+   failsafe / no-split fallback so it can never stay invisible. */
+html.js .fx-h1.reveal{transform:none;filter:none}            /* cancel the generic block reveal on the H1 only */
+html.js .fx-h1:not(.fx-split):not(.fx-shown){opacity:0}
+html.js .fx-h1.fx-split,html.js .fx-h1.fx-shown{opacity:1}
+.fx-h1 .fx-line{display:block;overflow:hidden;padding-block:.09em;margin-block:-.09em}
+.fx-h1 .fx-line__i{display:block;will-change:transform,filter;
+  transform:translateY(115%);filter:blur(var(--fx-line-blur));opacity:0;
+  transition:transform .85s var(--fx-sharp),filter .85s var(--fx-sharp),opacity .5s var(--ease)}
+.fx-h1.fx-in .fx-line__i{transform:none;filter:blur(0);opacity:1}
+.fx-h1.fx-in .fx-line:nth-child(1) .fx-line__i{transition-delay:.05s}
+.fx-h1.fx-in .fx-line:nth-child(2) .fx-line__i{transition-delay:.17s}
+
+/* 2 · HERO EYEBROW — coral hairline rule draws under the label */
+.hs-text .eyebrow{position:relative}
+.hs-text .eyebrow::after{content:"";position:absolute;left:0;right:0;bottom:-7px;height:1px;
+  background:var(--coral);transform:scaleX(0);transform-origin:left center;
+  transition:transform .6s var(--fx-sharp) .2s}
+.hs-text .eyebrow.reveal.in::after{transform:scaleX(1)}
+
+/* 3 · EDITOR SCREENSHOT — entrance rides .hs-shot's own .reveal; JS tilt +
+   parallax run on the inner .frame, so entrance and interaction never fight.
+   Plus a slow breathing glow behind the shot (coral, restrained). */
+.hs-shot{perspective:1600px}
+.hs-shot .frame{will-change:transform;transform:translateZ(0)}
+.hs-shot::before{animation:fx-breathe 8s ease-in-out infinite}
+@keyframes fx-breathe{0%,100%{opacity:.82;transform:scale(1)}50%{opacity:1;transform:scale(1.045)}}
+
+/* 4 · SECTION HEADINGS (How + FAQ) — eyebrow hairline + masked H2 wipe.
+   Container's generic reveal is neutralised so it only drives children. */
+html.js .fx-head.reveal{opacity:1;transform:none;filter:none;transition:none}
+html.js .fx-head .eyebrow{position:relative;display:inline-block;opacity:0;transform:translateY(9px);
+  transition:opacity .5s var(--ease),transform .55s var(--fx-sharp)}
+.fx-head.in .eyebrow{opacity:1;transform:none}
+.fx-head .eyebrow::after{content:"";position:absolute;left:0;right:0;bottom:-7px;height:1px;
+  background:var(--coral);transform:scaleX(0);transform-origin:left center;
+  transition:transform .6s var(--fx-sharp) .16s}
+.fx-head.in .eyebrow::after{transform:scaleX(1)}
+html.js .fx-head h2{clip-path:inset(0 100% 0 0);filter:blur(9px);opacity:0;
+  transition:clip-path .82s var(--fx-sharp) .12s,filter .82s var(--fx-sharp) .12s,opacity .45s var(--ease) .12s}
+.fx-head.in h2{clip-path:inset(0 0 0 0);filter:blur(0);opacity:1}
+html.js .fx-head .lede{opacity:0;transform:translateY(11px);
+  transition:opacity .6s var(--ease) .3s,transform .6s var(--ease) .3s}
+.fx-head.in .lede{opacity:1;transform:none}
+
+/* 5 · FEATURE VIZ — bring the static product demos to life on enter.
+   Each row keeps its own .reveal for the container; children are keyed to .in. */
+/* Row 1 · Generate — type the prompt, then drop the clips onto the timeline */
+html.js .feat-row .vz-typed{clip-path:inset(0 100% 0 0)}
+.feat-row.in .vz-typed{animation:fx-type 1.15s steps(28,end) .4s both}
+@keyframes fx-type{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+html.js .feat-row .vz-clip-a,html.js .feat-row .vz-clip-b{opacity:0;transform:translateX(-14px);
+  transition:opacity .5s var(--ease),transform .6s var(--fx-sharp)}
+.feat-row.in .vz-clip-a{opacity:1;transform:none;transition-delay:1.45s}
+.feat-row.in .vz-clip-b{opacity:1;transform:none;transition-delay:1.57s}
+/* Row 2 · Auto-Edit — draw the bar, then drop the markers in sequence
+   (the pins keep their centring translateX(-50%) throughout) */
+html.js .feat-row .vz-bar{transform:scaleX(0);transform-origin:left center;
+  transition:transform .7s var(--fx-sharp) .35s}
+.feat-row.in .vz-bar{transform:scaleX(1)}
+html.js .feat-row .vz-pin{opacity:0;transform:translateX(-50%) translateY(-13px);
+  transition:opacity .45s var(--ease),transform .55s var(--fx-sharp)}
+.feat-row.in .vz-pin{opacity:1;transform:translateX(-50%) translateY(0)}
+.feat-row.in .vz-track .vz-pin:nth-child(2){transition-delay:.85s}
+.feat-row.in .vz-track .vz-pin:nth-child(3){transition-delay:.98s}
+.feat-row.in .vz-track .vz-pin:nth-child(4){transition-delay:1.11s}
+/* Row 3 · Captions — the caption settles up out of blur, the word "changed" pops */
+html.js .feat-row .vz-cline{opacity:0;transform:translateY(15px);filter:blur(6px);
+  transition:opacity .6s var(--ease) .4s,transform .7s var(--fx-sharp) .4s,filter .7s var(--ease) .4s}
+.feat-row.in .vz-cline{opacity:1;transform:none;filter:blur(0)}
+.feat-row.in .vz-cline em{animation:fx-emph 1.1s var(--ease) 1.15s both}
+@keyframes fx-emph{0%,100%{transform:none;text-shadow:none}
+  45%{transform:translateY(-2px) scale(1.07);text-shadow:0 6px 22px rgba(226,136,95,.5)}}
+
+/* 6 · HOW-IT-WORKS FLOW — draw the rail, pop the 01/02/03 nodes in order */
+html.js .flow .flow-rail{clip-path:inset(0 100% 0 0);transition:clip-path .9s var(--fx-sharp) .15s}
+.flow.in .flow-rail{clip-path:inset(0 0 0 0)}
+html.js .flow .fnode{transform:scale(.5);opacity:0;
+  transition:transform .55s var(--fx-sharp),opacity .4s var(--ease)}
+.flow.in .fnode{transform:scale(1);opacity:1}
+.flow.in .fstep:nth-child(3) .fnode{transition-delay:.18s}
+.flow.in .fstep:nth-child(4) .fnode{transition-delay:.34s}
+
+/* 7 · FAQ — stagger the rows in, fade each answer on open.
+   .qa uses transform/opacity only and settles to none before any click;
+   .ans p is opacity-only — so the accordion's scrollHeight read is untouched. */
+html.js .faq.reveal{opacity:1;transform:none;filter:none;transition:none}   /* neutralise container; stagger rows */
+html.js .faq .qa{opacity:0;transform:translateY(16px);
+  transition:opacity .5s var(--ease),transform .6s var(--fx-sharp)}
+.faq.in .qa{opacity:1;transform:none}
+.faq.in .qa:nth-child(1){transition-delay:.04s}
+.faq.in .qa:nth-child(2){transition-delay:.15s}
+.faq.in .qa:nth-child(3){transition-delay:.26s}
+.faq .ans p{opacity:0;transition:opacity .35s var(--ease) .06s}
+.faq .qa.open .ans p{opacity:1}
+
+/* 8 · FOOTER — low-key staggered fade-up (rides the existing observer, no JS).
+   Container reveal neutralised so children stagger instead of double-fading. */
+html.js .footer .wrap.reveal{opacity:1;transform:none;filter:none;transition:none}
+html.js .footer .wrap.reveal>*{opacity:0;transform:translateY(14px);
+  transition:opacity .55s var(--ease),transform .6s var(--ease)}
+.footer .wrap.reveal.in>*{opacity:1;transform:none}
+.footer .wrap.reveal.in>*:nth-child(2){transition-delay:.08s}
+.footer .wrap.reveal.in>*:nth-child(3){transition-delay:.16s}
+
+/* 9 · NAV — brand glyph entrance pulse + a touch more elevation once scrolled */
+.nav .brand .glyph{animation:fx-glyph 1.2s var(--ease) .25s both}
+@keyframes fx-glyph{0%{transform:scale(.84);opacity:.35}55%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
+.nav.scrolled .nav-in{box-shadow:0 1px 0 var(--hi) inset,0 18px 44px -20px rgba(0,0,0,.85)}
+
+/* 10 · BACKGROUND CORAL GLOW — JS parallaxes it slower than the foreground
+   screenshot for true depth (keeps its translateX(-50%) centring) */
+.atmos .b1{will-change:transform}
+
+/* 11 · MAGNETIC BUTTONS — JS cursor-pull (inline transform, cleared on leave
+   so the existing :hover lift still works on touch/non-fine). Coral underglow
+   is scoped to the hero CTA buttons only, so it stays a restrained accent. */
+.fx-mag{will-change:transform}
+.hero-cta .dl{position:relative}
+.hero-cta .dl::after{content:"";position:absolute;inset:-6px;border-radius:15px;z-index:-1;opacity:0;
+  background:radial-gradient(ellipse at center,rgba(226,136,95,.55),transparent 70%);
+  filter:blur(13px);transition:opacity .3s var(--ease)}
+.hero-cta .dl:hover::after{opacity:.6}
+
+/* ════ prefers-reduced-motion — full off switch (incl. legacy unguarded anims) ════ */
+@media (prefers-reduced-motion:reduce){
+  html.js .fx-h1,html.js .fx-h1.reveal,html.js .fx-h1 .fx-line__i{
+    opacity:1!important;transform:none!important;filter:none!important;clip-path:none!important;transition:none!important}
+  .fx-h1 .fx-line{overflow:visible}
+  .hs-text .eyebrow::after,.fx-head .eyebrow::after{transform:scaleX(1)!important;transition:none!important}
+  html.js .fx-head.reveal,html.js .fx-head .eyebrow,html.js .fx-head h2,html.js .fx-head .lede{
+    opacity:1!important;transform:none!important;filter:none!important;clip-path:none!important;transition:none!important}
+  html.js .feat-row .vz-typed,html.js .feat-row .vz-clip-a,html.js .feat-row .vz-clip-b,
+  html.js .feat-row .vz-bar,html.js .feat-row .vz-cline,
+  html.js .faq .qa,html.js .flow .flow-rail,html.js .flow .fnode,
+  html.js .footer .wrap.reveal>*{
+    opacity:1!important;transform:none!important;filter:none!important;clip-path:none!important;transition:none!important;animation:none!important}
+  html.js .feat-row .vz-pin{opacity:1!important;transform:translateX(-50%)!important;transition:none!important}
+  .feat-row.in .vz-typed,.feat-row.in .vz-cline em,.nav .brand .glyph,.hs-shot::before,
+  .vz-caret,.acct-menu{animation:none!important}
+  .faq .ans p{opacity:1!important;transition:none!important}
+  .hs-shot .frame{transform:none!important}
+  .atmos .b1{transform:translateX(-50%)!important}
+}
+</style>
 </head>
 <body>
 
 <div class="grid-bg"></div>
-<div class="atmos"><b class="b1"></b><b class="b2"></b></div>
+<div class="atmos"><b class="b1"></b></div>
 
 <!-- page transition: build wipe -->
 <div id="pgx" aria-hidden="true">
@@ -346,8 +505,8 @@
     </nav>
     <div class="nav-cta">
       <a href="/studio/" class="btn btn-ghost nav-browser">Open in browser</a>
-      <a href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg" class="btn btn-primary">Download</a>
-      <a href="login.html" class="btn btn-ghost nav-signin" id="navSignin">Sign in</a>
+      <a href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg" class="btn btn-primary fx-mag">Download</a>
+      <a href="login.html" class="btn btn-ghost nav-signin fx-mag" id="navSignin">Sign in</a>
       <div class="nav-acct" id="navAcct" hidden></div>
     </div>
   </div>
@@ -390,11 +549,11 @@
 <section class="hero-split">
   <div class="hs-text">
     <p class="eyebrow reveal">Desktop app</p>
-    <h1 class="reveal d1">Your whole video editor,<br><span class="coral">by just asking.</span></h1>
+    <h1 class="reveal d1 fx-h1">Your whole video editor,<br><span class="coral">by just asking.</span></h1>
     <p class="lede reveal d2">The whole editor on your Mac or Windows. Runs on your own Claude, so it's free to run.</p>
     <div class="hero-cta reveal d3">
-      <a class="dl mac" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.5-.4 6.1 1 8.1.7 1 1.4 2.1 2.4 2 1-.04 1.3-.6 2.5-.6s1.5.6 2.6.6c1.1-.02 1.7-1 2.4-2 .8-1.2 1.1-2.3 1.1-2.3-.02-.01-2.1-.8-2.1-3.2zM14.5 6.1c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.5.9.07 1.8-.5 2.4-1.1z"/></svg> Download for macOS</a>
-      <a class="dl win" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio.Setup.0.1.0.exe"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.5 10.5 4.4v7.1H3zM11.4 4.3 21 3v8.5h-9.6zM3 12.5h7.5v7.1L3 18.5zM11.4 12.5H21V21l-9.6-1.3z"/></svg> Download for Windows</a>
+      <a class="dl mac fx-mag" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.5-.4 6.1 1 8.1.7 1 1.4 2.1 2.4 2 1-.04 1.3-.6 2.5-.6s1.5.6 2.6.6c1.1-.02 1.7-1 2.4-2 .8-1.2 1.1-2.3 1.1-2.3-.02-.01-2.1-.8-2.1-3.2zM14.5 6.1c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.5.9.07 1.8-.5 2.4-1.1z"/></svg> Download for macOS</a>
+      <a class="dl win fx-mag" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio.Setup.0.1.0.exe"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.5 10.5 4.4v7.1H3zM11.4 4.3 21 3v8.5h-9.6zM3 12.5h7.5v7.1L3 18.5zM11.4 12.5H21V21l-9.6-1.3z"/></svg> Download for Windows</a>
     </div>
     <p class="os-note reveal d3">Free. Mac (Apple&nbsp;Silicon) or Windows, one click. <a href="/studio/">Try in browser →</a></p>
   </div>
@@ -449,7 +608,7 @@
 <!-- HOW IT WORKS -->
 <section class="section" id="how">
   <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">How it works</p><h2>Footage in, finished mp4 out.</h2><p class="lede">Three steps from a raw clip to a render that matches your preview exactly.</p></div>
+    <div class="section-head center reveal fx-head"><p class="eyebrow">How it works</p><h2>Footage in, finished mp4 out.</h2><p class="lede">Three steps from a raw clip to a render that matches your preview exactly.</p></div>
     <div class="flow reveal d1">
       <div class="flow-rail"></div>
       <div class="fstep"><div class="fnode">01</div><h3>Bring in your footage</h3><p>Drag a video in or import it, and it lands on the timeline with its audio split onto a linked track you can move and mute.</p></div>
@@ -462,7 +621,7 @@
 <!-- FAQ -->
 <section class="section" id="faq">
   <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">Questions</p><h2>Good to know.</h2></div>
+    <div class="section-head center reveal fx-head"><p class="eyebrow">Questions</p><h2>Good to know.</h2></div>
     <div class="faq reveal d1">
       <div class="qa"><button type="button">Do I need an API key or pay per render?<span class="pm"></span></button><div class="ans"><p>No. Generation runs on the Claude CLI already installed on your machine, so there is no API key to set up and no per-render fee. If you already have a Claude subscription, it is free to run on it.</p></div></div>
       <div class="qa"><button type="button">What can the AI actually do?<span class="pm"></span></button><div class="ans"><p>You describe motion graphics like intros, lower thirds, and animated overlays, and Flimify builds, renders, and drops them onto your timeline. You can request several versions of one prompt, ask for changes on any render, and queue prompts to run in sequence.</p></div></div>
@@ -473,7 +632,7 @@
 
 <!-- FOOTER -->
 <footer class="footer">
-  <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:30px 0">
+  <div class="wrap reveal" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:30px 0">
     <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify</span></a>
     <nav style="display:flex;gap:20px;font-size:.9rem;flex-wrap:wrap">
       <a href="premiere.html">Premiere extension</a>
@@ -538,6 +697,123 @@
   import { renderNav, sessionUser, supabase } from "./auth.js";
   sessionUser().then(renderNav);
   supabase.auth.onAuthStateChange((_e, s) => renderNav(s?.user ?? null));
+</script>
+<script>
+/* FX · Swiss editorial motion — null-safe, reduced-motion-guarded.
+   Rides the existing .reveal -> .in observer (adds none of its own).
+   Does NOT touch the #pgx page transition or the FAQ accordion. */
+(function(){
+  "use strict";
+  var mqR = window.matchMedia ? matchMedia('(prefers-reduced-motion:reduce)') : {matches:false};
+  var reduce = mqR.matches;
+  var fine = window.matchMedia ? matchMedia('(pointer:fine)').matches : true;
+  var RAF = window.requestAnimationFrame || function(f){ return setTimeout(f,16); };
+  function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+
+  /* 1 · Hero headline → split into masked lines (by <br>), then wipe in */
+  var h1 = document.querySelector('.fx-h1');
+  (function(){
+    if (!h1) return;
+    try{
+      if (reduce){ h1.classList.add('fx-shown'); return; }
+      var groups = [[]];
+      Array.prototype.forEach.call(h1.childNodes, function(n){
+        if (n.nodeName === 'BR'){ groups.push([]); }
+        else { groups[groups.length-1].push(n); }
+      });
+      h1.textContent = '';
+      groups.forEach(function(g){
+        if (!g.length) return;
+        var line = document.createElement('span'); line.className = 'fx-line';
+        var inner = document.createElement('span'); inner.className = 'fx-line__i';
+        g.forEach(function(n){ inner.appendChild(n); });
+        line.appendChild(inner); h1.appendChild(line);
+      });
+      h1.classList.add('fx-split');
+      RAF(function(){ RAF(function(){ h1.classList.add('fx-in'); }); });
+    }catch(e){ h1.classList.add('fx-shown'); }
+  })();
+  /* failsafe: the headline can never be left hidden */
+  setTimeout(function(){
+    if (h1 && !h1.classList.contains('fx-split') && !h1.classList.contains('fx-shown')) h1.classList.add('fx-shown');
+  }, 1500);
+
+  if (reduce) return; /* everything below is pure enhancement */
+
+  /* 2 · Editor screenshot → pointer tilt + scroll parallax on the inner .frame,
+     lerped each frame so it settles buttery and the rAF idles when at rest.
+     (Entrance lives on .hs-shot's own .reveal, a different node — no conflict.) */
+  (function(){
+    var shot = document.querySelector('.hs-shot');
+    var frame = shot && shot.querySelector('.frame');
+    if (!frame) return;
+    var tRX=0,tRY=0,tPY=0, cRX=0,cRY=0,cPY=0, raf=0, hover=false;
+    function render(){
+      frame.style.transform =
+        'translate3d(0,'+cPY.toFixed(2)+'px,0) rotateX('+cRX.toFixed(2)+'deg) rotateY('+cRY.toFixed(2)+'deg)';
+    }
+    function loop(){
+      cRX+=(tRX-cRX)*0.09; cRY+=(tRY-cRY)*0.09; cPY+=(tPY-cPY)*0.12;
+      render();
+      if (hover || Math.abs(tRX-cRX)>0.01 || Math.abs(tRY-cRY)>0.01 || Math.abs(tPY-cPY)>0.04){ raf=RAF(loop); }
+      else { raf=0; }
+    }
+    function kick(){ if(!raf) raf=RAF(loop); }
+    if (fine){
+      shot.addEventListener('pointermove', function(e){
+        var r = shot.getBoundingClientRect();
+        var nx = (e.clientX-(r.left+r.width/2))/((r.width/2)||1);
+        var ny = (e.clientY-(r.top+r.height/2))/((r.height/2)||1);
+        tRY = clamp(nx,-1,1)*3.4;
+        tRX = clamp(ny,-1,1)*-2.6;
+        hover = true; kick();
+      }, {passive:true});
+      shot.addEventListener('pointerleave', function(){ tRX=0; tRY=0; hover=false; kick(); });
+    }
+    var st=false;
+    function onScroll(){
+      if (st) return; st=true;
+      RAF(function(){
+        var r = shot.getBoundingClientRect();
+        var vh = window.innerHeight || 800;
+        var p = clamp((r.top + r.height/2 - vh/2)/((vh/2 + r.height/2)||1), -1, 1);
+        tPY = p * -16; st=false; kick();
+      });
+    }
+    addEventListener('scroll', onScroll, {passive:true});
+    addEventListener('resize', onScroll, {passive:true});
+    onScroll();
+  })();
+
+  /* 3 · Background coral glow → slow scroll parallax (keeps translateX(-50%)) */
+  (function(){
+    var b1 = document.querySelector('.atmos .b1');
+    if (!b1) return;
+    var gt=false;
+    addEventListener('scroll', function(){
+      if (gt) return; gt=true;
+      RAF(function(){
+        var y = Math.min(140, (window.pageYOffset||0)*0.06);
+        b1.style.transform = 'translateX(-50%) translateY('+y.toFixed(1)+'px)';
+        gt=false;
+      });
+    }, {passive:true});
+  })();
+
+  /* 4 · Magnetic buttons → cursor pull via inline transform; cleared on leave so
+     the stylesheet :hover lift still works on touch / non-fine pointers */
+  if (fine){
+    Array.prototype.forEach.call(document.querySelectorAll('.fx-mag'), function(el){
+      el.addEventListener('pointermove', function(e){
+        var r = el.getBoundingClientRect();
+        var mx = (e.clientX-(r.left+r.width/2))*0.22;
+        var my = (e.clientY-(r.top+r.height/2))*0.30;
+        el.style.transform = 'translate('+mx.toFixed(1)+'px,'+(my-2).toFixed(1)+'px)';
+      }, {passive:true});
+      el.addEventListener('pointerleave', function(){ el.style.transform=''; });
+    });
+  }
+})();
 </script>
 </body>
 </html>
