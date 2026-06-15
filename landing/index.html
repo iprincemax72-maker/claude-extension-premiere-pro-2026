@@ -308,16 +308,6 @@
 
   /* ════ split hero: tagline left, screenshot right (contained) ════ */
   .hero-split{position:relative;max-width:var(--maxw);margin-inline:auto;display:grid;grid-template-columns:minmax(0,540px) minmax(0,1fr);align-items:center;gap:clamp(26px,4vw,54px);padding:clamp(20px,3vw,46px) var(--gutter) clamp(38px,5vw,70px)}
-  /* slowly-rotating background shapes (blue + off-white) behind the hero */
-  .hero-shapes{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;border-radius:28px}
-  .hs-spin{position:absolute;inset:-32%;animation:heroSpin 56s linear infinite}
-  .hs-spin b{position:absolute;border-radius:50%;filter:blur(52px)}
-  .hs-spin .sh1{width:40%;height:40%;background:#4382DF;opacity:.34;top:4%;left:2%}
-  .hs-spin .sh2{width:34%;height:34%;background:#F5F5F5;opacity:.14;bottom:8%;right:4%}
-  .hs-spin .sh3{width:28%;height:28%;background:#4382DF;opacity:.24;top:50%;left:48%}
-  @keyframes heroSpin{to{transform:rotate(360deg)}}
-  @media (prefers-reduced-motion:reduce){.hs-spin{animation:none}}
-  .hs-text,.hs-shot{position:relative;z-index:1}
   .hs-text{min-width:0}
   .hs-text .eyebrow{display:inline-block}
   .hs-text h1{font-size:clamp(2.2rem,3.6vw,3.3rem);margin-top:1.05rem}
@@ -398,7 +388,6 @@
 
 <!-- HERO: tagline left, editor screenshot right -->
 <section class="hero-split">
-  <div class="hero-shapes" aria-hidden="true"><div class="hs-spin"><b class="sh1"></b><b class="sh2"></b><b class="sh3"></b></div></div>
   <div class="hs-text">
     <p class="eyebrow reveal">Desktop app</p>
     <h1 class="reveal d1">Your whole video editor,<br><span class="coral">by just asking.</span></h1>
