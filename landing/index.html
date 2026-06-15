@@ -25,7 +25,7 @@
     --text:#FAFAFA; --text-2:#9a9aa1; --text-3:#7c7d87;
     --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.14); --hi:rgba(255,255,255,0.05);
     --coral:#E2885F; --coral-2:#F0A87E; --coral-press:#cc6f44; --btn:#F4F4F5; --btn-ink:#0a0a0b; --indigo:#6d6ae0;
-    --maxw:1140px; --gutter:clamp(20px,5vw,44px);
+    --maxw:1240px; --gutter:clamp(20px,5vw,44px);
     --sans:"Schibsted Grotesk",system-ui,-apple-system,sans-serif;
     --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
     --ease:cubic-bezier(0.22,1,0.36,1);
@@ -240,6 +240,27 @@
 
   /* compact nav on phones (secondary items live in the hero + footer) */
   @media (max-width:640px){.nav-pre,.nav-browser{display:none}.nav-cta{gap:8px}.nav-cta .btn{padding:.7em 1em;font-size:.88rem}}
+
+  /* ════ split hero: tagline left, editor screenshot right (full-bleed) ════ */
+  .hero-split{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.12fr);align-items:center;gap:clamp(20px,3vw,46px);padding:clamp(22px,3.2vw,52px) 0 clamp(40px,5vw,82px)}
+  .hs-text{padding-left:max(var(--gutter),calc((100vw - var(--maxw))/2 + var(--gutter)));padding-right:18px;min-width:0}
+  .hs-text .eyebrow{display:inline-block}
+  .hs-text h1{font-size:clamp(2.3rem,4vw,3.6rem);margin-top:1.05rem;max-width:15ch}
+  .hs-text .lede{margin-top:1.2rem;max-width:46ch}
+  .hs-text .hero-cta{display:flex;justify-content:flex-start;flex-wrap:wrap;margin-top:1.8rem}
+  .hs-text .os-note{margin-top:1rem}
+  .hs-shot{position:relative;min-width:0}
+  .hs-shot::before{content:"";position:absolute;left:3%;top:6%;width:94%;height:88%;background:radial-gradient(ellipse,rgba(226,136,95,0.22),transparent 64%);filter:blur(30px);z-index:-1}
+  .hs-shot .frame{border-radius:16px 0 0 16px;overflow:hidden;border:1px solid var(--line-2);border-right:0;box-shadow:0 40px 90px -36px rgba(0,0,0,0.9),0 1px 0 var(--hi) inset}
+  .hs-shot .frame img{width:100%;height:auto;display:block}
+  @media (max-width:920px){
+    .hero-split{grid-template-columns:1fr;gap:clamp(28px,5vw,40px);text-align:center;padding-bottom:clamp(34px,5vw,56px)}
+    .hs-text{padding:0 var(--gutter)}
+    .hs-text h1,.hs-text .lede{margin-inline:auto}
+    .hs-text .hero-cta{justify-content:center}
+    .hs-shot{padding:0 var(--gutter)}
+    .hs-shot .frame{border-radius:14px;border-right:1px solid var(--line-2)}
+  }
 </style>
 <script>document.documentElement.className+=' js';</script>
 </head>
@@ -298,25 +319,20 @@
 
 <a id="top"></a>
 
-<!-- HERO + DOWNLOAD (the only section) -->
-<section class="hero">
-  <div class="wrap">
+<!-- HERO: tagline left, editor screenshot right -->
+<section class="hero-split">
+  <div class="hs-text">
     <p class="eyebrow reveal">Desktop app</p>
     <h1 class="reveal d1">Your whole video editor,<br><span class="coral">by just asking.</span></h1>
-    <p class="lede reveal d2" style="margin:1.2rem auto 0;max-width:42ch">The whole editor on your Mac or Windows. Runs on your own Claude, so it's free to run.</p>
-    <div class="hero-cta reveal d3" style="margin-top:2rem">
+    <p class="lede reveal d2">The whole editor on your Mac or Windows. Runs on your own Claude, so it's free to run.</p>
+    <div class="hero-cta reveal d3">
       <a class="dl mac" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.5-.4 6.1 1 8.1.7 1 1.4 2.1 2.4 2 1-.04 1.3-.6 2.5-.6s1.5.6 2.6.6c1.1-.02 1.7-1 2.4-2 .8-1.2 1.1-2.3 1.1-2.3-.02-.01-2.1-.8-2.1-3.2zM14.5 6.1c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.5.9.07 1.8-.5 2.4-1.1z"/></svg> Download for macOS</a>
       <a class="dl win" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio.Setup.0.1.0.exe"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.5 10.5 4.4v7.1H3zM11.4 4.3 21 3v8.5h-9.6zM3 12.5h7.5v7.1L3 18.5zM11.4 12.5H21V21l-9.6-1.3z"/></svg> Download for Windows</a>
     </div>
     <p class="os-note reveal d3">Free. Mac (Apple&nbsp;Silicon) or Windows, one click. <a href="/studio/">Open Flimify in browser →</a></p>
   </div>
-</section>
-
-<!-- PRODUCT SHOWCASE -->
-<section class="section" id="product" style="padding-top:clamp(22px,4vw,48px)">
-  <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">The editor</p><h2>One window. The whole edit.</h2><p class="lede">A real multi-track timeline, a live preview, Effect Controls, and an AI copilot that renders graphics straight onto your tracks, all in the same place.</p></div>
-    <div class="stage reveal d1"><div class="frame"><img src="editor-shot.png" width="1919" height="966" alt="The Flimify Studio editor with a clip on the timeline, the live preview, and the AI copilot panel" /></div></div>
+  <div class="hs-shot reveal d2">
+    <div class="frame"><img src="editor-hero.png" width="1919" height="973" alt="The Flimify Studio editor with a clip on the timeline, the live preview, and the AI copilot panel" /></div>
   </div>
 </section>
 
