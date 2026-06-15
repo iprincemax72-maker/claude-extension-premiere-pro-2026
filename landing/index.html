@@ -81,22 +81,35 @@
   .nav-links a::after{content:"";position:absolute;left:0;right:0;bottom:-7px;height:2px;border-radius:2px;background:var(--coral);transform:scaleX(0);transform-origin:left center;transition:transform 0.24s var(--ease)}
   .nav-links a:hover::after{transform:scaleX(1)}
 
-  /* page transition: build wipe (panels rise to cover, then navigate) */
+  /* page transition: build wipe — both directions (cover on leave, peel on arrival) */
   #pgx{position:fixed;inset:0;z-index:2000;pointer-events:none}
   .pgx-cols{position:absolute;inset:0;display:grid;grid-template-columns:repeat(6,1fr)}
-  .pgx-cols>span{background:linear-gradient(180deg,#181109,var(--bg) 86%);box-shadow:0 0 0 .6px rgba(226,136,95,.12);transform:scaleY(0);transform-origin:bottom;will-change:transform}
+  .pgx-cols>span{background:linear-gradient(180deg,#181109,var(--bg) 86%);box-shadow:0 0 0 .6px rgba(226,136,95,.12);transform:scaleY(0);will-change:transform}
   .pgx-badge{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;opacity:0}
   .pgx-badge img{width:50px;height:50px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(226,136,95,.6))}
   .pgx-badge span{font-family:var(--mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--coral)}
-  #pgx.pgx-cover .pgx-cols>span{animation:pgxBuild .5s var(--ease) forwards}
+  /* leave: panels build up to cover */
+  #pgx.pgx-cover .pgx-cols>span{transform-origin:bottom;animation:pgxBuild .5s var(--ease) forwards}
   #pgx.pgx-cover .pgx-cols>span:nth-child(2){animation-delay:.05s}
   #pgx.pgx-cover .pgx-cols>span:nth-child(3){animation-delay:.1s}
   #pgx.pgx-cover .pgx-cols>span:nth-child(4){animation-delay:.15s}
   #pgx.pgx-cover .pgx-cols>span:nth-child(5){animation-delay:.2s}
   #pgx.pgx-cover .pgx-cols>span:nth-child(6){animation-delay:.25s}
-  #pgx.pgx-cover .pgx-badge{animation:pgxBadge .4s var(--ease) .3s forwards}
+  #pgx.pgx-cover .pgx-badge{animation:pgxBadgeIn .4s var(--ease) .3s forwards}
+  /* arrive (pgx-arriving set before paint): start covered, peel away — auto-plays via CSS */
+  html.pgx-arriving #pgx .pgx-cols>span{transform:scaleY(1);transform-origin:top;animation:pgxPeel .55s var(--ease) forwards}
+  html.pgx-arriving #pgx .pgx-cols>span:nth-child(1){animation-delay:.22s}
+  html.pgx-arriving #pgx .pgx-cols>span:nth-child(2){animation-delay:.18s}
+  html.pgx-arriving #pgx .pgx-cols>span:nth-child(3){animation-delay:.14s}
+  html.pgx-arriving #pgx .pgx-cols>span:nth-child(4){animation-delay:.1s}
+  html.pgx-arriving #pgx .pgx-cols>span:nth-child(5){animation-delay:.06s}
+  html.pgx-arriving #pgx .pgx-cols>span:nth-child(6){animation-delay:.02s}
+  html.pgx-arriving #pgx .pgx-badge{opacity:1;animation:pgxBadgeOut .35s var(--ease) forwards}
   @keyframes pgxBuild{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-  @keyframes pgxBadge{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @keyframes pgxPeel{from{transform:scaleY(1)}to{transform:scaleY(0)}}
+  @keyframes pgxBadgeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @keyframes pgxBadgeOut{from{opacity:1}to{opacity:0}}
+  @media (prefers-reduced-motion:reduce){#pgx{display:none!important}}
   .nav-cta{display:flex;align-items:center;gap:10px}
   @media (max-width:740px){.nav-links{display:none}}
 
@@ -312,7 +325,7 @@
     .hs-text .hero-cta{justify-content:center}
   }
 </style>
-<script>document.documentElement.className+=' js';</script>
+<script>document.documentElement.className+=' js';try{if(sessionStorage.getItem('pgx')){document.documentElement.classList.add('pgx-arriving');sessionStorage.removeItem('pgx');}}catch(e){}</script>
 </head>
 <body>
 
@@ -322,7 +335,7 @@
 <!-- page transition: build wipe -->
 <div id="pgx" aria-hidden="true">
   <div class="pgx-cols"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-  <div class="pgx-badge"><img src="flimify-logo.png" alt=""><span>Premiere extension</span></div>
+  <div class="pgx-badge"><img src="flimify-logo.png" alt=""><span data-pgx-label>Flimify Studio</span></div>
 </div>
 
 <!-- NAV -->
@@ -394,13 +407,10 @@
 <!-- FEATURES -->
 <section class="section" id="features">
   <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">What it does</p><h2>The heavy lifting, handled.</h2><p class="lede">Flimify writes your motion graphics, finds the moments worth marking, and captions your footage, so your time goes to the edit instead of the grunt work.</p></div>
-
     <div class="feat-row reveal">
       <div class="feat-text">
         <p class="eyebrow">Generate</p>
-        <h3>Describe it, and it lands on your timeline.</h3>
-        <p>Ask for a graphic and it renders straight onto your timeline.</p>
+        <h3>It builds the graphics you describe, right on your timeline.</h3>
       </div>
       <div class="feat-viz" aria-hidden="true">
         <div class="vz-prompt"><span>✨</span><span class="vz-typed">make a glowing intro that says LAUNCH</span><span class="vz-caret"></span></div>
@@ -412,8 +422,7 @@
     <div class="feat-row reverse reveal">
       <div class="feat-text">
         <p class="eyebrow">Auto-Edit <span class="tag-studio">Studio</span></p>
-        <h3>It finds the moments worth marking.</h3>
-        <p>It reads your footage and places graphics at the key moments for you.</p>
+        <h3>It finds the key moments and builds graphics for them.</h3>
       </div>
       <div class="feat-viz" aria-hidden="true">
         <div class="vz-track">
@@ -429,8 +438,7 @@
     <div class="feat-row reveal">
       <div class="feat-text">
         <p class="eyebrow">Captions <span class="tag-studio">Studio</span></p>
-        <h3>Captions, transcribed and styled for you.</h3>
-        <p>It transcribes your clip and lays a styled caption track over it.</p>
+        <h3>It transcribes your clip and adds styled captions.</h3>
       </div>
       <div class="feat-viz" aria-hidden="true">
         <div class="vz-capframe"><span class="vz-cline">and that <em>changed</em> everything</span></div>
@@ -488,19 +496,28 @@
     document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
   } else { document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); }); }
 
-  // build-wipe transition to the Premiere extension page
+  // build-wipe page transition (cover on leave, peel on arrival)
   (function(){
-    var pgx = document.getElementById('pgx');
+    var pgx = document.getElementById('pgx'), docEl = document.documentElement;
     var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches;
-    document.querySelectorAll('a[href="premiere.html"]').forEach(function(a){
-      a.addEventListener('click', function(e){
-        if (e.metaKey||e.ctrlKey||e.shiftKey||e.altKey||e.button){ return; }
-        e.preventDefault();
-        if (!pgx || reduce){ location.href = 'premiere.html'; return; }
-        pgx.classList.add('pgx-cover');
-        setTimeout(function(){ location.href = 'premiere.html'; }, 720);
+    if (docEl.classList.contains('pgx-arriving')){
+      setTimeout(function(){ if (pgx) pgx.style.display = 'none'; docEl.classList.remove('pgx-arriving'); }, 1100);
+    }
+    function cover(links, dest, label){
+      document.querySelectorAll(links).forEach(function(a){
+        a.addEventListener('click', function(e){
+          if (e.metaKey||e.ctrlKey||e.shiftKey||e.altKey||e.button){ return; }
+          e.preventDefault();
+          if (!pgx || reduce){ location.href = dest; return; }
+          var lbl = pgx.querySelector('[data-pgx-label]'); if (lbl) lbl.textContent = label;
+          try { sessionStorage.setItem('pgx', '1'); } catch (e2) {}
+          docEl.classList.remove('pgx-arriving'); pgx.classList.remove('pgx-reveal'); pgx.style.display = '';
+          pgx.classList.add('pgx-cover');
+          setTimeout(function(){ location.href = dest; }, 720);
+        });
       });
-    });
+    }
+    cover('a[href="premiere.html"]', 'premiere.html', 'Premiere extension');
   })();
 
   // FAQ accordion: smooth open/close (single-open), animates max-height

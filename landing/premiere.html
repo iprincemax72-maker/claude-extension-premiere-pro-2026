@@ -640,23 +640,35 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 .mobile-menu nav a { font-size: 1.7rem; font-weight: 600; letter-spacing: -0.02em; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .mobile-menu .btn { margin-top: 30px; }
 
-/* page transition: peel reveal on arrival (auto-plays, no JS needed) */
+/* page transition: build wipe — both directions (cover on leave, peel on arrival) */
 #pgx{position:fixed;inset:0;z-index:2000;pointer-events:none}
 .pgx-cols{position:absolute;inset:0;display:grid;grid-template-columns:repeat(6,1fr)}
-.pgx-cols>span{background:linear-gradient(180deg,#181109,var(--bg) 86%);box-shadow:0 0 0 .6px rgba(226,136,95,.12);transform:scaleY(1);transform-origin:top;will-change:transform;animation:pgxPeel .55s var(--ease) forwards}
-.pgx-cols>span:nth-child(1){animation-delay:.22s}
-.pgx-cols>span:nth-child(2){animation-delay:.18s}
-.pgx-cols>span:nth-child(3){animation-delay:.14s}
-.pgx-cols>span:nth-child(4){animation-delay:.1s}
-.pgx-cols>span:nth-child(5){animation-delay:.06s}
-.pgx-cols>span:nth-child(6){animation-delay:.02s}
-.pgx-badge{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;opacity:1;animation:pgxBadgeOut .35s var(--ease) forwards}
+.pgx-cols>span{background:linear-gradient(180deg,#181109,var(--bg) 86%);box-shadow:0 0 0 .6px rgba(226,136,95,.12);transform:scaleY(0);will-change:transform}
+.pgx-badge{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;opacity:0}
 .pgx-badge img{width:50px;height:50px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(226,136,95,.6))}
 .pgx-badge span{font-family:var(--mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--coral)}
+#pgx.pgx-cover .pgx-cols>span{transform-origin:bottom;animation:pgxBuild .5s var(--ease) forwards}
+#pgx.pgx-cover .pgx-cols>span:nth-child(2){animation-delay:.05s}
+#pgx.pgx-cover .pgx-cols>span:nth-child(3){animation-delay:.1s}
+#pgx.pgx-cover .pgx-cols>span:nth-child(4){animation-delay:.15s}
+#pgx.pgx-cover .pgx-cols>span:nth-child(5){animation-delay:.2s}
+#pgx.pgx-cover .pgx-cols>span:nth-child(6){animation-delay:.25s}
+#pgx.pgx-cover .pgx-badge{animation:pgxBadgeIn .4s var(--ease) .3s forwards}
+html.pgx-arriving #pgx .pgx-cols>span{transform:scaleY(1);transform-origin:top;animation:pgxPeel .55s var(--ease) forwards}
+html.pgx-arriving #pgx .pgx-cols>span:nth-child(1){animation-delay:.22s}
+html.pgx-arriving #pgx .pgx-cols>span:nth-child(2){animation-delay:.18s}
+html.pgx-arriving #pgx .pgx-cols>span:nth-child(3){animation-delay:.14s}
+html.pgx-arriving #pgx .pgx-cols>span:nth-child(4){animation-delay:.1s}
+html.pgx-arriving #pgx .pgx-cols>span:nth-child(5){animation-delay:.06s}
+html.pgx-arriving #pgx .pgx-cols>span:nth-child(6){animation-delay:.02s}
+html.pgx-arriving #pgx .pgx-badge{opacity:1;animation:pgxBadgeOut .35s var(--ease) forwards}
+@keyframes pgxBuild{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 @keyframes pgxPeel{from{transform:scaleY(1)}to{transform:scaleY(0)}}
+@keyframes pgxBadgeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes pgxBadgeOut{from{opacity:1}to{opacity:0}}
-@media (prefers-reduced-motion:reduce){#pgx{display:none}}
+@media (prefers-reduced-motion:reduce){#pgx{display:none!important}}
 </style>
+<script>try{if(sessionStorage.getItem('pgx')){document.documentElement.classList.add('pgx-arriving');sessionStorage.removeItem('pgx');}}catch(e){}</script>
 </head>
 <body>
 
@@ -667,7 +679,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <!-- page transition: peel reveal on arrival -->
 <div id="pgx" aria-hidden="true">
   <div class="pgx-cols"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-  <div class="pgx-badge"><img src="flimify-logo.png" alt=""><span>Premiere extension</span></div>
+  <div class="pgx-badge"><img src="flimify-logo.png" alt=""><span data-pgx-label>Premiere extension</span></div>
 </div>
 
 <!-- NAV -->
@@ -675,7 +687,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   <div class="nav-in">
     <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Premiere&nbsp;extension</small></span></a>
     <nav class="nav-links">
-      <a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a>
+      <a href="/">Flimify&nbsp;Studio</a><a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a>
     </nav>
     <div class="nav-cta">
       <a href="login.html" class="btn btn-ghost nav-signin" id="navSignin">Sign in</a>
@@ -741,7 +753,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <!-- HERO -->
 <section class="hero">
   <div class="wrap">
-    <p class="eyebrow load-up l1">AI motion graphics</p>
+    <p class="eyebrow load-up l1">Premiere extension</p>
     <h1 class="hero-h1">
       <span class="w" style="animation-delay:.12s">Motion</span>
       <span class="w" style="animation-delay:.2s">graphics,</span><br>
@@ -1521,8 +1533,28 @@ document.addEventListener('click', function (e) {
 })();
 </script>
 
-<script>/* clean up the transition overlay after the reveal so it never lingers */
-setTimeout(function(){ var p=document.getElementById('pgx'); if(p) p.style.display='none'; }, 1300);</script>
+<script>
+/* build-wipe page transition (cover on leave to the Studio app, peel on arrival) */
+(function(){
+  var pgx = document.getElementById('pgx'), docEl = document.documentElement;
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if (docEl.classList.contains('pgx-arriving')){
+    setTimeout(function(){ if (pgx) pgx.style.display = 'none'; docEl.classList.remove('pgx-arriving'); }, 1100);
+  }
+  document.querySelectorAll('a[href="/"]').forEach(function(a){
+    a.addEventListener('click', function(e){
+      if (e.metaKey||e.ctrlKey||e.shiftKey||e.altKey||e.button){ return; }
+      e.preventDefault();
+      if (!pgx || reduce){ location.href = '/'; return; }
+      var lbl = pgx.querySelector('[data-pgx-label]'); if (lbl) lbl.textContent = 'Flimify Studio';
+      try { sessionStorage.setItem('pgx', '1'); } catch (e2) {}
+      docEl.classList.remove('pgx-arriving'); pgx.classList.remove('pgx-reveal'); pgx.style.display = '';
+      pgx.classList.add('pgx-cover');
+      setTimeout(function(){ location.href = '/'; }, 720);
+    });
+  });
+})();
+</script>
 
 </body>
 </html>
