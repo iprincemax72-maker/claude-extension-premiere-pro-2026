@@ -80,6 +80,23 @@
   .nav-links a:hover{color:var(--text)}
   .nav-links a::after{content:"";position:absolute;left:0;right:0;bottom:-7px;height:2px;border-radius:2px;background:var(--coral);transform:scaleX(0);transform-origin:left center;transition:transform 0.24s var(--ease)}
   .nav-links a:hover::after{transform:scaleX(1)}
+
+  /* page transition: build wipe (panels rise to cover, then navigate) */
+  #pgx{position:fixed;inset:0;z-index:2000;pointer-events:none}
+  .pgx-cols{position:absolute;inset:0;display:grid;grid-template-columns:repeat(6,1fr)}
+  .pgx-cols>span{background:linear-gradient(180deg,#181109,var(--bg) 86%);box-shadow:0 0 0 .6px rgba(226,136,95,.12);transform:scaleY(0);transform-origin:bottom;will-change:transform}
+  .pgx-badge{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;opacity:0}
+  .pgx-badge img{width:50px;height:50px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(226,136,95,.6))}
+  .pgx-badge span{font-family:var(--mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--coral)}
+  #pgx.pgx-cover .pgx-cols>span{animation:pgxBuild .5s var(--ease) forwards}
+  #pgx.pgx-cover .pgx-cols>span:nth-child(2){animation-delay:.05s}
+  #pgx.pgx-cover .pgx-cols>span:nth-child(3){animation-delay:.1s}
+  #pgx.pgx-cover .pgx-cols>span:nth-child(4){animation-delay:.15s}
+  #pgx.pgx-cover .pgx-cols>span:nth-child(5){animation-delay:.2s}
+  #pgx.pgx-cover .pgx-cols>span:nth-child(6){animation-delay:.25s}
+  #pgx.pgx-cover .pgx-badge{animation:pgxBadge .4s var(--ease) .3s forwards}
+  @keyframes pgxBuild{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+  @keyframes pgxBadge{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
   .nav-cta{display:flex;align-items:center;gap:10px}
   @media (max-width:740px){.nav-links{display:none}}
 
@@ -302,10 +319,16 @@
 <div class="grid-bg"></div>
 <div class="atmos"><b class="b1"></b><b class="b2"></b></div>
 
+<!-- page transition: build wipe -->
+<div id="pgx" aria-hidden="true">
+  <div class="pgx-cols"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+  <div class="pgx-badge"><img src="flimify-logo.png" alt=""><span>Premiere extension</span></div>
+</div>
+
 <!-- NAV -->
 <header class="nav" id="nav">
   <div class="nav-in">
-    <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Studio</small></span></a>
+    <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify</span></a>
     <nav class="nav-links">
       <a href="#features">Features</a><a href="#how">How it works</a><a href="#faq">FAQ</a><a href="premiere.html">Premiere&nbsp;extension</a>
     </nav>
@@ -441,27 +464,10 @@
   </div>
 </section>
 
-<!-- DOWNLOAD CTA -->
-<section class="section" id="get">
-  <div class="wrap">
-    <div class="dlbox reveal">
-      <span class="lamp" aria-hidden="true"></span>
-      <p class="eyebrow">Ready when you are</p>
-      <h2 style="margin:12px auto 0;max-width:18ch">Edit your next video by just asking.</h2>
-      <p class="lede" style="margin:14px auto 0;max-width:50ch">Runs on your own Claude plan, with nothing to paste and nothing to pay per render.</p>
-      <div class="dlrow">
-        <a class="dl mac" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16.4 12.6c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.5-.4 6.1 1 8.1.7 1 1.4 2.1 2.4 2 1-.04 1.3-.6 2.5-.6s1.5.6 2.6.6c1.1-.02 1.7-1 2.4-2 .8-1.2 1.1-2.3 1.1-2.3-.02-.01-2.1-.8-2.1-3.2zM14.5 6.1c.5-.7.9-1.6.8-2.6-.8.03-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.5.9.07 1.8-.5 2.4-1.1z"/></svg> Download for macOS</a>
-        <a class="dl win" href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio.Setup.0.1.0.exe"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 5.5 10.5 4.4v7.1H3zM11.4 4.3 21 3v8.5h-9.6zM3 12.5h7.5v7.1L3 18.5zM11.4 12.5H21V21l-9.6-1.3z"/></svg> Download for Windows</a>
-      </div>
-      <p class="dlnote">Free. Mac (Apple&nbsp;Silicon) or Windows. Prefer no install? <a href="/studio/" style="color:var(--coral)">Open Flimify in your browser →</a></p>
-    </div>
-  </div>
-</section>
-
 <!-- FOOTER -->
 <footer class="footer">
   <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:30px 0">
-    <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Studio</small></span></a>
+    <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify</span></a>
     <nav style="display:flex;gap:20px;font-size:.9rem;flex-wrap:wrap">
       <a href="premiere.html">Premiere extension</a>
       <a href="/studio/">Web app</a>
@@ -481,6 +487,21 @@
     var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); }, {threshold:0.12, rootMargin:'0px 0px -8% 0px'});
     document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
   } else { document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); }); }
+
+  // build-wipe transition to the Premiere extension page
+  (function(){
+    var pgx = document.getElementById('pgx');
+    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches;
+    document.querySelectorAll('a[href="premiere.html"]').forEach(function(a){
+      a.addEventListener('click', function(e){
+        if (e.metaKey||e.ctrlKey||e.shiftKey||e.altKey||e.button){ return; }
+        e.preventDefault();
+        if (!pgx || reduce){ location.href = 'premiere.html'; return; }
+        pgx.classList.add('pgx-cover');
+        setTimeout(function(){ location.href = 'premiere.html'; }, 720);
+      });
+    });
+  })();
 </script>
 
 <!-- same Supabase login as the rest of the site -->

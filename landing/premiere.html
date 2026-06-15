@@ -639,6 +639,23 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 .mobile-menu nav { display: flex; flex-direction: column; gap: 2px; margin-top: 36px; }
 .mobile-menu nav a { font-size: 1.7rem; font-weight: 600; letter-spacing: -0.02em; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .mobile-menu .btn { margin-top: 30px; }
+
+/* page transition: peel reveal on arrival (auto-plays, no JS needed) */
+#pgx{position:fixed;inset:0;z-index:2000;pointer-events:none}
+.pgx-cols{position:absolute;inset:0;display:grid;grid-template-columns:repeat(6,1fr)}
+.pgx-cols>span{background:linear-gradient(180deg,#181109,var(--bg) 86%);box-shadow:0 0 0 .6px rgba(226,136,95,.12);transform:scaleY(1);transform-origin:top;will-change:transform;animation:pgxPeel .55s var(--ease) forwards}
+.pgx-cols>span:nth-child(1){animation-delay:.22s}
+.pgx-cols>span:nth-child(2){animation-delay:.18s}
+.pgx-cols>span:nth-child(3){animation-delay:.14s}
+.pgx-cols>span:nth-child(4){animation-delay:.1s}
+.pgx-cols>span:nth-child(5){animation-delay:.06s}
+.pgx-cols>span:nth-child(6){animation-delay:.02s}
+.pgx-badge{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;opacity:1;animation:pgxBadgeOut .35s var(--ease) forwards}
+.pgx-badge img{width:50px;height:50px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(226,136,95,.6))}
+.pgx-badge span{font-family:var(--mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--coral)}
+@keyframes pgxPeel{from{transform:scaleY(1)}to{transform:scaleY(0)}}
+@keyframes pgxBadgeOut{from{opacity:1}to{opacity:0}}
+@media (prefers-reduced-motion:reduce){#pgx{display:none}}
 </style>
 </head>
 <body>
@@ -646,10 +663,17 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <div class="progress" id="progress"></div>
 <div class="grid-bg"></div>
 <div class="atmos"><b class="b1"></b><b class="b2"></b></div>
+
+<!-- page transition: peel reveal on arrival -->
+<div id="pgx" aria-hidden="true">
+  <div class="pgx-cols"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+  <div class="pgx-badge"><img src="flimify-logo.png" alt=""><span>Premiere extension</span></div>
+</div>
+
 <!-- NAV -->
 <header class="nav" id="nav">
   <div class="nav-in">
-    <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify</span></a>
+    <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Premiere&nbsp;extension</small></span></a>
     <nav class="nav-links">
       <a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a>
     </nav>
@@ -954,7 +978,7 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
 <footer class="footer">
   <div class="wrap">
     <div class="footer-grid">
-      <div class="footer-about"><a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify</span></a><p class="blurb">An AI motion-graphics and video-editing copilot — a standalone Mac &amp; Windows app, and a Premiere&nbsp;Pro panel.</p></div>
+      <div class="footer-about"><a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Premiere&nbsp;extension</small></span></a><p class="blurb">An AI motion-graphics and video-editing copilot — a standalone Mac &amp; Windows app, and a Premiere&nbsp;Pro panel.</p></div>
       <div><h4>Product</h4><ul><li><a href="#how">How it works</a></li><li><a href="#pricing">Pricing</a></li><li><a href="#install">Install</a></li></ul></div>
       <div><h4>Support</h4><ul><li><a href="#faq">FAQ</a></li><li><a href="#install">Install steps</a></li><li><a href="#">Contact</a></li><li><a href="#">Changelog</a></li></ul></div>
       <div><h4>Legal</h4><ul><li><a href="#">Terms</a></li><li><a href="#">Privacy</a></li><li><a href="#">Refunds</a></li><li><a href="#">License</a></li></ul></div>
@@ -1496,6 +1520,9 @@ document.addEventListener('click', function (e) {
   window.addEventListener('load', function () { jump(); setTimeout(jump, 150); });
 })();
 </script>
+
+<script>/* clean up the transition overlay after the reveal so it never lingers */
+setTimeout(function(){ var p=document.getElementById('pgx'); if(p) p.style.display='none'; }, 1300);</script>
 
 </body>
 </html>
