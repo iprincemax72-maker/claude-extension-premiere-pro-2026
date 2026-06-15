@@ -278,6 +278,9 @@
   .feat-text h3{font-size:clamp(1.55rem,2.7vw,2.2rem);margin:.7rem 0 0;letter-spacing:-.025em;line-height:1.12;max-width:18ch}
   .tag-studio{font-family:var(--mono);font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--coral);border:1px solid var(--line-2);border-radius:999px;padding:2px 7px;font-weight:500}
   .feat-viz{position:relative;background:linear-gradient(165deg,var(--s1s),var(--bg-soft));border:1px solid var(--line-2);border-radius:18px;padding:clamp(20px,2.4vw,32px);min-height:0;display:flex;flex-direction:column;justify-content:center;gap:12px;overflow:hidden;box-shadow:0 34px 80px -40px rgba(0,0,0,.92),0 1px 0 var(--hi) inset}
+  /* real screen-recording demo (plain video, no mockup animation) */
+  .feat-video{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--line-2);background:#000;box-shadow:0 34px 80px -40px rgba(0,0,0,.92),0 1px 0 var(--hi) inset}
+  .feat-video video{display:block;width:100%;height:auto}
   .feat-viz::before{content:"";position:absolute;right:-12%;top:-30%;width:55%;height:160%;background:radial-gradient(ellipse,rgba(226,136,95,.1),transparent 60%);pointer-events:none}
   .feat-viz>*{position:relative;z-index:1}
   .vz-step{font-size:.72rem;color:var(--text-3);text-align:center}
@@ -582,14 +585,8 @@ html.js .footer .wrap.reveal>*{opacity:0;transform:translateY(14px);
         <p class="eyebrow">Auto-Edit <span class="tag-studio">Studio</span></p>
         <h3>It finds the key moments and builds graphics for them.</h3>
       </div>
-      <div class="feat-viz" aria-hidden="true">
-        <div class="vz-track">
-          <span class="vz-bar"></span>
-          <span class="vz-pin" style="left:20%"><b>stat</b></span>
-          <span class="vz-pin" style="left:50%"><b>lower third</b></span>
-          <span class="vz-pin" style="left:80%"><b>callout</b></span>
-        </div>
-        <p class="vz-step">graphics placed at the key moments</p>
+      <div class="feat-video">
+        <video src="autoedit-demo.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Auto-Edit demo: Flimify finds the key moments in a clip and builds graphics for them"></video>
       </div>
     </div>
 
