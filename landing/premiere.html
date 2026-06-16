@@ -682,7 +682,7 @@ html.pgx-arriving.pgx-rtl #pgx .pgx-panel{transform:translateX(0);animation:pgxO
   <div class="nav-in">
     <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Premiere&nbsp;extension</small></span></a>
     <nav class="nav-links">
-      <a href="/">Flimify&nbsp;Studio</a><a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a>
+      <a href="/">Flimify&nbsp;Studio</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a>
     </nav>
     <div class="nav-cta">
       <a href="login.html" class="btn btn-ghost nav-signin" id="navSignin">Sign in</a>
@@ -697,7 +697,7 @@ html.pgx-arriving.pgx-rtl #pgx .pgx-panel{transform:translateX(0);animation:pgxO
   <div class="mm-top"><span class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"> Flimify</span>
     <button class="nav-toggle" id="navClose" aria-label="Close menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
-  <nav><a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a><a href="login.html" id="mmSignin">Sign in</a></nav>
+  <nav><a href="#pricing">Pricing</a><a href="#install">Install</a><a href="#faq">FAQ</a><a href="login.html" id="mmSignin">Sign in</a></nav>
   <a href="#pricing" class="btn btn-primary btn-block btn-lg" data-buy>Get it</a>
 </div>
 
@@ -795,33 +795,7 @@ html.pgx-arriving.pgx-rtl #pgx .pgx-panel{transform:translateX(0);animation:pgxO
   </div>
 </section>
 
-<!-- HOW -->
-<section class="section" id="how">
-  <div class="wrap">
-    <div class="section-head center reveal"><p class="eyebrow">How it works</p><h2>Prompt to timeline in three.</h2></div>
-    <div class="flow">
-      <div class="flow-rail"></div>
-      <div class="fstep reveal">
-        <div class="fnode">01</div>
-        <h3>Describe it</h3>
-        <p>Type it in plain words.</p>
-        <div class="fviz"><div class="viz-prompt"><span class="vp-dot"></span>make a 3-step checklist<span class="vp-caret"></span></div></div>
-      </div>
-      <div class="fstep reveal d1">
-        <div class="fnode">02</div>
-        <h3>Flimify builds it</h3>
-        <p>Writes the code, renders it.</p>
-        <div class="fviz"><div class="viz-render"><div class="vr-line"></div><div class="vr-line s"></div><div class="vr-bar"><i></i></div><div class="vr-label">rendering · subscribe_v3</div></div></div>
-      </div>
-      <div class="fstep reveal d2">
-        <div class="fnode">03</div>
-        <h3>On your timeline</h3>
-        <p>One click. Ready to play.</p>
-        <div class="fviz"><div class="viz-tl"><div class="vt-track"><span class="clip a"></span></div><div class="vt-track"><span class="clip b"></span></div><div class="vt-play"></div></div></div>
-      </div>
-    </div>
-  </div>
-</section>
+
 
 
 <!-- DEMO -->
@@ -1009,7 +983,7 @@ html.pgx-arriving.pgx-rtl #pgx .pgx-panel{transform:translateX(0);animation:pgxO
   <div class="wrap">
     <div class="footer-grid">
       <div class="footer-about"><a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify <small>Premiere&nbsp;extension</small></span></a><p class="blurb">An AI motion-graphics and video-editing copilot — a standalone Mac &amp; Windows app, and a Premiere&nbsp;Pro panel.</p></div>
-      <div><h4>Product</h4><ul><li><a href="#how">How it works</a></li><li><a href="#pricing">Pricing</a></li><li><a href="#install">Install</a></li></ul></div>
+      <div><h4>Product</h4><ul><li><a href="#pricing">Pricing</a></li><li><a href="#install">Install</a></li></ul></div>
       <div><h4>Support</h4><ul><li><a href="#faq">FAQ</a></li><li><a href="#install">Install steps</a></li><li><a href="#">Contact</a></li><li><a href="#">Changelog</a></li></ul></div>
       <div><h4>Legal</h4><ul><li><a href="#">Terms</a></li><li><a href="#">Privacy</a></li><li><a href="#">Refunds</a></li><li><a href="#">License</a></li></ul></div>
     </div>
@@ -1220,16 +1194,7 @@ billToggle.addEventListener('click', () => {
   window.addEventListener('load', () => setTimeout(() => document.querySelectorAll('.reveal:not(.in)').forEach(el => el.classList.add('in')), 2500));
 })();
 
-/* draw the timeline rail when "how it works" scrolls into view */
-(function () {
-  const flow = document.querySelector('.flow'); if (!flow) return;
-  const draw = () => flow.classList.add('drawn');
-  if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver((es, o) => es.forEach(e => { if (e.isIntersecting) { draw(); o.disconnect(); } }), { threshold: 0.25 });
-    io.observe(flow);
-  } else draw();
-  window.addEventListener('load', () => setTimeout(draw, 2600)); // failsafe so it can never stay hidden
-})();
+
 
 /* count-up */
 (function () {
