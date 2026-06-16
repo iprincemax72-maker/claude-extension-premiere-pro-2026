@@ -88,12 +88,12 @@
   /* page transition: build wipe — both directions (cover on leave, peel on arrival) */
   #pgx{position:fixed;inset:0;z-index:2000;pointer-events:none}
   .pgx-cols{position:absolute;inset:0;display:grid;grid-template-columns:repeat(6,1fr)}
-  .pgx-cols>span{background:linear-gradient(180deg,#181109,var(--bg) 86%);box-shadow:0 0 0 .6px rgba(226,136,95,.12);transform:scaleY(0);will-change:transform}
+  .pgx-cols>span{background:linear-gradient(180deg,#1c140c,#0d0905);box-shadow:0 0 0 .6px rgba(226,136,95,.14);transform:scaleX(0);will-change:transform}
   .pgx-badge{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;opacity:0}
   .pgx-badge img{width:50px;height:50px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(226,136,95,.6))}
   .pgx-badge span{font-family:var(--mono);font-size:.74rem;letter-spacing:.2em;text-transform:uppercase;color:var(--coral)}
   /* leave: panels build up to cover */
-  #pgx.pgx-cover .pgx-cols>span{transform-origin:bottom;animation:pgxBuild .5s var(--ease) forwards}
+  #pgx.pgx-cover .pgx-cols>span{transform-origin:left;animation:pgxBuild .5s var(--ease) forwards}
   #pgx.pgx-cover .pgx-cols>span:nth-child(2){animation-delay:.05s}
   #pgx.pgx-cover .pgx-cols>span:nth-child(3){animation-delay:.1s}
   #pgx.pgx-cover .pgx-cols>span:nth-child(4){animation-delay:.15s}
@@ -101,16 +101,16 @@
   #pgx.pgx-cover .pgx-cols>span:nth-child(6){animation-delay:.25s}
   #pgx.pgx-cover .pgx-badge{animation:pgxBadgeIn .4s var(--ease) .3s forwards}
   /* arrive (pgx-arriving set before paint): start covered, peel away — auto-plays via CSS */
-  html.pgx-arriving #pgx .pgx-cols>span{transform:scaleY(1);transform-origin:top;animation:pgxPeel .55s var(--ease) forwards}
-  html.pgx-arriving #pgx .pgx-cols>span:nth-child(1){animation-delay:.22s}
-  html.pgx-arriving #pgx .pgx-cols>span:nth-child(2){animation-delay:.18s}
-  html.pgx-arriving #pgx .pgx-cols>span:nth-child(3){animation-delay:.14s}
-  html.pgx-arriving #pgx .pgx-cols>span:nth-child(4){animation-delay:.1s}
-  html.pgx-arriving #pgx .pgx-cols>span:nth-child(5){animation-delay:.06s}
-  html.pgx-arriving #pgx .pgx-cols>span:nth-child(6){animation-delay:.02s}
+  html.pgx-arriving #pgx .pgx-cols>span{transform:scaleX(1);transform-origin:right;animation:pgxPeel .55s var(--ease) forwards}
+  html.pgx-arriving #pgx .pgx-cols>span:nth-child(1){animation-delay:.02s}
+  html.pgx-arriving #pgx .pgx-cols>span:nth-child(2){animation-delay:.06s}
+  html.pgx-arriving #pgx .pgx-cols>span:nth-child(3){animation-delay:.1s}
+  html.pgx-arriving #pgx .pgx-cols>span:nth-child(4){animation-delay:.14s}
+  html.pgx-arriving #pgx .pgx-cols>span:nth-child(5){animation-delay:.18s}
+  html.pgx-arriving #pgx .pgx-cols>span:nth-child(6){animation-delay:.22s}
   html.pgx-arriving #pgx .pgx-badge{opacity:1;animation:pgxBadgeOut .35s var(--ease) forwards}
-  @keyframes pgxBuild{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-  @keyframes pgxPeel{from{transform:scaleY(1)}to{transform:scaleY(0)}}
+  @keyframes pgxBuild{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  @keyframes pgxPeel{from{transform:scaleX(1)}to{transform:scaleX(0)}}
   @keyframes pgxBadgeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
   @keyframes pgxBadgeOut{from{opacity:1}to{opacity:0}}
   @media (prefers-reduced-motion:reduce){#pgx{display:none!important}}
@@ -355,7 +355,6 @@
 <!-- page transition: build wipe -->
 <div id="pgx" aria-hidden="true">
   <div class="pgx-cols"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-  <div class="pgx-badge"><img src="flimify-logo.png" alt=""><span data-pgx-label>Flimify Studio</span></div>
 </div>
 
 <!-- NAV -->
