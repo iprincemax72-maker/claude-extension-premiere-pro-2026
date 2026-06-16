@@ -72,9 +72,10 @@
   .btn-lg{font-size:1rem;padding:0.95em 1.55em}
 
   /* nav */
-  .nav{position:sticky;top:0;z-index:100;padding:20px clamp(12px,3vw,26px) 0}
-  .nav-in{max-width:var(--maxw);margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:58px;padding:0 10px 0 16px;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:saturate(1.4) blur(14px);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 0 var(--hi) inset,0 14px 34px -18px rgba(0,0,0,0.7);transition:border-color 0.25s var(--ease),box-shadow 0.25s var(--ease)}
-  .nav.scrolled .nav-in{border-color:var(--line-2)}
+  .nav{position:sticky;top:0;z-index:100;padding:20px clamp(12px,3vw,26px) 0;transition:padding .28s var(--ease)}
+  .nav-in{max-width:var(--maxw);margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:58px;padding:0 10px 0 16px;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:saturate(1.4) blur(14px);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 0 var(--hi) inset,0 14px 34px -18px rgba(0,0,0,0.7);transition:height .28s var(--ease),border-color 0.25s var(--ease),box-shadow 0.25s var(--ease)}
+  .nav.scrolled{padding-top:8px}
+  .nav.scrolled .nav-in{height:46px;border-color:var(--line-2)}
   .brand{display:flex;align-items:center;gap:0.6em;font-weight:600;font-size:1.04rem;letter-spacing:-0.02em}
   .brand .glyph{width:28px;height:28px;flex:0 0 auto;object-fit:contain;filter:drop-shadow(0 0 8px rgba(226,136,95,.45))}
   .brand small{font-family:var(--mono);font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--coral);display:block;margin-top:1px;font-weight:400}
