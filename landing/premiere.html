@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Flimify for Premiere Pro — motion graphics by just asking</title>
 <meta name="description" content="Flimify is an AI motion-graphics and video editor — a standalone Mac &amp; Windows app, plus a Premiere Pro panel. Describe a title, lower third, or animation; it writes the code, renders it, and drops it on your timeline. Runs on your own Claude, no API key." />
-<meta name="theme-color" content="#09090b" />
+<meta name="theme-color" content="#EAE3D3" />
 <meta property="og:title" content="Flimify: motion graphics by just asking" />
 <meta property="og:description" content="Describe it. Flimify builds it. It's on your timeline. Runs on your Claude plan, no API key." />
 <meta property="og:type" content="website" />
@@ -35,7 +35,7 @@
 <script>document.documentElement.classList.add('js');</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -46,31 +46,34 @@
 ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  --bg:      #09090b;
-  --bg-soft: #0b0b0e;
-  --s1:      #1212159e;   /* card (translucent for depth over glow) */
-  --s1s:     #121215;     /* solid card */
-  --s2:      #1a1a1e;     /* elevated */
-  --s3:      #232329;     /* input / hover */
-  --text:    #FAFAFA;
-  --text-2:  #9a9aa1;
-  --text-3:  #7c7d87;   /* AA-compliant muted (~4.6:1 on bg) for small labels */
-  --line:    rgba(255,255,255,0.08);
-  --line-2:  rgba(255,255,255,0.14);
-  --hi:      rgba(255,255,255,0.05);   /* top-edge highlight */
-  --coral:   #E2885F;
-  --coral-2: #F0A87E;
-  --coral-press: #cc6f44;
-  --btn:     #F4F4F5;
-  --btn-ink: #0a0a0b;
-  --indigo:  #6d6ae0;     /* faint secondary atmosphere only */
+  /* Warm light theme (Option A) */
+  --bg:      #EAE3D3;
+  --bg-soft: #F1EBDD;
+  --s1:      #F4EEE0e6;   /* card (translucent over glow) */
+  --s1s:     #F4EEE0;     /* solid card */
+  --s2:      #E3DAC8;     /* elevated */
+  --s3:      #D6CDB7;     /* input / hover */
+  --text:    #1A1510;
+  --text-2:  #5f574a;
+  --text-3:  #857c6d;
+  --line:    rgba(26,21,16,0.12);
+  --line-2:  rgba(26,21,16,0.18);
+  --hi:      rgba(255,255,255,0.5);   /* top-edge highlight */
+  --coral:   #CC5A2E;
+  --coral-2: #E0734A;
+  --coral-press: #b04a22;
+  --btn:     #1A1510;
+  --btn-ink: #F4EFE3;
+  --indigo:  #6d6ae0;
 
   --maxw: 1140px;
   --gutter: clamp(20px, 5vw, 44px);
-  --sans: "Schibsted Grotesk", system-ui, -apple-system, sans-serif;
+  --display: "Bricolage Grotesque", system-ui, sans-serif;
+  --sans: "Inter", system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
+h1, h2, h3, h4 { font-family: var(--display); }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }

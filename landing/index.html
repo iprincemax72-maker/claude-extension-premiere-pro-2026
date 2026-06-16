@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Flimify Studio, the AI video editor that runs on your own Claude</title>
 <meta name="description" content="Flimify Studio is a full AI video editor for Mac and Windows. Generate motion graphics, edit on a pro timeline, caption, auto-edit, and export to mp4. The AI runs on your own Claude, so there is no API key and nothing to pay per render." />
-<meta name="theme-color" content="#09090b" />
+<meta name="theme-color" content="#EAE3D3" />
 <link rel="icon" type="image/png" href="flimify-favicon.png" />
 <link rel="apple-touch-icon" href="flimify-icon.png" />
 <meta property="og:title" content="Flimify Studio, AI video editor" />
@@ -18,18 +18,21 @@
 <link rel="canonical" href="https://www.flimify.com/" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
   :root{
-    --bg:#09090b; --bg-soft:#0b0b0e; --s1s:#121215; --s2:#1a1a1e; --s3:#232329;
-    --text:#FAFAFA; --text-2:#9a9aa1; --text-3:#7c7d87;
-    --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.14); --hi:rgba(255,255,255,0.05);
-    --coral:#E2885F; --coral-2:#F0A87E; --coral-press:#cc6f44; --btn:#F4F4F5; --btn-ink:#0a0a0b; --indigo:#6d6ae0;
+    /* Warm light theme (Option A) */
+    --bg:#EAE3D3; --bg-soft:#F1EBDD; --s1s:#F4EEE0; --s2:#E3DAC8; --s3:#D6CDB7;
+    --text:#1A1510; --text-2:#5f574a; --text-3:#857c6d;
+    --line:rgba(26,21,16,0.12); --line-2:rgba(26,21,16,0.18); --hi:rgba(255,255,255,0.5);
+    --coral:#CC5A2E; --coral-2:#E0734A; --coral-press:#b04a22; --btn:#1A1510; --btn-ink:#F4EFE3; --indigo:#6d6ae0;
     --maxw:1200px; --gutter:clamp(20px,4vw,44px);
-    --sans:"Schibsted Grotesk",system-ui,-apple-system,sans-serif;
+    --display:"Bricolage Grotesque",system-ui,sans-serif;
+    --sans:"Inter",system-ui,-apple-system,sans-serif;
     --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
     --ease:cubic-bezier(0.22,1,0.36,1);
   }
+  h1,h2,h3,h4{font-family:var(--display)}
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
   @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
