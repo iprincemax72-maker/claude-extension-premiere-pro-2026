@@ -525,6 +525,14 @@ html.js .reveal.in { opacity: 1; transform: none; filter: none; }
   box-shadow: 0 1px 0 var(--hi) inset, 0 60px 120px -42px rgba(0,0,0,0.9), 0 0 100px -34px rgba(226,136,95,0.28);
   will-change: transform; transition: transform 0.3s var(--ease);
 }
+/* the mockup is a dark product screen — restore dark-theme tokens inside it so its
+   text and surfaces stay readable against the light page */
+.glass {
+  --text:#FAFAFA; --text-2:#aba7ad; --text-3:#8f8a90;
+  --bg-soft:#100d17; --s1s:#171420; --s2:#201c29; --s3:#2a2533;
+  --line:rgba(255,255,255,0.09); --line-2:rgba(255,255,255,0.14); --hi:rgba(255,255,255,0.06);
+  --btn:#F4F4F5; --btn-ink:#15110d; --coral:#E2885F;
+}
 .mock-bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.02); }
 .mock-bar .lights { display: flex; gap: 6px; }
 .mock-bar .lights i { width: 11px; height: 11px; border-radius: 50%; }
