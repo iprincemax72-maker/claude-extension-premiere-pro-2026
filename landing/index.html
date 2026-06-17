@@ -266,6 +266,7 @@
   .feat-row{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:clamp(32px,6vw,96px)}
   .feat-row + .feat-row{margin-top:clamp(56px,9vw,128px)}
   .feat-row.reverse .feat-text{order:2}
+  .feat-text{position:relative}
   .feat-text .eyebrow{display:inline-flex;align-items:center;gap:8px}
   .feat-text h3{font-size:clamp(1.55rem,2.7vw,2.2rem);margin:.7rem 0 0;letter-spacing:-.025em;line-height:1.12;max-width:18ch}
   .tag-studio{font-family:var(--mono);font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--coral);border:1px solid var(--line-2);border-radius:999px;padding:2px 7px;font-weight:500}
@@ -303,10 +304,18 @@
   .vz-frame::before{content:"";position:absolute;inset:0;background:radial-gradient(46% 56% at 68% 38%,rgba(226,136,95,.2),transparent 72%)}
   .vz-caption{position:relative;font-weight:800;font-size:clamp(.98rem,1.85vw,1.28rem);letter-spacing:-.01em;text-align:center;color:#fff;text-shadow:0 2px 11px rgba(0,0,0,.75)}
   .vz-caption em{color:var(--coral);font-style:normal}
+
+  .feat-arrow{position:absolute;top:50%;left:100%;width:40px;height:40px;margin-left:clamp(0px, 2vw, 24px);transform:translateY(-50%);color:var(--coral);z-index:2;pointer-events:none;display:grid;place-items:center;animation:featArrowNudge 1.6s var(--ease) infinite}
+  .feat-arrow svg{width:28px;height:28px;filter:drop-shadow(0 0 6px rgba(226,136,95,0.4))}
+  .feat-row.reverse .feat-arrow{left:auto;right:100%;margin-left:0;margin-right:clamp(0px, 2vw, 24px);animation-name:featArrowNudgeRev}
+  @keyframes featArrowNudge{0%,100%{transform:translateY(-50%) translateX(0)}50%{transform:translateY(-50%) translateX(6px)}}
+  @keyframes featArrowNudgeRev{0%,100%{transform:translateY(-50%) rotate(180deg) translateX(0)}50%{transform:translateY(-50%) rotate(180deg) translateX(6px)}}
+
   @media (max-width:820px){
     .feat-row{grid-template-columns:1fr;gap:22px}
     .feat-row + .feat-row{margin-top:clamp(40px,9vw,56px)}
     .feat-row.reverse .feat-text{order:0}
+    .feat-arrow{display:none}
   }
 
   /* compact nav on phones (secondary items live in the hero + footer) */
@@ -418,6 +427,7 @@
       <div class="feat-text">
         <p class="eyebrow">Generate</p>
         <h3>It builds the graphics you describe, right on your timeline.</h3>
+        <span class="feat-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
       </div>
       <div class="feat-viz" aria-hidden="true">
         <div class="vz-prompt"><span class="vz-spark">✦</span><span class="vz-typed">make a glowing intro that says LAUNCH</span><span class="vz-caret"></span><span class="vz-go">Generate</span></div>
@@ -430,6 +440,7 @@
       <div class="feat-text">
         <p class="eyebrow">Auto-Edit <span class="tag-studio">Studio</span></p>
         <h3>It finds the key moments and builds graphics for them.</h3>
+        <span class="feat-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
       </div>
       <div class="feat-viz vz-ae" aria-hidden="true">
         <div class="vz-moments">
@@ -446,6 +457,7 @@
       <div class="feat-text">
         <p class="eyebrow">Captions <span class="tag-studio">Studio</span></p>
         <h3>It transcribes your clip and adds styled captions.</h3>
+        <span class="feat-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
       </div>
       <div class="feat-viz" aria-hidden="true">
         <div class="vz-frame"><span class="vz-caption">and that <em>changed</em> everything</span></div>
