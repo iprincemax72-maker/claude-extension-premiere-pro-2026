@@ -323,7 +323,7 @@
   .hs-shot{position:relative;min-width:0}
   .hs-shot::before{content:"";position:absolute;left:-6%;top:-2%;width:112%;height:104%;background:radial-gradient(ellipse,rgba(226,136,95,0.18),transparent 66%);filter:blur(36px);z-index:-1}
   .hs-shot .frame{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line-2);box-shadow:0 36px 80px -38px rgba(0,0,0,0.92),0 1px 0 var(--hi) inset;isolation:isolate}
-  .hs-shot .frame::after{content:"";position:absolute;inset:0;border-radius:inherit;padding:2px;background:conic-gradient(from var(--beam),transparent 75%,var(--coral),transparent 100%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;animation:beam 4s linear infinite}
+  .hs-shot .frame::after{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:3px;background:conic-gradient(from var(--beam),transparent 60%,var(--coral),transparent 100%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;animation:beam 4s linear infinite;filter:brightness(1.5) drop-shadow(0 0 5px var(--coral));z-index:10}
   @keyframes beam{to{--beam:360deg}}
   .hs-shot .frame img{width:100%;height:auto;display:block}
   @media (max-width:880px){
