@@ -100,7 +100,14 @@
   @keyframes pgxOutL{from{transform:translateX(0)}to{transform:translateX(-100%)}}
   @media (prefers-reduced-motion:reduce){#pgx{display:none!important}}
   .nav-cta{display:flex;align-items:center;gap:10px}
-  @media (max-width:740px){.nav-links{display:none}}
+  .nav-toggle{display:none;align-items:center;background:none;border:none;cursor:pointer;padding:8px;color:var(--text)}
+  .nav-toggle svg{width:24px;height:24px}
+  .mobile-menu{position:fixed;inset:0;z-index:1500;background:var(--bg);padding:22px var(--gutter);transform:translateY(-100%);transition:transform .32s var(--ease);display:flex;flex-direction:column}
+  .mobile-menu.open{transform:none}
+  .mobile-menu .mm-top{display:flex;align-items:center;justify-content:space-between;height:44px}
+  .mobile-menu nav{display:flex;flex-direction:column;gap:2px;margin-top:34px}
+  .mobile-menu nav a{font-family:var(--display);font-size:1.7rem;font-weight:700;letter-spacing:-.02em;color:var(--text);padding:14px 0;border-bottom:1px solid var(--line)}
+  @media (max-width:740px){.nav-links{display:none}.nav-toggle{display:inline-flex}}
 
   /* sections */
   .section{padding:clamp(52px,7vw,94px) 0;position:relative;scroll-margin-top:40px}
@@ -319,7 +326,7 @@
   }
 
   /* compact nav on phones (secondary items live in the hero + footer) */
-  @media (max-width:640px){.nav-browser{display:none}.nav-cta{gap:8px}.nav-cta .btn{padding:.7em 1em;font-size:.88rem}}
+  @media (max-width:640px){.nav-browser,.nav-signin{display:none}.nav-cta{gap:8px}.nav-cta .btn{padding:.7em 1em;font-size:.88rem}}
 
   /* ════ split hero: tagline left, screenshot right (contained) ════ */
   .hero-split{position:relative;max-width:1420px;margin-inline:auto;display:grid;grid-template-columns:minmax(0,500px) 1.2fr;align-items:center;gap:clamp(26px,4vw,64px);padding:clamp(20px,3vw,46px) var(--gutter) clamp(38px,5vw,70px)}
@@ -365,9 +372,23 @@
       <a href="https://github.com/iprincemax72-maker/flimify-studio/releases/download/v0.1.0/Flimify.Studio-0.1.0-arm64.dmg" class="btn btn-primary">Download</a>
       <a href="login.html" class="btn btn-ghost nav-signin" id="navSignin">Sign in</a>
       <div class="nav-acct" id="navAcct" hidden></div>
+      <button class="nav-toggle" id="navToggle" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
     </div>
   </div>
 </header>
+
+<div class="mobile-menu" id="mobileMenu">
+  <div class="mm-top"><a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify</span></a>
+    <button class="nav-toggle" id="navClose" aria-label="Close menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <nav>
+    <a href="#features">Features</a>
+    <a href="#faq">FAQ</a>
+    <a href="premiere.html">Premiere&nbsp;extension</a>
+    <a href="/studio/">Open in browser</a>
+    <a href="login.html">Sign in</a>
+  </nav>
+</div>
 
 <script>
 /* Anti-flash: reflect the persisted Supabase session before supabase-js loads,
@@ -523,6 +544,12 @@
       });
     }
     cover('a[href="premiere.html"]', 'premiere.html', 'ltr');
+
+    // mobile menu (hamburger) — without this, phones can't reach the nav links
+    var mm = document.getElementById('mobileMenu'), mt = document.getElementById('navToggle'), mc = document.getElementById('navClose');
+    if (mt && mm) mt.addEventListener('click', function(){ mm.classList.add('open'); });
+    if (mc && mm) mc.addEventListener('click', function(){ mm.classList.remove('open'); });
+    if (mm) mm.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', function(){ mm.classList.remove('open'); }); });
   })();
 
   // FAQ accordion: smooth open/close (single-open), animates max-height
