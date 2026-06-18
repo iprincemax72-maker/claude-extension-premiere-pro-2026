@@ -310,6 +310,8 @@ html.js .flow.drawn .flow-rail { transform: scaleX(1); }
 .eb-glow-2 { border: 2px solid var(--eb-color); filter: blur(4px); }
 .eb-background-glow { z-index: -1; transform: scale(1.06); filter: blur(28px); opacity: 0.24; background: linear-gradient(-30deg, var(--eb-color), transparent, var(--eb-color)); }
 @media (prefers-reduced-motion: reduce) { .eb-canvas-container { display: none; } }
+/* phones/tablets: the electric-border canvas overhangs the frame and pushes the page wider than the screen — drop it, keep the framed video */
+@media (max-width: 768px) { #demoEB .eb-canvas-container, #demoEB .eb-layers { display: none; } }
 .vplayer { position: absolute; left: 16px; right: 16px; bottom: 15px; z-index: 2; display: flex; align-items: center; gap: 12px; }
 .vplayer .vscrub { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.16); position: relative; }
 .vplayer .vscrub i { position: absolute; left: 0; top: 0; bottom: 0; width: 22%; background: linear-gradient(90deg, var(--coral), var(--coral-2)); border-radius: 2px; }
@@ -1089,6 +1091,7 @@ billToggle.addEventListener('click', () => {
   const container = document.getElementById('demoFrame');
   if (!canvas || !container) return;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (window.matchMedia('(max-width: 768px)').matches) return;   // skip on phones/tablets (the canvas overhang overflows narrow screens)
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
