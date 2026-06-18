@@ -504,6 +504,65 @@
   </div>
 </section>
 
+<!-- PREMIERE EXTENSION CTA -->
+<style>
+  .prx-sec{padding:clamp(8px,2vw,24px) 0 clamp(44px,6vw,76px)}
+  .prx{position:relative;display:flex;align-items:center;gap:clamp(20px,3vw,34px);flex-wrap:wrap;
+    padding:clamp(26px,4vw,50px) clamp(24px,4vw,54px);border-radius:26px;overflow:hidden;isolation:isolate;
+    color:#efeaff;text-decoration:none;
+    background:
+      radial-gradient(130% 150% at 86% 16%,rgba(140,124,255,.36),transparent 56%),
+      linear-gradient(135deg,#191233 0%,#251b4f 54%,#150e2a 100%);
+    border:1px solid rgba(160,148,255,.22);
+    box-shadow:0 26px 58px -28px rgba(38,22,92,.72),inset 0 1px 0 rgba(255,255,255,.06);
+    transition:transform .5s var(--ease),box-shadow .5s var(--ease)}
+  .prx:hover{transform:translateY(-4px);box-shadow:0 40px 86px -30px rgba(64,38,150,.82),inset 0 1px 0 rgba(255,255,255,.09)}
+  /* faint NLE-timeline scanlines fading in from the right */
+  .prx::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+    background-image:linear-gradient(90deg,rgba(184,172,255,.11) 1px,transparent 1px);background-size:34px 100%;
+    -webkit-mask-image:linear-gradient(90deg,transparent 52%,#000);mask-image:linear-gradient(90deg,transparent 52%,#000);opacity:.55}
+  /* light beam that sweeps right on hover, previewing the left-to-right page wipe */
+  .prx::before{content:"";position:absolute;top:-60%;left:-25%;width:50%;height:220%;z-index:-1;
+    background:linear-gradient(90deg,transparent,rgba(176,162,255,.18),transparent);transform:rotate(8deg);filter:blur(7px);
+    transition:transform .85s var(--ease)}
+  .prx:hover::before{transform:translateX(80%) rotate(8deg)}
+  .prx-badge{flex:0 0 auto;width:58px;height:58px;border-radius:15px;display:grid;place-items:center;
+    font-family:var(--display);font-weight:800;font-size:1.45rem;color:#efecff;
+    background:linear-gradient(160deg,#3b2c7a,#5d48c8);border:1px solid rgba(184,172,255,.42);
+    box-shadow:0 10px 26px -10px rgba(93,72,200,.85),inset 0 1px 0 rgba(255,255,255,.2)}
+  .prx-copy{flex:1 1 360px;min-width:240px}
+  .prx-ey{font-family:var(--mono);font-size:.7rem;letter-spacing:.17em;text-transform:uppercase;color:#b6abff;font-weight:500}
+  .prx-copy h2{color:#fbfaff;font-size:clamp(1.5rem,3vw,2.3rem);line-height:1.05;letter-spacing:-.03em;margin:.4rem 0 .5rem;font-weight:700}
+  .prx-copy h2 .pr{background:linear-gradient(90deg,#c2baff,#8f80ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .prx-sub{color:#c9c1ee;font-size:1rem;line-height:1.5;max-width:48ch}
+  .prx-go{flex:0 0 auto;margin-left:auto;display:inline-flex;align-items:center;gap:11px;white-space:nowrap;
+    padding:15px 26px;border-radius:14px;font-weight:700;font-size:1.02rem;color:#fff;
+    background:linear-gradient(180deg,var(--coral-2),var(--coral));
+    box-shadow:0 16px 32px -12px rgba(204,90,46,.66),inset 0 1px 0 rgba(255,255,255,.32);
+    transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
+  .prx:hover .prx-go{transform:translateX(5px);box-shadow:0 22px 40px -14px rgba(204,90,46,.78),inset 0 1px 0 rgba(255,255,255,.36)}
+  .prx-chev{display:inline-flex;font-weight:800;font-size:1.05em;line-height:1}
+  .prx-chev span{animation:prxChev 1.3s var(--ease) infinite}
+  .prx-chev span:nth-child(2){animation-delay:.13s}
+  .prx-chev span:nth-child(3){animation-delay:.26s}
+  @keyframes prxChev{0%,100%{opacity:.4;transform:translateX(0)}50%{opacity:1;transform:translateX(3px)}}
+  @media (max-width:640px){.prx-go{margin-left:0;width:100%;justify-content:center}}
+  @media (prefers-reduced-motion:reduce){.prx-chev span{animation:none}.prx::before{display:none}.prx:hover{transform:none}}
+</style>
+<section class="prx-sec">
+  <div class="wrap">
+    <a href="premiere.html" class="prx reveal" aria-label="Get Flimify as a Premiere Pro extension">
+      <span class="prx-badge" aria-hidden="true">Pr</span>
+      <div class="prx-copy">
+        <p class="prx-ey">Already living in your timeline?</p>
+        <h2>Need this as a <span class="pr">Premiere&nbsp;Pro</span> extension?</h2>
+        <p class="prx-sub">The same Claude-powered motion graphics and auto-edit, docked right inside Premiere so you never have to leave your timeline.</p>
+      </div>
+      <span class="prx-go">Open the extension <span class="prx-chev" aria-hidden="true"><span>&rsaquo;</span><span>&rsaquo;</span><span>&rsaquo;</span></span></span>
+    </a>
+  </div>
+</section>
+
 <!-- FOOTER -->
 <footer class="footer">
   <div class="wrap">
