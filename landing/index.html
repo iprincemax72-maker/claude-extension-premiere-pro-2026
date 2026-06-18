@@ -189,6 +189,11 @@
   .footer ul a:hover{color:var(--coral)}
   .footer-bottom{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:44px;padding-top:22px;border-top:1px solid var(--line);flex-wrap:wrap}
   .footer-bottom p{font-family:var(--mono);font-size:0.7rem;color:var(--text-3)}
+  .footer-bottom .credit a{color:var(--coral);font-weight:600;transition:color .15s var(--ease)}
+  .footer-bottom .credit a:hover{color:var(--coral-2);text-decoration:underline;text-underline-offset:2px}
+  .footer-bottom .credit .heart{color:#ff5a5a}
+  .footer .disclaimer{font-family:var(--mono);font-size:0.66rem;color:var(--text-3);line-height:1.55;margin-top:14px;max-width:82ch}
+  @media (max-width:640px){.footer-links{gap:28px 36px}}
 
   /* reveal */
   html.js .reveal{opacity:0;transform:translateY(26px);filter:blur(6px);transition:opacity 0.7s var(--ease),transform 0.7s var(--ease),filter 0.7s var(--ease)}
@@ -501,14 +506,23 @@
 
 <!-- FOOTER -->
 <footer class="footer">
-  <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:30px 0">
-    <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify</span></a>
-    <nav style="display:flex;gap:20px;font-size:.9rem;flex-wrap:wrap">
-      <a href="premiere.html">Premiere extension</a>
-      <a href="/studio/">Web app</a>
-      <a href="account.html">Account</a>
-    </nav>
-    <span style="font-size:.85rem;color:var(--text-3)">© Flimify · Runs on your own Claude</span>
+  <div class="wrap">
+    <div class="footer-top">
+      <div class="footer-about">
+        <a href="/" class="brand"><img class="glyph" src="flimify-logo.png" alt="Flimify"><span>Flimify</span></a>
+        <p class="blurb">A full AI video editor for Mac and Windows. Generate motion graphics, edit on a pro timeline, caption, and export to mp4, all on your own Claude.</p>
+      </div>
+      <div class="footer-links">
+        <div><h4>Product</h4><ul><li><a href="#features">Features</a></li><li><a href="/studio/">Try in browser</a></li><li><a href="premiere.html">Premiere&nbsp;extension</a></li></ul></div>
+        <div><h4>Support</h4><ul><li><a href="#faq">FAQ</a></li><li><a href="account.html">Account</a></li><li><a href="#">Changelog</a></li></ul></div>
+        <div><h4>Legal</h4><ul><li><a href="#">Terms</a></li><li><a href="#">Privacy</a></li><li><a href="#">Refunds</a></li><li><a href="#">License</a></li></ul></div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© <span id="year">2026</span> Flimify</p>
+      <p class="credit">Made by <a href="https://github.com/iprincemax72-maker" target="_blank" rel="noopener">iprincemax72-maker</a> <span class="heart">♥</span> for editors</p>
+    </div>
+    <p class="disclaimer">Flimify is an independent product, not affiliated with, endorsed by, or sponsored by Anthropic or Adobe. “Claude”, “Adobe”, and “Premiere&nbsp;Pro” are trademarks of their respective owners.</p>
   </div>
 </footer>
 
@@ -550,6 +564,7 @@
     if (mt && mm) mt.addEventListener('click', function(){ mm.classList.add('open'); });
     if (mc && mm) mc.addEventListener('click', function(){ mm.classList.remove('open'); });
     if (mm) mm.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', function(){ mm.classList.remove('open'); }); });
+    var yr = document.getElementById('year'); if (yr) yr.textContent = new Date().getFullYear();
   })();
 
   // FAQ accordion: smooth open/close (single-open), animates max-height
