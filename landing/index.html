@@ -429,6 +429,48 @@
 <a id="top"></a>
 
 <!-- HERO: tagline left, editor screenshot right -->
+<style>
+  /* Premiere extension CTA — sits in the hero's left column, under the download buttons */
+  .prx{position:relative;display:flex;align-items:center;gap:14px;margin-top:1.7rem;max-width:500px;
+    padding:15px 16px;border-radius:18px;overflow:hidden;isolation:isolate;color:#efeaff;text-decoration:none;text-align:left;
+    background:
+      radial-gradient(135% 165% at 90% 8%,rgba(140,124,255,.34),transparent 56%),
+      linear-gradient(135deg,#191233 0%,#251b4f 55%,#150e2a 100%);
+    border:1px solid rgba(160,148,255,.24);
+    box-shadow:0 18px 40px -22px rgba(38,22,92,.72),inset 0 1px 0 rgba(255,255,255,.06);
+    transition:transform .45s var(--ease),box-shadow .45s var(--ease)}
+  .prx:hover{transform:translateY(-3px);box-shadow:0 26px 56px -24px rgba(64,38,150,.82),inset 0 1px 0 rgba(255,255,255,.09)}
+  /* faint NLE-timeline scanlines fading in from the right */
+  .prx::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+    background-image:linear-gradient(90deg,rgba(184,172,255,.12) 1px,transparent 1px);background-size:26px 100%;
+    -webkit-mask-image:linear-gradient(90deg,transparent 44%,#000);mask-image:linear-gradient(90deg,transparent 44%,#000);opacity:.5}
+  /* light beam that sweeps right on hover, previewing the left-to-right page wipe */
+  .prx::before{content:"";position:absolute;top:-60%;left:-30%;width:46%;height:220%;z-index:-1;
+    background:linear-gradient(90deg,transparent,rgba(176,162,255,.2),transparent);transform:rotate(9deg);filter:blur(6px);
+    transition:transform .8s var(--ease)}
+  .prx:hover::before{transform:translateX(130%) rotate(9deg)}
+  .prx-badge{flex:0 0 auto;width:46px;height:46px;border-radius:12px;display:grid;place-items:center;
+    font-family:var(--display);font-weight:800;font-size:1.18rem;color:#efecff;
+    background:linear-gradient(160deg,#3b2c7a,#5d48c8);border:1px solid rgba(184,172,255,.42);
+    box-shadow:0 8px 20px -8px rgba(93,72,200,.85),inset 0 1px 0 rgba(255,255,255,.2)}
+  .prx-copy{flex:1 1 auto;min-width:0;display:block}
+  .prx-ey{display:block;font-family:var(--mono);font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:#b6abff;font-weight:500}
+  .prx-ttl{display:block;font-family:var(--display);font-weight:700;font-size:1.04rem;line-height:1.16;letter-spacing:-.02em;color:#fbfaff;margin-top:3px}
+  .prx-ttl .pr{background:linear-gradient(90deg,#c2baff,#8f80ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .prx-go{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+    padding:11px 15px;border-radius:11px;font-weight:700;font-size:.9rem;color:#fff;
+    background:linear-gradient(180deg,var(--coral-2),var(--coral));
+    box-shadow:0 10px 22px -10px rgba(204,90,46,.72),inset 0 1px 0 rgba(255,255,255,.3);
+    transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
+  .prx:hover .prx-go{transform:translateX(3px)}
+  .prx-chev{display:inline-flex;font-weight:800;line-height:1}
+  .prx-chev span{animation:prxChev 1.3s var(--ease) infinite}
+  .prx-chev span:nth-child(2){animation-delay:.13s}
+  .prx-chev span:nth-child(3){animation-delay:.26s}
+  @keyframes prxChev{0%,100%{opacity:.4;transform:translateX(0)}50%{opacity:1;transform:translateX(2px)}}
+  @media (max-width:880px){.prx{margin-inline:auto}}
+  @media (prefers-reduced-motion:reduce){.prx-chev span{animation:none}.prx::before{display:none}.prx:hover{transform:none}}
+</style>
 <section class="hero-split">
   <div class="hs-text">
     <p class="eyebrow reveal">Desktop app</p>
@@ -440,6 +482,14 @@
       <a class="dl browser" href="/studio/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Try in browser →</a>
     </div>
     <p class="os-note reveal d3">Free. Mac (Apple&nbsp;Silicon) or Windows, one click.</p>
+    <a href="premiere.html" class="prx reveal d3" aria-label="Get Flimify as a Premiere Pro extension">
+      <span class="prx-badge" aria-hidden="true">Pr</span>
+      <span class="prx-copy">
+        <span class="prx-ey">Already in Premiere?</span>
+        <span class="prx-ttl">Need this as a <span class="pr">Premiere&nbsp;Pro</span> extension?</span>
+      </span>
+      <span class="prx-go">Open <span class="prx-chev" aria-hidden="true"><span>&rsaquo;</span><span>&rsaquo;</span><span>&rsaquo;</span></span></span>
+    </a>
   </div>
   <div class="hs-shot reveal d2">
     <div class="frame"><img src="editor-hero.png" width="1919" height="973" alt="The Flimify Studio editor with a clip on the timeline, the live preview, and the AI copilot panel" /></div>
@@ -501,65 +551,6 @@
       <div class="qa"><button type="button">What can the AI actually do?<span class="pm"></span></button><div class="ans"><p>You describe motion graphics like intros, lower thirds, and animated overlays, and Flimify builds, renders, and drops them onto your timeline. You can request several versions of one prompt, ask for changes on any render, and queue prompts to run in sequence.</p></div></div>
       <div class="qa"><button type="button">What does the free plan include?<span class="pm"></span></button><div class="ans"><p>The free plan lets you edit on the full timeline and export, with a limit of 10 renders per month. Auto-Edit and auto-captions are part of the Studio plan.</p></div></div>
     </div>
-  </div>
-</section>
-
-<!-- PREMIERE EXTENSION CTA -->
-<style>
-  .prx-sec{padding:clamp(8px,2vw,24px) 0 clamp(44px,6vw,76px)}
-  .prx{position:relative;display:flex;align-items:center;gap:clamp(20px,3vw,34px);flex-wrap:wrap;
-    padding:clamp(26px,4vw,50px) clamp(24px,4vw,54px);border-radius:26px;overflow:hidden;isolation:isolate;
-    color:#efeaff;text-decoration:none;
-    background:
-      radial-gradient(130% 150% at 86% 16%,rgba(140,124,255,.36),transparent 56%),
-      linear-gradient(135deg,#191233 0%,#251b4f 54%,#150e2a 100%);
-    border:1px solid rgba(160,148,255,.22);
-    box-shadow:0 26px 58px -28px rgba(38,22,92,.72),inset 0 1px 0 rgba(255,255,255,.06);
-    transition:transform .5s var(--ease),box-shadow .5s var(--ease)}
-  .prx:hover{transform:translateY(-4px);box-shadow:0 40px 86px -30px rgba(64,38,150,.82),inset 0 1px 0 rgba(255,255,255,.09)}
-  /* faint NLE-timeline scanlines fading in from the right */
-  .prx::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
-    background-image:linear-gradient(90deg,rgba(184,172,255,.11) 1px,transparent 1px);background-size:34px 100%;
-    -webkit-mask-image:linear-gradient(90deg,transparent 52%,#000);mask-image:linear-gradient(90deg,transparent 52%,#000);opacity:.55}
-  /* light beam that sweeps right on hover, previewing the left-to-right page wipe */
-  .prx::before{content:"";position:absolute;top:-60%;left:-25%;width:50%;height:220%;z-index:-1;
-    background:linear-gradient(90deg,transparent,rgba(176,162,255,.18),transparent);transform:rotate(8deg);filter:blur(7px);
-    transition:transform .85s var(--ease)}
-  .prx:hover::before{transform:translateX(80%) rotate(8deg)}
-  .prx-badge{flex:0 0 auto;width:58px;height:58px;border-radius:15px;display:grid;place-items:center;
-    font-family:var(--display);font-weight:800;font-size:1.45rem;color:#efecff;
-    background:linear-gradient(160deg,#3b2c7a,#5d48c8);border:1px solid rgba(184,172,255,.42);
-    box-shadow:0 10px 26px -10px rgba(93,72,200,.85),inset 0 1px 0 rgba(255,255,255,.2)}
-  .prx-copy{flex:1 1 360px;min-width:240px}
-  .prx-ey{font-family:var(--mono);font-size:.7rem;letter-spacing:.17em;text-transform:uppercase;color:#b6abff;font-weight:500}
-  .prx-copy h2{color:#fbfaff;font-size:clamp(1.5rem,3vw,2.3rem);line-height:1.05;letter-spacing:-.03em;margin:.4rem 0 .5rem;font-weight:700}
-  .prx-copy h2 .pr{background:linear-gradient(90deg,#c2baff,#8f80ff);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .prx-sub{color:#c9c1ee;font-size:1rem;line-height:1.5;max-width:48ch}
-  .prx-go{flex:0 0 auto;margin-left:auto;display:inline-flex;align-items:center;gap:11px;white-space:nowrap;
-    padding:15px 26px;border-radius:14px;font-weight:700;font-size:1.02rem;color:#fff;
-    background:linear-gradient(180deg,var(--coral-2),var(--coral));
-    box-shadow:0 16px 32px -12px rgba(204,90,46,.66),inset 0 1px 0 rgba(255,255,255,.32);
-    transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
-  .prx:hover .prx-go{transform:translateX(5px);box-shadow:0 22px 40px -14px rgba(204,90,46,.78),inset 0 1px 0 rgba(255,255,255,.36)}
-  .prx-chev{display:inline-flex;font-weight:800;font-size:1.05em;line-height:1}
-  .prx-chev span{animation:prxChev 1.3s var(--ease) infinite}
-  .prx-chev span:nth-child(2){animation-delay:.13s}
-  .prx-chev span:nth-child(3){animation-delay:.26s}
-  @keyframes prxChev{0%,100%{opacity:.4;transform:translateX(0)}50%{opacity:1;transform:translateX(3px)}}
-  @media (max-width:640px){.prx-go{margin-left:0;width:100%;justify-content:center}}
-  @media (prefers-reduced-motion:reduce){.prx-chev span{animation:none}.prx::before{display:none}.prx:hover{transform:none}}
-</style>
-<section class="prx-sec">
-  <div class="wrap">
-    <a href="premiere.html" class="prx reveal" aria-label="Get Flimify as a Premiere Pro extension">
-      <span class="prx-badge" aria-hidden="true">Pr</span>
-      <div class="prx-copy">
-        <p class="prx-ey">Already living in your timeline?</p>
-        <h2>Need this as a <span class="pr">Premiere&nbsp;Pro</span> extension?</h2>
-        <p class="prx-sub">The same Claude-powered motion graphics and auto-edit, docked right inside Premiere so you never have to leave your timeline.</p>
-      </div>
-      <span class="prx-go">Open the extension <span class="prx-chev" aria-hidden="true"><span>&rsaquo;</span><span>&rsaquo;</span><span>&rsaquo;</span></span></span>
-    </a>
   </div>
 </section>
 
