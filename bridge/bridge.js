@@ -7,7 +7,11 @@ const fs = require('fs');
 const os = require('os');
 
 const PORT = 3737;
-const PANEL_VERSION = '11.0';   // bump each release — drives the /check-update badge + /diagnostics
+const PANEL_VERSION = '11.1';   // bump each release — drives the /check-update badge + /diagnostics
+// Model used when the per-mode generation model hard-fails (e.g. a separately
+// metered model reports "out of usage credits"). Haiku is the plan's base fast
+// model, so it stays available — a render degrades instead of dead-ending.
+const GEN_FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
 const SESSION_ID = crypto.randomUUID();
 // WORK_DIR pins to wherever bridge.js itself lives, so the bridge always
 // finds the remotion-intro project sitting next to it — even if the user
@@ -4449,10 +4453,22 @@ const server = http.createServer((req, res) => {
         const useMsg = opts.message   || fullMessage;
         const useCwd = opts.cwd       || WORK_DIR;
         const quiet  = !!opts.quiet;
+        // Model per render mode (hybrid): Fast stays on the small fast model (Haiku)
+        // so the quick path is snappy; Default + Slow use Opus 4.8 (latest Opus) for
+        // the best-looking graphics, accepting the slower generation. NOTE: Fable 5
+        // is credit-metered separately and hard-fails with "out of usage credits"
+        // when empty, so it is deliberately NOT used here. GEN_FALLBACK_MODEL catches
+        // any model that runs dry so a render degrades instead of erroring out.
+        // The panel's composer-bar model picker can pin a specific model; 'auto'
+        // (or anything unrecognised) falls through to the per-mode default above.
+        const ALLOWED_GEN_MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-4-8', 'claude-fable-5'];
+        const pickedModel = ALLOWED_GEN_MODELS.includes(payload && payload.model) ? payload.model : null;
+        const genModel = opts.model || pickedModel || (renderMode === 'fast' ? 'claude-haiku-4-5-20251001' : 'claude-opus-4-8');
         const args = [
           '-p',
           '--output-format', 'stream-json',
           '--verbose',
+          '--model', genModel,
           '--permission-mode', 'bypassPermissions',
           '--append-system-prompt', useSys,
           '--no-session-persistence',
@@ -4549,6 +4565,14 @@ const server = http.createServer((req, res) => {
               }
               if (!err) {
                 err = 'Claude exited with code ' + code + '. Possible causes: quota / network / auth. Try again.';
+              }
+              // A separately-metered model (e.g. Fable 5) can hard-fail with "out of
+              // usage credits" while the plan's other models still work fine. Retry
+              // once on the fallback model so the render degrades instead of dying.
+              if (!opts.model && /usage credits|out of credits|\/model to switch/i.test(err)) {
+                clog('bridge', 'warn', 'generation model out of credits, retrying on fallback',
+                  { from: genModel, to: GEN_FALLBACK_MODEL }, reqId);
+                return runClaudeOnce(retry, Object.assign({}, opts, { model: GEN_FALLBACK_MODEL })).then(done);
               }
               return done({
                 ok: false,
@@ -6021,7 +6045,7 @@ const REMOTION_TOOLKIT_PACKAGES = [
 // alongside Remotion so the engine toggle's "HyperFrames" mode works. NOT
 // version-pinned to remotion — it's an independent package.
 const HYPERFRAMES_PACKAGE = 'hyperframes';
-const HYPERFRAMES_VERSION = '0.6.85';
+const HYPERFRAMES_VERSION = '0.7.64';
 
 // Ensure the hyperframes CLI is installed in the remotion-intro project and its
 // telemetry is off. One-time, non-blocking, runs at launch.
