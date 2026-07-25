@@ -4454,16 +4454,16 @@ const server = http.createServer((req, res) => {
         const useCwd = opts.cwd       || WORK_DIR;
         const quiet  = !!opts.quiet;
         // Model per render mode (hybrid): Fast stays on the small fast model (Haiku)
-        // so the quick path is snappy; Default + Slow use Opus 4.8 (latest Opus) for
+        // so the quick path is snappy; Default + Slow use Opus 5 (latest Opus) for
         // the best-looking graphics, accepting the slower generation. NOTE: Fable 5
         // is credit-metered separately and hard-fails with "out of usage credits"
         // when empty, so it is deliberately NOT used here. GEN_FALLBACK_MODEL catches
         // any model that runs dry so a render degrades instead of erroring out.
         // The panel's composer-bar model picker can pin a specific model; 'auto'
         // (or anything unrecognised) falls through to the per-mode default above.
-        const ALLOWED_GEN_MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-4-8', 'claude-fable-5'];
+        const ALLOWED_GEN_MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-fable-5'];
         const pickedModel = ALLOWED_GEN_MODELS.includes(payload && payload.model) ? payload.model : null;
-        const genModel = opts.model || pickedModel || (renderMode === 'fast' ? 'claude-haiku-4-5-20251001' : 'claude-opus-4-8');
+        const genModel = opts.model || pickedModel || (renderMode === 'fast' ? 'claude-haiku-4-5-20251001' : 'claude-opus-5');
         const args = [
           '-p',
           '--output-format', 'stream-json',

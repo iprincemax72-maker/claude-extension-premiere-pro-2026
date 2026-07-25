@@ -4571,7 +4571,7 @@
       </div>
       <!-- MODEL picker — deliberately in the composer bar (NOT buried in settings)
            so a model that runs out of usage credits can be swapped in one click. -->
-      <div class="eng-group" id="modelGroup" title="Which Claude model writes the animation. Auto = Haiku on Fast, Opus on Default/Slow. Switch here if a model runs out of credits.">
+      <div class="eng-group" id="modelGroup" title="Which Claude model writes the animation. Auto = Haiku on Fast, Opus 5 on Default/Slow. Switch here if a model runs out of credits.">
         <button class="eng-btn" id="modelBtn" type="button" aria-haspopup="true" aria-expanded="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3.2M12 18.8V22M4.9 4.9l2.3 2.3M16.8 16.8l2.3 2.3M2 12h3.2M18.8 12H22M4.9 19.1l2.3-2.3M16.8 7.2l2.3-2.3"/></svg>
           <span id="modelLabel">Auto</span>
@@ -4579,7 +4579,7 @@
         </button>
         <div class="eng-menu" id="modelMenu" role="menu">
           <button class="eng-opt mdl-opt" data-model="auto" role="menuitemradio" type="button">
-            <span class="eng-opt-main"><b>Auto</b><span>Haiku on Fast, Opus on Default/Slow</span></span>
+            <span class="eng-opt-main"><b>Auto</b><span>Haiku on Fast, Opus 5 on Default/Slow</span></span>
             <svg class="eng-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </button>
           <button class="eng-opt mdl-opt" data-model="claude-haiku-4-5-20251001" role="menuitemradio" type="button">
@@ -4590,8 +4590,12 @@
             <span class="eng-opt-main"><b>Sonnet 5</b><span>Balanced speed and quality</span></span>
             <svg class="eng-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </button>
+          <button class="eng-opt mdl-opt" data-model="claude-opus-5" role="menuitemradio" type="button">
+            <span class="eng-opt-main"><b>Opus 5</b><span>Newest — best looking</span></span>
+            <svg class="eng-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
           <button class="eng-opt mdl-opt" data-model="claude-opus-4-8" role="menuitemradio" type="button">
-            <span class="eng-opt-main"><b>Opus 4.8</b><span>Best looking — slowest</span></span>
+            <span class="eng-opt-main"><b>Opus 4.8</b><span>Previous Opus — slowest</span></span>
             <svg class="eng-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </button>
           <button class="eng-opt mdl-opt" data-model="claude-fable-5" role="menuitemradio" type="button">
@@ -8962,6 +8966,7 @@ const MODEL_LABELS = {
   'auto': 'Auto',
   'claude-haiku-4-5-20251001': 'Haiku 4.5',
   'claude-sonnet-5': 'Sonnet 5',
+  'claude-opus-5': 'Opus 5',
   'claude-opus-4-8': 'Opus 4.8',
   'claude-fable-5': 'Fable 5',
 };
