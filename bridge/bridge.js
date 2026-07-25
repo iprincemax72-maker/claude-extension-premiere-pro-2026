@@ -2120,6 +2120,35 @@ function _momentPayloadText(m) {
 //     swaps to SSD, slowing per-task time. The user explicitly chose this
 //     over the 6-parallel option that wouldn't swap. If you hit OOM kills,
 //     drop the cap back to 6-8 in this same constant.
+// The Auto-Edit graphic prompt used to ORDER Claude to read six skill files
+// before it could write a line — six tool round-trips per graphic, and the
+// Remotion render itself is only ~7s of a ~60s job. The rules are static, so
+// we read them once here and hand them over in-context instead. Same rules,
+// guaranteed present, zero round-trips. Lazily cached; if a file is missing we
+// just drop it and the prompt still stands on its own.
+let _aeRulesCache = null;
+function aeInlinedRules() {
+  if (_aeRulesCache !== null) return _aeRulesCache;
+  const SKILLS = path.join(os.homedir(), '.claude', 'skills');
+  const want = [
+    ['TRANSPARENT OUTPUT (alpha is critical for overlays)', 'remotion-best-practices/rules/transparent-videos.md'],
+    ['TEXT ANIMATION',                                      'remotion-best-practices/rules/text-animations.md'],
+    ['TIMING, INTERPOLATE + SPRING',                        'remotion-best-practices/rules/timing.md'],
+    ['ANIMATION MATH (easings, stagger, clamp)',            'remotion-transitions/references/animation-math.md'],
+  ];
+  const parts = [];
+  for (const [label, rel] of want) {
+    try {
+      const body = fs.readFileSync(path.join(SKILLS, rel), 'utf8')
+        .replace(/^---[\s\S]*?---\s*/, '').trim();
+      if (body) parts.push('── ' + label + ' ──\n' + body);
+    } catch {}
+  }
+  _aeRulesCache = parts.join('\n\n');
+  try { clog('bridge', 'info', 'auto-edit rules inlined', { files: parts.length, bytes: _aeRulesCache.length }); } catch {}
+  return _aeRulesCache;
+}
+
 function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
   const PARALLEL_CAP = 16;
   const vidW = (genOpts && genOpts.width)  || 1920;
@@ -2304,21 +2333,20 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
       'BUILD IT:',
       '- Write a FRESH Remotion composition from scratch. Do NOT copy or import',
       '  a template from src/templates/. Build the animation yourself.',
-      '- BEFORE you write any code, read the relevant skill rule files:',
-      '    ~/.claude/skills/remotion-best-practices/rules/transparent-videos.md',
-      '      (MANDATORY — alpha output is critical for overlays)',
-      '    ~/.claude/skills/remotion-best-practices/rules/text-animations.md',
-      '      (for any text the overlay shows)',
-      '    ~/.claude/skills/remotion-best-practices/rules/timing.md',
-      '      (interpolate / spring / easings — use these, not CSS transitions)',
-      '    ~/.claude/skills/remotion-transitions/references/animation-math.md',
-      '      (easing functions, stagger formulas, the `clamp` pattern)',
-      '  For the OVERLAY ENTRY/EXIT animation specifically, study the patterns in:',
-      '    ~/.claude/skills/remotion-transitions/references/transition-catalog.md',
-      '    ~/.claude/skills/remotion-transitions-extra/references/transition-catalog-extra.md',
-      '      (Striped Slam, Zoom Punch, Iris Open, Page Tear, etc. — pick the',
-      '      reveal pattern that fits the moment\'s energy and adapt it to your',
-      '      overlay\'s in/out animation, not as a TransitionSeries.)',
+      '- The rules you need are INLINED BELOW under "SKILL RULES". Do NOT open',
+      '  them with Read — you already have them. Go straight to writing the',
+      '  component; every read is dead time on a job that renders in seconds.',
+      '- DO NOT EXPLORE THE PROJECT. Everything you need is stated here:',
+      '    • project root: ' + WORK_DIR + '/remotion-intro (deps + node_modules ready)',
+      '    • you write exactly TWO new files under src/, then run the render',
+      '    • no ls, no cat, no reading other components. Every prior render is a',
+      '      DIFFERENT design — opening one only biases you and burns time.',
+      '- For the OVERLAY ENTRY/EXIT animation, pick a reveal that fits the',
+      '  moment\'s energy (striped slam, zoom punch, iris open, page tear, mask',
+      '  wipe, glitch cut...) and build it as your own in/out animation — not a',
+      '  TransitionSeries. Only if you want one specific catalogued recipe may',
+      '  you read ~/.claude/skills/remotion-transitions/references/transition-catalog.md',
+      '  (or -extra) — optional, and it costs a round-trip, so prefer your own.',
       '  For TEXT-DRIVEN overlays (titles, captions, callouts, stats), write',
       '  bespoke Remotion components — pick fonts, motion, easing, palette',
       vo
@@ -2348,11 +2376,9 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
            + '  cause of "it still has a background". ProRes 422 (the default codec) also\n'
            + '  has no alpha. --mute silences audio (the bridge also strips it with\n'
            + '  ffmpeg -an).\n'
-           + '  VERIFY FOR REAL — do NOT just trust the pixel format. Extract a corner\n'
-           + '  pixel and confirm its alpha is ~0:\n'
-           + '      ffmpeg -y -i OUT.mov -vf "format=rgba,crop=2:2:0:0" -frames:v 1 -f rawvideo /tmp/a.raw && python3 -c "d=open(\'/tmp/a.raw\',\'rb\').read(); print(\'corner alpha:\', d[3])"\n'
-           + '  If the corner alpha is not ~0, the background is still there — re-render\n'
-           + '  WITH --image-format png. A yuva pixel format alone does NOT prove the bg is gone.'),
+           + '  Do NOT ffprobe or pixel-check the result afterwards — the bridge already\n'
+           + '  verifies pix_fmt AND samples the alpha, and re-runs you automatically if\n'
+           + '  it is opaque. Just render with the flags above and finish.'),
         ].join('\n'),
       placement,
       '- TIMING IS CRITICAL — the narration plays for the ENTIRE ' + task.durationSec.toFixed(1) + 's,',
@@ -2366,6 +2392,14 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
       '',
       'When finished, the file at ' + task.outFile + ' must exist on disk.',
       'Emit [[IMPORT:' + task.outFile + ']] when done.',
+      // The skill rules, handed over instead of read. Last so the task above
+      // stays the first thing in view.
+      (aeInlinedRules()
+        ? '\n═══════════════════════════════════════════════════════════════════\n'
+          + 'SKILL RULES — already loaded for you. Do not Read these files.\n'
+          + '═══════════════════════════════════════════════════════════════════\n\n'
+          + aeInlinedRules()
+        : ''),
     ].join('\n');
   }
 
