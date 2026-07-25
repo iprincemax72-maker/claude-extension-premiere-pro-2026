@@ -583,9 +583,19 @@
   /* ── Transcript view (Auto-Edit line picker) ──────────────────────────
      Reads like a document: highlight text with the mouse to mark a graphic. */
   #txView { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
-  .tx-head { display:flex; align-items:flex-start; gap:10px; padding:16px 18px 10px; border-bottom:1px solid var(--line); }
+  .tx-head { display:flex; align-items:center; gap:10px; padding:12px 18px; border-bottom:1px solid var(--line); }
+  .tx-steps { display:flex; align-items:center; gap:7px; flex:1 1 auto; }
+  .tx-step { font-size:11px; font-weight:600; color:var(--text-dim); opacity:.45;
+    padding:3px 9px; border-radius:20px; border:1px solid transparent; white-space:nowrap; }
+  .tx-step.on { opacity:1; color:var(--text); border-color:var(--line);
+    background:color-mix(in srgb, var(--accent) 14%, transparent); }
+  .tx-step.done { opacity:.8; color:var(--text-dim); }
+  .tx-pane { flex:1; display:flex; flex-direction:column; min-height:0; }
+  .tx-lead { padding:14px 20px 2px; }
   .tx-title { font-size:14px; font-weight:650; color:var(--text); letter-spacing:-0.01em; }
   .tx-sub { font-size:11.5px; color:var(--text-dim); margin-top:3px; line-height:1.45; }
+  /* the questions list reuses .ae-questions styling but fills the pane here */
+  #txQuestions { max-height:none; gap:16px; padding:16px 20px 20px; }
   .tx-close { margin-left:auto; background:transparent; border:none; color:var(--text-dim);
     font-size:20px; line-height:1; cursor:pointer; padding:2px 6px; border-radius:6px; }
   .tx-close:hover { color:var(--text); background:rgba(255,255,255,.06); }
@@ -4600,19 +4610,43 @@
      transcript is readable: highlight text with the mouse to mark a graphic. -->
 <div id="txView" style="display:none">
   <div class="tx-head">
-    <div>
-      <div class="tx-title">Select the parts you want graphics on</div>
-      <div class="tx-sub">Drag over the words with your mouse, or right-click a sentence. Click a highlight to remove it.</div>
+    <div class="tx-steps">
+      <span class="tx-step on" data-s="pick">1 &middot; Pick moments</span>
+      <span class="tx-step" data-s="style">2 &middot; Style</span>
+      <span class="tx-step" data-s="gen">3 &middot; Generate</span>
     </div>
     <button type="button" class="tx-close" id="txCancel" title="Cancel">&times;</button>
   </div>
-  <div class="tx-body" id="txBody"></div>
-  <div class="tx-foot">
-    <span class="tx-count" id="txCount">Nothing selected yet</span>
-    <button type="button" class="tx-clear" id="txClear">Clear</button>
-    <button type="button" class="tx-go" id="txGo" disabled>Continue &rarr;</button>
+
+  <!-- STEP 1 — pick the moments off the transcript -->
+  <div class="tx-pane" data-pane="pick">
+    <div class="tx-lead">
+      <div class="tx-title">Where do you want the graphics?</div>
+      <div class="tx-sub">Drag over the words with your mouse, or right-click a sentence. Click a highlight to remove it.</div>
+    </div>
+    <div class="tx-body" id="txBody"></div>
+    <div class="tx-foot">
+      <span class="tx-count" id="txCount">Nothing selected yet</span>
+      <button type="button" class="tx-clear" id="txClear">Clear</button>
+      <button type="button" class="tx-go" id="txGo" disabled>Continue &rarr;</button>
+    </div>
   </div>
-  <button type="button" class="tx-add" id="txAdd" style="display:none">✦ Graphic here</button>
+
+  <!-- STEP 2 — how they should look -->
+  <div class="tx-pane" data-pane="style" style="display:none">
+    <div class="tx-lead">
+      <div class="tx-title">How should they look?</div>
+      <div class="tx-sub">These steer every graphic in the edit.</div>
+    </div>
+    <div class="tx-body ae-questions" id="txQuestions"></div>
+    <div class="tx-foot">
+      <span class="tx-count" id="txStyleCount"></span>
+      <button type="button" class="tx-clear" id="txBack">&larr; Back</button>
+      <button type="button" class="tx-go" id="txGen">Generate &rarr;</button>
+    </div>
+  </div>
+
+  <button type="button" class="tx-add" id="txAdd" style="display:none">&#10022; Graphic here</button>
 </div>
 
 <div class="composer">
@@ -10747,9 +10781,27 @@ function txShow(sentences, suggested) {
   });
   if (log) log.style.display = 'none';
   view.style.display = 'flex';
+  txPane('pick');
   body.scrollTop = 0;
   txSync();
   return true;
+}
+// Swap the visible pane and light up the matching step chip.
+function txPane(name) {
+  const { view } = txEls();
+  if (!view) return;
+  view.querySelectorAll('.tx-pane').forEach(p =>
+    p.style.display = (p.dataset.pane === name) ? 'flex' : 'none');
+  txStep(name);
+}
+function txStep(name) {
+  const order = ['pick', 'style', 'gen'];
+  const at = order.indexOf(name);
+  document.querySelectorAll('#txView .tx-step').forEach(el => {
+    const i = order.indexOf(el.dataset.s);
+    el.classList.toggle('on', i === at);
+    el.classList.toggle('done', i < at);
+  });
 }
 function txHide() {
   const { view, add, log } = txEls();
@@ -10822,17 +10874,28 @@ function txMark(spans) {
   if (cancel) cancel.addEventListener('click', () => { txHide(); aeWizard = null; });
   if (go) go.addEventListener('click', () => {
     if (!aeWizard || !aeWizard.picks.size) return;
+    const n = aeWizard.picks.size;
+    const sc = document.getElementById('txStyleCount');
+    if (sc) sc.textContent = n + ' graphic' + (n === 1 ? '' : 's') + ' to build';
+    renderAeQuestions('txQuestions');
+    txPane('style');
+  });
+  const back = document.getElementById('txBack');
+  if (back) back.addEventListener('click', () => txPane('pick'));
+  const gen = document.getElementById('txGen');
+  if (gen) gen.addEventListener('click', () => {
+    if (!aeWizard) return;
+    const reqId = aeWizard.reqId, density = aeWizard.density;
+    const answers = Object.assign({}, aeWizard.answers);
+    const refImages = (aeWizard.refImages || []).map(r => r.path).filter(Boolean);
+    txStep('gen');
     txHide();
-    autoeditModal.classList.add('show');
-    renderAeQuestions();
-    aeShowStep('questions');
-    aeScrollQuestionsTop();
-    requestAnimationFrame(aeScrollQuestionsTop);
+    runAutoEditV2({ reqId, density, answers, refImages });
   });
 })();
 
-function renderAeQuestions() {
-  const wrap = document.getElementById('aeQuestions');
+function renderAeQuestions(targetId) {
+  const wrap = document.getElementById(targetId || 'aeQuestions');
   if (!wrap) return;
   wrap.innerHTML = '';
   // Auto-detected sequence format chip — shows what we read so the user knows
