@@ -12,6 +12,9 @@ const PANEL_VERSION = '11.1';   // bump each release — drives the /check-updat
 // metered model reports "out of usage credits"). Haiku is the plan's base fast
 // model, so it stays available — a render degrades instead of dead-ending.
 const GEN_FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
+// Model for Auto-Edit's thinking steps: the interview questions, the moment
+// plan, and the plan fit-check. No Haiku in the Auto-Edit pipeline.
+const AE_MODEL = 'claude-opus-5';
 const SESSION_ID = crypto.randomUUID();
 // WORK_DIR pins to wherever bridge.js itself lives, so the bridge always
 // finds the remotion-intro project sitting next to it — even if the user
@@ -1417,12 +1420,11 @@ function detectMoments(sentences, density, styleOverride, reqId, log, extraGuida
     // it before it answers. cwd is a temp dir, not WORK_DIR, so claude
     // doesn't load the project's CLAUDE.md (which tells it to go read the
     // Remotion skill files — irrelevant to a pure text→JSON task and a
-    // source of multi-minute stalls). Haiku + bypassPermissions keep it
-    // fast and unblocked.
+    // source of multi-minute stalls). bypassPermissions keeps it unblocked.
     const proc = spawn(claudePath, [
       '-p', fullPrompt,
       '--output-format', 'text',
-      '--model', 'claude-haiku-4-5-20251001',
+      '--model', AE_MODEL,
       '--permission-mode', 'bypassPermissions',
       '--no-session-persistence',
     ], {
@@ -1607,14 +1609,16 @@ async function extractFaceFrames(seg, reqId, log) {
 // questions and the plan fit-check. Returns raw stdout (best-effort; '' on
 // failure so callers degrade gracefully). Registered as an _activeAutoedit
 // child so ESC cancels it.
-function runClaudeText(promptStr, timeoutMs, log, label) {
+// `model` is optional and defaults to the fast model. Auto-Edit passes
+// AE_MODEL for its judgment calls; other callers keep the fast default.
+function runClaudeText(promptStr, timeoutMs, log, label, model) {
   return new Promise((resolve) => {
     const claudePath = process.env.CLAUDE_CLI || 'claude';
     const extendedPath = [process.env.PATH || '', '/Users/anshdhakad/.local/bin', '/opt/homebrew/bin', '/usr/local/bin'].filter(Boolean).join(':');
     const proc = spawn(claudePath, [
       '-p', promptStr,
       '--output-format', 'text',
-      '--model', 'claude-haiku-4-5-20251001',
+      '--model', model || 'claude-haiku-4-5-20251001',
       '--permission-mode', 'bypassPermissions',
       '--no-session-persistence',
     ], { env: { ...process.env, PATH: extendedPath }, cwd: os.tmpdir(), stdio: ['ignore', 'pipe', 'pipe'] });
@@ -1699,7 +1703,7 @@ async function detectInterviewQuestions(sentences, density, log) {
       '{"id":"c1","q":"There\'s a 3-step list around the middle — show it as…","options":[{"value":"checklist","label":"Animated checklist"},{"value":"caption","label":"Just captions"},{"value":"skip","label":"Skip it"}]}',
       'Each question: 2-3 options, each with a short value and a human label. Max 2 questions. If the content is unremarkable, output NOTHING.',
     ].join('\n');
-    const raw = await runClaudeText(system + '\n\nTRANSCRIPT:\n' + sample, 90000, log, 'interview');
+    const raw = await runClaudeText(system + '\n\nTRANSCRIPT:\n' + sample, 90000, log, 'interview', AE_MODEL);
     const content = [];
     for (const line of String(raw).split('\n')) {
       let t = line.trim();
@@ -1821,7 +1825,7 @@ async function verifyPlan(moments, sentences, spanStart, spanEnd, log) {
       'Return ONE JSON object only, nothing else: {"drop":[<indices to remove>],"note":"<one short sentence on the overall fit>"}.',
       'Be conservative — only drop clearly bad or duplicate graphics. An empty drop list is the normal, expected answer.',
     ].join('\n');
-    const raw = await runClaudeText(sys + '\n\nPLAN:\n' + list, 90000, log, 'verify');
+    const raw = await runClaudeText(sys + '\n\nPLAN:\n' + list, 90000, log, 'verify', AE_MODEL);
     const mt = String(raw).match(/\{[\s\S]*\}/);
     if (mt) {
       const v = JSON.parse(mt[0]);
