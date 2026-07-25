@@ -7058,6 +7058,8 @@ function _clipWatchModalOpen() {
 }
 let _clipWatchLastSig = null;
 let _clipWatchUseSig = true;     // false → host has no ccSelectionSig (old engine); use ccGetSelectedClip
+let _clipWatchSigFails = 0;      // consecutive {ok:false} from ccSelectionSig
+let _clipWatchFallbackFails = 0; // consecutive {ok:false} from the fallback call
 function _esEvalError(s) { return s != null && String(s).indexOf('EvalScript error') === 0; }
 async function _clipWatchTick() {
   if (document.hidden) return;
@@ -7081,7 +7083,23 @@ async function _clipWatchTick() {
       // fall through to the fallback below this tick
     } else {
       let sg; try { sg = JSON.parse(rawSig); } catch { return; }
-      if (!sg || !sg.ok) return;
+      // host.jsx can answer with well-formed JSON that still says it failed
+      // (e.g. {ok:false,error:"InternalError: Stack overrun"}). That is NOT an
+      // "EvalScript error" string, so the check above misses it and we used to
+      // keep polling every 500ms forever — tens of thousands of failing calls,
+      // which is exactly the ExtendScript hammering that destabilises Premiere.
+      // Give it a few tries, then fall back and slow down.
+      if (!sg || !sg.ok) {
+        if (++_clipWatchSigFails >= 3) {
+          cclog('warn', 'ccSelectionSig failing — backing off to the slow fallback',
+                { error: (sg && sg.error) || 'unknown', fails: _clipWatchSigFails });
+          _clipWatchUseSig = false;
+          _clipWatchSigFails = 0;
+          if (_clipWatchPoll) { clearInterval(_clipWatchPoll); _clipWatchPoll = setInterval(_clipWatchTick, 1200); }
+        }
+        return;
+      }
+      _clipWatchSigFails = 0;
       const sig = sg.sig || '';                  // '' = nothing selected
       if (sig === _clipWatchLastSig) return;     // unchanged — cheap exit
       _clipWatchLastSig = sig;
@@ -7096,6 +7114,18 @@ async function _clipWatchTick() {
   let raw; try { raw = await evalES('ccGetSelectedClip()'); } catch { return; }
   if (raw == null || _esEvalError(raw)) return;
   let sel; try { sel = JSON.parse(raw); } catch { return; }
+  // If the fallback ALSO keeps failing, the host engine is in a bad state.
+  // Stop the watch rather than keep poking ExtendScript — this is an optional
+  // convenience feature, not worth risking Premiere's stability for.
+  if (sel && sel.ok === false) {
+    if (++_clipWatchFallbackFails >= 5) {
+      cclog('warn', 'clip watch disabled — ExtendScript keeps failing',
+            { error: sel.error || 'unknown' });
+      stopClipConversationWatch();
+    }
+    return;
+  }
+  _clipWatchFallbackFails = 0;
   const p = (sel && sel.ok && sel.path) ? sel.path : null;
   const sig = p || '';
   if (sig === _clipWatchLastSig) return;
