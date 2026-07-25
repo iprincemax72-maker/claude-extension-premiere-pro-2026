@@ -2969,16 +2969,15 @@ V4 API RULES (a model with older knowledge writes these WRONG):
 ═══════════════════════════════════════════════════════════════════════════
 INSTALLED SKILLS — load these before writing Remotion code, they have
 battle-tested patterns that will dramatically improve output quality.
-Skills live in ~/.claude/skills/. Read the relevant rule file(s) first,
-then write code that follows the pattern.
+Skills live in ~/.claude/skills/.
 
-  remotion-best-practices/
-    rules/transparent-videos.md   READ THIS for any transparent / alpha /
-                                  overlay request. Tells you exactly how to
-                                  render alpha-capable .mov correctly.
-    rules/text-animations.md      Typography animation patterns.
+ALREADY IN YOUR CONTEXT — do NOT Read these, you have them below under
+REMOTION BEST PRACTICES. Reading them again is pure dead time:
+    rules/animations.md, rules/transparent-videos.md, rules/text-animations.md
+    (plus rules/motion-design.md + rules/timing.md on Default/Slow)
+
+Worth a read ONLY if the request actually needs that specific technique:
     rules/transitions.md          Scene transition patterns.
-    rules/timing.md               Easing, springs, interpolation curves.
     rules/sequencing.md           <Series>, <Sequence>, trim/delay patterns.
     rules/calculate-metadata.md   Dynamic durationInFrames from props.
     rules/voiceover.md            ElevenLabs TTS + word timestamps.
@@ -3460,7 +3459,11 @@ function _readBPRule(file) {
     return s;
   } catch { return ''; }
 }
-const BP_CORE  = _readBPRule('animations.md');
+// Inlined so Claude never spends a tool round-trip fetching them. transparent-
+// videos + text-animations join the core set because they are the two the
+// prompt used to say "READ THIS" about — which cost a call on almost every job.
+const BP_CORE  = [_readBPRule('animations.md'), _readBPRule('transparent-videos.md'),
+                  _readBPRule('text-animations.md')].filter(Boolean).join('\n\n---\n\n');
 const BP_CRAFT = [_readBPRule('motion-design.md'), _readBPRule('timing.md')].filter(Boolean).join('\n\n---\n\n');
 clog('bridge', 'info', 'best-practices loaded', {
   core: BP_CORE.length, craft: BP_CRAFT.length, dir: BP_RULES_DIR,
