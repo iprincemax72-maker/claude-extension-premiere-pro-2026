@@ -11097,6 +11097,9 @@ async function runAutoEditV2(opts) {
         // The lines the user ticked. Sent verbatim — the bridge builds the plan
         // from exactly these and skips its own moment detection.
         picks: (aeWizard && aeWizard.picks) ? [...aeWizard.picks] : undefined,
+        // Same model picker as the composer, so Auto-Edit is a speed/quality
+        // dial too instead of silently following the CLI default.
+        model: (userSettings.model && userSettings.model !== 'auto') ? userSettings.model : undefined,
       }),
       signal: abort.signal,
     });

@@ -2424,10 +2424,18 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
     return new Promise((resolve) => {
       const tag = `gen[${task.idx}]${isRetry ? ' (retry)' : ''}`;
       const aeSys = (genOpts && genOpts.engine === 'hyperframes') ? HYPERFRAMES_SYSTEM_PROMPT : SYSTEM_PROMPT;
+      // Honour the composer's model picker. Without this the graphic render
+      // silently inherited whatever the CLI default happened to be, so Auto-Edit
+      // quality drifted with an unrelated setting and there was no way to trade
+      // speed for polish from the panel. Built into the array rather than
+      // spliced in — an off-by-one here lands the flag inside another option's
+      // value and the CLI dies instantly with no output.
+      const aeModelArgs = (genOpts && genOpts.model) ? ['--model', genOpts.model] : [];
       const args = [
         '-p',
         '--output-format', 'stream-json',
         '--verbose',
+        ...aeModelArgs,
         '--permission-mode', 'bypassPermissions',
         '--append-system-prompt', aeSys,
         '--no-session-persistence',
@@ -5895,7 +5903,9 @@ const server = http.createServer((req, res) => {
             .filter(p => typeof p === 'string' && p && (() => { try { return fs.existsSync(p); } catch { return false; } })())
             .slice(0, 6);
           const aeEngine = (payload.engine === 'hyperframes') ? 'hyperframes' : 'remotion';
-          const genOpts = { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames, userExtra, refImages, engine: aeEngine };
+          const AE_ALLOWED = ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-fable-5'];
+          const aeModel = AE_ALLOWED.includes(payload && payload.model) ? payload.model : null;
+          const genOpts = { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames, userExtra, refImages, engine: aeEngine, model: aeModel };
           // Persist the final plan + render options so a SINGLE graphic can be
           // re-rendered later (the per-graphic "Change" feature) without re-running
           // analyze. Keyed by reqId; merges over the analyze-time cache entry.
