@@ -10782,6 +10782,7 @@ function aeFmtT(sec) {
   const s = Math.max(0, Math.floor(+sec || 0));
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
+let _txLastIdx = null;   // anchor for shift+click range selection
 function txEls() {
   return {
     view: document.getElementById('txView'),
@@ -10817,6 +10818,7 @@ function txShow(sentences, suggested) {
   if (!view || !body) return false;
   aeWizard.sentences = sentences;
   aeWizard.picks = new Set((suggested || []).filter(i => typeof i === 'number'));
+  _txLastIdx = null;
   body.innerHTML = '';
   sentences.forEach((s) => {
     const t = document.createElement('button');
@@ -10915,14 +10917,26 @@ function txMark(spans) {
     txMark(spans.length ? spans : [hit]);
   });
 
-  // Plain click on a marked sentence removes it.
+  // Click a sentence: toggle it. Shift+click: mark everything from the last
+  // one you touched to here — picking a long run shouldn't be 20 clicks.
   body.addEventListener('click', (e) => {
     const hit = e.target.closest && e.target.closest('.tx-s');
     if (!hit) return;
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed) return;      // that was a drag, not a click
     const i = +hit.dataset.i;
-    if (aeWizard.picks.has(i)) { aeWizard.picks.delete(i); txSync(); }
+    if (e.shiftKey && _txLastIdx != null && _txLastIdx !== i) {
+      const lo = Math.min(_txLastIdx, i), hi = Math.max(_txLastIdx, i);
+      for (const s of (aeWizard.sentences || [])) {
+        if (s.i >= lo && s.i <= hi) aeWizard.picks.add(s.i);
+      }
+      _txLastIdx = i;
+      txSync();
+      return;
+    }
+    _txLastIdx = i;
+    if (aeWizard.picks.has(i)) aeWizard.picks.delete(i); else aeWizard.picks.add(i);
+    txSync();
   });
 
   const clear = document.getElementById('txClear');
@@ -10944,6 +10958,14 @@ function txMark(spans) {
     const n = aeWizard.picks.size;
     const sc = document.getElementById('txStyleCount');
     if (sc) sc.textContent = n + ' graphic' + (n === 1 ? '' : 's') + ' to build';
+    // Reuse the tone/style you picked last time — most people keep one look
+    // across a project, and re-answering identical questions every run is a tax.
+    try {
+      const last = userSettings.aeLastAnswers || {};
+      Object.keys(last).forEach(k => {
+        if (!(k in aeWizard.answers)) aeWizard.answers[k] = last[k];
+      });
+    } catch (e) {}
     renderAeQuestions('txQuestions');
     txPane('style');
   });
@@ -10955,6 +10977,10 @@ function txMark(spans) {
     const reqId = aeWizard.reqId, density = aeWizard.density;
     const answers = Object.assign({}, aeWizard.answers);
     const refImages = (aeWizard.refImages || []).map(r => r.path).filter(Boolean);
+    try {
+      userSettings.aeLastAnswers = { styleConsistency: answers.styleConsistency, tone: answers.tone };
+      saveSettings();
+    } catch (e) {}
     txStep('gen');
     txHide();
     runAutoEditV2({ reqId, density, answers, refImages });
