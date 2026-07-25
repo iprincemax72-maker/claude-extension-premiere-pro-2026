@@ -580,6 +580,37 @@
   }
 
   /* ───── LOG ───── */
+  /* ── Transcript view (Auto-Edit line picker) ──────────────────────────
+     Reads like a document: highlight text with the mouse to mark a graphic. */
+  #txView { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
+  .tx-head { display:flex; align-items:flex-start; gap:10px; padding:16px 18px 10px; border-bottom:1px solid var(--line); }
+  .tx-title { font-size:14px; font-weight:650; color:var(--text); letter-spacing:-0.01em; }
+  .tx-sub { font-size:11.5px; color:var(--text-dim); margin-top:3px; line-height:1.45; }
+  .tx-close { margin-left:auto; background:transparent; border:none; color:var(--text-dim);
+    font-size:20px; line-height:1; cursor:pointer; padding:2px 6px; border-radius:6px; }
+  .tx-close:hover { color:var(--text); background:rgba(255,255,255,.06); }
+  .tx-body { flex:1; min-height:0; overflow-y:auto; padding:18px 20px 22px;
+    font-size:14.5px; line-height:2.05; color:var(--text-dim); user-select:text; -webkit-user-select:text; cursor:text; }
+  .tx-s { border-radius:5px; padding:2px 1px; transition:background .12s, color .12s; }
+  .tx-s:hover { background:rgba(255,255,255,.05); }
+  .tx-s.on { background:color-mix(in srgb, var(--accent) 26%, transparent);
+    color:var(--text); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent) inset; cursor:pointer; }
+  .tx-s.on::after { content:'✦'; font-size:9px; vertical-align:super; margin-left:3px; color:var(--accent); }
+  .tx-t { font-size:10px; font-variant-numeric:tabular-nums; color:var(--text-dim);
+    opacity:.5; margin-right:5px; user-select:none; }
+  .tx-foot { display:flex; align-items:center; gap:9px; padding:10px 18px 12px; border-top:1px solid var(--line); }
+  .tx-count { flex:1 1 auto; font-size:11.5px; color:var(--text-dim); }
+  .tx-clear, .tx-go { border-radius:8px; padding:7px 14px; font-size:12px; cursor:pointer;
+    font-family:var(--font-ui); font-weight:600; border:1px solid var(--line); background:transparent; color:var(--text-dim); }
+  .tx-clear:hover { color:var(--text); }
+  .tx-go { border-color:transparent; background:var(--accent); color:#fff; }
+  .tx-go:disabled { opacity:.4; cursor:default; }
+  /* floating button that appears where you finished highlighting */
+  .tx-add { position:absolute; z-index:40; transform:translate(-50%,-100%);
+    background:var(--accent); color:#fff; border:none; border-radius:8px; padding:6px 11px;
+    font-size:11.5px; font-weight:650; cursor:pointer; font-family:var(--font-ui);
+    box-shadow:0 8px 20px -6px rgba(0,0,0,.6); white-space:nowrap; }
+
   #log {
     flex: 1;
     overflow-y: auto;
@@ -4033,24 +4064,6 @@
       </div>
     </div>
 
-    <!-- STEP 3 — pick the lines. The user chooses which sentences get a graphic;
-         suggestions come pre-ticked but nothing here is enforced downstream. -->
-    <div class="ae-step" data-step="picks" style="display:none">
-      <div class="autocut-modal-title">Where do you want the graphics?</div>
-      <div class="autocut-modal-subtitle">Tap the lines you want a motion graphic on. Suggestions are pre-ticked — change them however you like.</div>
-      <div class="ae-pick-bar">
-        <span id="aePickCount">0 selected</span>
-        <span class="ae-pick-spacer"></span>
-        <button type="button" class="ae-pick-act" id="aePickAll">Select all</button>
-        <button type="button" class="ae-pick-act" id="aePickNone">Clear</button>
-      </div>
-      <div class="ae-picks" id="aePicks"></div>
-      <div class="autocut-modal-actions">
-        <button type="button" class="autocut-modal-cancel" data-ae-cancel>Cancel</button>
-        <button id="aePicksNext" type="button" class="autocut-modal-go">Continue &rarr;</button>
-      </div>
-    </div>
-
     <!-- STEP 4 — questions -->
     <div class="ae-step" data-step="questions" style="display:none">
       <div class="autocut-modal-title">A few quick questions</div>
@@ -4581,6 +4594,25 @@
     <div class="empty-no-match" id="emptyNoMatch" style="display:none">No matches</div>
   </div>
   </div><!-- /tab-content t1 -->
+</div>
+
+<!-- TRANSCRIPT VIEW — the Auto-Edit line picker. Takes over the main area so the
+     transcript is readable: highlight text with the mouse to mark a graphic. -->
+<div id="txView" style="display:none">
+  <div class="tx-head">
+    <div>
+      <div class="tx-title">Select the parts you want graphics on</div>
+      <div class="tx-sub">Drag over the words with your mouse, or right-click a sentence. Click a highlight to remove it.</div>
+    </div>
+    <button type="button" class="tx-close" id="txCancel" title="Cancel">&times;</button>
+  </div>
+  <div class="tx-body" id="txBody"></div>
+  <div class="tx-foot">
+    <span class="tx-count" id="txCount">Nothing selected yet</span>
+    <button type="button" class="tx-clear" id="txClear">Clear</button>
+    <button type="button" class="tx-go" id="txGo" disabled>Continue &rarr;</button>
+  </div>
+  <button type="button" class="tx-add" id="txAdd" style="display:none">✦ Graphic here</button>
 </div>
 
 <div class="composer">
@@ -10645,13 +10677,14 @@ async function analyzeAutoEdit() {
     // Content questions are redundant now that the user picks the lines
     // themselves — keep only the ones that decide how it LOOKS.
     const AE_STYLE_QIDS = ['styleConsistency', 'tone', 'ratio', 'custom'];
-    aeWizard.sentences = Array.isArray(data.sentences) ? data.sentences : [];
-    if (aeWizard.sentences.length) {
+    const txSentences = Array.isArray(data.sentences) ? data.sentences : [];
+    if (txSentences.length) {
       aeWizard.questions = aeWizard.questions.filter(q => q && AE_STYLE_QIDS.includes(q.id));
-      aeWizard.picks = new Set((data.suggested || []).filter(i => typeof i === 'number'));
-      renderAePicks();
-      aeShowStep('picks');
-      if (aeMinimized) aeRestore();
+      // Hand the transcript to the main panel area — the modal is too cramped
+      // to read in, and this lets you highlight text with the mouse.
+      autoeditModal.classList.remove('show');
+      aeMinimized = false;
+      txShow(txSentences, data.suggested || []);
     } else {
       // No transcript came back (older bridge) — fall back to the old flow.
       renderAeQuestions();
@@ -10670,60 +10703,127 @@ async function analyzeAutoEdit() {
   }
 }
 
-// ── Transcript line picker ────────────────────────────────────────────────
-// The user ticks which sentences get a motion graphic. Their selection is sent
-// verbatim to the bridge, which never adds or drops one.
+// ── Transcript view ───────────────────────────────────────────────────────
+// Takes over the main panel area and lays the transcript out as readable text.
+// Highlight words with the mouse (or right-click a sentence) to mark where a
+// motion graphic goes. Whatever is marked is exactly what gets built.
 function aeFmtT(sec) {
   const s = Math.max(0, Math.floor(+sec || 0));
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
-function aeUpdatePickCount() {
-  const n = aeWizard && aeWizard.picks ? aeWizard.picks.size : 0;
-  const el = document.getElementById('aePickCount');
-  if (el) el.textContent = n + ' selected';
-  const go = document.getElementById('aePicksNext');
+function txEls() {
+  return {
+    view: document.getElementById('txView'),
+    body: document.getElementById('txBody'),
+    add:  document.getElementById('txAdd'),
+    go:   document.getElementById('txGo'),
+    cnt:  document.getElementById('txCount'),
+    log:  document.getElementById('log'),
+  };
+}
+function txSync() {
+  const { body, go, cnt } = txEls();
+  if (!body) return;
+  const n = (aeWizard && aeWizard.picks) ? aeWizard.picks.size : 0;
+  body.querySelectorAll('.tx-s').forEach(el =>
+    el.classList.toggle('on', !!(aeWizard && aeWizard.picks && aeWizard.picks.has(+el.dataset.i))));
+  if (cnt) cnt.textContent = n ? (n + ' graphic' + (n === 1 ? '' : 's') + ' selected') : 'Nothing selected yet';
   if (go) go.disabled = n === 0;
 }
-function renderAePicks() {
-  const wrap = document.getElementById('aePicks');
-  if (!wrap || !aeWizard) return;
-  if (!aeWizard.picks) aeWizard.picks = new Set();
-  wrap.innerHTML = '';
-  (aeWizard.sentences || []).forEach((s) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'ae-line' + (aeWizard.picks.has(s.i) ? ' sel' : '');
-    b.dataset.i = String(s.i);
-    const tick = document.createElement('span'); tick.className = 'ae-tick'; tick.textContent = '✓';
-    const t = document.createElement('span'); t.className = 'ae-t'; t.textContent = aeFmtT(s.startSec);
-    const tx = document.createElement('span'); tx.textContent = s.text;
-    b.appendChild(tick); b.appendChild(t); b.appendChild(tx);
-    b.addEventListener('click', () => {
-      if (aeWizard.picks.has(s.i)) aeWizard.picks.delete(s.i); else aeWizard.picks.add(s.i);
-      b.classList.toggle('sel');
-      aeUpdatePickCount();
-    });
-    wrap.appendChild(b);
+// Show the transcript view for this run. `suggested` starts pre-marked.
+function txShow(sentences, suggested) {
+  const { view, body, log } = txEls();
+  if (!view || !body) return false;
+  aeWizard.sentences = sentences;
+  aeWizard.picks = new Set((suggested || []).filter(i => typeof i === 'number'));
+  body.innerHTML = '';
+  sentences.forEach((s) => {
+    const t = document.createElement('span');
+    t.className = 'tx-t'; t.textContent = aeFmtT(s.startSec);
+    const sp = document.createElement('span');
+    sp.className = 'tx-s'; sp.dataset.i = String(s.i); sp.textContent = s.text;
+    body.appendChild(t); body.appendChild(sp);
+    body.appendChild(document.createTextNode(' '));
   });
-  aeUpdatePickCount();
-  wrap.scrollTop = 0;
+  if (log) log.style.display = 'none';
+  view.style.display = 'flex';
+  body.scrollTop = 0;
+  txSync();
+  return true;
 }
-(function initAePicks() {
-  const all = document.getElementById('aePickAll');
-  const none = document.getElementById('aePickNone');
-  const next = document.getElementById('aePicksNext');
-  if (all) all.addEventListener('click', () => {
-    if (!aeWizard) return;
-    aeWizard.picks = new Set((aeWizard.sentences || []).map(s => s.i));
-    renderAePicks();
+function txHide() {
+  const { view, add, log } = txEls();
+  if (view) view.style.display = 'none';
+  if (add) add.style.display = 'none';
+  if (log) log.style.display = '';
+}
+// Sentences the current mouse selection touches.
+function txSpansInSelection() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) return [];
+  const range = sel.getRangeAt(0);
+  const { body } = txEls();
+  if (!body) return [];
+  return [...body.querySelectorAll('.tx-s')].filter(el => {
+    try { return range.intersectsNode(el); } catch (e) { return false; }
   });
-  if (none) none.addEventListener('click', () => {
-    if (!aeWizard) return;
-    aeWizard.picks = new Set();
-    renderAePicks();
+}
+function txMark(spans) {
+  if (!spans.length || !aeWizard) return;
+  spans.forEach(el => aeWizard.picks.add(+el.dataset.i));
+  try { window.getSelection().removeAllRanges(); } catch (e) {}
+  const { add } = txEls();
+  if (add) add.style.display = 'none';
+  txSync();
+}
+(function initTxView() {
+  const { view, body, add, go, cnt } = txEls();
+  if (!view || !body) return;
+
+  // Finished dragging over some words → offer to mark them.
+  body.addEventListener('mouseup', (e) => {
+    setTimeout(() => {
+      const spans = txSpansInSelection();
+      if (!spans.length) { if (add) add.style.display = 'none'; return; }
+      if (!add) return;
+      const r = view.getBoundingClientRect();
+      add.style.left = (e.clientX - r.left) + 'px';
+      add.style.top  = (e.clientY - r.top - 6) + 'px';
+      add.style.display = 'block';
+    }, 0);
   });
-  if (next) next.addEventListener('click', () => {
-    if (!aeWizard || !aeWizard.picks || !aeWizard.picks.size) return;
+  if (add) add.addEventListener('mousedown', (e) => {
+    e.preventDefault();               // keep the selection alive through the click
+    txMark(txSpansInSelection());
+  });
+
+  // Right-click: mark the selection, or the sentence under the cursor.
+  body.addEventListener('contextmenu', (e) => {
+    const spans = txSpansInSelection();
+    const hit = e.target.closest && e.target.closest('.tx-s');
+    if (!spans.length && !hit) return;
+    e.preventDefault();
+    txMark(spans.length ? spans : [hit]);
+  });
+
+  // Plain click on a marked sentence removes it.
+  body.addEventListener('click', (e) => {
+    const hit = e.target.closest && e.target.closest('.tx-s');
+    if (!hit) return;
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) return;      // that was a drag, not a click
+    const i = +hit.dataset.i;
+    if (aeWizard.picks.has(i)) { aeWizard.picks.delete(i); txSync(); }
+  });
+
+  const clear = document.getElementById('txClear');
+  if (clear) clear.addEventListener('click', () => { if (aeWizard) { aeWizard.picks = new Set(); txSync(); } });
+  const cancel = document.getElementById('txCancel');
+  if (cancel) cancel.addEventListener('click', () => { txHide(); aeWizard = null; });
+  if (go) go.addEventListener('click', () => {
+    if (!aeWizard || !aeWizard.picks.size) return;
+    txHide();
+    autoeditModal.classList.add('show');
     renderAeQuestions();
     aeShowStep('questions');
     aeScrollQuestionsTop();
