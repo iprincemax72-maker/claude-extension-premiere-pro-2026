@@ -2079,11 +2079,11 @@
   .eng-opt-main { display: flex; flex-direction: column; gap: 1px; flex: 1 1 auto; min-width: 0; }
   .eng-opt-main b { font-size: 12px; font-weight: 600; }
   .eng-opt-main span { font-size: 10.5px; color: var(--text-dim); }
-  /* Model picker menu — compact: names only, tight rows (engine menu keeps its subtitles) */
-  #modelMenu { min-width: 168px; padding: 4px; gap: 1px; }
-  #modelMenu .eng-opt { padding: 5px 8px; }
-  #modelMenu .eng-opt-main span { display: none; }
-  #modelMenu .eng-opt-main b { font-size: 11.5px; font-weight: 500; }
+  /* Model + engine picker menus — compact: names only, tight rows */
+  #modelMenu, #engineMenu { min-width: 168px; padding: 4px; gap: 1px; }
+  #modelMenu .eng-opt, #engineMenu .eng-opt { padding: 5px 8px; }
+  #modelMenu .eng-opt-main span, #engineMenu .eng-opt-main span { display: none; }
+  #modelMenu .eng-opt-main b, #engineMenu .eng-opt-main b { font-size: 11.5px; font-weight: 500; }
   .eng-tick { width: 14px; height: 14px; flex: 0 0 auto; color: var(--accent); opacity: 0; }
   .eng-opt.sel .eng-tick { opacity: 1; }
   .input-toolbar .eng-btn { font-size: 10px; height: 22px; }
