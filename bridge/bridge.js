@@ -586,6 +586,21 @@ function groupWordsIntoLines(words, opts) {
     curChars += (curChars ? 1 : 0) + w.text.length;
   }
   flush();
+
+  // A line's end carries holdMs so the caption lingers a beat after the last
+  // word. That is a nicety for a real pause — but in continuous speech the NEXT
+  // line starts well within that hold, so the lines overlap. Each line is later
+  // cut into its own timeline clip (splitCaptionClips), and overlapping clips
+  // land on stacked tracks in Premiere: two translucent overlays composite over
+  // each other, which darkens the picture and briefly shows two captions at
+  // once. That is the caption "flickering / going dark".
+  // So the hold yields whenever the next line needs the time.
+  for (let i = 0; i < lines.length - 1; i++) {
+    const next = lines[i + 1];
+    if (lines[i].endMs > next.startMs) {
+      lines[i].endMs = Math.max(lines[i].startMs + 120, next.startMs);
+    }
+  }
   return lines;
 }
 
@@ -923,23 +938,33 @@ async function renderCaptions(opts) {
 // with every caption in it). ProRes 4444 is all-intra, so ffmpeg -c copy cuts
 // are frame-accurate and fast (no re-encode, alpha preserved). Returns
 // [{ path, timelineSec, durationSec, text }] in timeline order.
-async function splitCaptionClips(srcMov, lines, baseTimelineSec, reqId, log) {
+async function splitCaptionClips(srcMov, lines, baseTimelineSec, reqId, log, fps) {
   // Each cut is an independent ffmpeg `-c copy` (no re-encode) — run them in parallel
   // instead of one-at-a-time. runWithConcurrency preserves input order, so the
   // returned clips stay in timeline order.
+  //
+  // FRAME-EXACT CUTS. Asking ffmpeg for a duration in seconds makes it round UP
+  // to a whole frame, so a clip came out 7-20ms longer than asked and ran into
+  // the next one. On the timeline that is a frame of two caption clips stacked,
+  // compositing over each other — a dark flash. Snapping both edges to the frame
+  // grid and cutting an exact frame COUNT makes consecutive clips tile perfectly.
+  const FPS = (fps && fps > 0) ? fps : 30;
   const stamp = Date.now();
   const jobs = lines.map((l, i) => () => new Promise((res) => {
-    const startSec = Math.max(0, l.startMs / 1000);
-    const dur = Math.max(0.1, (l.endMs - l.startMs) / 1000);
+    const startFrame = Math.max(0, Math.round((l.startMs / 1000) * FPS));
+    const endFrame = Math.max(startFrame + 1, Math.round((l.endMs / 1000) * FPS));
+    const nFrames = endFrame - startFrame;
+    const startSec = startFrame / FPS;
+    const dur = nFrames / FPS;
     const dest = path.join(OUTPUT_DIR, 'caption_' + String(reqId).slice(0, 8) + '_' + i + '_' + stamp + '.mov');
     // -ss before -i = fast input seek; exact for all-intra ProRes. -c copy keeps alpha.
-    const ff = spawn(FFMPEG_BIN, ['-y', '-ss', String(startSec), '-i', srcMov, '-t', String(dur), '-c', 'copy', dest]);
+    const ff = spawn(FFMPEG_BIN, ['-y', '-ss', String(startSec), '-i', srcMov, '-frames:v', String(nFrames), '-c', 'copy', dest]);
     ff.stderr.on('data', () => {});
     const k = setTimeout(() => { try { ff.kill('SIGKILL'); } catch {} res(null); }, 60000);
     ff.on('error', () => { clearTimeout(k); res(null); });
     ff.on('close', c => {
       clearTimeout(k);
-      if (c === 0 && fs.existsSync(dest)) res({ path: dest, timelineSec: baseTimelineSec + startSec, durationSec: dur, text: (l.words || []).map(w => w.text).join(' ') });
+      if (c === 0 && fs.existsSync(dest)) res({ path: dest, timelineSec: baseTimelineSec + startSec, durationSec: dur, text: (l.words || []).map(w => w.text).join(' ') });   // startSec/dur are frame-snapped above
       else res(null);
     });
   }));
@@ -5416,7 +5441,7 @@ const server = http.createServer((req, res) => {
 
         broadcastProgress('Splitting into per-line clips', 82, reqId);
         let clips = [];
-        try { clips = await splitCaptionClips(outFile, lines, baseTimeline, reqId, log); } catch (e) { log('split failed: ' + (e && e.message || e)); }
+        try { clips = await splitCaptionClips(outFile, lines, baseTimeline, reqId, log, fps); } catch (e) { log('split failed: ' + (e && e.message || e)); }
         if (clips.length) { try { fs.unlinkSync(outFile); } catch {} }
         else clips = [{ path: outFile, timelineSec: baseTimeline, durationSec: (lines.length ? lines[lines.length - 1].endMs / 1000 : totalDur), text: '' }];
 

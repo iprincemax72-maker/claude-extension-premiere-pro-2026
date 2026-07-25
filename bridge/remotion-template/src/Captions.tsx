@@ -141,7 +141,12 @@ const ENTRANCES: Array<(p: number) => { transform: string; opacity: number }> = 
 // The line that should be on screen at `ms` (and its index). Small lead-in so
 // the line appears a hair before the first word is spoken (feels snappier).
 function activeLineIndex(lines: CaptionLine[], ms: number, leadMs = 80): number {
-  for (let i = 0; i < lines.length; i++) {
+  // Walk BACKWARDS so the newest matching line wins. The lead-in and the 120ms
+  // tail make neighbouring windows overlap slightly; taking the first match
+  // meant the previous line kept the screen for the first frames of the next
+  // line's window — and since each line is cut into its own timeline clip from
+  // exactly that window, those clips began with the WRONG caption on them.
+  for (let i = lines.length - 1; i >= 0; i--) {
     if (ms >= lines[i].startMs - leadMs && ms <= lines[i].endMs + 120) return i;
   }
   return -1;
