@@ -10798,7 +10798,17 @@ function txSync() {
   const n = (aeWizard && aeWizard.picks) ? aeWizard.picks.size : 0;
   body.querySelectorAll('.tx-s').forEach(el =>
     el.classList.toggle('on', !!(aeWizard && aeWizard.picks && aeWizard.picks.has(+el.dataset.i))));
-  if (cnt) cnt.textContent = n ? (n + ' graphic' + (n === 1 ? '' : 's') + ' selected') : 'Nothing selected yet';
+  // Rough render-time hint. 16 graphics render at once and each takes a couple
+  // of minutes, so cost goes up in batches, not per pick. Deliberately fuzzy —
+  // it's here to set expectations before a 40-pick run, not to be a stopwatch.
+  if (cnt) {
+    if (!n) { cnt.textContent = 'Nothing selected yet'; }
+    else {
+      const mins = Math.ceil(n / 16) * 3;
+      cnt.textContent = n + ' graphic' + (n === 1 ? '' : 's') + ' selected'
+        + '  ·  ~' + mins + ' min to render';
+    }
+  }
   if (go) go.disabled = n === 0;
 }
 // Show the transcript view for this run. `suggested` starts pre-marked.
