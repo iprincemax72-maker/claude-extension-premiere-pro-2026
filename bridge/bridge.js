@@ -1938,6 +1938,50 @@ function concatToTimeline(timeMap, t) {
 // Anti-collision + density cap. Sorts moments by start time, drops anything
 // that lands within `minGapSec` of the previous kept moment, then caps the
 // total to `maxPerMin × clipMinutes`.
+// ── USER-PICKED moments ───────────────────────────────────────────────────
+// The user ticked sentences in the transcript picker; those ARE the plan. We
+// only ask Claude what each one should LOOK like (type + short label) — it
+// never adds, drops or re-times a pick. Every picked line comes back as a
+// moment, even if the labelling call fails (falls back to a callout).
+const AE_MOMENT_TYPES = ['stat', 'quote', 'name', 'list', 'callout', 'question', 'section', 'fact'];
+async function labelPickedLines(sentences, picks, log) {
+  const byIdx = new Map(sentences.map(s => [s.i, s]));
+  const chosen = picks.map(i => byIdx.get(i)).filter(Boolean);
+  if (!chosen.length) return [];
+  const fallback = (s) => ({
+    startSec: s.startSec, endSec: s.endSec, type: 'callout',
+    label: s.text.split(/\s+/).slice(0, 6).join(' ').slice(0, 60),
+  });
+  let labelled = {};
+  try {
+    const list = chosen.map(s => `${s.i}: ${s.text}`).join('\n');
+    const sys = [
+      'For each numbered line, choose how an on-screen motion graphic should present it.',
+      'TYPES: ' + AE_MOMENT_TYPES.join(', ') + '.',
+      'The label is the SHORT on-screen text (max 8 words) — not a description.',
+      'Return ONLY a JSON array, one entry per line given, no prose:',
+      '[{"i":3,"type":"list","label":"Tools · Van · Materials"}]',
+    ].join('\n');
+    const raw = await runClaudeText(sys + '\n\nLINES:\n' + list, 120000, log, 'labelpicks', AE_MODEL);
+    const m = String(raw || '').match(/\[[\s\S]*\]/);
+    if (m) {
+      for (const e of JSON.parse(m[0])) {
+        if (e && typeof e.i === 'number') labelled[e.i] = e;
+      }
+    }
+    log(`labelpicks: ${Object.keys(labelled).length}/${chosen.length} labelled`);
+  } catch (e) { log('labelpicks failed, using fallbacks: ' + e.message); }
+  return chosen.map((s) => {
+    const e = labelled[s.i];
+    if (!e) return fallback(s);
+    return {
+      startSec: s.startSec, endSec: s.endSec,
+      type: AE_MOMENT_TYPES.includes(e.type) ? e.type : 'callout',
+      label: String(e.label || '').slice(0, 80) || fallback(s).label,
+    };
+  });
+}
+
 function spaceMoments(moments, minGapSec, maxPerMin, totalDurSec) {
   const sorted = [...moments].sort((a, b) => a.startSec - b.startSec);
   const kept = [];
@@ -5723,6 +5767,27 @@ const server = http.createServer((req, res) => {
         if (_activeAutoedit.aborted) throw new Error('cancelled');
         const questions = await detectInterviewQuestions(sentences, density, log);
 
+        // Suggested lines for the transcript picker. The USER makes the final
+        // call — these are just pre-ticked so a long video isn't a blank slate.
+        // Non-fatal: if the suggestion pass fails, the picker opens with nothing
+        // ticked and the user picks from scratch.
+        let suggested = [];
+        try {
+          broadcastProgress('Suggesting moments', 30, reqId);
+          const sugg = await detectMoments(sentences, density, style, reqId, log, '');
+          suggested = (sugg || []).map((m) => {
+            // moments carry timeline seconds — map each back to its sentence
+            let best = -1, bestD = Infinity;
+            for (const s of sentences) {
+              const d = Math.abs(s.startSec - m.startSec);
+              if (d < bestD) { bestD = d; best = s.i; }
+            }
+            return best;
+          }).filter((i) => i >= 0);
+          suggested = [...new Set(suggested)].sort((a, b) => a - b);
+          log(`suggested ${suggested.length} lines: ${JSON.stringify(suggested)}`);
+        } catch (e) { log('suggestion pass failed (picker opens unticked): ' + e.message); }
+
         // Face-avoidance: grab start/mid/end frames so the generator can place graphics
         // away from the speaker's face. Skipped for voiceover-only (full-screen) mode.
         let faceFrames = [];
@@ -5734,7 +5799,13 @@ const server = http.createServer((req, res) => {
 
         broadcastProgressDone(reqId);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, reqId, questions, sentenceCount: sentences.length, durationSec: (spanEnd - spanStart) }));
+        res.end(JSON.stringify({
+          ok: true, reqId, questions, sentenceCount: sentences.length, durationSec: (spanEnd - spanStart),
+          // The transcript itself + suggested picks, so the panel can show the
+          // line picker and the user chooses which sentences get a graphic.
+          sentences: sentences.map(s => ({ i: s.i, startSec: s.startSec, endSec: s.endSec, text: s.text })),
+          suggested,
+        }));
       } catch (e) {
         log(`analyze ERROR ${e.message}`);
         broadcastProgressDone(reqId);
@@ -5775,7 +5846,64 @@ const server = http.createServer((req, res) => {
         if (!(vidH >= 240 && vidH <= 4096)) vidH = 1080;
         log(`AUTO EDIT run reqId=${reqId} density=${density} styleMode=${styleMode} tone=${tone} res=${vidW}x${vidH} answers=${JSON.stringify(answers)}`);
 
-        // ── Plan (answer-steered) ─────────────────────────────────────────
+        // Render a finished plan and answer the request. Shared by both paths
+        // (user-picked lines and the automatic planner) so they render, cache
+        // and report identically.
+        const _aeGenerateAndRespond = async (plan, planReport) => {
+          broadcastProgress('Generating motion graphics', 42, reqId);
+          const userExtra = String(answers.custom || '').trim().slice(0, 600);
+          // Reference images the user pasted into the "Anything else?" box — Claude
+          // reads them and mirrors their style. Keep only existing files.
+          const refImages = (Array.isArray(payload.refImages) ? payload.refImages : [])
+            .filter(p => typeof p === 'string' && p && (() => { try { return fs.existsSync(p); } catch { return false; } })())
+            .slice(0, 6);
+          const aeEngine = (payload.engine === 'hyperframes') ? 'hyperframes' : 'remotion';
+          const genOpts = { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames, userExtra, refImages, engine: aeEngine };
+          // Persist the final plan + render options so a SINGLE graphic can be
+          // re-rendered later (the per-graphic "Change" feature) without re-running
+          // analyze. Keyed by reqId; merges over the analyze-time cache entry.
+          try { _aeCacheSet(reqId, Object.assign({}, cached, { plan, genOpts })); } catch {}
+          const renderResults = await generateMomentsParallel(plan, reqId, log, (done, total) => {
+            broadcastProgress(`Generating motion graphics (${done}/${total})`, 42 + Math.floor((done / total) * 48), reqId);
+          }, genOpts);
+
+          const applied = renderResults.filter(r => r && r.ok).map(r => ({ ...r, timelineSec: r.atSec }));
+          const skipped = renderResults.filter(r => r && !r.ok);
+          log(`render done ok=${applied.length} skipped=${skipped.length}`);
+
+          broadcastProgressDone(reqId);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: true, reqId, applied, skipped, planReport,
+            summary: `${applied.length}/${plan.length} graphics ready` + (skipped.length ? ` (${skipped.length} skipped)` : ''),
+            logFile: logPath,
+          }));
+        };
+
+        // ── Plan ──────────────────────────────────────────────────────────
+        // If the user ticked lines in the transcript picker, THOSE are the plan.
+        // We only ask what each should look like — no auto-detection, no spacing
+        // filter, no fit-check, because every one of those can drop a pick and
+        // the user's choice is final. Falls back to the automatic planner when
+        // no picks were sent (older panel, or the picker was skipped).
+        const picks = Array.isArray(payload.picks)
+          ? [...new Set(payload.picks.map(Number).filter(n => Number.isInteger(n) && n >= 0))].sort((a, b) => a - b)
+          : null;
+        if (picks && picks.length) {
+          broadcastProgress('Reading your picked lines', 30, reqId);
+          if (_activeAutoedit.aborted) throw new Error('cancelled');
+          const picked = await labelPickedLines(sentences, picks, log);
+          log(`user picks: ${picks.length} -> ${picked.length} moments (user-chosen, unfiltered)`);
+          if (!picked.length) {
+            broadcastProgressDone(reqId);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, reqId, applied: [], skipped: [], summary: 'None of the picked lines could be used.' }));
+            _activeAutoedit = null;
+            return;
+          }
+          return await _aeGenerateAndRespond(picked, `${picked.length} line${picked.length !== 1 ? 's' : ''} you picked`);
+        }
+
         broadcastProgress('Planning the edit', 30, reqId);
         if (_activeAutoedit.aborted) throw new Error('cancelled');
         const guidance = buildMomentGuidance(answers);
@@ -5815,35 +5943,7 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        // ── Generate (style-locked or varied per the answers) ─────────────
-        broadcastProgress('Generating motion graphics', 42, reqId);
-        const userExtra = String(answers.custom || '').trim().slice(0, 600);
-        // Reference images the user pasted into the "Anything else?" box — Claude
-        // reads them and mirrors their style. Keep only existing files.
-        const refImages = (Array.isArray(payload.refImages) ? payload.refImages : [])
-          .filter(p => typeof p === 'string' && p && (() => { try { return fs.existsSync(p); } catch { return false; } })())
-          .slice(0, 6);
-        const aeEngine = (payload.engine === 'hyperframes') ? 'hyperframes' : 'remotion';
-        const genOpts = { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames, userExtra, refImages, engine: aeEngine };
-        // Persist the final plan + render options so a SINGLE graphic can be
-        // re-rendered later (the per-graphic "Change" feature) without re-running
-        // analyze. Keyed by reqId; merges over the analyze-time cache entry.
-        try { _aeCacheSet(reqId, Object.assign({}, cached, { plan, genOpts })); } catch {}
-        const renderResults = await generateMomentsParallel(plan, reqId, log, (done, total) => {
-          broadcastProgress(`Generating motion graphics (${done}/${total})`, 42 + Math.floor((done / total) * 48), reqId);
-        }, genOpts);
-
-        const applied = renderResults.filter(r => r && r.ok).map(r => ({ ...r, timelineSec: r.atSec }));
-        const skipped = renderResults.filter(r => r && !r.ok);
-        log(`render done ok=${applied.length} skipped=${skipped.length}`);
-
-        broadcastProgressDone(reqId);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          ok: true, reqId, applied, skipped, planReport: verified.report,
-          summary: `${applied.length}/${plan.length} graphics ready` + (skipped.length ? ` (${skipped.length} skipped)` : ''),
-          logFile: logPath,
-        }));
+        return await _aeGenerateAndRespond(plan, verified.report);
       } catch (e) {
         log(`run ERROR ${e.message}`);
         broadcastProgressDone(reqId);
