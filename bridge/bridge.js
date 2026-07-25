@@ -3090,6 +3090,21 @@ Only when the request does NOT involve transparency: render H.264 .mp4.
 
 3. Emit the import marker so the panel auto-imports it.
 
+DETERMINISM — every frame must be a pure function of useCurrentFrame().
+Remotion renders frames across MANY parallel Chrome processes and screenshots
+each one; anything depending on wall-clock time or GPU layer state renders
+differently per frame and shows up as FLICKER in the exported video.
+  - NEVER use a CSS transition or CSS animation / keyframes. They animate on
+    real time, so each frame gets captured at an arbitrary point mid-animation.
+    Drive every change from the frame number instead (interpolate, spring,
+    interpolateColors).
+  - NEVER set willChange. It promotes the element to a GPU layer, and layer
+    rasterisation is not identical across render workers.
+  - No Math.random(), no Date.now(), nothing that varies per render.
+Measured, not theoretical: a caption composition using a 90ms CSS colour
+transition plus willChange produced 8,690 pixels of colour difference between
+two renders of the SAME frame. Removing both made every frame byte-identical.
+
 AUDIO POLICY — NEVER include audio in rendered output. The user is a video editor who handles their own audio in Premiere; renders that ship with audio (especially loud auto-generated SFX or music) are unwanted and can damage hearing.
 - Do NOT use Remotion's <Audio>, <Sequence audio>, or any sound-emitting components.
 - Do NOT add SFX, narration, music, or stingers — even when the prompt would seem to suggest one ("dramatic intro", "boom", "whoosh transition", "alarm", etc). These are visual cues only.

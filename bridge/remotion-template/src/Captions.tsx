@@ -18,7 +18,7 @@
  */
 
 import React, { type CSSProperties } from 'react';
-import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Easing } from 'remotion';
+import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, interpolateColors, spring, Easing } from 'remotion';
 
 export type CaptionWord = { text: string; startMs: number; endMs: number; kw?: boolean };
 export type CaptionLine = { words: CaptionWord[]; startMs: number; endMs: number };
@@ -365,19 +365,19 @@ const WordView: React.FC<{
       const DUR = 300;
       const p = clamp01(interpolate(ms, [word.startMs, word.startMs + DUR], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: easeOut }));
       return (
-        <span style={{ display: 'inline-block', color: col, opacity: p, transform: slide(p, 0.4), transformOrigin: 'center bottom', transition: 'color 90ms linear', willChange: 'transform, opacity' }}>{word.text}</span>
+        <span style={{ display: 'inline-block', color: col, opacity: p, transform: slide(p, 0.4), transformOrigin: 'center bottom' }}>{word.text}</span>
       );
     }
     // letter-by-letter: each character fades in + slides, staggered.
     const letters = Array.from(word.text);
     const PER = 26, DUR = 320;   // ms stagger per letter, ms per-letter fade
     return (
-      <span style={{ display: 'inline-block', color: col, transformOrigin: 'center bottom', transition: 'color 90ms linear' }}>
+      <span style={{ display: 'inline-block', color: col, transformOrigin: 'center bottom' }}>
         {letters.map((ch, li) => {
           const st = word.startMs + li * PER;
           const p = clamp01(interpolate(ms, [st, st + DUR], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: easeOut }));
           return (
-            <span key={li} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: p, transform: slide(p, 0.5), willChange: 'transform, opacity' }}>{ch}</span>
+            <span key={li} style={{ display: 'inline-block', whiteSpace: 'pre', opacity: p, transform: slide(p, 0.5) }}>{ch}</span>
           );
         })}
       </span>
@@ -410,11 +410,18 @@ const WordView: React.FC<{
     opacity = interpolate(lineInProgress, [0, 130], [0, 1], { extrapolateRight: 'clamp', easing: easeOut });
     if (vary) color = hlColor;
   } else if (style === 'karaoke') {
+    // Colour is derived from `ms`, never from a CSS transition. A transition
+    // animates on wall-clock time, and Remotion screenshots each frame from one
+    // of N parallel Chrome workers at an unpredictable point in that animation —
+    // so the same word came out a different shade every frame (the flicker /
+    // "sometimes dark" artefact). Frame-derived, every worker agrees exactly.
+    const FADE_MS = 90;
+    const inP = clamp01((ms - word.startMs) / FADE_MS);          // dim → highlight
+    const outP = clamp01((ms - word.endMs) / FADE_MS);           // highlight → spoken
+    color = interpolateColors(inP, [0, 1], [dim(opt.accent), hlColor]);
+    if (outP > 0) color = interpolateColors(outP, [0, 1], [hlColor, baseColor]);
     if (active) {
-      color = hlColor;
       transform = `scale(${1 + 0.08 * Math.sin(Math.min(1, (ms - word.startMs) / Math.max(1, word.endMs - word.startMs)) * Math.PI)})`;
-    } else if (!spoken) {
-      color = dim(opt.accent);
     }
   } else if (style === 'tiktok') {
     if (!spoken) return null;
@@ -441,8 +448,7 @@ const WordView: React.FC<{
         opacity,
         transform: transform || undefined,
         transformOrigin: 'center bottom',
-        transition: 'color 90ms linear',
-        willChange: 'transform, opacity',
+               
         // when there's a highlight box, drop the per-letter stroke so the box reads clean
         WebkitTextStroke: background ? '0' : undefined,
       }}
