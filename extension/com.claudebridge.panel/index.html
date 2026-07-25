@@ -4576,7 +4576,7 @@
       </div>
       <!-- MODEL picker — deliberately in the composer bar (NOT buried in settings)
            so a model that runs out of usage credits can be swapped in one click. -->
-      <div class="eng-group" id="modelGroup" title="Which Claude model writes the animation. Auto = Haiku on Fast, Opus 5 on Default/Slow. Switch here if a model runs out of credits.">
+      <div class="eng-group" id="modelGroup" title="Which Claude model writes the animation. Auto follows the Fast/Default/Slow setting (the button shows what it picked). Choose a model to lock that one instead.">
         <button class="eng-btn" id="modelBtn" type="button" aria-haspopup="true" aria-expanded="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3.2M12 18.8V22M4.9 4.9l2.3 2.3M16.8 16.8l2.3 2.3M2 12h3.2M18.8 12H22M4.9 19.1l2.3-2.3M16.8 7.2l2.3-2.3"/></svg>
           <span id="modelLabel">Auto</span>
@@ -8899,6 +8899,8 @@ function setRenderMode(m) {
   try { saveSettings(); } catch {}
   document.querySelectorAll('.rmode-pill').forEach(p =>
     p.classList.toggle('active', p.dataset.rmode === m));
+  // The speed pills decide what "Auto" resolves to, so refresh that label too.
+  try { syncModelUI(); } catch (e) {}
 }
 // Reflect the ACTIVE tab's render mode in the pills without mutating anything
 // (used on tab switch).
@@ -8907,6 +8909,7 @@ function syncRenderModeUI() {
   const m = (t && t.renderMode) || userSettings.renderMode || 'default';
   document.querySelectorAll('.rmode-pill').forEach(p =>
     p.classList.toggle('active', p.dataset.rmode === m));
+  try { syncModelUI(); } catch (e) {}
 }
 (function initRenderMode() {
   const group = document.getElementById('renderModeGroup');
@@ -8981,10 +8984,25 @@ function setGenModel(m) {
   try { saveSettings(); } catch (e) {}
   syncModelUI();
 }
+// What 'auto' actually resolves to — MUST match the bridge's per-mode default.
+function autoModelFor(mode) {
+  return (mode === 'fast') ? 'claude-haiku-4-5-20251001' : 'claude-opus-5';
+}
 function syncModelUI() {
   const m = (userSettings && userSettings.model) || 'auto';
   const lbl = document.getElementById('modelLabel');
-  if (lbl) lbl.textContent = MODEL_LABELS[m] || 'Auto';
+  // On Auto the button spells out the model it lands on ("Auto · Opus 5"), so
+  // the bar always says which model you're getting instead of making you work
+  // out how the speed pills and this picker interact.
+  if (lbl) {
+    if (m === 'auto') {
+      const t = tabs[activeTabIdx];
+      const mode = (t && t.renderMode) || userSettings.renderMode || 'default';
+      lbl.textContent = 'Auto · ' + (MODEL_LABELS[autoModelFor(mode)] || '');
+    } else {
+      lbl.textContent = MODEL_LABELS[m] || 'Auto';
+    }
+  }
   document.querySelectorAll('#modelMenu .mdl-opt').forEach(o =>
     o.classList.toggle('sel', o.dataset.model === m));
 }
