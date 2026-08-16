@@ -1143,7 +1143,18 @@ function analyseTranscriptWithClaude(transcript, opts) {
     // Give real headroom: 2 min base + 2.5s/segment, capped at 8 min.
     const timeoutMs = Math.min(480000, 120000 + transcript.length * 2500);
     let done = false;
-    const finish = (result) => { if (done) return; done = true; clearTimeout(killer); resolve(result); };
+    // /autocut-cancel kills whatever is in _activeAutocut, but nothing ever put
+    // anything there — so Cancel reported success while this subprocess carried
+    // on running against the user's plan. Register it, and only clear the slot
+    // if it is still ours (a later autocut may already own it).
+    _activeAutocut = proc;
+    const finish = (result) => {
+      if (done) return;
+      done = true;
+      clearTimeout(killer);
+      if (_activeAutocut === proc) _activeAutocut = null;
+      resolve(result);
+    };
     const killer = setTimeout(() => {
       log(`analyseClaude: TIMEOUT at ${el()} — killing pid=${proc.pid}. stdoutSoFar=${stdoutBuf.length}B stderrSoFar=${JSON.stringify(stderrBuf.slice(-400))}`);
       try { proc.kill('SIGKILL'); } catch {}

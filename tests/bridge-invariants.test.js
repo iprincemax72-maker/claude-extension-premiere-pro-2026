@@ -70,6 +70,18 @@ check('the only JSON.parse(body) in the file is the guard itself',
 check('endpoints go through parseObjBody',
       (SRC.match(/parseObjBody\(body\)/g) || []).length >= 13);
 
+// ── 4b. a cancel handle that is never assigned is a dead cancel button ─────
+// /autocut-cancel kills whatever sits in _activeAutocut. For a long time the
+// only write to it was `= null`, so the check never fired: Cancel reported
+// success while the claude subprocess kept running against the user's plan.
+for (const [handle, killer] of [['_activeAutocut', '/autocut-cancel'],
+                                ['_activeAutoedit', '/autoedit-cancel']]) {
+  const writes = LINES.filter(l => new RegExp(`${handle} = (?!null)`).test(l)
+                                   && !new RegExp(`^\\s*let ${handle}`).test(l));
+  check(`${handle} is actually assigned, so ${killer} can kill something`,
+        writes.length > 0, 'only ever cleared, never set');
+}
+
 // ── 5. the parallel pool must not re-read the queue while starting workers ──
 // Workers shift a task off before their first await, so re-reading queue.length
 // in the loop condition let already-started workers shrink the target count.
