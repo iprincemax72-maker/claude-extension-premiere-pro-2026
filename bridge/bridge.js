@@ -4225,7 +4225,10 @@ const server = http.createServer((req, res) => {
       const killer = setTimeout(() => {
         try { proc.kill('SIGKILL'); } catch {}
         finish('');
-      }, 12000);
+      }, 25000);   // the call itself measures ~10s (the model deliberates even on an
+                   // autocomplete), so a 12s cap was killing calls that were about to
+                   // succeed. Costs nothing to wait: the panel aborts this request the
+                   // moment the user types again, and the bridge kills the process.
 
       proc.stdout.on('data', d => stdout += d);
       proc.stderr.on('data', d => stderr += d);
