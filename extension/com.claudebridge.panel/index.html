@@ -12693,9 +12693,11 @@ function _runQueuedIntent(intent) {
   if (intent.varCtx) {
     sendMessage(intent.msg || '', { varCtx: intent.varCtx, planAnswers: intent.planAnswers || undefined, skipPlan: !!intent.skipPlan });
   } else {
-    input.value = intent.msg || '';
-    autosize();
-    sendMessage();
+    // Pass the queued prompt straight through instead of staging it in the
+    // composer. The queue drains the moment a render finishes, so writing to
+    // input.value there wipes whatever the user happens to be typing — and
+    // sendMessage already leaves the composer alone when given a preset.
+    sendMessage(intent.msg || '');
   }
 }
 
