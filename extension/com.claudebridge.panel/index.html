@@ -10816,6 +10816,9 @@ function txSync() {
 function txShow(sentences, suggested) {
   const { view, body, log } = txEls();
   if (!view || !body) return false;
+  // Refuse an empty transcript — the view would open with nothing to pick and
+  // no way forward but Cancel. The caller falls back to the old flow instead.
+  if (!Array.isArray(sentences) || !sentences.length) return false;
   aeWizard.sentences = sentences;
   aeWizard.picks = new Set((suggested || []).filter(i => typeof i === 'number'));
   _txLastIdx = null;

@@ -105,7 +105,9 @@ section('caption line timing');
 // snaps both edges to the grid; consecutive clips must share a boundary exactly.
 section('caption clip tiling');
 {
-  for (const fps of [24, 25, 30, 50, 60]) {
+  // NTSC rates included on purpose — real footage is 23.976/29.97 far more often
+  // than a clean integer, and the snap must land on whole frames there too.
+  for (const fps of [23.976, 24, 25, 29.97, 30, 50, 59.94, 60]) {
     const lines = groupWordsIntoLines(speech(SENTENCE, { gapMs: 60 }), {});
     const wins = lines.map(l => captionClipWindow(l, fps));
     const overlaps = wins.filter((w, i) => wins[i + 1] && w.endFrame > wins[i + 1].startFrame);

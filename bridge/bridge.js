@@ -2601,7 +2601,13 @@ function generateMomentsParallel(moments, reqId, log, onProgress, genOpts) {
     if (!tasks.length) return [];
     const queue = tasks.slice();
     const workers = [];
-    for (let w = 0; w < Math.min(MAX_INFLIGHT, queue.length); w++) {
+    // Count the workers BEFORE starting any. Each worker runs synchronously up to
+    // its first await — and it shifts a task off the queue before that — so
+    // re-reading queue.length in the loop condition let the already-started
+    // workers shrink the very number that decides how many more to start.
+    // With 2 tasks that meant ONE worker (fully sequential); with 16, about 8.
+    const workerCount = Math.min(MAX_INFLIGHT, queue.length);
+    for (let w = 0; w < workerCount; w++) {
       workers.push((async () => {
         while (queue.length) {
           if (_activeAutoedit && _activeAutoedit.aborted) break;
