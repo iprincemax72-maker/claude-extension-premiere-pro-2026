@@ -49,6 +49,19 @@ process.on('unhandledRejection', (reason) => {
   try { if (typeof clog === 'function') clog('bridge', 'error', 'unhandledRejection (kept alive)', { reason: String(reason && reason.message || reason), stack: String(reason && reason.stack || '').slice(0, 1400) }); } catch {}
 });
 
+// Every endpoint parses its body and then reads properties off the result.
+// JSON.parse('null') succeeds and returns null, so that read throws — inside a
+// req 'end' callback, where the throw reaches uncaughtException instead of the
+// endpoint's own catch. The bridge stays up (see above) but the response is
+// never written, so the request hangs until the client gives up: in the panel
+// that is a spinner that never stops and never errors. Valid JSON that is not
+// an object becomes an empty payload; malformed JSON still throws, so each
+// endpoint's existing catch keeps returning its own 400 shape.
+function parseObjBody(body) {
+  const v = JSON.parse(body);
+  return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // UNIFIED LOG COLLECTOR
 // One JSONL file that every module feeds into — panel, bridge, ExtendScript
@@ -4129,7 +4142,7 @@ const server = http.createServer((req, res) => {
     req.on('data', c => body += c);
     req.on('end', () => {
       let payload;
-      try { payload = JSON.parse(body); } catch { res.writeHead(400); res.end('{"expanded":""}'); return; }
+      try { payload = parseObjBody(body); } catch { res.writeHead(400); res.end('{"expanded":""}'); return; }
       const promptText = (payload.prompt || '').toString();
       if (!promptText.trim() || promptText.length < 3 || promptText.length > 2000) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -4206,7 +4219,7 @@ const server = http.createServer((req, res) => {
     req.on('data', c => body += c);
     req.on('end', () => {
       let payload;
-      try { payload = JSON.parse(body); } catch { res.writeHead(400); res.end('{"completion":""}'); return; }
+      try { payload = parseObjBody(body); } catch { res.writeHead(400); res.end('{"completion":""}'); return; }
       const prefix = (payload.prefix || '').toString();
       if (!prefix.trim() || prefix.length < 4 || prefix.length > 600) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -4276,7 +4289,7 @@ const server = http.createServer((req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       let p;
-      try { p = JSON.parse(body); }
+      try { p = parseObjBody(body); }
       catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
       const message = (p.message || '').toString();
       if (!message.trim()) { res.writeHead(400); res.end('{"error":"empty message"}'); return; }
@@ -4297,7 +4310,7 @@ const server = http.createServer((req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       let payload;
-      try { payload = JSON.parse(body); }
+      try { payload = parseObjBody(body); }
       catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
 
       const message = payload.message;
@@ -5377,7 +5390,7 @@ const server = http.createServer((req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       let payload;
-      try { payload = JSON.parse(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+      try { payload = parseObjBody(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
       const reqId = payload.reqId || crypto.randomUUID();
       const segments = Array.isArray(payload.segments) ? payload.segments : [];
       const grouping = (payload.grouping && typeof payload.grouping === 'object') ? payload.grouping : {};
@@ -5416,7 +5429,7 @@ const server = http.createServer((req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       let payload;
-      try { payload = JSON.parse(body); }
+      try { payload = parseObjBody(body); }
       catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
       const reqId = payload.reqId || crypto.randomUUID();
       const segments = Array.isArray(payload.segments) ? payload.segments : [];
@@ -5564,7 +5577,7 @@ const server = http.createServer((req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       let payload;
-      try { payload = JSON.parse(body); }
+      try { payload = parseObjBody(body); }
       catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
       const { clipPath, clipDuration, clipIn, clipOut, useTranscript, includeSilence, findFillers, findRepeats } = payload;
       const reqId = payload.reqId || crypto.randomUUID();
@@ -5723,7 +5736,7 @@ const server = http.createServer((req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       let payload;
-      try { payload = JSON.parse(body); }
+      try { payload = parseObjBody(body); }
       catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
 
       const {
@@ -5893,7 +5906,7 @@ const server = http.createServer((req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       let payload;
-      try { payload = JSON.parse(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+      try { payload = parseObjBody(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
       const reqId = payload.reqId || crypto.randomUUID();
       const segments = Array.isArray(payload.segments) ? payload.segments : null;
       const density = payload.density || 'moderate';
@@ -5999,7 +6012,7 @@ const server = http.createServer((req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       let payload;
-      try { payload = JSON.parse(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+      try { payload = parseObjBody(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
       const reqId = payload.reqId;
       const answers = (payload.answers && typeof payload.answers === 'object') ? payload.answers : {};
       const cached = reqId && _autoeditCache.get(reqId);
@@ -6145,7 +6158,7 @@ const server = http.createServer((req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       let payload;
-      try { payload = JSON.parse(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+      try { payload = parseObjBody(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
       const reqId = payload.reqId;
       const idx = Number(payload.idx);
       const change = String(payload.change || '').trim();
@@ -6199,7 +6212,7 @@ const server = http.createServer((req, res) => {
     req.on('data', c => body += c);
     req.on('end', () => {
       let payload;
-      try { payload = JSON.parse(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
+      try { payload = parseObjBody(body); } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return; }
       const raw = String(payload.path || '');
       try {
         if (!raw || raw.indexOf('..') !== -1) { res.writeHead(400); res.end(JSON.stringify({ error: 'bad path' })); return; }
@@ -6539,7 +6552,7 @@ async function handleUpdateRequest(req, res) {
   req.on('end', async () => {
     let force = false;
     try {
-      const payload = body ? JSON.parse(body) : {};
+      const payload = body ? parseObjBody(body) : {};
       force = !!payload.force;
     } catch {}
     try {
