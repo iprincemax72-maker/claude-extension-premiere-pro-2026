@@ -211,8 +211,8 @@ CLAUDE.md     # This file — agent-facing
 | `/autocut` | POST | `{clipPath, clipDuration, clipIn?, clipOut?, includeSilence?, findFillers?, findRepeats?, useTranscript?}` | `{cuts[], totalCut, transcribed, summary, method}` |
 | `/autocut-cancel` | POST | — | `{ok}` — aborts the currently-running autocut claude subprocess so the user can recover from a stuck pipeline without restarting the bridge |
 | `/autoedit` | POST | `{clipPath, clipDuration, clipIn?, clipOut?, density?, styleOverride?, premiereCaptions?, reqId?}` | `{ok, reqId, applied[], skipped[], summary, logFile}` — LEGACY one-shot single-clip pipeline (transcript → moment-picker → render graphics in parallel). Still works; the panel no longer uses it (see v2 below) |
-| `/autoedit/analyze` | POST | `{segments:[{path,inSec,outSec,timelineStart}], span:{start,end}, density?, reqId?}` | `{ok, reqId, questions:[{id,q,type,options:[{value,label}]}], sentenceCount, durationSec}` — **AUTO-EDIT v2 phase 1.** Extracts + concatenates the audio of N timeline segments (multi-clip selection AND nested sequences both flatten to segments via `ccGetSelectedClips`), transcribes once (Parakeet), caches the transcript by `reqId`, and returns smart **content-based interview questions** (plus 2 fixed: style-consistency + tone). Transcript times are mapped back to absolute timeline seconds via the segment offset map. |
-| `/autoedit/run` | POST | `{reqId, answers:{styleConsistency,tone,...}, density?}` | `{ok, reqId, applied[], skipped[], planReport, summary, logFile}` — **AUTO-EDIT v2 phase 2.** Uses the cached transcript: answer-steered `detectMoments` → spacing/gap-fill → **`verifyPlan` fit-check** (deterministic clamp to span + light Claude review that drops bad/duplicate picks) → `generateMomentsParallel` with a **style directive** (`styleConsistency:'same'` locks ONE `STYLE_PRESETS[tone]` look across every graphic; `'vary'` forces per-moment diversity). Applied items carry `timelineSec` (absolute) so `ccAutoEditApply` places them correctly for multi-clip/nested. |
+| `/autoedit/analyze` | POST | `{segments:[{path,inSec,outSec,timelineStart}], span:{start,end}, density?, reqId?}` | `{ok, reqId, questions:[{id,q,type,options:[{value,label}]}], sentenceCount, durationSec}` — **AUTO-EDIT v2 phase 1.** Extracts + concatenates the audio of N timeline segments (multi-clip selection AND nested sequences both flatten to segments via `ccGetSelectedClips`), transcribes once (Parakeet), caches the transcript by `reqId`, and returns smart **content-based interview questions** (plus 2 fixed: style-consistency + tone). ALSO returns `sentences[]` (the transcript itself) and `suggested[]` (sentence indices it would pick) so the panel can show the **transcript picker**. Transcript times are mapped back to absolute timeline seconds via the segment offset map. |
+| `/autoedit/run` | POST | `{reqId, answers:{styleConsistency,tone,...}, density?, picks?, model?}` | `{ok, reqId, applied[], skipped[], planReport, summary, logFile}` — **AUTO-EDIT v2 phase 2.** If `picks` (sentence indices from the transcript picker) is present, THOSE ARE THE PLAN: `labelPickedLines` only decides each one's type + on-screen label, and moment-detection / spacing / `verifyPlan` are all SKIPPED because each of them can drop a user's choice. Otherwise (no picks) it falls back to the automatic path: answer-steered `detectMoments` → spacing/gap-fill → **`verifyPlan` fit-check** (deterministic clamp to span + light Claude review that drops bad/duplicate picks) → `generateMomentsParallel` with a **style directive** (`styleConsistency:'same'` locks ONE `STYLE_PRESETS[tone]` look across every graphic; `'vary'` forces per-moment diversity). Applied items carry `timelineSec` (absolute) so `ccAutoEditApply` places them correctly for multi-clip/nested. |
 | `/autoedit/rerender` | POST | `{reqId, idx, change}` | `{ok, reqId, idx, file, atSec, timelineSec, durationSec, type, label}` — **AUTO-EDIT v2 per-graphic change.** Re-renders ONE graphic (the plan moment at `idx`) with the user's `change` applied, reusing the run's locked style/resolution/placement (the run persists its final `plan` + `genOpts` into `_autoeditCache` keyed by reqId, 30-min TTL). `buildPrompt` appends a `CHANGE` directive when `genOpts.changeDirective` is set. The panel then swaps the new file on the timeline in place via `ccAutoEditReplace`. Same-session only (needs the cached plan); returns a session-expired error otherwise. |
 | `/autoedit-cancel` | POST | — | `{ok}` — aborts the currently-running autoedit pipeline (analyze OR run; kills all in-flight child renders + the interview/verify Haiku calls) |
 | `/update` | POST | — | `{ok, updated[], bridgeChanged, premiereRestartNeeded}` — pulls from GitHub raw |
@@ -286,6 +286,29 @@ Source-of-truth resolution: the bridge prefers a **local repo** if it finds one 
 
 A small ↻ button in the panel header triggers `/update` manually (force). Toast feedback: *"Updated: panel UI, ExtendScript"* / *"Already up to date"* / *"Update failed: ..."*.
 
+### Models + render modes (what actually runs)
+
+- **Every generation runs on Opus 5.** Haiku is gone from the render path — it was
+  measured SLOWER end-to-end (238s vs 79s on the same graphic), because the cost
+  here is agentic round-trips, not tokens per second. Haiku is still used for the
+  composer's inline autocomplete only.
+- **Auto-Edit's thinking** (interview questions, moment plan, plan fit-check) uses
+  `AE_MODEL` — also Opus 5. These decide WHICH lines get a graphic, so a cheap
+  model there is what makes an edit feel wrong even when the graphics look good.
+- The composer's **model picker** overrides all of the above for `/chat` AND
+  `/autoedit/run` (both accept `model`). Left on Auto it uses the per-mode default.
+- **FAST mode gets a SHORT prompt** (`buildFastSystemPrompt`, ~1.8KB) instead of the
+  full ~51KB (SYSTEM_PROMPT + best-practices + ambition header), and skips the mode
+  header and best-practices block entirely. It is meant to behave like asking in a
+  terminal: understand, write, render, done. Measured ~45s.
+- **Nothing renders twice.** The HyperFrames prompt used to instruct a draft pass
+  then a final pass; a live run reached a "Fourth draft render" at 21 minutes. Both
+  engines now render once and only re-render if the render actually FAILED.
+- **Nothing explores.** Both prompts forbid `ls`/`cat`/reading old components and
+  probing the output folder for dimensions — with ONE carve-out: an iteration
+  ("Make a new version of a previous render.") MUST read the file named on the
+  `Previous file:` line, since that is what it is editing.
+
 ### Chat + render flow
 
 1. User types prompt → `POST /chat` with `{message, context: {sequenceName, playhead, selectedClips, …}}`
@@ -344,6 +367,27 @@ Bridge parses tolerantly — strict JSON first, then ``` json fence, then expand
 **Stage 4: ccApplyAutoCuts** — Sets `seq.setInPoint(tStart) + seq.setOutPoint(tEnd)` then calls `qeSeq.extract()` (Quick Edit — `app.enableQE()`). Extract ripple-deletes the in/out range across **all tracks**, closing the gap. Cuts run chronologically with a `shiftOffset` accumulator — each applied cut adds its duration to the offset, and later cuts subtract that offset from their original timeline positions so ripples don't drift.
 
 **Stage 5: Undo button** — After cuts apply, an Undo button appears in the card. It calls `ccUndo(appliedCount)` which presses Premiere's native Edit > Undo once per applied cut — full session reversed in one click. Premiere's regular Cmd+Z still works too.
+
+### Transcript picker (Auto-Edit) — YOU choose the moments
+
+Auto-Edit no longer guesses where graphics go. After `/autoedit/analyze` returns
+the transcript, the panel hands the whole thing to a **full-panel takeover view**
+(`#txView`, replaces `#log`) laid out as readable prose, with a `1 Pick moments /
+2 Style / 3 Generate` step header:
+
+- **Drag over words** with the mouse → a floating "✦ Graphic here" button marks
+  the sentences the selection touches. **Right-click** a sentence does the same.
+  **Click a highlight** to remove it. **Shift+click** fills a range.
+- Claude's suggestions come pre-marked, but they are only a starting point.
+- Clicking a **timestamp** moves Premiere's playhead there (`ccSetPlayhead`), so
+  you can see the shot you are reading.
+- The footer shows the count plus a rough render estimate (16 render at once, so
+  cost steps in batches, not per pick).
+- **Esc** steps back from Style to Picks before closing, so one stray press can't
+  throw a selection away.
+
+Whatever is marked is exactly what gets built — the bridge skips every filter
+that could drop one (see `/autoedit/run`).
 
 ### Settings panel
 
@@ -427,7 +471,7 @@ curl -s http://127.0.0.1:3737/ping
 
 ### Validation suite
 
-Four test passes guard the panel + the Remotion skills. Run them after any change to `index.html`, `bridge.js`, or the v2 skill source files:
+Six passes guard the panel, the render output and the Remotion skills. Run them after any change to `index.html`, `bridge.js`, `Captions.tsx`, or the v2 skill source files:
 
 One-time setup (the Python audits need a browser):
 ```bash
