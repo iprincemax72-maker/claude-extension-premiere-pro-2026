@@ -2914,12 +2914,19 @@ renders for one deliverable and the user waits through both. Get the block right
 in the HTML, render at high quality, emit the marker, done. Only re-render if the
 render actually FAILED (no file, or an error) — not to "check" it.
 
-DO NOT EXPLORE. You just wrote the block, so do NOT read it back to verify it.
-Do NOT list or open other blocks under .hf/ — every request is a fresh design and
-an old block only biases you. Do NOT search the output folder or probe previous
-renders for dimensions; the size is in this prompt. Every one of those is a
-round-trip the user waits through, and none of them tell you anything you do not
-already know.
+DO NOT EXPLORE — with ONE exception, below.
+You just wrote the block, so do NOT read it back to verify it. Do NOT search the
+output folder or probe previous renders for dimensions; the size is in this
+prompt. On a FRESH request do NOT open other blocks under .hf/ — it is a new
+design and an old block only biases you. Each of those is a round-trip the user
+waits through for information you already have.
+
+THE EXCEPTION — ITERATION. If the message begins "Make a new version of a
+previous render." then you are EDITING, not creating. You MUST find and read the
+block that produced the file named on the "Previous file:" line (look under
+.hf/ for the matching slug), then change ONLY what the "Change:" line asks for
+and re-render it. Keep everything else — text, colours, timing, layout —
+byte-identical. Reading in that case is required, not waste.
 
 WORKED EXAMPLE (vertical kinetic title, 3s, opaque):
   ${WORK_DIR}/remotion-intro/.hf/hype-title/index.html:
@@ -3566,6 +3573,9 @@ function buildFastSystemPrompt() {
     '- Use a unique <Name> so you never collide with an earlier render.',
     '- Do NOT explore the project first. No ls, no cat, no reading old components.',
     '  Everything you need is in this prompt.',
+    '- EXCEPTION — if the message begins "Make a new version of a previous render."',
+    '  you are EDITING. Read the component behind the "Previous file:" path, change',
+    '  ONLY what the "Change:" line asks, keep the rest identical, re-render.',
     '',
     'HOW TO RENDER IT (run exactly once, from ' + WORK_DIR + '/remotion-intro)',
     '  Normal (opaque mp4):',
