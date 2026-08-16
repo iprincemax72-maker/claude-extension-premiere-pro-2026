@@ -4686,7 +4686,7 @@
       </div>
       <!-- MODEL picker — deliberately in the composer bar (NOT buried in settings)
            so a model that runs out of usage credits can be swapped in one click. -->
-      <div class="eng-group" id="modelGroup" title="Which Claude model writes the animation. Auto follows the Fast/Default/Slow setting (the button shows what it picked). Choose a model to lock that one instead.">
+      <div class="eng-group" id="modelGroup" title="Which Claude model writes the animation. Auto uses Opus 5. Choose a model to lock that one instead.">
         <button class="eng-btn" id="modelBtn" type="button" aria-haspopup="true" aria-expanded="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3.2M12 18.8V22M4.9 4.9l2.3 2.3M16.8 16.8l2.3 2.3M2 12h3.2M18.8 12H22M4.9 19.1l2.3-2.3M16.8 7.2l2.3-2.3"/></svg>
           <span id="modelLabel">Auto</span>
@@ -4694,7 +4694,7 @@
         </button>
         <div class="eng-menu" id="modelMenu" role="menu">
           <button class="eng-opt mdl-opt" data-model="auto" role="menuitemradio" type="button">
-            <span class="eng-opt-main"><b>Auto</b><span>Haiku on Fast, Opus 5 on Default/Slow</span></span>
+            <span class="eng-opt-main"><b>Auto</b><span>Opus 5 — the strong model is also the fastest here</span></span>
             <svg class="eng-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </button>
           <button class="eng-opt mdl-opt" data-model="claude-haiku-4-5-20251001" role="menuitemradio" type="button">
@@ -9109,7 +9109,7 @@ function syncEngineUI() {
 
 // MODEL picker — which Claude model writes the animation. Lives in the composer
 // bar (not settings) so a model that runs dry on usage credits is one click to
-// swap. 'auto' defers to the bridge's per-mode default (Haiku on Fast, Opus else).
+// swap. 'auto' defers to the bridge's default, which is Opus 5 for every mode.
 const MODEL_LABELS = {
   'auto': 'Auto',
   'claude-haiku-4-5-20251001': 'Haiku 4.5',
@@ -9126,7 +9126,7 @@ function setGenModel(m) {
 }
 // What 'auto' actually resolves to — MUST match the bridge's per-mode default.
 function autoModelFor(mode) {
-  return (mode === 'fast') ? 'claude-haiku-4-5-20251001' : 'claude-opus-5';
+  return 'claude-opus-5';
 }
 function syncModelUI() {
   const m = (userSettings && userSettings.model) || 'auto';
@@ -12913,6 +12913,20 @@ async function sendMessage(presetMsg, sendOpts) {
     const prefs = [];
     if (userSettings.aspect && userSettings.aspect !== 'auto') {
       prefs.push('aspect=' + userSettings.aspect);
+    } else {
+      // 'auto' used to send NOTHING, so Claude had no idea what size to render
+      // and went looking — probing old renders in the output dir to guess the
+      // dimensions. That is minutes of find/ffprobe on a folder full of large
+      // .mov files, and it looks like a hang. We already know the answer: ask
+      // the sequence. Best-effort; if it fails we simply send nothing as before.
+      try {
+        const raw = await evalES('ccGetSeqDims()');
+        const d = raw ? JSON.parse(raw) : null;
+        if (d && d.ok && d.width > 0 && d.height > 0) {
+          const size = aeNormalizeRenderSize(d.width, d.height);
+          if (size) prefs.push('size=' + size + ' (matches the sequence)');
+        }
+      } catch (e) {}
     }
     if (userSettings.duration && userSettings.duration !== 'auto') {
       prefs.push('duration=' + userSettings.duration + 's');

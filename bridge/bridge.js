@@ -938,6 +938,18 @@ async function renderCaptions(opts) {
 // with every caption in it). ProRes 4444 is all-intra, so ffmpeg -c copy cuts
 // are frame-accurate and fast (no re-encode, alpha preserved). Returns
 // [{ path, timelineSec, durationSec, text }] in timeline order.
+// Where one caption line's clip starts and how many frames it runs, snapped to
+// the frame grid. Pure + exported for tests: this is the math that decides
+// whether consecutive caption clips tile cleanly or overlap (overlapping clips
+// stack on the Premiere timeline and composite into a dark flash).
+function captionClipWindow(line, fps) {
+  const FPS = (fps && fps > 0) ? fps : 30;
+  const startFrame = Math.max(0, Math.round((line.startMs / 1000) * FPS));
+  const endFrame = Math.max(startFrame + 1, Math.round((line.endMs / 1000) * FPS));
+  const nFrames = endFrame - startFrame;
+  return { startFrame, endFrame, nFrames, startSec: startFrame / FPS, dur: nFrames / FPS };
+}
+
 async function splitCaptionClips(srcMov, lines, baseTimelineSec, reqId, log, fps) {
   // Each cut is an independent ffmpeg `-c copy` (no re-encode) — run them in parallel
   // instead of one-at-a-time. runWithConcurrency preserves input order, so the
@@ -951,11 +963,7 @@ async function splitCaptionClips(srcMov, lines, baseTimelineSec, reqId, log, fps
   const FPS = (fps && fps > 0) ? fps : 30;
   const stamp = Date.now();
   const jobs = lines.map((l, i) => () => new Promise((res) => {
-    const startFrame = Math.max(0, Math.round((l.startMs / 1000) * FPS));
-    const endFrame = Math.max(startFrame + 1, Math.round((l.endMs / 1000) * FPS));
-    const nFrames = endFrame - startFrame;
-    const startSec = startFrame / FPS;
-    const dur = nFrames / FPS;
+    const { startSec, dur, nFrames } = captionClipWindow(l, FPS);
     const dest = path.join(OUTPUT_DIR, 'caption_' + String(reqId).slice(0, 8) + '_' + i + '_' + stamp + '.mov');
     // -ss before -i = fast input seek; exact for all-intra ProRes. -c copy keeps alpha.
     const ff = spawn(FFMPEG_BIN, ['-y', '-ss', String(startSec), '-i', srcMov, '-frames:v', String(nFrames), '-c', 'copy', dest]);
@@ -2893,14 +2901,16 @@ hyperframes renders a DIRECTORY whose index.html is your block.
        cd "${WORK_DIR}/remotion-intro" && npx hyperframes render "./.hf/<slug>" -o "<OUTPUT_DIR>/<file>.mov" --format mov --fps 30 --quality high
      <OUTPUT_DIR> = the output dir from [PREMIERE CONTEXT] (quote it; may contain
      spaces). Clip length comes from your block's data-duration. Use
-     --quality draft while iterating (a few seconds), --quality high for the final.
+     ALWAYS --quality high. Render ONCE and ship it.
      The render is silent — no audio is added.
 
   3. Emit ONE marker per file so the panel imports it:
        [[IMPORT:<OUTPUT_DIR>/<file>.mov]]
 
-Iterate fast: a draft render is only a few seconds, so just render and look at
-the result rather than guessing.
+RENDER ONCE. Do not do a draft pass and then a final pass — that is two full
+renders for one deliverable and the user waits through both. Get the block right
+in the HTML, render at high quality, emit the marker, done. Only re-render if the
+render actually FAILED (no file, or an error) — not to "check" it.
 
 WORKED EXAMPLE (vertical kinetic title, 3s, opaque):
   ${WORK_DIR}/remotion-intro/.hf/hype-title/index.html:
@@ -3114,6 +3124,16 @@ these, or the output will have a solid black background:
 Only when the request does NOT involve transparency: render H.264 .mp4.
 
 3. Emit the import marker so the panel auto-imports it.
+
+CANVAS SIZE — never go looking for it. The message carries a USER PREFS line
+with the size when it is known. If it does not, use 1920x1080 (or 1080x1920 if
+the request is clearly vertical) and move on.
+Do NOT hunt through the output folder, do NOT ffprobe a previous render, and do
+NOT look for an old scratch directory to infer dimensions. That folder holds
+hundreds of large .mov files; a find or probe across it takes MINUTES, produces
+a frozen-looking progress bar, and tells you nothing the prompt has not already
+told you. Same for style: every prompt is a fresh design, so there is nothing
+worth reading in a previous render.
 
 DETERMINISM — every frame must be a pure function of useCurrentFrame().
 Remotion renders frames across MANY parallel Chrome processes and screenshots
@@ -3519,6 +3539,48 @@ clog('bridge', 'info', 'best-practices loaded', {
 
 // Build the inject block for a given render mode. Empty string if no rules
 // were found (skill not installed) — caller-safe.
+// FAST mode gets a SHORT prompt on purpose. Default/Slow carry ~50KB of rules
+// (system prompt + best practices + mode header) which is what makes them
+// deliberate and slow. Fast should behave like asking in a terminal: understand
+// the request, write it, render it, done. Everything here is load-bearing —
+// paths, flags, the import marker, and the two rules that silently ruin a
+// render (audio, and wall-clock animation).
+function buildFastSystemPrompt() {
+  return [
+    'You are generating ONE motion graphic for a video editor working in Adobe Premiere Pro.',
+    'Be direct and pragmatic. Build the simplest thing that genuinely satisfies the request, then stop.',
+    '',
+    'HOW TO BUILD IT',
+    '- Remotion project (already installed, do NOT npm install): ' + WORK_DIR + '/remotion-intro',
+    '- Write TWO files in src/: your component, and a one-composition entry',
+    '  src/<Name>.entry.tsx that registers ONLY it. Never touch src/Root.tsx.',
+    '- Use a unique <Name> so you never collide with an earlier render.',
+    '- Do NOT explore the project first. No ls, no cat, no reading old components.',
+    '  Everything you need is in this prompt.',
+    '',
+    'HOW TO RENDER IT (run exactly once, from ' + WORK_DIR + '/remotion-intro)',
+    '  Normal (opaque mp4):',
+    '    npx remotion render src/<Name>.entry.tsx <Name> "<OUTPUT_DIR>/<file>.mp4" --codec h264 --mute --hardware-acceleration=if-possible',
+    '  Transparent overlay (only if asked for transparent/overlay):',
+    '    npx remotion render src/<Name>.entry.tsx <Name> "<OUTPUT_DIR>/<file>.mov" --codec prores --prores-profile 4444 --image-format png --pixel-format yuva444p10le --mute',
+    '  <OUTPUT_DIR> is the output dir from the [PREMIERE CONTEXT] block. Quote it.',
+    '- Render ONCE. No draft pass, no re-render to "check" it, no ffprobe of your',
+    '  own output — the app already verifies the file. Only re-render if it FAILED.',
+    '',
+    'TWO RULES THAT SILENTLY RUIN A RENDER',
+    '- No audio. Ever. Always pass --mute.',
+    '- Animate from useCurrentFrame() only. No CSS transition, no CSS animation,',
+    '  no keyframes, no willChange, no Math.random(), no Date.now(). Frames are',
+    '  rendered by parallel browsers; anything time-based flickers.',
+    '',
+    'Canvas size comes from the USER PREFS line if present, else 1920x1080',
+    '(or 1080x1920 if the request is clearly vertical). Never go hunting for it.',
+    '',
+    'When the file exists, emit exactly: [[IMPORT:<abs path to the file>]]',
+    'Reply in ONE short sentence. No essay.',
+  ].join('\n');
+}
+
 function buildBestPracticesBlock(renderMode) {
   const parts = [];
   if (BP_CORE) parts.push(BP_CORE);
@@ -4422,6 +4484,9 @@ const server = http.createServer((req, res) => {
         // with the real hyperframes CLI. Self-contained prompt; the
         // Remotion-specific best-practices block + mode headers don't apply.
         resolvedSystemPrompt = HYPERFRAMES_SYSTEM_PROMPT;
+      } else if (renderMode === 'fast') {
+        // Short prompt, no mode header, no best-practices block (see below).
+        resolvedSystemPrompt = buildFastSystemPrompt();
       } else if (renderMode === 'slow') {
         // SLOW is the only mode that keeps the self-critique (render a middle
         // still, read it, check centering/clipping/contrast, one retry).
@@ -4529,7 +4594,7 @@ const server = http.createServer((req, res) => {
       // header, then the base system prompt.
       // Remotion-specific framing (creative-ambition mode headers + the
       // best-practices rules block) only applies to the Remotion engine.
-      if (tabMode !== 'chat' && engine !== 'hyperframes') {
+      if (tabMode !== 'chat' && engine !== 'hyperframes' && renderMode !== 'fast') {
         resolvedSystemPrompt = (MODE_HEADERS[renderMode] || '') + resolvedSystemPrompt;
         resolvedSystemPrompt = buildBestPracticesBlock(renderMode) + resolvedSystemPrompt;
       }
@@ -4596,7 +4661,7 @@ const server = http.createServer((req, res) => {
         // (or anything unrecognised) falls through to the per-mode default above.
         const ALLOWED_GEN_MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-fable-5'];
         const pickedModel = ALLOWED_GEN_MODELS.includes(payload && payload.model) ? payload.model : null;
-        const genModel = opts.model || pickedModel || (renderMode === 'fast' ? 'claude-haiku-4-5-20251001' : 'claude-opus-5');
+        const genModel = opts.model || pickedModel || 'claude-opus-5';
         const args = [
           '-p',
           '--output-format', 'stream-json',
