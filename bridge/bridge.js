@@ -5753,7 +5753,8 @@ const server = http.createServer((req, res) => {
       if (!clipPath) { res.writeHead(400); res.end('{"error":"missing clipPath"}'); return; }
       if (!fs.existsSync(clipPath)) { res.writeHead(404); res.end('{"error":"file not found"}'); return; }
 
-      _activeAutoedit = { children: new Set(), aborted: false };
+      const myRun = { children: new Set(), aborted: false };
+      _activeAutoedit = myRun;
       const logPath = path.join(OUTPUT_DIR, `autoedit-${reqId}.log`);
       // Per-request file log AND the unified collector.
       const log = (s) => {
@@ -5773,7 +5774,7 @@ const server = http.createServer((req, res) => {
           broadcastProgressDone(reqId);
           res.writeHead(400);
           res.end(JSON.stringify({ error: 'Clip is too short (need at least 30s)', reqId }));
-          _activeAutoedit = null;
+          if (_activeAutoedit === myRun) _activeAutoedit = null;
           return;
         }
 
@@ -5791,11 +5792,11 @@ const server = http.createServer((req, res) => {
         } else {
           // Transcribe fallback when Premiere captions aren't available
           broadcastProgress('Extracting audio', 5, reqId);
-          if (_activeAutoedit.aborted) throw new Error('cancelled');
+          if (myRun.aborted) throw new Error('cancelled');
           const wavPath = await extractAudioForTranscription(clipPath, inP, outP);
 
           broadcastProgress('Transcribing', 12, reqId);
-          if (_activeAutoedit.aborted) throw new Error('cancelled');
+          if (myRun.aborted) throw new Error('cancelled');
           const transcriptRaw = await runTranscribe(wavPath, totalDur);
           log(`parakeet transcript: ${(transcriptRaw || []).length} sentence segments`);
 
@@ -5803,7 +5804,7 @@ const server = http.createServer((req, res) => {
             broadcastProgressDone(reqId);
             res.writeHead(400);
             res.end(JSON.stringify({ error: 'Couldn\'t hear much speech in this clip', reqId }));
-            _activeAutoedit = null;
+            if (_activeAutoedit === myRun) _activeAutoedit = null;
             return;
           }
           // The transcriber returns segments as { start, end, text } with
@@ -5821,13 +5822,13 @@ const server = http.createServer((req, res) => {
           broadcastProgressDone(reqId);
           res.writeHead(400);
           res.end(JSON.stringify({ error: 'Not enough speech in this clip', reqId }));
-          _activeAutoedit = null;
+          if (_activeAutoedit === myRun) _activeAutoedit = null;
           return;
         }
 
         // ── 3. Ask Claude to identify moments ─────────────────────────────
         broadcastProgress('Finding key moments', 28, reqId);
-        if (_activeAutoedit.aborted) throw new Error('cancelled');
+        if (myRun.aborted) throw new Error('cancelled');
         const moments = await detectMoments(sentences, density, styleOverride, reqId, log);
         log(`moments raw: ${moments.length}`);
 
@@ -5858,7 +5859,7 @@ const server = http.createServer((req, res) => {
           broadcastProgressDone(reqId);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true, reqId, applied: [], skipped: [], summary: 'No suitable moments found.' }));
-          _activeAutoedit = null;
+          if (_activeAutoedit === myRun) _activeAutoedit = null;
           return;
         }
 
@@ -5890,7 +5891,7 @@ const server = http.createServer((req, res) => {
         broadcastProgressDone(reqId);
         try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e), reqId, logFile: logPath })); } catch {}
       } finally {
-        _activeAutoedit = null;
+        if (_activeAutoedit === myRun) _activeAutoedit = null;
       }
     });
     return;
@@ -5916,7 +5917,8 @@ const server = http.createServer((req, res) => {
       for (const s of segments) {
         if (!s || !s.path || !fs.existsSync(s.path)) { res.writeHead(404); res.end(JSON.stringify({ error: 'media file not found: ' + ((s && s.path) || '?'), reqId })); return; }
       }
-      _activeAutoedit = { children: new Set(), aborted: false };
+      const myRun = { children: new Set(), aborted: false };
+      _activeAutoedit = myRun;
       const logPath = path.join(OUTPUT_DIR, `autoedit-${reqId}.log`);
       const log = (s) => { try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${s}\n`); } catch {} clog('autoedit', /error|fail|timeout/i.test(String(s)) ? 'error' : 'info', String(s), null, reqId); };
       try {
@@ -5925,16 +5927,16 @@ const server = http.createServer((req, res) => {
         log(`AUTO EDIT analyze reqId=${reqId} segs=${segments.length} density=${density}`);
 
         broadcastProgress('Extracting audio', 6, reqId);
-        if (_activeAutoedit.aborted) throw new Error('cancelled');
+        if (myRun.aborted) throw new Error('cancelled');
         const { wavPath, totalDur, timeMap } = await extractConcatAudio(segments, reqId, log);
         if (spanEnd == null) spanEnd = spanStart + totalDur;
-        if (totalDur < 5) { broadcastProgressDone(reqId); res.writeHead(400); res.end(JSON.stringify({ error: 'Selection is too short (need at least ~5s of audio)', reqId })); _activeAutoedit = null; return; }
+        if (totalDur < 5) { broadcastProgressDone(reqId); res.writeHead(400); res.end(JSON.stringify({ error: 'Selection is too short (need at least ~5s of audio)', reqId })); if (_activeAutoedit === myRun) _activeAutoedit = null; return; }
 
         broadcastProgress('Transcribing', 16, reqId);
-        if (_activeAutoedit.aborted) throw new Error('cancelled');
+        if (myRun.aborted) throw new Error('cancelled');
         const transcriptRaw = await runTranscribe(wavPath, totalDur);
         log(`parakeet: ${(transcriptRaw || []).length} segments`);
-        if (!transcriptRaw || transcriptRaw.length < 3) { broadcastProgressDone(reqId); res.writeHead(400); res.end(JSON.stringify({ error: "Couldn't hear much speech in the selection", reqId })); _activeAutoedit = null; return; }
+        if (!transcriptRaw || transcriptRaw.length < 3) { broadcastProgressDone(reqId); res.writeHead(400); res.end(JSON.stringify({ error: "Couldn't hear much speech in the selection", reqId })); if (_activeAutoedit === myRun) _activeAutoedit = null; return; }
 
         const sentences = transcriptRaw.map((seg, i) => {
           const cs = (typeof seg.start === 'number') ? seg.start : 0;
@@ -5953,10 +5955,10 @@ const server = http.createServer((req, res) => {
             text:     (seg.text || '').trim(),
           };
         }).filter(s => s.text.length > 0);
-        if (sentences.length < 3) { broadcastProgressDone(reqId); res.writeHead(400); res.end(JSON.stringify({ error: 'Not enough speech in the selection', reqId })); _activeAutoedit = null; return; }
+        if (sentences.length < 3) { broadcastProgressDone(reqId); res.writeHead(400); res.end(JSON.stringify({ error: 'Not enough speech in the selection', reqId })); if (_activeAutoedit === myRun) _activeAutoedit = null; return; }
 
         broadcastProgress('Reading the speech', 24, reqId);
-        if (_activeAutoedit.aborted) throw new Error('cancelled');
+        if (myRun.aborted) throw new Error('cancelled');
         const questions = await detectInterviewQuestions(sentences, density, log);
 
         // Suggested lines for the transcript picker. The USER makes the final
@@ -6002,7 +6004,7 @@ const server = http.createServer((req, res) => {
         log(`analyze ERROR ${e.message}`);
         broadcastProgressDone(reqId);
         try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e), reqId, logFile: logPath })); } catch {}
-      } finally { _activeAutoedit = null; }
+      } finally { if (_activeAutoedit === myRun) _activeAutoedit = null; }
     });
     return;
   }
@@ -6017,7 +6019,8 @@ const server = http.createServer((req, res) => {
       const answers = (payload.answers && typeof payload.answers === 'object') ? payload.answers : {};
       const cached = reqId && _autoeditCache.get(reqId);
       if (!cached) { res.writeHead(400); res.end(JSON.stringify({ error: 'Auto-Edit session expired — run analyze again', reqId })); return; }
-      _activeAutoedit = { children: new Set(), aborted: false };
+      const myRun = { children: new Set(), aborted: false };
+      _activeAutoedit = myRun;
       const logPath = path.join(OUTPUT_DIR, `autoedit-${reqId}.log`);
       const log = (s) => { try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${s}\n`); } catch {} clog('autoedit', /error|fail|timeout/i.test(String(s)) ? 'error' : 'info', String(s), null, reqId); };
       try {
@@ -6085,21 +6088,21 @@ const server = http.createServer((req, res) => {
           : null;
         if (picks && picks.length) {
           broadcastProgress('Reading your picked lines', 30, reqId);
-          if (_activeAutoedit.aborted) throw new Error('cancelled');
+          if (myRun.aborted) throw new Error('cancelled');
           const picked = await labelPickedLines(sentences, picks, log);
           log(`user picks: ${picks.length} -> ${picked.length} moments (user-chosen, unfiltered)`);
           if (!picked.length) {
             broadcastProgressDone(reqId);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, reqId, applied: [], skipped: [], summary: 'None of the picked lines could be used.' }));
-            _activeAutoedit = null;
+            if (_activeAutoedit === myRun) _activeAutoedit = null;
             return;
           }
           return await _aeGenerateAndRespond(picked, `${picked.length} line${picked.length !== 1 ? 's' : ''} you picked`);
         }
 
         broadcastProgress('Planning the edit', 30, reqId);
-        if (_activeAutoedit.aborted) throw new Error('cancelled');
+        if (myRun.aborted) throw new Error('cancelled');
         const guidance = buildMomentGuidance(answers);
         const moments = await detectMoments(sentences, density, style, reqId, log, guidance);
         log(`moments raw: ${moments.length}`);
@@ -6119,7 +6122,7 @@ const server = http.createServer((req, res) => {
 
         // ── Fit-check (the "double check it fits the video" step) ─────────
         broadcastProgress('Double-checking the plan fits', 38, reqId);
-        if (_activeAutoedit.aborted) throw new Error('cancelled');
+        if (myRun.aborted) throw new Error('cancelled');
         const verified = await verifyPlan(filtered, sentences, spanStart, spanEnd, log);
         log(`verify: ${verified.report}`);
         let plan = verified.moments;
@@ -6133,7 +6136,7 @@ const server = http.createServer((req, res) => {
           broadcastProgressDone(reqId);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true, reqId, applied: [], skipped: [], summary: 'No suitable moments found.', planReport: verified.report }));
-          _activeAutoedit = null;
+          if (_activeAutoedit === myRun) _activeAutoedit = null;
           return;
         }
 
@@ -6142,7 +6145,7 @@ const server = http.createServer((req, res) => {
         log(`run ERROR ${e.message}`);
         broadcastProgressDone(reqId);
         try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e), reqId, logFile: logPath })); } catch {}
-      } finally { _activeAutoedit = null; }
+      } finally { if (_activeAutoedit === myRun) _activeAutoedit = null; }
     });
     return;
   }
@@ -6167,7 +6170,8 @@ const server = http.createServer((req, res) => {
       if (!cached.plan || !cached.genOpts) { res.writeHead(400); res.end(JSON.stringify({ error: 'Nothing to change yet — generate the graphics first', reqId })); return; }
       if (!Number.isInteger(idx) || idx < 0 || idx >= cached.plan.length) { res.writeHead(400); res.end(JSON.stringify({ error: 'That graphic is no longer available', reqId })); return; }
       if (!change) { res.writeHead(400); res.end(JSON.stringify({ error: 'No change described', reqId })); return; }
-      _activeAutoedit = { children: new Set(), aborted: false };
+      const myRun = { children: new Set(), aborted: false };
+      _activeAutoedit = myRun;
       const logPath = path.join(OUTPUT_DIR, `autoedit-${reqId}.log`);
       const log = (s) => { try { fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${s}\n`); } catch {} clog('autoedit', /error|fail|timeout/i.test(String(s)) ? 'error' : 'info', String(s), null, reqId); };
       try {
@@ -6198,7 +6202,7 @@ const server = http.createServer((req, res) => {
         log(`rerender ERROR ${e.message}`);
         broadcastProgressDone(reqId);
         try { res.writeHead(500); res.end(JSON.stringify({ error: e.message || String(e), reqId })); } catch {}
-      } finally { _activeAutoedit = null; }
+      } finally { if (_activeAutoedit === myRun) _activeAutoedit = null; }
     });
     return;
   }
