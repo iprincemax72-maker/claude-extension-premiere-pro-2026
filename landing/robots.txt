@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.flimify.com/sitemap.xml
+Sitemap: https://claudexpremiere.vercel.app/sitemap.xml
