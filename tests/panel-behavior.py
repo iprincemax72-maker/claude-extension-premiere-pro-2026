@@ -109,6 +109,27 @@ async def run(pg):
     check("closing the transcript tab by hand hides the view",
           not await pg.is_visible("#txView"))
 
+    # ---- re-wiring the captions progress feed must not orphan the old one ---
+    # Captions wire this twice per session (transcribe, then create). If the
+    # first one's 'done' never lands, overwriting capState.es left it connected
+    # and still calling capSetProgress, so a stale run drove the new run's bar.
+    es = await pg.evaluate("""() => {
+      const live = new Set(); const Real = window.EventSource;
+      window.EventSource = function (url) {
+        const e = new Real(url); live.add(e);
+        const rc = e.close.bind(e); e.close = () => { live.delete(e); rc(); };
+        return e;
+      };
+      window.EventSource.prototype = Real.prototype;
+      capWireProgressES('req-1');
+      capWireProgressES('req-2');          // no 'done' in between
+      const n = live.size;
+      for (const e of [...live]) { try { e.close(); } catch (_) {} }
+      window.EventSource = Real;
+      return n;
+    }""")
+    check("re-wiring the captions feed closes the previous one", es == 1, f"{es} live EventSources")
+
     # ---- transcript text is data, not markup --------------------------------
     await pg.evaluate("""(s) => { aeWizard = { picks:new Set() }; return txShow(s, []); }""",
                       [{"i": 0, "startSec": 0, "text": '<img src=x onerror="window.__pwned=1">'}])

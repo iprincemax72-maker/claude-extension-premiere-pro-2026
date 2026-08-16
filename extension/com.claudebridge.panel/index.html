@@ -10407,6 +10407,12 @@ function capBuildOptions() {
 }
 function capWireProgressES(reqId) {
   try {
+    // Captions wire this up twice per session (transcribe, then create). The
+    // first one normally closes on its 'done', but if that event never lands —
+    // an abort, or an error path that skips broadcastProgressDone — overwriting
+    // capState.es orphaned it: still connected, still calling capSetProgress,
+    // so a stale run drove the progress bar of the new one.
+    if (capState.es) { try { capState.es.close(); } catch {} capState.es = null; }
     const es = new EventSource(BRIDGE + '/progress-stream');
     capState.es = es;
     es.addEventListener('progress', (ev) => { try { const p = JSON.parse(ev.data); if (p.reqId && p.reqId !== reqId) return; capSetProgress(p.text, typeof p.pct === 'number' ? p.pct : undefined); } catch {} });
