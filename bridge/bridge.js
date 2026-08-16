@@ -7,7 +7,7 @@ const fs = require('fs');
 const os = require('os');
 
 const PORT = 3737;
-const PANEL_VERSION = '11.1';   // bump each release — drives the /check-update badge + /diagnostics
+const PANEL_VERSION = '11.2';   // bump each release — drives the /check-update badge + /diagnostics
 // Model used when the per-mode generation model hard-fails (e.g. a separately
 // metered model reports "out of usage credits"). Haiku is the plan's base fast
 // model, so it stays available — a render degrades instead of dead-ending.
@@ -1809,7 +1809,7 @@ async function detectPlanQuestions(message, log) {
       'Each question: 2-4 options, each with a short value and a human label. Hard cap 6 questions.',
       'If the request is already fully specified, output NOTHING.',
     ].join('\n');
-    const raw = await runClaudeText(system + '\n\nUSER REQUEST:\n' + msg.slice(0, 4000), 60000, log, 'planq');
+    const raw = await runClaudeText(system + '\n\nUSER REQUEST:\n' + msg.slice(0, 4000), 60000, log, 'planq', AE_MODEL);
     const content = [];
     for (const line of String(raw).split('\n')) {
       let t = line.trim();
