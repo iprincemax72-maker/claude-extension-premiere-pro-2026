@@ -13204,8 +13204,16 @@ function addContinueBtn(container, originalMsg, lastStatus) {
   btn.innerHTML =
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>' +
     '<span>Continue</span>';
-  btn.addEventListener('mouseenter', () => btn.style.background = 'var(--accent)');
-  btn.addEventListener('mouseleave', () => btn.style.background = 'var(--accent-soft)');
+  // Hover fills the button with the accent — so the label and icon (both
+  // currentColor = accent) must flip to white, or they disappear into it.
+  btn.addEventListener('mouseenter', () => {
+    btn.style.background = 'var(--accent)';
+    btn.style.color = '#fff';
+  });
+  btn.addEventListener('mouseleave', () => {
+    btn.style.background = 'var(--accent-soft)';
+    btn.style.color = 'var(--accent)';
+  });
   btn.addEventListener('click', () => {
     btn.disabled = true;
     btn.style.opacity = '0.5';
