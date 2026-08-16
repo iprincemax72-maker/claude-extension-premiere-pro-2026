@@ -575,7 +575,14 @@ function groupWordsIntoLines(words, opts) {
 
   const clean = (words || [])
     .filter(w => w && String(w.text || '').trim() && Number.isFinite(w.startMs) && Number.isFinite(w.endMs))
-    .map(w => ({ text: String(w.text).trim(), startMs: Math.max(0, w.startMs), endMs: Math.max(w.startMs + 1, w.endMs) }))
+    // endMs must be derived from the CLAMPED start. Deriving it from the raw
+    // w.startMs meant a word with a negative timestamp (start -50, end -60)
+    // produced startMs 0 with endMs -49: a line with negative duration, which
+    // becomes a broken clip downstream. Found by fuzzing, not by a real render.
+    .map(w => {
+      const s = Math.max(0, w.startMs);
+      return { text: String(w.text).trim(), startMs: s, endMs: Math.max(s + 1, w.endMs) };
+    })
     .sort((a, b) => a.startMs - b.startMs);
 
   const lines = [];
@@ -611,7 +618,13 @@ function groupWordsIntoLines(words, opts) {
   for (let i = 0; i < lines.length - 1; i++) {
     const next = lines[i + 1];
     if (lines[i].endMs > next.startMs) {
-      lines[i].endMs = Math.max(lines[i].startMs + 120, next.startMs);
+      // Yield ALL the way to the next line. This used to floor at
+      // startMs + 120ms to keep a line readable, but that floor re-created the
+      // exact overlap it sits here to prevent whenever the next line starts
+      // sooner than 120ms later — which is common on fast speech. A line that
+      // is briefly short is fine; two clips stacked on the same frame is the
+      // dark flash. Only the 1ms is kept, so duration stays positive.
+      lines[i].endMs = Math.max(lines[i].startMs + 1, next.startMs);
     }
   }
   return lines;
