@@ -2907,10 +2907,19 @@ hyperframes renders a DIRECTORY whose index.html is your block.
   3. Emit ONE marker per file so the panel imports it:
        [[IMPORT:<OUTPUT_DIR>/<file>.mov]]
 
+THREE STEPS, NOTHING ELSE: write the block, render it, emit the marker.
+
 RENDER ONCE. Do not do a draft pass and then a final pass — that is two full
 renders for one deliverable and the user waits through both. Get the block right
 in the HTML, render at high quality, emit the marker, done. Only re-render if the
 render actually FAILED (no file, or an error) — not to "check" it.
+
+DO NOT EXPLORE. You just wrote the block, so do NOT read it back to verify it.
+Do NOT list or open other blocks under .hf/ — every request is a fresh design and
+an old block only biases you. Do NOT search the output folder or probe previous
+renders for dimensions; the size is in this prompt. Every one of those is a
+round-trip the user waits through, and none of them tell you anything you do not
+already know.
 
 WORKED EXAMPLE (vertical kinetic title, 3s, opaque):
   ${WORK_DIR}/remotion-intro/.hf/hype-title/index.html:
@@ -4483,7 +4492,15 @@ const server = http.createServer((req, res) => {
         // HyperFrames engine — Claude authors an HTML/GSAP block + renders it
         // with the real hyperframes CLI. Self-contained prompt; the
         // Remotion-specific best-practices block + mode headers don't apply.
-        resolvedSystemPrompt = HYPERFRAMES_SYSTEM_PROMPT;
+        // This branch is checked BEFORE renderMode, so Fast used to be ignored
+        // entirely here — same elaborate build whichever speed you picked.
+        resolvedSystemPrompt = HYPERFRAMES_SYSTEM_PROMPT
+          + (renderMode === 'fast'
+            ? '\n\nMODE: FAST — keep it SIMPLE. One clear idea, a handful of elements,'
+              + '\none motion. Do not layer effects, do not choreograph multiple beats,'
+              + '\ndo not stack blur/drop-shadow (they are the most expensive thing you'
+              + '\ncan render, per frame). Write it, render it, ship it.'
+            : '');
       } else if (renderMode === 'fast') {
         // Short prompt, no mode header, no best-practices block (see below).
         resolvedSystemPrompt = buildFastSystemPrompt();
