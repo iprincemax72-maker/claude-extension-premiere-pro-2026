@@ -3099,10 +3099,15 @@ OUTPUT FORMAT REQUIREMENTS (critical — Premiere can't import some formats):
   \`--mute\` instead.
 
 ★★★ TRANSPARENCY — READ THIS, IT IS THE #1 THING PEOPLE GET WRONG ★★★
-If the request mentions "transparent", "no background", "remove the
-background", "alpha", "overlay", "on top of", "for V2/V3", or anything
-that implies the result sits OVER other footage — you MUST do BOTH of
-these, or the output will have a solid black background:
+DEFAULT IS OPAQUE. If the user did not ask for transparency, render a normal
+opaque .mp4 with a painted background. Never infer transparency from what the
+graphic depicts. A subscribe button, a lower-third, a logo sting, a callout
+arrow are all ordinary opaque clips unless the user says otherwise. "It would
+look better over footage" is NOT your call to make.
+
+ONLY when the request actually says "transparent", "no background", "remove
+the background", "alpha", "overlay", "on top of", or "for V2/V3" you MUST do
+BOTH of these, or the output will have a solid black background:
 
   1. THE COMPOSITION MUST NOT PAINT A BACKGROUND. Do not put a
      \`backgroundColor\` on the root, do not render a solid <AbsoluteFill>
@@ -3564,7 +3569,10 @@ function buildFastSystemPrompt() {
     'HOW TO RENDER IT (run exactly once, from ' + WORK_DIR + '/remotion-intro)',
     '  Normal (opaque mp4):',
     '    npx remotion render src/<Name>.entry.tsx <Name> "<OUTPUT_DIR>/<file>.mp4" --codec h264 --mute --hardware-acceleration=if-possible',
-    '  Transparent overlay (only if asked for transparent/overlay):',
+    '  Transparent overlay — ONLY if the user literally used one of these words:',
+    '  transparent, alpha, overlay, no background, "on top of", V2/V3. Never pick',
+    '  this because the graphic "looks like" it belongs over footage. A subscribe',
+    '  button, lower-third or logo sting is an opaque mp4 unless they said so:',
     '    npx remotion render src/<Name>.entry.tsx <Name> "<OUTPUT_DIR>/<file>.mov" --codec prores --prores-profile 4444 --image-format png --pixel-format yuva444p10le --mute',
     '  <OUTPUT_DIR> is the output dir from the [PREMIERE CONTEXT] block. Quote it.',
     '- Render ONCE. No draft pass, no re-render to "check" it, no ffprobe of your',
