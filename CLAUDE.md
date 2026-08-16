@@ -429,7 +429,30 @@ curl -s http://127.0.0.1:3737/ping
 
 Four test passes guard the panel + the Remotion skills. Run them after any change to `index.html`, `bridge.js`, or the v2 skill source files:
 
+One-time setup (the Python audits need a browser):
 ```bash
+python3 -m playwright install chromium
+```
+
+```bash
+# 0. Render pipeline — the only tests that check OUTPUT, not UI.
+#    Fast group (~1s): caption lines never overlap, clips tile frame-exactly at
+#    24/25/30/50/60fps, and Captions.tsx contains nothing frame-nondeterministic
+#    (CSS transition/animation/keyframes, willChange, Math.random, Date.now).
+#    --render (~1 min) additionally renders for real and asserts: the same
+#    composition renders byte-identically twice (catches flicker), the output
+#    pixel format carries alpha, and the corner pixel is actually transparent.
+node tests/render-pipeline.test.js            # fast
+node tests/render-pipeline.test.js --render   # + real renders
+
+# 0b. Contrast audit — catches controls that render invisible. Sweeps every
+#     visible control in NORMAL and HOVER state at two viewports, and BUILDS the
+#     runtime-only ones (Continue button, toasts) so they get checked too. Added
+#     after the Continue button turned into a blank blob on hover: its label and
+#     icon were accent-coloured and hover filled the background with the same
+#     accent. Verified to fail when that bug is reintroduced.
+python3 tests/panel-contrast.py
+
 # 1. Strict TypeScript check on all 24 skill source files + the 3 showreel templates.
 #    Catches prop-naming bugs and JSX-case issues that the render itself tolerates.
 bash tests/skill-sources-typecheck.sh

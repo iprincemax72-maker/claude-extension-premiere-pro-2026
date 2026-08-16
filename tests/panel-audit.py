@@ -58,8 +58,17 @@ async def audit(b, w, h, label):
     # not the stale fallback. Bumps happen often; the test shouldn't
     # break on every bump.
     ver = await p.evaluate("() => document.getElementById('versionTag') && document.getElementById('versionTag').textContent")
-    if not ver or not ver.startswith("10."):
-        r("crit","version",f"panel version is {ver!r}, expected something starting with '10.'")
+    # Compare against the bridge's PANEL_VERSION instead of a hardcoded major.
+    # Hardcoding meant this went red on every release and stopped being trusted;
+    # what actually matters is that panel and bridge agree.
+    import re as _re, pathlib as _pl
+    _bridge = (_pl.Path(__file__).parent.parent / "bridge" / "bridge.js").read_text(errors="ignore")
+    _m = _re.search(r"PANEL_VERSION\s*=\s*'([^']+)'", _bridge)
+    expected = _m.group(1) if _m else None
+    if not ver or not _re.match(r"^\d+\.\d+", ver.strip()):
+        r("crit","version",f"panel version is {ver!r}, not a well-formed version")
+    elif expected and ver.strip() != expected:
+        r("crit","version",f"panel says {ver.strip()!r} but bridge.js PANEL_VERSION is {expected!r} — they must match")
 
     # === CHIPS ===
     cc = await p.evaluate("() => document.querySelectorAll('#chips .chip:not(.chip-line)').length")
