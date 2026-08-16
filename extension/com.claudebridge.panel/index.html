@@ -13861,12 +13861,20 @@ async function expandPrompt(level, clickedBtn) {
     const r = await fetch(BRIDGE + '/expand', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: text, level }),
+      body: JSON.stringify({ prompt: text, level, model: userSettings.model || 'auto' }),
       signal: expandAbort.signal,
     });
     if (!r.ok) throw new Error('Bridge returned ' + r.status);
     const data = await r.json();
-    if (data && data.expanded) {
+    // Expand replaces what you typed, and assigning to .value wipes the
+    // textarea's native undo stack — so a bad expansion destroys the prompt
+    // with no way back. A weak model answers "I need a few specifics: 1. ..."
+    // instead of rewriting, which is exactly the case that must not overwrite.
+    const looksLikeQuestions = (s) => /^\s*(i(?:'| a)?m? |i'd |could you|can you|what |which |to write|before i)/i.test(s)
+      && s.indexOf('?') > -1 && s.indexOf('?') < 400;
+    if (data && data.expanded && looksLikeQuestions(data.expanded)) {
+      failureNote = 'Expand asked for details instead of rewriting — your prompt was kept';
+    } else if (data && data.expanded) {
       input.value = data.expanded;
       autosize();
       clearGhost();

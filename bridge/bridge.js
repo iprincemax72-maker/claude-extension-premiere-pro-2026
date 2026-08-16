@@ -4140,13 +4140,20 @@ const server = http.createServer((req, res) => {
       const level = ['light', 'medium', 'heavy'].indexOf(payload.level) >= 0 ? payload.level : 'medium';
       const sys = EXPAND_SYSTEMS[level];
 
-      // No --model flag → uses the user's default (Opus 4.7) for proper depth.
+      // Every other path pins its model. This one used to send no --model at
+      // all and inherit whatever the CLI default happened to be, so Expand was
+      // the one feature whose quality silently changed when that default moved
+      // — and the composer's model picker never reached it. Pin it, and let the
+      // picker override when it is set to something other than 'auto'.
+      const wantModel = (typeof payload.model === 'string' && payload.model && payload.model !== 'auto')
+        ? payload.model : AE_MODEL;
       const args = [
         '-p',
         '--output-format', 'json',
         '--no-session-persistence',
         '--exclude-dynamic-system-prompt-sections',
         '--disable-slash-commands',
+        '--model', wantModel,
         '--append-system-prompt', sys,
         promptText,
       ];
