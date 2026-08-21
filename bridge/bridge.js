@@ -57,6 +57,39 @@ process.on('unhandledRejection', (reason) => {
 // that is a spinner that never stops and never errors. Valid JSON that is not
 // an object becomes an empty payload; malformed JSON still throws, so each
 // endpoint's existing catch keeps returning its own 400 shape.
+// ── DURABLE RENDER INDEX ──────────────────────────────────────────────────
+// History lived only in the panel's localStorage. Close Premiere (which closes
+// the panel), lose that storage, or produce a render outside the panel, and
+// there was no record of it anywhere — the file sat on disk with nothing
+// pointing at it. The bridge is the one process that sees every render, so it
+// writes an append-only index the panel merges in on boot.
+const RENDER_INDEX = path.join(WORK_DIR, 'renders.jsonl');
+function recordRenders(paths, prompt, reqId) {
+  if (!paths || !paths.length) return;
+  try {
+    const lines = paths.filter(Boolean).map(f => JSON.stringify({
+      t: Date.now(),
+      file: String(f),
+      prompt: String(prompt || '').slice(0, 2000),
+      reqId: reqId || '',
+    })).join('\n') + '\n';
+    fs.appendFileSync(RENDER_INDEX, lines);
+  } catch (e) {
+    try { clog('bridge', 'warn', 'render index write failed', { err: String(e && e.message || e) }); } catch {}
+  }
+}
+function readRenderIndex(limit) {
+  try {
+    const raw = fs.readFileSync(RENDER_INDEX, 'utf8').trim();
+    if (!raw) return [];
+    const out = [];
+    for (const line of raw.split('\n')) {
+      try { const o = JSON.parse(line); if (o && o.file) out.push(o); } catch {}
+    }
+    return out.slice(-(limit || 300)).reverse();
+  } catch { return []; }
+}
+
 function parseObjBody(body) {
   const v = JSON.parse(body);
   return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
@@ -3899,6 +3932,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Renders the bridge has produced, newest first. The panel merges anything it
+  // doesn't already have into History on boot, so a render survives the panel
+  // closing, localStorage being cleared, or being produced outside the panel.
+  if (req.method === 'GET' && req.url.startsWith('/renders/recent')) {
+    let n = 300;
+    try { const q = new URL('http://x' + req.url).searchParams.get('n'); if (q) n = Math.max(1, Math.min(1000, +q || 300)); } catch {}
+    const all = readRenderIndex(n);
+    // Only offer files that are still on disk — a dead path helps nobody.
+    const live = all.filter(r => { try { return fs.existsSync(r.file); } catch { return false; } });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, count: live.length, renders: live }));
+    return;
+  }
+
   if (req.method === 'GET' && req.url === '/ping') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, session: SESSION_ID, outputDir: OUTPUT_DIR, auth: AUTH_ENABLED }));
@@ -5017,7 +5064,9 @@ const server = http.createServer((req, res) => {
 
       try {
         const safePaths = await Promise.all(rawImports.map(p => ensurePremiereImportable(p)));
-        sendOk({ reply, imports: safePaths.filter(Boolean) });
+        const finalPaths = safePaths.filter(Boolean);
+        recordRenders(finalPaths, message, reqId);
+        sendOk({ reply, imports: finalPaths });
       } catch (err) {
         console.error('transcode error:', err.message);
         sendOk({ reply, imports: rawImports });

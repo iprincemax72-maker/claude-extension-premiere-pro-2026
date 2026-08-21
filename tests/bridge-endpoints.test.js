@@ -76,6 +76,22 @@ async function reachable() {
     check(`${ep} rejects malformed JSON`, s === 400 || s === 404, `got ${s}`);
   }
 
+  // The render index is what makes a render survive the panel closing.
+  {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 5000);
+    let ok = false, shaped = false;
+    try {
+      const r = await fetch(BRIDGE + '/renders/recent?n=5', { signal: ctl.signal });
+      ok = r.status === 200;
+      const d = await r.json();
+      shaped = !!d && d.ok === true && Array.isArray(d.renders)
+               && d.renders.every(x => x && typeof x.file === 'string');
+    } catch {} finally { clearTimeout(t); }
+    check('/renders/recent answers 200', ok);
+    check('/renders/recent returns {ok, renders:[{file}]}', shaped);
+  }
+
   // The guard must not have broken the happy path. This one spawns the CLI, so
   // it needs a real timeout — the 8s hostile-payload budget is for replies that
   // should be immediate.

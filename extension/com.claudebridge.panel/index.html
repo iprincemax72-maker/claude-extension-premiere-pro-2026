@@ -6520,6 +6520,49 @@ function saveHistory() {
   renderHistoryBadge();
 }
 
+// Pull in renders the bridge made that History has no row for. History lives in
+// this panel's localStorage, so closing Premiere, clearing storage, or a render
+// produced outside the panel all left the file orphaned on disk with nothing
+// pointing at it. The bridge keeps an append-only index; this reconciles it.
+let _mergingRenders = false;
+async function mergeBridgeRenders() {
+  if (_mergingRenders) return 0;   // renderHistory calls this, and this calls renderHistory
+  _mergingRenders = true;
+  try {
+    const r = await fetch(BRIDGE + '/renders/recent?n=300');
+    if (!r.ok) return 0;
+    const data = await r.json();
+    if (!data || !Array.isArray(data.renders)) return 0;
+    const known = new Set(history.map(h => h && h.path).filter(Boolean));
+    let added = 0;
+    // oldest first so the newest ends up on top after unshift
+    for (const rec of data.renders.slice().reverse()) {
+      if (!rec || !rec.file || known.has(rec.file)) continue;
+      const id = (rec.t || Date.now()) + '_' + Math.random().toString(36).slice(2, 7);
+      history.unshift({
+        id, thread: id,
+        kind: IMAGE_EXTS.has(extOf(rec.file)) ? 'image' : 'video',
+        prompt: rec.prompt || '',
+        path: rec.file,
+        mode: '',
+        reply: '',
+        t: rec.t || Date.now(),
+        recovered: true,
+      });
+      known.add(rec.file);
+      added++;
+    }
+    if (added) {
+      if (history.length > HISTORY_MAX) history = history.slice(0, HISTORY_MAX);
+      saveHistory();
+      if (historyPanel && historyPanel.classList.contains('show')) renderHistory();
+      try { cclog('info', 'recovered renders into history', { added }); } catch (e) {}
+    }
+    return added;
+  } catch (e) { return 0; }
+  finally { _mergingRenders = false; }
+}
+
 function addHistoryEntry({prompt, path, mode, reply, iterationOf}) {
   // A run that produces no file still cost the user the thinking they typed.
   // History used to be written only inside the loop over rendered files, so a
@@ -6678,6 +6721,7 @@ function relTime(ts) {
 const ICON_FILM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5"/></svg>';
 
 function renderHistory() {
+  try { mergeBridgeRenders(); } catch (e) {}
   if (history.length === 0) {
     historyList.innerHTML = '<div class="history-empty">No renders yet.<br>Send a message to generate your first animation.</div>';
     return;
@@ -7853,6 +7897,10 @@ input.addEventListener('paste', () => setTimeout(_scheduleDraftSave, 50));
 /* Restore draft on panel load. Tries localStorage (new strict path) first,
    falls back to the old sessionStorage location so drafts written by older
    versions still recover. */
+// Reconcile with the bridge's render index once at boot, so a render that
+// happened while this panel was closed shows up without opening History.
+setTimeout(() => { try { mergeBridgeRenders(); } catch (e) {} }, 2500);
+
 (function restoreDraftOnLoad() {
   try {
     let draft = localStorage.getItem(DRAFT_KEY);
