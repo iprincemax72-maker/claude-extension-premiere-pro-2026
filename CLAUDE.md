@@ -471,7 +471,7 @@ curl -s http://127.0.0.1:3737/ping
 
 ### Validation suite
 
-Six passes guard the panel, the render output and the Remotion skills. Run them after any change to `index.html`, `bridge.js`, `Captions.tsx`, or the v2 skill source files:
+Eleven passes guard the panel, the bridge, the render output and the Remotion skills. Run them after any change to `index.html`, `bridge.js`, `Captions.tsx`, or the v2 skill source files:
 
 One-time setup (the Python audits need a browser):
 ```bash
@@ -497,6 +497,34 @@ node tests/render-pipeline.test.js --render   # + real renders
 #     accent. Verified to fail when that bug is reintroduced.
 python3 tests/panel-contrast.py
 
+# 0c. Panel behaviour — bugs where the panel overwrites state the USER owns, at a
+#     moment they did not ask for it. None of these throw, so the console stays
+#     clean and the contrast/audit passes stay green while the feature quietly
+#     eats your work. Covers the queue drain clobbering a half-typed prompt, the
+#     expand guard, the transcript-tab lifecycle, and the captions progress feed
+#     being re-subscribed without closing the old one.
+python3 tests/panel-behavior.py
+
+# 0d. Bridge invariants — source-level rules a running bridge can't easily prove.
+#     Each handler must own its own run token instead of sharing _activeAutoedit
+#     (two Auto-Edit operations at once corrupted each other's cancel state), a
+#     cancel handle that is only ever cleared and never assigned is a dead cancel
+#     button, and the parallel pool must fix its worker count before starting.
+node tests/bridge-invariants.test.js
+
+# 0e. Bridge endpoints — hostile request bodies. A body of `null` used to hang
+#     every endpoint: JSON.parse('null') succeeds, the deref throws inside the
+#     'end' callback, and the response is never written. Needs a live bridge;
+#     skips cleanly without one.
+node tests/bridge-endpoints.test.js
+
+# 0f. Caption timing fuzz — property-based, seeded so failures reproduce. Asserts
+#     no overlap, positive durations, no word lost or duplicated, frame-aligned
+#     clips. Found the overlap guard re-creating the overlap it prevents, and a
+#     negative-duration line from a negative input timestamp. Prints a KNOWN GAP
+#     it deliberately does not assert (sub-frame clips still share a frame).
+node tests/captions-fuzz.test.js
+
 # 1. Strict TypeScript check on all 24 skill source files + the 3 showreel templates.
 #    Catches prop-naming bugs and JSX-case issues that the render itself tolerates.
 bash tests/skill-sources-typecheck.sh
@@ -513,7 +541,10 @@ python3 tests/panel-audit-edge-cases.py
 python3 tests/panel-audit-edge-cases-pt3.py
 ```
 
-Each must report 0 critical / 0 minor before a release. The version assertion in pt1 loosely matches "10." so legitimate version bumps don't break the audit (you'd see it flag a missing/stale version, not a wrong number).
+Each must report 0 critical / 0 minor before a release. pt1 compares the panel's
+version against `PANEL_VERSION` in bridge.js rather than a hardcoded string, so a
+bump can't silently drift the two apart. It reads the LIVE bridge, so it reports a
+false critical in the window between a version bump and the bridge restarting.
 
 ### Skill docs — where to look first
 
