@@ -6521,7 +6521,24 @@ function saveHistory() {
 }
 
 function addHistoryEntry({prompt, path, mode, reply, iterationOf}) {
-  if (!path) return;
+  // A run that produces no file still cost the user the thinking they typed.
+  // History used to be written only inside the loop over rendered files, so a
+  // prompt that was refused (out of disk, an error, a question back) left no
+  // trace at all — and closing Premiere closes the panel, so the text was gone
+  // for good. Keep the prompt itself; it is the part that took effort.
+  if (!path) {
+    if (!prompt || !String(prompt).trim()) return;
+    const recent = history.find(h => h && h.kind === 'prompt' && h.prompt === prompt
+                                     && (Date.now() - h.t) < 60000);
+    if (recent) return;                       // same prompt retried, don't stack duplicates
+    const pid = Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    history.unshift({ id: pid, thread: pid, kind: 'prompt', prompt: prompt,
+                      path: '', reply: reply || '', t: Date.now() });
+    if (history.length > HISTORY_MAX) history = history.slice(0, HISTORY_MAX);
+    saveHistory();
+    if (historyPanel.classList.contains('show')) renderHistory();
+    return;
+  }
   const kind = IMAGE_EXTS.has(extOf(path)) ? 'image' : 'video';
   // De-dup by path. Renders are logged twice — once immediately when the
   // render lands (never lost to a reload) and again on Import (captures the
@@ -6698,10 +6715,15 @@ function renderHistory() {
     } else {
       thumbHTML = '<div class="history-thumb" data-id="' + e.id + '">' + ICON_FILM + '</div>';
     }
-    const fileExists = !_fs || (function(){ try { return _fs.existsSync(e.path); } catch { return true; } })();
+    const promptOnly = e.kind === 'prompt' || !e.path;
+    const fileExists = promptOnly || !_fs || (function(){ try { return _fs.existsSync(e.path); } catch { return true; } })();
     const promptText = root.prompt ? escapeHTML(root.prompt) : '<span style="opacity:0.5">(no prompt saved)</span>';
-    const fname = e.path.split('/').pop();
-    const meta = relTime(e.t) + ' · ' + escapeHTML(fname) + (fileExists ? '' : ' · <span style="color:var(--err)">missing</span>');
+    const fname = e.path ? e.path.split('/').pop() : '';
+    // "missing" means a file we made was deleted. A prompt that never rendered
+    // is a different thing and saying "missing" about it reads as lost work.
+    const meta = promptOnly
+      ? relTime(e.t) + ' · <span style="color:var(--text-dim)">didn\'t render — prompt saved</span>'
+      : relTime(e.t) + ' · ' + escapeHTML(fname) + (fileExists ? '' : ' · <span style="color:var(--err)">missing</span>');
     const copyBtn = root.prompt
       ? '<button class="history-copy" data-act="copy" data-id="' + e.id + '" title="Copy original prompt">'
         + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'
@@ -13179,6 +13201,11 @@ async function sendMessage(presetMsg, sendOpts) {
     placeholder.body.innerHTML = renderMarkdown(replyText);
     streamReveal(placeholder.body);
 
+    // No file came back — blocked on disk, an error, or it asked a question
+    // instead of building. Keep the prompt so closing Premiere doesn't erase it.
+    if (activeTabType !== 'chat' && !(data.imports && data.imports.length)) {
+      try { addHistoryEntry({ prompt: msg || '', path: '', reply: replyText || '' }); } catch (e) {}
+    }
     if (activeTabType !== 'chat' && data.imports && data.imports.length) {
       for (const p of data.imports) {
         if (streamedPaths.has(p)) continue;   // already shown live as it finished
@@ -13211,6 +13238,8 @@ async function sendMessage(presetMsg, sendOpts) {
       cancelLine.textContent = 'Cancelled.' + (lastStatus ? ' Was at: ' + lastStatus : '');
       placeholder.body.appendChild(cancelLine);
       addContinueBtn(placeholder.body, msg, lastStatus);
+      // cancelled/errored runs still cost the user their prompt
+      try { addHistoryEntry({ prompt: msg || '', path: '' }); } catch (e) {}
       cclog('info', 'chat cancelled by user', { lastStatus: (typeof lastStatus !== 'undefined' ? lastStatus : (typeof resumeStatus !== 'undefined' ? resumeStatus : '')) });
     } else {
       // FAILED (bridge died, claude killed, network) — not user-cancelled.
@@ -13220,6 +13249,8 @@ async function sendMessage(presetMsg, sendOpts) {
         + '<p style="color:var(--text-dim);font-size:11.5px">Is the bridge running?'
         + (lastStatus ? ' Last status: ' + escapeHTML(lastStatus) : '') + '</p>';
       try { addContinueBtn(placeholder.body, msg, lastStatus); } catch (e) {}
+      // cancelled/errored runs still cost the user their prompt
+      try { addHistoryEntry({ prompt: msg || '', path: '' }); } catch (e) {}
       cclog('error', 'chat send failed', { error: String(err && err.message || err) });
     }
   } finally {

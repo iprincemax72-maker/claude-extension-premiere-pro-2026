@@ -130,6 +130,32 @@ async def run(pg):
     }""")
     check("re-wiring the captions feed closes the previous one", es == 1, f"{es} live EventSources")
 
+    # ---- a prompt that renders nothing must still be kept -------------------
+    # History was written only inside the loop over rendered files, so a run
+    # that was blocked (out of disk), errored, or answered with a question left
+    # no trace. Closing Premiere closes the panel, so that text was gone.
+    h = await pg.evaluate("""() => {
+      history.length = 0;
+      addHistoryEntry({ prompt: 'a prompt that never rendered', path: '', reply: 'blocked' });
+      const one = history.length;
+      addHistoryEntry({ prompt: 'a prompt that never rendered', path: '', reply: 'blocked' });
+      const dup = history.length;
+      addHistoryEntry({ prompt: '   ', path: '' });
+      const blank = history.length;
+      addHistoryEntry({ prompt: 'a real render', path: '/tmp/x.mp4', mode: '', reply: 'ok' });
+      saveHistory();
+      return { one, dup, blank, total: history.length, kinds: history.map(x => x.kind) };
+    }""")
+    check("a prompt with no render is kept", h["one"] == 1, str(h))
+    check("retrying the same prompt does not stack", h["dup"] == 1, str(h))
+    check("a blank prompt is still ignored", h["blank"] == 1, str(h))
+    check("file-backed history still works", h["total"] == 2 and "video" in h["kinds"], str(h))
+
+    await pg.reload()
+    await pg.wait_for_timeout(900)
+    kept = await pg.evaluate("() => history.filter(x => x.kind === 'prompt').length")
+    check("the prompt survives a panel reload", kept == 1, f"{kept} kept")
+
     # ---- transcript text is data, not markup --------------------------------
     await pg.evaluate("""(s) => { aeWizard = { picks:new Set() }; return txShow(s, []); }""",
                       [{"i": 0, "startSec": 0, "text": '<img src=x onerror="window.__pwned=1">'}])
