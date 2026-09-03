@@ -288,6 +288,16 @@ A small ↻ button in the panel header triggers `/update` manually (force). Toas
 
 ### Models + render modes (what actually runs)
 
+- **Bridge spawns are isolated from the user's own hooks.** `spawnClaude` adds
+  `--setting-sources project,local`, which drops the `user` source where plugin
+  hooks are registered. A render is not an interactive session and should not
+  fire someone's memory plugin: a broken one BLOCKED the prompt outright
+  ("UserPromptSubmit operation blocked by hook") and killed real renders, and
+  even a healthy one cost ~16s per spawn (20s vs 4s on the same trivial prompt;
+  /expand went 15s to 4s). Do NOT use `--bare` for this — it also stops OAuth and
+  keychain being read, and this user has no API key, so it cannot authenticate.
+  Skills live in ~/.claude/skills on disk and still resolve; `effortLevel` does
+  live in the user settings, so it is read once and passed back via `--settings`.
 - **Models are chosen by ALIAS, not by pinned version.** The picker and every
   default send `opus` / `sonnet` / `haiku` / `fable`, which the CLI resolves to
   the newest model in that family (`claude --help`: "Provide an alias for the

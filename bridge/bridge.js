@@ -7,7 +7,7 @@ const fs = require('fs');
 const os = require('os');
 
 const PORT = 3737;
-const PANEL_VERSION = '11.4';   // bump each release — drives the /check-update badge + /diagnostics
+const PANEL_VERSION = '11.5';   // bump each release — drives the /check-update badge + /diagnostics
 // Model used when the per-mode generation model hard-fails (e.g. a separately
 // metered model reports "out of usage credits"). Haiku is the plan's base fast
 // model, so it stays available — a render degrades instead of dead-ending.
@@ -348,7 +348,43 @@ function spawnClaude(args, opts) {
   const o = Object.assign({}, opts);
   if (t.shell) o.shell = true;
   if (process.platform === 'win32') o.windowsHide = true;
-  return spawn(t.cmd, t.prefixArgs.concat(args || []), o);
+  return spawn(t.cmd, t.prefixArgs.concat(_isolationArgs(args), args || []), o);
+}
+
+// The user's own settings.json registers hooks from whatever plugins they have
+// installed, and those hooks run on every spawn we make. A render is not an
+// interactive session and has no business triggering someone's memory plugin:
+// a broken one BLOCKS the prompt outright ("UserPromptSubmit operation blocked
+// by hook", which killed real renders), and a working one still cost ~16s per
+// spawn here (20s vs 4s on the same trivial prompt).
+//
+// --setting-sources drops the `user` source, which is where hooks live. NOT
+// --bare, which also stops OAuth and keychain being read: this user has no API
+// key, so --bare cannot authenticate at all.
+//
+// Skills are read from ~/.claude/skills on disk, not from settings, so
+// remotion-best-practices still resolves. effortLevel does live in the user
+// settings though, so it is read once and passed back explicitly.
+let _userEffort = null;
+function _readUserEffort() {
+  if (_userEffort !== null) return _userEffort;
+  _userEffort = '';
+  try {
+    const f = path.join(os.homedir(), '.claude', 'settings.json');
+    const v = JSON.parse(fs.readFileSync(f, 'utf8')).effortLevel;
+    if (typeof v === 'string' && /^[a-z]+$/.test(v)) _userEffort = v;
+  } catch {}
+  return _userEffort;
+}
+function _isolationArgs(args) {
+  const a = args || [];
+  // `claude --version` and friends take no session flags.
+  if (a.length && String(a[0]).startsWith('--') && a[0] !== '-p') return [];
+  if (a.includes('--setting-sources')) return [];
+  const out = ['--setting-sources', 'project,local'];
+  const eff = _readUserEffort();
+  if (eff) out.push('--settings', JSON.stringify({ effortLevel: eff }));
+  return out;
 }
 
 // Run ffmpeg silencedetect and return parsed pause ranges.
