@@ -288,7 +288,16 @@ A small ↻ button in the panel header triggers `/update` manually (force). Toas
 
 ### Models + render modes (what actually runs)
 
-- **Every generation runs on Opus 5.** Haiku is gone from the render path — it was
+- **Models are chosen by ALIAS, not by pinned version.** The picker and every
+  default send `opus` / `sonnet` / `haiku` / `fable`, which the CLI resolves to
+  the newest model in that family (`claude --help`: "Provide an alias for the
+  latest model"). A new release is therefore picked up with no code change —
+  the pinned ids went stale and nobody noticed until the picker was still
+  offering Opus 4.8 after it left the lineup. Old pinned ids are still accepted
+  so a saved setting keeps working. There is no CLI command that enumerates
+  models: `claude models` is not a subcommand, it is just a prompt, so it is
+  slow and can invent names. Do not build a model list on it.
+- **Every generation runs on Opus.** Haiku is gone from the render path — it was
   measured SLOWER end-to-end (238s vs 79s on the same graphic), because the cost
   here is agentic round-trips, not tokens per second. Haiku is still used for the
   composer's inline autocomplete only.

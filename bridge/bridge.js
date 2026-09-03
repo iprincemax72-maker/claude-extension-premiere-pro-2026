@@ -7,14 +7,17 @@ const fs = require('fs');
 const os = require('os');
 
 const PORT = 3737;
-const PANEL_VERSION = '11.3';   // bump each release — drives the /check-update badge + /diagnostics
+const PANEL_VERSION = '11.4';   // bump each release — drives the /check-update badge + /diagnostics
 // Model used when the per-mode generation model hard-fails (e.g. a separately
 // metered model reports "out of usage credits"). Haiku is the plan's base fast
 // model, so it stays available — a render degrades instead of dead-ending.
-const GEN_FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
+const GEN_FALLBACK_MODEL = 'haiku';
 // Model for Auto-Edit's thinking steps: the interview questions, the moment
 // plan, and the plan fit-check. No Haiku in the Auto-Edit pipeline.
-const AE_MODEL = 'claude-opus-5';
+// 'opus' is the CLI's alias for the NEWEST Opus, not a pinned version. The
+// picker and these defaults all use aliases so a new model release is picked up
+// on its own — the version numbers here used to go stale and nobody noticed.
+const AE_MODEL = 'opus';
 const SESSION_ID = crypto.randomUUID();
 // WORK_DIR pins to wherever bridge.js itself lives, so the bridge always
 // finds the remotion-intro project sitting next to it — even if the user
@@ -4772,9 +4775,9 @@ const server = http.createServer((req, res) => {
         // any model that runs dry so a render degrades instead of erroring out.
         // The panel's composer-bar model picker can pin a specific model; 'auto'
         // (or anything unrecognised) falls through to the per-mode default above.
-        const ALLOWED_GEN_MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-fable-5'];
+        const ALLOWED_GEN_MODELS = ['opus', 'sonnet', 'haiku', 'fable', 'claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-fable-5'];
         const pickedModel = ALLOWED_GEN_MODELS.includes(payload && payload.model) ? payload.model : null;
-        const genModel = opts.model || pickedModel || 'claude-opus-5';
+        const genModel = opts.model || pickedModel || 'opus';
         const args = [
           '-p',
           '--output-format', 'stream-json',
@@ -6126,7 +6129,7 @@ const server = http.createServer((req, res) => {
             .filter(p => typeof p === 'string' && p && (() => { try { return fs.existsSync(p); } catch { return false; } })())
             .slice(0, 6);
           const aeEngine = (payload.engine === 'hyperframes') ? 'hyperframes' : 'remotion';
-          const AE_ALLOWED = ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-fable-5'];
+          const AE_ALLOWED = ['opus', 'sonnet', 'haiku', 'fable', 'claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-fable-5'];
           const aeModel = AE_ALLOWED.includes(payload && payload.model) ? payload.model : null;
           const genOpts = { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames, userExtra, refImages, engine: aeEngine, model: aeModel };
           // Persist the final plan + render options so a SINGLE graphic can be
