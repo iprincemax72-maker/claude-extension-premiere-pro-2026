@@ -298,6 +298,22 @@ A small ↻ button in the panel header triggers `/update` manually (force). Toas
   keychain being read, and this user has no API key, so it cannot authenticate.
   Skills live in ~/.claude/skills on disk and still resolve; `effortLevel` does
   live in the user settings, so it is read once and passed back via `--settings`.
+- **GPT models run through the CODEX CLI, not claude.** `spawnClaude` cannot run
+  them at all. `runCodexOnce` mirrors `runClaudeOnce`'s contract and the dispatch
+  happens in one place inside `runClaudeOnce`, so the version fan-out, the retry
+  and the out-of-credits fallback all route correctly without knowing about
+  codex. Codex authenticates with the user's ChatGPT plan (`~/.codex/auth.json`
+  has `auth_mode: "chatgpt"` and an EMPTY api key), so this does not break the
+  no-API-key rule. It has no `--append-system-prompt`, so the system prompt is
+  prepended to the message, and the final assistant message is read from `-o`
+  rather than mined from a stream. Current lineup only: gpt-6-astra (flagship),
+  gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna (cheapest/fastest).
+- **Effort is one control for both.** claude takes `--effort`, codex takes
+  `-c model_reasoning_effort`, and both accept the SAME five values: low,
+  medium, high, xhigh, max (confirmed by feeding claude a bogus value, which
+  prints the valid list). An unknown value is dropped rather than passed on,
+  because claude warns and ignores it while codex silently accepts it — either
+  way the UI would be claiming an effort that is not being applied.
 - **Models are chosen by ALIAS, not by pinned version.** The picker and every
   default send `opus` / `sonnet` / `haiku` / `fable`, which the CLI resolves to
   the newest model in that family (`claude --help`: "Provide an alias for the

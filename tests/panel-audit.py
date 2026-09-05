@@ -143,7 +143,10 @@ async def audit(b, w, h, label):
     # === HISTORY (with seeded data) ===
     await p.click('#historyBtn'); await p.wait_for_timeout(500)
     rows = await p.evaluate("() => document.querySelectorAll('.history-item').length")
-    if rows != 3: r("minor","history",f"history rows = {rows}, expected 3")
+    # The panel also merges renders the bridge knows about (renders.jsonl) so a
+    # render survives the panel closing. That means the seeded rows are a FLOOR,
+    # not the exact count, whenever a real bridge is running with real history.
+    if rows < 3: r("minor","history",f"history rows = {rows}, expected at least the 3 seeded")
     # Remove-missing button regression
     rm_present = await p.evaluate("() => !!document.querySelector('button[data-tool=\"remove-missing\"]')")
     if not rm_present: r("crit","history-remove-missing","'Remove missing' button NOT present (regression)")

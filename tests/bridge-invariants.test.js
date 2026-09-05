@@ -82,6 +82,21 @@ for (const [handle, killer] of [['_activeAutocut', '/autocut-cancel'],
         writes.length > 0, 'only ever cleared, never set');
 }
 
+// ── 4c. GPT routing + effort ───────────────────────────────────────────────
+// GPT models cannot run on the claude CLI; they go through codex, which
+// authenticates with the ChatGPT subscription (no API key, same as the rest of
+// the project). One dispatch point keeps the fan-out and retry paths honest.
+check('GPT models route to codex, not claude',
+      /if \(isGptModel\(genModel\)\) \{[\s\S]{0,200}runCodexOnce\(/.test(SRC));
+check('codex binary is resolved, not assumed on PATH', /const CODEX_BIN = \(\(\) => \{/.test(SRC));
+check('effort is validated before being passed',
+      /const EFFORT_LEVELS = \['low', 'medium', 'high', 'xhigh', 'max'\]/.test(SRC)
+      && /cleanEffort\(payload && payload\.effort\)/.test(SRC));
+check('claude gets --effort only when set', /\.\.\.\(genEffort \? \['--effort', genEffort\] : \[\]\)/.test(SRC));
+check('codex gets model_reasoning_effort', /model_reasoning_effort="' \+ o\.effort/.test(SRC));
+check('no retired models in the allowlist',
+      !/'gpt-4|'o3'|'gpt-5'/.test(SRC));
+
 // ── 5. the parallel pool must not re-read the queue while starting workers ──
 // Workers shift a task off before their first await, so re-reading queue.length
 // in the loop condition let already-started workers shrink the target count.

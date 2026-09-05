@@ -156,6 +156,39 @@ async def run(pg):
     kept = await pg.evaluate("() => history.filter(x => x.kind === 'prompt').length")
     check("the prompt survives a panel reload", kept == 1, f"{kept} kept")
 
+    # ---- model + effort pickers ---------------------------------------------
+    # The model list must carry BOTH families, and effort must survive a bogus
+    # value rather than sticking on it (both CLIs ignore an unknown level, so a
+    # bad one would silently mean "default" while the UI claimed otherwise).
+    models = await pg.evaluate("() => [...document.querySelectorAll('#modelMenu .mdl-opt')].map(o => o.dataset.model)")
+    check("claude aliases offered", all(m in models for m in ["opus", "sonnet", "haiku", "fable"]), str(models))
+    check("gpt models offered", all(m in models for m in
+          ["gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]), str(models))
+    check("no retired models offered",
+          not any(m in models for m in ["claude-opus-4-8", "gpt-4", "gpt-4o", "o3", "gpt-5"]), str(models))
+
+    efforts = await pg.evaluate("() => [...document.querySelectorAll('#effortMenu .eff-opt')].map(o => o.dataset.effort)")
+    check("effort levels match both CLIs",
+          efforts == ["auto", "low", "medium", "high", "xhigh", "max"], str(efforts))
+
+    eff = await pg.evaluate("""() => {
+      const out = {};
+      for (const x of ['max', 'low', '__bogus__']) { setEffort(x); out[x] = userSettings.effort; }
+      setGenModel('gpt-6-astra'); out.gptLabel = MODEL_LABELS[userSettings.model];
+      return out;
+    }""")
+    check("effort sticks", eff["max"] == "max" and eff["low"] == "low", str(eff))
+    check("bogus effort falls back to auto", eff["__bogus__"] == "auto", str(eff))
+    check("gpt model labels correctly", eff["gptLabel"] == "GPT-6 Astra", str(eff))
+
+    await pg.click("#effortBtn")
+    await pg.wait_for_timeout(200)
+    check("effort menu opens", await pg.is_visible("#effortMenu .eff-opt"))
+    await pg.click("#effortMenu .eff-opt[data-effort='high']")
+    await pg.wait_for_timeout(200)
+    check("picking an effort applies it",
+          await pg.evaluate("() => userSettings.effort") == "high")
+
     # ---- transcript text is data, not markup --------------------------------
     await pg.evaluate("""(s) => { aeWizard = { picks:new Set() }; return txShow(s, []); }""",
                       [{"i": 0, "startSec": 0, "text": '<img src=x onerror="window.__pwned=1">'}])

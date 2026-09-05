@@ -7,13 +7,38 @@ const fs = require('fs');
 const os = require('os');
 
 const PORT = 3737;
-const PANEL_VERSION = '11.5';   // bump each release — drives the /check-update badge + /diagnostics
+const PANEL_VERSION = '11.6';   // bump each release — drives the /check-update badge + /diagnostics
 // Model used when the per-mode generation model hard-fails (e.g. a separately
 // metered model reports "out of usage credits"). Haiku is the plan's base fast
 // model, so it stays available — a render degrades instead of dead-ending.
 const GEN_FALLBACK_MODEL = 'haiku';
 // Model for Auto-Edit's thinking steps: the interview questions, the moment
 // plan, and the plan fit-check. No Haiku in the Auto-Edit pipeline.
+// GPT models run through the Codex CLI, not the claude CLI. Codex authenticates
+// with the user's ChatGPT subscription (auth_mode "chatgpt", no API key), so
+// this keeps the no-API-key rule the whole project is built on.
+// codex is installed per-user (~/.local/bin) and is often NOT on the PATH the
+// bridge inherits when Premiere spawns it, so check the usual spots first.
+const CODEX_BIN = (() => {
+  const cands = [
+    path.join(os.homedir(), '.local', 'bin', 'codex'),
+    '/opt/homebrew/bin/codex',
+    '/usr/local/bin/codex',
+  ];
+  for (const c of cands) { try { if (fs.existsSync(c)) return c; } catch {} }
+  return 'codex';   // last resort: whatever PATH resolves
+})();
+
+const GPT_MODELS = ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'];
+function isGptModel(m) { return typeof m === 'string' && /^gpt-/i.test(m); }
+
+// Both CLIs happen to take the SAME five effort levels: claude via --effort,
+// codex via -c model_reasoning_effort. Anything else is dropped rather than
+// passed through, because claude warns and ignores an unknown value and codex
+// silently accepts one.
+const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
+function cleanEffort(e) { return EFFORT_LEVELS.includes(e) ? e : null; }
+
 // 'opus' is the CLI's alias for the NEWEST Opus, not a pinned version. The
 // picker and these defaults all use aliases so a new model release is picked up
 // on its own — the version numbers here used to go stale and nobody noticed.
@@ -4797,6 +4822,74 @@ const server = http.createServer((req, res) => {
       // override the shared single-render params so each parallel version runs
       // in its own isolated workspace, silently (no per-line progress spam),
       // and registers its child proc with the orchestrator for group-abort.
+      // Same contract as runClaudeOnce: resolves { ok, reply, error, aborted }.
+      // Codex has no --append-system-prompt, so the system prompt is prepended to
+      // the message, and the final assistant message comes from -o rather than
+      // being mined out of a stream.
+      function runCodexOnce(o) {
+        const outFile = path.join(os.tmpdir(), 'flimify-codex-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.txt');
+        const args = [
+          'exec',
+          '--skip-git-repo-check',
+          '--dangerously-bypass-approvals-and-sandbox',
+          '-m', o.model,
+          '-C', o.cwd,
+          '-o', outFile,
+        ];
+        if (o.effort) args.push('-c', 'model_reasoning_effort="' + o.effort + '"');
+        args.push(o.sys + '\n\n' + o.msg);
+
+        return new Promise(resolve => {
+          const proc = spawn(CODEX_BIN, args, { cwd: o.cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+          if (o.procs) o.procs.push(proc);
+          let stderr = '', resolved = false, aborted = false;
+
+          const onAbort = () => { aborted = true; try { proc.kill('SIGKILL'); } catch {} };
+          if (!o.procs) req.once('aborted', onAbort);
+
+          // Codex prints human-readable activity rather than stream-json, so drive
+          // the progress bar off the lines that name a tool.
+          proc.stdout.on('data', chunk => {
+            if (o.quiet) return;
+            for (const line of chunk.toString().split('\n')) {
+              const t = line.trim();
+              if (!t || /^\d{4}-\d\d-\d\dT/.test(t)) continue;       // timestamps / log noise
+              if (/^(exec|apply_patch|shell|web_search|read_file|write)\b/i.test(t)) {
+                broadcastProgress(t.slice(0, 70), null, reqId);
+              }
+            }
+          });
+          proc.stderr.on('data', d => { stderr += d.toString(); });
+
+          const HARD_TIMEOUT_MS = 30 * 60 * 1000;
+          const hardKiller = setTimeout(() => {
+            if (resolved) return;
+            console.log('  [chat] hard timeout (30 min) — killing codex');
+            try { proc.kill('SIGKILL'); } catch {}
+          }, HARD_TIMEOUT_MS);
+
+          const done = (obj) => {
+            if (resolved) return;
+            resolved = true;
+            clearTimeout(hardKiller);
+            if (!o.procs) { try { req.off('aborted', onAbort); } catch {} }
+            try { fs.unlinkSync(outFile); } catch {}
+            resolve(obj);
+          };
+
+          proc.on('error', err => done({ ok: false, error: 'codex CLI not found: ' + err.message }));
+          proc.on('close', code => {
+            if (aborted) return done({ ok: false, aborted: true });
+            let reply = '';
+            try { reply = fs.readFileSync(outFile, 'utf8').trim(); } catch {}
+            if (code !== 0 && !reply) {
+              return done({ ok: false, error: (stderr.trim() || ('codex exited with code ' + code)).slice(0, 600) });
+            }
+            done({ ok: true, reply });
+          });
+        });
+      }
+
       function runClaudeOnce(retry, opts) {
         opts = opts || {};
         const useSys = opts.sysPrompt || resolvedSystemPrompt;
@@ -4811,14 +4904,22 @@ const server = http.createServer((req, res) => {
         // any model that runs dry so a render degrades instead of erroring out.
         // The panel's composer-bar model picker can pin a specific model; 'auto'
         // (or anything unrecognised) falls through to the per-mode default above.
-        const ALLOWED_GEN_MODELS = ['opus', 'sonnet', 'haiku', 'fable', 'claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-fable-5'];
+        const ALLOWED_GEN_MODELS = [...GPT_MODELS, 'opus', 'sonnet', 'haiku', 'fable', 'claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-fable-5'];
         const pickedModel = ALLOWED_GEN_MODELS.includes(payload && payload.model) ? payload.model : null;
         const genModel = opts.model || pickedModel || 'opus';
+        const genEffort = cleanEffort(payload && payload.effort);
+        // One dispatch point so the fan-out, the retry and the credits-fallback
+        // all route the same way without each knowing about codex.
+        if (isGptModel(genModel)) {
+          return runCodexOnce({ model: genModel, sys: useSys, msg: useMsg, cwd: useCwd,
+                                quiet, procs: opts.procs, effort: genEffort });
+        }
         const args = [
           '-p',
           '--output-format', 'stream-json',
           '--verbose',
           '--model', genModel,
+          ...(genEffort ? ['--effort', genEffort] : []),
           '--permission-mode', 'bypassPermissions',
           '--append-system-prompt', useSys,
           '--no-session-persistence',
