@@ -72,13 +72,23 @@ async def main():
         # Accept
         await p.click('.cc-confirm-btn[data-act=\"ok\"]')
         await p.wait_for_timeout(900)
+        # "Remove missing" removes rows whose FILE is gone, not every row. The
+        # panel also merges the bridge's render index, and those files do exist,
+        # so the right assertion is that nothing missing survives — not that the
+        # list is empty. It used to be the same thing; it stopped being once a
+        # render could outlive the panel that made it.
         rows_after = await p.evaluate("() => document.querySelectorAll('.history-item').length")
-        if rows_after != 0:
-            r("crit","remove-missing", f"rows after remove = {rows_after}, expected 0")
-        ls = await p.evaluate("() => JSON.parse(localStorage.getItem('claudeBridge.history') || '[]').length")
-        if ls != 0:
-            r("crit","remove-missing-persist", f"localStorage has {ls} rows still")
-        print(f"  ✓ rows after remove: {rows_after}, localStorage: {ls}")
+        still_missing = await p.evaluate(
+            "() => [...document.querySelectorAll('.history-item')]"
+            ".filter(e => /\\bmissing\\b/.test(e.textContent)).length")
+        if still_missing != 0:
+            r("crit","remove-missing", f"{still_missing} missing rows survived the remove")
+        ls_missing = await p.evaluate(
+            "() => { const seeded = JSON.parse(localStorage.getItem('claudeBridge.history') || '[]');"
+            "  return seeded.filter(h => h && h.path && h.path.indexOf('/__gone__/') >= 0).length; }")
+        if ls_missing != 0:
+            r("crit","remove-missing-persist", f"localStorage kept {ls_missing} missing rows")
+        print(f"  ✓ rows after remove: {rows_after}, still-missing: {still_missing}")
         await p.keyboard.press('Escape')
         await p.wait_for_timeout(300)
 
