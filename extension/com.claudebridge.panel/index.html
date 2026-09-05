@@ -2096,20 +2096,31 @@
 
   /* ───── Engine selector (Remotion ⇄ HyperFrames) ───── */
   .eng-group { position: relative; display: inline-flex; flex: 0 0 auto; }
+  /* Settings dropdowns sit QUIET at rest. There are three of them now (engine,
+     model, effort) and painting each one accent-on-accent made the settings
+     shout louder than Auto-Edit, Captions and Send — every control competing,
+     no hierarchy. The accent is earned here: on hover, while open, and on the
+     value itself. This is a panel docked in Premiere, so it should read as tool
+     chrome, not as a row of buttons demanding attention. */
   .eng-btn {
     display: inline-flex; align-items: center; gap: 5px;
     height: 24px; padding: 0 8px;
-    border: 1px solid var(--accent-line); border-radius: 7px;
-    background: var(--accent-soft);
-    color: var(--accent); font-family: var(--font-ui);
+    border: 1px solid var(--border); border-radius: 7px;
+    background: rgba(255,255,255,0.04);
+    color: var(--text-dim); font-family: var(--font-ui);
     font-size: 10.5px; font-weight: 600; cursor: pointer;
     transition: color .12s var(--ease-out), border-color .12s var(--ease-out), background .12s var(--ease-out);
     white-space: nowrap; user-select: none;
   }
-  .eng-btn:hover { color: var(--text); border-color: var(--accent-line); }
+  /* the icon is decoration, the value is the information */
+  .eng-btn > svg:first-child { opacity: .45; }
+  .eng-btn:hover { color: var(--text); border-color: var(--accent-line); background: var(--accent-soft); }
+  .eng-btn:hover > svg:first-child { opacity: .8; }
   .eng-btn svg { width: 12px; height: 12px; flex: 0 0 auto; }
   .eng-btn .eng-caret { width: 10px; height: 10px; opacity: .7; transition: transform .15s var(--ease-out); }
-  .eng-group.open .eng-btn { border-color: var(--accent-line); color: var(--text); }
+  .eng-group.open .eng-btn { border-color: var(--accent-line); color: var(--text);
+    background: var(--accent-soft); }
+  .eng-group.open .eng-btn > svg:first-child { opacity: .9; color: var(--accent); }
   .eng-group.open .eng-btn .eng-caret { transform: rotate(180deg); }
   /* HyperFrames active → tint the pill so the switch is obvious */
   .eng-btn.hf-active { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
@@ -3360,10 +3371,20 @@
   .ref-row .ref-bar { flex: 1 1 auto; border-bottom: none; min-width: 76px; }
   /* Both rows wrap instead of squeezing a child to nothing. A CEP panel can be
      docked very narrow, and the old row silently clipped rather than reflowing. */
-  .ref-row { flex-wrap: wrap; row-gap: 4px; }
-  .set-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 5px;
-    border-bottom: 1px solid var(--border-soft); padding: 5px 9px 5px 0; }
+  /* The two rows are ONE header, so only the pair gets a rule under it. A border
+     between them made the composer read as a table of controls. */
+  .ref-row { flex-wrap: wrap; row-gap: 4px; border-bottom: none; padding-bottom: 2px; }
+  .set-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; row-gap: 5px;
+    border-bottom: 1px solid var(--border-soft); padding: 0 9px 6px 0; }
   .set-row > * { flex: 0 0 auto; }
+  /* Uniform control height across the header. They were 24 / 25 / 26 and the
+     ragged baseline was a good part of why this looked unfinished. */
+  .set-row .eng-btn, .set-row .out-btn, .ref-row .ae-pill { height: 24px; }
+  .ref-row .ae-pill { margin-right: 0; }
+  /* Fast/Default/Slow is a segmented control, so give it its own quiet shell
+     rather than letting three bare words float next to bordered pills. */
+  .set-row .rmode-group { background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+    border-radius: 7px; padding: 2px; height: 24px; align-items: center; }
   .ref-row .rmode-group { flex: 0 0 auto; }
   .ref-row .ae-pill { flex: 0 0 auto; margin-right: 0; }
   body.chat-mode .ref-row .ae-pill,
@@ -3964,7 +3985,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot" role="img" aria-label="Flimify"></div>
     <span>Flimify</span>
-    <span class="version-tag" id="versionTag">11.7</span>
+    <span class="version-tag" id="versionTag">11.8</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -4581,7 +4602,7 @@
         <button class="settings-btn" id="settingCopyDiag" title="Copies env + a live claude probe + recent errors — paste it to support">Copy diagnostics for support</button>
         <button class="settings-btn danger" id="settingFactoryReset">Reset all settings</button>
       </div>
-      <div class="settings-foot">v<span id="settingsVersion">11.7</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
+      <div class="settings-foot">v<span id="settingsVersion">11.8</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
       <div class="settings-credit">
         Made by <a href="https://github.com/iprincemax72-maker" target="_blank" class="credit-link">iprincemax72-maker</a> <span class="credit-heart">&#10084;</span> Premiere Pro
       </div>
@@ -7712,7 +7733,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '11.7';
+  const PANEL_VERSION = '11.8';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
