@@ -1541,5 +1541,13 @@ document.addEventListener('click', function (e) {
 })();
 </script>
 
+<!-- Vercel Web Analytics. Plain-HTML integration: the @vercel/analytics npm
+     package is for framework builds and there is nothing here to bundle it, so
+     per Vercel's docs the script tag IS the install for a static site.
+     The route is served by Vercel once Web Analytics is enabled on the project. -->
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
