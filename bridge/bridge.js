@@ -7,7 +7,7 @@ const fs = require('fs');
 const os = require('os');
 
 const PORT = 3737;
-const PANEL_VERSION = '11.9';   // bump each release — drives the /check-update badge + /diagnostics
+const PANEL_VERSION = '12.0';   // bump each release — drives the /check-update badge + /diagnostics
 // Model used when the per-mode generation model hard-fails (e.g. a separately
 // metered model reports "out of usage credits"). Haiku is the plan's base fast
 // model, so it stays available — a render degrades instead of dead-ending.
@@ -85,6 +85,137 @@ process.on('unhandledRejection', (reason) => {
 // that is a spinner that never stops and never errors. Valid JSON that is not
 // an object becomes an empty payload; malformed JSON still throws, so each
 // endpoint's existing catch keeps returning its own 400 shape.
+// ── GENMOTION ─────────────────────────────────────────────────────────────
+// GenMotion (dev.genmotion.desktop) is an Electron motion-design app whose agent
+// runs on the user's own Claude Code or Codex subscription. It has no headless
+// render: its renderer runs inside a hidden window of the app, its MCP server is
+// in-process for its own agent, and its local HTTP API sits behind a per-launch
+// secret handed only to its own window. So the integration stays on the surface
+// it supports: launch it through its own `genmotion` launcher (optionally sharing
+// a folder with its agent), read its projects on disk, and bring its MP4 exports
+// onto the Premiere timeline.
+const GENMOTION_APP = '/Applications/GenMotion.app';
+const GENMOTION_BIN = '/usr/local/bin/genmotion';
+const GENMOTION_PROJECTS = process.env.GENMOTION_PROJECTS_DIR || path.join(os.homedir(), '.genmotion', 'projects');
+
+function genmotionInstalled() {
+  try { return fs.existsSync(GENMOTION_APP); } catch { return false; }
+}
+// The launcher records its version in its header, so this needs no spawn.
+function genmotionVersion() {
+  try {
+    const m = /GenMotion\s+([0-9][^\s]*)/.exec(fs.readFileSync(GENMOTION_BIN, 'utf8'));
+    return m ? m[1] : '';
+  } catch { return ''; }
+}
+function listGenmotionProjects() {
+  let dirs = [];
+  try { dirs = fs.readdirSync(GENMOTION_PROJECTS, { withFileTypes: true }).filter(d => d.isDirectory()); }
+  catch { return []; }
+  const out = [];
+  for (const d of dirs) {
+    const dir = path.join(GENMOTION_PROJECTS, d.name);
+    let meta;
+    try { meta = JSON.parse(fs.readFileSync(path.join(dir, 'project.json'), 'utf8')); } catch { continue; }
+    if (!meta || typeof meta !== 'object') continue;
+    const fps = Number(meta.fps) > 0 ? Number(meta.fps) : 30;
+    const scenes = Array.isArray(meta.scenes) ? meta.scenes : [];
+    const frames = scenes.reduce((n, sc) => n + (Number(sc && sc.durationInFrames) || 0), 0);
+    let exports = [];
+    try {
+      exports = fs.readdirSync(path.join(dir, 'exports'))
+        .filter(n => /\.mp4$/i.test(n))
+        .map(n => {
+          const f = path.join(dir, 'exports', n);
+          const st = fs.statSync(f);
+          return { file: f, name: n, size: st.size, mtime: st.mtimeMs };
+        })
+        .sort((a, b) => b.mtime - a.mtime);
+    } catch {}
+    const thumb = path.join(dir, '.genmotion', 'thumbnail.jpg');
+    let updatedAt = 0;
+    try { updatedAt = fs.statSync(path.join(dir, 'project.json')).mtimeMs; } catch {}
+    if (exports[0]) updatedAt = Math.max(updatedAt, exports[0].mtime);
+    out.push({
+      id: d.name,
+      dir,
+      name: (typeof meta.name === 'string' && meta.name.trim()) ? meta.name : d.name,
+      engine: meta.engine || '',
+      fps,
+      width: Number(meta.width) || 0,
+      height: Number(meta.height) || 0,
+      scenes: scenes.length,
+      durationSec: frames ? +(frames / fps).toFixed(2) : 0,
+      thumbnail: fs.existsSync(thumb) ? thumb : '',
+      updatedAt,
+      exports,
+    });
+  }
+  return out.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+// Announce a NEW export once, and only after its file stops growing. The encoder
+// writes the MP4 progressively, so the first fs event lands mid-write, and
+// importing then would hand Premiere a truncated clip.
+function watchGenmotionExports(root, onNew, intervalMs) {
+  const iv = intervalMs > 0 ? intervalMs : 1500;
+  const maxTries = Math.ceil(360000 / iv);
+  const known = new Set();
+  const pending = new Map();
+  try {
+    for (const proj of fs.readdirSync(root)) {
+      try {
+        for (const n of fs.readdirSync(path.join(root, proj, 'exports'))) {
+          if (/\.mp4$/i.test(n)) known.add(path.join(root, proj, 'exports', n));
+        }
+      } catch {}
+    }
+  } catch { return null; }
+  const settle = (file, lastSize, tries) => {
+    let size = -1;
+    try { size = fs.statSync(file).size; } catch { pending.delete(file); return; }
+    if (size > 0 && size === lastSize) {
+      pending.delete(file);
+      known.add(file);
+      try { onNew(file); } catch {}
+      return;
+    }
+    if (tries >= maxTries) { pending.delete(file); return; }
+    pending.set(file, setTimeout(() => settle(file, size, tries + 1), iv));
+  };
+  try {
+    const w = fs.watch(root, { recursive: true }, (evt, rel) => {
+      if (!rel || !/(^|[\\/])exports[\\/][^\\/]+\.mp4$/i.test(String(rel))) return;
+      const file = path.join(root, String(rel));
+      if (known.has(file) || pending.has(file)) return;
+      pending.set(file, setTimeout(() => settle(file, -1, 0), iv));
+    });
+    const close = w.close.bind(w);
+    w.close = () => { for (const t of pending.values()) clearTimeout(t); pending.clear(); close(); };
+    return w;
+  } catch { return null; }
+}
+function broadcastGenmotionExport(file) {
+  const projDir = path.dirname(path.dirname(file));
+  let name = path.basename(projDir);
+  try {
+    const m = JSON.parse(fs.readFileSync(path.join(projDir, 'project.json'), 'utf8'));
+    if (m && typeof m.name === 'string' && m.name.trim()) name = m.name;
+  } catch {}
+  const data = JSON.stringify({ file, project: path.basename(projDir), name });
+  for (const c of progressClients) {
+    try { c.write('event: genmotionExport\ndata: ' + data + '\n\n'); } catch {}
+  }
+  try { clog('bridge', 'info', 'genmotion export detected', { file }); } catch {}
+}
+// Started lazily on the first panel connection rather than at boot, and retried
+// on later ones, so installing GenMotion (or making a first project) after the
+// bridge is already up still gets picked up.
+let _genmotionWatcher = null;
+function ensureGenmotionWatcher() {
+  if (_genmotionWatcher || !genmotionInstalled()) return;
+  _genmotionWatcher = watchGenmotionExports(GENMOTION_PROJECTS, broadcastGenmotionExport);
+}
+
 // ── DURABLE RENDER INDEX ──────────────────────────────────────────────────
 // History lived only in the panel's localStorage. Close Premiere (which closes
 // the panel), lose that storage, or produce a render outside the panel, and
@@ -3983,6 +4114,7 @@ const server = http.createServer((req, res) => {
   // "Working" indicator can swap in to "Writing component", "Rendering video",
   // etc. as Claude actually does each step.
   if (req.method === 'GET' && req.url === '/progress-stream') {
+    ensureGenmotionWatcher();
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -3993,6 +4125,60 @@ const server = http.createServer((req, res) => {
     const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 25000);
     progressClients.add(res);
     req.on('close', () => { clearInterval(ping); progressClients.delete(res); });
+    return;
+  }
+
+  // GenMotion. See the GENMOTION block near the top for why this is launch,
+  // projects on disk and exports, and nothing that reaches inside the app.
+  if (req.method === 'GET' && req.url === '/genmotion/status') {
+    ensureGenmotionWatcher();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      installed: genmotionInstalled(),
+      version: genmotionVersion(),
+      launcher: fs.existsSync(GENMOTION_BIN),
+      projectsRoot: GENMOTION_PROJECTS,
+    }));
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/genmotion/projects') {
+    const installed = genmotionInstalled();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, installed, projects: installed ? listGenmotionProjects() : [] }));
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/genmotion/open') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+      let payload;
+      try { payload = parseObjBody(body || '{}'); } catch { return send(400, { ok: false, error: 'bad json' }); }
+      if (!genmotionInstalled()) return send(404, { ok: false, error: 'GenMotion is not installed' });
+      const args = [];
+      if (payload.dir) {
+        let dir;
+        try { dir = fs.realpathSync(String(payload.dir)); } catch { return send(400, { ok: false, error: 'folder not found' }); }
+        let isDir = false;
+        try { isDir = fs.statSync(dir).isDirectory(); } catch {}
+        // Same refusal as GenMotion's own launcher: a grant names one folder, and
+        // the disk root or the home folder would name every credential on it.
+        if (!isDir || dir === '/' || dir === os.homedir()) return send(400, { ok: false, error: 'not a folder GenMotion can be given' });
+        args.push(dir);
+      }
+      try {
+        const child = fs.existsSync(GENMOTION_BIN)
+          ? spawn(GENMOTION_BIN, args, { detached: true, stdio: 'ignore' })
+          : spawn('open', ['-a', GENMOTION_APP], { detached: true, stdio: 'ignore' });
+        child.on('error', () => {});
+        child.unref();
+      } catch (e) {
+        return send(500, { ok: false, error: String((e && e.message) || e) });
+      }
+      clog('bridge', 'info', 'genmotion opened', { shared: args[0] || null });
+      send(200, { ok: true, shared: args[0] || null });
+    });
     return;
   }
 

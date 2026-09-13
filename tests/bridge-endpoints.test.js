@@ -76,6 +76,25 @@ async function reachable() {
     check(`${ep} rejects malformed JSON`, s === 400 || s === 404, `got ${s}`);
   }
 
+  // GenMotion read endpoints. /genmotion/open is deliberately left out of every
+  // check here: an empty body is a valid "just open the app" request, and a test
+  // suite should never launch apps on someone's screen.
+  for (const [ep, keys] of [['/genmotion/status', ['installed', 'version', 'projectsRoot']],
+                            ['/genmotion/projects', ['installed', 'projects']]]) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 5000);
+    let status = 0, shaped = false;
+    try {
+      const r = await fetch(BRIDGE + ep, { signal: ctl.signal });
+      status = r.status;
+      const d = await r.json();
+      shaped = !!d && d.ok === true && keys.every(k => k in d)
+               && (ep !== '/genmotion/projects' || Array.isArray(d.projects));
+    } catch {} finally { clearTimeout(t); }
+    check(`${ep} answers 200`, status === 200, `got ${status}`);
+    check(`${ep} has the expected shape`, shaped);
+  }
+
   // The render index is what makes a render survive the panel closing.
   {
     const ctl = new AbortController();

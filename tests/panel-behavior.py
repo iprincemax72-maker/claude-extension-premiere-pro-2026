@@ -189,6 +189,83 @@ async def run(pg):
     check("picking an effort applies it",
           await pg.evaluate("() => userSettings.effort") == "high")
 
+    # ---- GenMotion menu ------------------------------------------------------
+    # GenMotion has no headless API, so the menu is launch, projects and imports.
+    # Import must hand Premiere the NEWEST export and record it in history, and a
+    # project name from disk must render as text rather than markup.
+    gm = await pg.evaluate("""async () => {
+      const btn = document.getElementById('genmotionBtn');
+      if (!btn) return { err: 'no button' };
+      btn.hidden = false;
+      const realFetch = window.fetch;
+      window.fetch = async (url, opts) => {
+        if (String(url).endsWith('/genmotion/projects')) {
+          return new Response(JSON.stringify({ ok: true, installed: true, projects: [
+            { id: 'a', name: 'Drop Notch <ad>', dir: '/tmp/a', fps: 30, width: 1920, height: 1080,
+              scenes: 3, durationSec: 10, thumbnail: '', updatedAt: 2, exports: [
+                { file: '/tmp/a/exports/new.mp4', name: 'new.mp4', size: 9, mtime: 2 },
+                { file: '/tmp/a/exports/old.mp4', name: 'old.mp4', size: 9, mtime: 1 } ] },
+            { id: 'b', name: 'Unexported', dir: '/tmp/b', fps: 30, width: 0, height: 0,
+              scenes: 1, durationSec: 2, thumbnail: '', updatedAt: 1, exports: [] } ] }), { status: 200 });
+        }
+        return realFetch(url, opts);
+      };
+      const realImport = window.importIntoPremiere, realHist = window.addHistoryEntry;
+      const calls = [], hist = [];
+      window.importIntoPremiere = async (file) => { calls.push(file); return { ok: true }; };
+      window.addHistoryEntry = (e) => { hist.push(e.prompt); };
+      btn.click();
+      await new Promise(r => setTimeout(r, 300));
+      const pop = document.querySelector('.gm-pop');
+      const rows = pop ? pop.querySelectorAll('.gm-proj').length : 0;
+      const nameEl = pop && pop.querySelector('.gm-name');
+      const asText = !!nameEl && nameEl.textContent.includes('<ad>') && !pop.querySelector('ad');
+      const imps = pop ? [...pop.querySelectorAll('.gm-imp')] : [];
+      const unexportedDisabled = imps[1] ? imps[1].disabled : null;
+      if (imps[0]) imps[0].click();
+      await new Promise(r => setTimeout(r, 200));
+      window.fetch = realFetch;
+      window.importIntoPremiere = realImport;
+      window.addHistoryEntry = realHist;
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      return { rows, asText, unexportedDisabled, calls, hist };
+    }""")
+    check("GenMotion menu lists projects", gm.get("rows") == 2, str(gm))
+    check("GenMotion project names render as text, not markup", gm.get("asText") is True, str(gm))
+    check("Import is disabled for a project with no export", gm.get("unexportedDisabled") is True, str(gm))
+    check("Import hands Premiere the newest export", gm.get("calls") == ["/tmp/a/exports/new.mp4"], str(gm))
+    check("an imported GenMotion clip lands in history", gm.get("hist") == ["GenMotion · Drop Notch <ad>"], str(gm))
+
+    # ---- the header fits a narrow dock ----------------------------------------
+    # The header's right-hand controls never shrink or wrap, so adding the
+    # GenMotion button pushed the account button and status pill off the edge at
+    # 430px. And `hidden` did not hide the button at all, because .icon-btn sets
+    # display and that beats the browser's default [hidden] rule, so it showed for
+    # everyone without GenMotion.
+    hid = await pg.evaluate("""() => {
+      const gm = document.getElementById('genmotionBtn');
+      const was = gm.hidden;
+      gm.hidden = true;
+      const d = getComputedStyle(gm).display;
+      gm.hidden = was;
+      return d;
+    }""")
+    check("the GenMotion button really hides when GenMotion is not installed", hid == "none", f"display={hid}")
+    for w in (430, 520):
+        await pg.set_viewport_size({"width": w, "height": 900})
+        await pg.wait_for_timeout(150)
+        fit = await pg.evaluate("""() => {
+          document.getElementById('genmotionBtn').hidden = false;
+          const group = document.getElementById('historyBtn').parentElement;
+          const vis = [...group.children].filter(k => getComputedStyle(k).display !== 'none'
+                                                    && k.getBoundingClientRect().width > 0);
+          const off = vis.filter(k => k.getBoundingClientRect().right > innerWidth + 1).map(k => k.id);
+          return { right: Math.round(vis[vis.length - 1].getBoundingClientRect().right), vw: innerWidth, off };
+        }""")
+        check(f"the header fits at {w}px with GenMotion shown", not fit["off"], str(fit))
+    await pg.set_viewport_size({"width": 460, "height": 900})
+    await pg.wait_for_timeout(100)
+
     # ---- transcript text is data, not markup --------------------------------
     await pg.evaluate("""(s) => { aeWizard = { picks:new Set() }; return txShow(s, []); }""",
                       [{"i": 0, "startSec": 0, "text": '<img src=x onerror="window.__pwned=1">'}])

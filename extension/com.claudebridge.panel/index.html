@@ -1646,6 +1646,22 @@
   /* Tactile press feedback — buttery micro-interactions on the main controls */
   .icon-btn { transition: background .12s var(--ease-out), color .12s var(--ease-out), border-color .12s var(--ease-out), transform .12s var(--ease-out); }
   .icon-btn:active:not(:disabled) { transform: scale(0.9); }
+  /* `hidden` does not hide an .icon-btn on its own: the class sets display, and
+     that beats the browser's default [hidden] rule. The GenMotion button relies on
+     the attribute to stay out of the header when the app is not installed. */
+  #genmotionBtn[hidden] { display: none; }
+  /* Header on a narrow dock. The right-hand controls never shrink or wrap, so
+     below ~520px they ran off the edge, taking the account button and the status
+     pill with them (Premiere docks this panel down to about 400px). The Ask
+     Questions label goes first, since the button keeps its icon and tooltip, then
+     the version tag, which Settings also shows. */
+  @media (max-width: 560px) {
+    #planBtn span { display: none; }
+    #planBtn { padding: 0 6px; }
+  }
+  @media (max-width: 460px) {
+    #versionTag { display: none; }
+  }
   /* Plan-mode toggle in the header */
   .plan-toggle {
     display: inline-flex;
@@ -3985,7 +4001,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot" role="img" aria-label="Flimify"></div>
     <span>Flimify</span>
-    <span class="version-tag" id="versionTag">11.9</span>
+    <span class="version-tag" id="versionTag">12.0</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -4021,6 +4037,13 @@
         <polyline points="4 17 10 11 4 5"/>
         <line x1="12" y1="19" x2="20" y2="19"/>
       </svg>
+    </button>
+    <!-- GenMotion: only shown when the app is installed (see initGenMotion) -->
+    <button class="icon-btn" id="genmotionBtn" type="button" title="GenMotion: open it, and bring its exports onto the timeline" aria-label="GenMotion" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 12c0-4 2-7 6-7-1 3-3 5-6 7z"/><path d="M12 12c4 0 7 2 7 6-3-1-5-3-7-6z"/><path d="M12 12c0 4-2 7-6 7 1-3 3-5 6-7z"/><path d="M12 12c-4 0-7-2-7-6 3 1 5 3 7 6z"/>
+      </svg>
+      <span class="gm-dot" hidden></span>
     </button>
     <button class="icon-btn" id="historyBtn" type="button" title="History — past renders" aria-label="History">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -4602,7 +4625,7 @@
         <button class="settings-btn" id="settingCopyDiag" title="Copies env + a live claude probe + recent errors — paste it to support">Copy diagnostics for support</button>
         <button class="settings-btn danger" id="settingFactoryReset">Reset all settings</button>
       </div>
-      <div class="settings-foot">v<span id="settingsVersion">11.9</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
+      <div class="settings-foot">v<span id="settingsVersion">12.0</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
       <div class="settings-credit">
         Made by <a href="https://github.com/iprincemax72-maker" target="_blank" class="credit-link">iprincemax72-maker</a> <span class="credit-heart">&#10084;</span> Premiere Pro
       </div>
@@ -7726,7 +7749,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '11.9';
+  const PANEL_VERSION = '12.0';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -7978,6 +8001,220 @@ input.addEventListener('paste', () => setTimeout(_scheduleDraftSave, 50));
 // Reconcile with the bridge's render index once at boot, so a render that
 // happened while this panel was closed shows up without opening History.
 setTimeout(() => { try { mergeBridgeRenders(); } catch (e) {} }, 2500);
+
+// ── GENMOTION ─────────────────────────────────────────────────────────────
+// GenMotion has no headless render or public API: its renderer lives inside the
+// app, its MCP server is internal, and its local API is secret-guarded. So this
+// works on its supported surface: open the app (optionally sharing the open
+// Premiere project's folder with its agent), list its projects, and import their
+// MP4 exports onto the timeline. The bridge announces new exports once they have
+// finished writing.
+(function initGenMotion() {
+  const btn = document.getElementById('genmotionBtn');
+  if (!btn) return;
+  const dot = btn.querySelector('.gm-dot');
+  let pop = null, projects = [], loaded = false;
+
+  const style = document.createElement('style');
+  style.textContent = [
+    '#genmotionBtn{position:relative}',
+    '#genmotionBtn .gm-dot{position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--accent)}',
+    '.gm-pop{position:fixed;z-index:9999;width:300px;max-height:calc(100vh - 90px);display:flex;flex-direction:column;background:#161619;border:1px solid rgba(255,255,255,.12);border-radius:13px;box-shadow:0 24px 60px -30px rgba(0,0,0,.9);opacity:0;transform:translateY(-6px) scale(.98);pointer-events:none;transition:opacity .14s,transform .14s;font-size:12px}',
+    '.gm-pop.open{opacity:1;transform:none;pointer-events:auto}',
+    '.gm-pop .gm-head{padding:11px 12px 10px;border-bottom:1px solid rgba(255,255,255,.07)}',
+    '.gm-pop .gm-title{display:flex;align-items:baseline;gap:6px;font-weight:700;font-size:13.5px;color:#fafafa}',
+    '.gm-pop .gm-ver{color:#7c7d87;font-weight:500;font-size:10.5px}',
+    '.gm-pop .gm-acts{display:flex;gap:6px;margin-top:9px}',
+    '.gm-pop .gm-btn{flex:1 1 0;min-width:0;font:600 11.5px system-ui;border:0;border-radius:8px;padding:.6em .5em;cursor:pointer;background:#232329;color:#fafafa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.gm-pop .gm-btn:hover{background:#2c2c33}',
+    '.gm-pop .gm-btn.gm-primary{background:var(--accent);color:#15110d}',
+    '.gm-pop .gm-btn:disabled{opacity:.45;cursor:default}',
+    '.gm-pop .gm-list{overflow-y:auto;padding:6px}',
+    '.gm-pop .gm-proj{display:flex;gap:9px;align-items:center;padding:7px;border-radius:9px}',
+    '.gm-pop .gm-proj:hover{background:rgba(255,255,255,.04)}',
+    '.gm-pop .gm-thumb{flex:0 0 auto;width:64px;height:36px;border-radius:5px;object-fit:cover;background:#0e0e11;border:1px solid rgba(255,255,255,.07)}',
+    '.gm-pop .gm-info{flex:1 1 auto;min-width:0}',
+    '.gm-pop .gm-name{font-weight:600;font-size:12px;color:#fafafa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.gm-pop .gm-meta{color:#7c7d87;font-size:10.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.gm-pop .gm-imp{flex:0 0 auto;font:600 11px system-ui;border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:5px 9px;cursor:pointer;background:transparent;color:#fafafa}',
+    '.gm-pop .gm-imp:hover{border-color:var(--accent);color:var(--accent)}',
+    '.gm-pop .gm-imp:disabled{cursor:default;border-color:rgba(255,255,255,.08);color:#7c7d87}',
+    '.gm-pop .gm-empty{color:#9a9aa1;line-height:1.5;padding:16px 12px;text-align:center;font-size:11.5px}',
+  ].join('');
+  document.head.appendChild(style);
+
+  const fmtDur = (sec) => {
+    if (!sec) return '';
+    if (sec < 60) return (Math.round(sec * 10) / 10) + 's';
+    return Math.floor(sec / 60) + 'm ' + Math.round(sec % 60) + 's';
+  };
+
+  async function fetchProjects() {
+    try {
+      const r = await fetch(BRIDGE + '/genmotion/projects');
+      const d = await r.json();
+      projects = (d && Array.isArray(d.projects)) ? d.projects : [];
+    } catch (e) { projects = []; }
+    loaded = true;
+    return projects;
+  }
+
+  function ensurePop() {
+    if (pop) return pop;
+    pop = document.createElement('div');
+    pop.className = 'gm-pop';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'GenMotion');
+    pop.addEventListener('click', onPopClick);
+    document.body.appendChild(pop);
+    return pop;
+  }
+
+  function position() {
+    const r = btn.getBoundingClientRect();
+    pop.style.top = (r.bottom + 8) + 'px';
+    pop.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+  }
+
+  function render() {
+    const ver = btn.dataset.version || '';
+    const head = '<div class="gm-head">'
+      + '<div class="gm-title">GenMotion' + (ver ? '<span class="gm-ver">v' + escapeHTML(ver) + '</span>' : '') + '</div>'
+      + '<div class="gm-acts">'
+      +   '<button class="gm-btn gm-primary" type="button" data-gm="open-project" title="Open GenMotion with the open Premiere project folder shared, so its agent can use your footage">Open with project</button>'
+      +   '<button class="gm-btn" type="button" data-gm="open">Open GenMotion</button>'
+      + '</div></div>';
+    let list;
+    if (!loaded) {
+      list = '<div class="gm-empty">Loading projects…</div>';
+    } else if (!projects.length) {
+      list = '<div class="gm-empty">No GenMotion projects yet.<br>Make something there and export it, and it shows up here ready for the timeline.</div>';
+    } else {
+      list = projects.map((p, i) => {
+        const latest = p.exports && p.exports[0];
+        const thumb = p.thumbnail ? pathToSrc(p.thumbnail, 'image') : '';
+        const bits = [];
+        if (p.scenes) bits.push(p.scenes + ' scene' + (p.scenes === 1 ? '' : 's'));
+        if (p.durationSec) bits.push(fmtDur(p.durationSec));
+        if (p.width && p.height) bits.push(p.width + '×' + p.height);
+        bits.push(latest ? (p.exports.length + ' export' + (p.exports.length === 1 ? '' : 's')) : 'not exported yet');
+        return '<div class="gm-proj">'
+          + (thumb ? '<img class="gm-thumb" alt="" src="' + thumb + '">' : '<div class="gm-thumb"></div>')
+          + '<div class="gm-info"><div class="gm-name" title="' + escapeHTML(p.name) + '">' + escapeHTML(p.name) + '</div>'
+          + '<div class="gm-meta">' + escapeHTML(bits.join(' · ')) + '</div></div>'
+          + '<button class="gm-imp" type="button" data-gm="import" data-i="' + i + '"'
+          + (latest ? ' title="Import ' + escapeHTML(latest.name) + ' to the timeline"'
+                    : ' disabled title="Export this project in GenMotion first"')
+          + '>Import</button>'
+          + '</div>';
+      }).join('');
+    }
+    pop.innerHTML = head + '<div class="gm-list">' + list + '</div>';
+  }
+
+  function close() { if (pop) pop.classList.remove('open'); }
+
+  async function open() {
+    ensurePop();
+    render();
+    position();
+    pop.classList.add('open');
+    if (dot) dot.hidden = true;
+    await fetchProjects();
+    if (pop.classList.contains('open')) { render(); position(); }
+  }
+
+  async function onPopClick(e) {
+    const el = e.target.closest('[data-gm]');
+    if (!el || el.disabled) return;
+    const act = el.dataset.gm;
+
+    if (act === 'open' || act === 'open-project') {
+      let dir = null;
+      if (act === 'open-project') {
+        try {
+          const ctx = JSON.parse(await evalES('ccGetContext()'));
+          if (ctx && ctx.projectPath) dir = ctx.projectPath.replace(/[\\/][^\\/]*$/, '');
+        } catch (err) {}
+        if (!dir) { ccToast('Save the Premiere project first. GenMotion is given its folder.', true); return; }
+      }
+      el.disabled = true;
+      try {
+        const r = await fetch(BRIDGE + '/genmotion/open', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dir ? { dir } : {}),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || !d.ok) throw new Error(d.error || ('bridge ' + r.status));
+        ccToast(dir ? 'Opening GenMotion with the project folder' : 'Opening GenMotion');
+        close();
+      } catch (err) {
+        ccToast('Could not open GenMotion: ' + (err.message || err), true);
+      } finally {
+        el.disabled = false;
+      }
+      return;
+    }
+
+    if (act === 'import') {
+      const p = projects[+el.dataset.i];
+      const latest = p && p.exports && p.exports[0];
+      if (!latest) return;
+      el.disabled = true;
+      el.textContent = 'Importing…';
+      try {
+        const res = await importIntoPremiere(latest.file, activeMode);
+        if (!res || !res.ok) throw new Error((res && res.error) || 'import failed');
+        try { addHistoryEntry({ prompt: 'GenMotion · ' + p.name, path: latest.file, mode: activeMode }); } catch (err) {}
+        el.textContent = 'Imported';
+        ccToast('Imported ' + p.name + ' to the timeline');
+      } catch (err) {
+        el.disabled = false;
+        el.textContent = 'Import';
+        ccToast('Import failed: ' + (err.message || err), true);
+      }
+    }
+  }
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (pop && pop.classList.contains('open')) close(); else open();
+  });
+  document.addEventListener('click', (e) => {
+    if (pop && pop.classList.contains('open') && !pop.contains(e.target) && !btn.contains(e.target)) close();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  window.addEventListener('resize', () => { if (pop && pop.classList.contains('open')) position(); });
+
+  // The bridge may still be starting when the panel loads, so retry the status
+  // check for a little while before deciding GenMotion is not there.
+  (async function boot() {
+    let st = null;
+    for (let i = 0; i < 8 && !st; i++) {
+      try {
+        const d = await (await fetch(BRIDGE + '/genmotion/status')).json();
+        if (d && d.ok) st = d;
+      } catch (e) {}
+      if (!st) await new Promise(r => setTimeout(r, 1500));
+    }
+    if (!st || !st.installed) return;
+    btn.hidden = false;
+    btn.dataset.version = st.version || '';
+    // One long-lived listener for export notices; renders open their own streams.
+    try {
+      const es = new EventSource(BRIDGE + '/progress-stream');
+      es.addEventListener('genmotionExport', (ev) => {
+        let d = {};
+        try { d = JSON.parse(ev.data); } catch (err) {}
+        if (dot) dot.hidden = false;
+        ccToast('GenMotion export ready: ' + (d.name || 'new video') + '. Open the GenMotion menu to import it.');
+        if (pop && pop.classList.contains('open')) fetchProjects().then(() => { render(); position(); });
+      });
+    } catch (e) {}
+  })();
+})();
+
 
 (function restoreDraftOnLoad() {
   try {

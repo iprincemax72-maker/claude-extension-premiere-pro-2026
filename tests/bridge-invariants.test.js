@@ -97,6 +97,19 @@ check('codex gets model_reasoning_effort', /model_reasoning_effort="' \+ o\.effo
 check('no retired models in the allowlist',
       !/'gpt-4|'o3'|'gpt-5'/.test(SRC));
 
+// ── 4d. GenMotion: supported surface only ─────────────────────────────────
+// GenMotion's local HTTP API runs behind a per-launch secret handed only to its
+// own window, and its renderer lives inside the app. Reading that secret out of
+// the running app, or loading its render bundle ourselves, would be getting
+// around the access control of a paid product. The integration is launch,
+// projects on disk, and exports.
+check('bridge does not reach into GenMotion private internals',
+      !/--gm-api-url|__gmInit|render-host\.js/.test(SRC));
+check('GenMotion opens through its own launcher', /spawn\(GENMOTION_BIN/.test(SRC));
+check('refuses to hand GenMotion the disk root or the home folder',
+      /dir === '\/' \|\| dir === os\.homedir\(\)/.test(SRC));
+check('new GenMotion exports wait for the file to stop growing', /size > 0 && size === lastSize/.test(SRC));
+
 // ── 5. the parallel pool must not re-read the queue while starting workers ──
 // Workers shift a task off before their first await, so re-reading queue.length
 // in the loop condition let already-started workers shrink the target count.

@@ -222,6 +222,9 @@ CLAUDE.md     # This file — agent-facing
 | `/preview/<file>` | GET | — | Streams a file from `~/PremiereClaude/output/` with byte-range support |
 | `/delete-file` | POST | `{path}` | `{ok, deleted?}` — deletes a rendered file from disk for the panel's "Delete" buttons (render cards + History entries). SAFE-GUARDED: media extensions only, path must resolve inside `OUTPUT_DIR` or a `*/output/*` folder under the user's home, no `..` traversal, regular files only. Idempotent (already-gone returns `{ok, alreadyGone}`). Rejects system files / paths outside the output area with 403. |
 | `/progress-stream` | GET | — | SSE — pushes `{ text, pct }` per work-stage event |
+| `/genmotion/status` | GET | — | `{ok, installed, version, launcher, projectsRoot}`. Whether GenMotion is installed. Also starts the export watcher if it is not running yet. |
+| `/genmotion/projects` | GET | — | `{ok, installed, projects:[{id, dir, name, engine, fps, width, height, scenes, durationSec, thumbnail, updatedAt, exports:[{file, name, size, mtime}]}]}`. GenMotion projects newest first, each project's exports newest first. Folders without a readable `project.json` are skipped. |
+| `/genmotion/open` | POST | `{dir?}` | `{ok, shared}`. Launches GenMotion through its own `genmotion` launcher, sharing `dir` with its agent when given. Refuses the disk root and the home folder, as the launcher does. Kept out of the endpoint fuzz tests, because an empty body is a valid request that opens the app. |
 | `/addedit` | POST | — | `{ok}` — osascript-driven menu click to run Premiere's "Add Edit to All Tracks" (Cmd+Shift+K), with fallthrough to "Add Edit" (Cmd+K) if the All-Tracks variant doesn't exist on the user's Premiere build |
 | `/addedit-keystroke` | POST | — | `{ok}` — fires the raw Cmd+Shift+K keystroke via System Events. Backup path for builds where the menu-click variant fails (different Premiere locale / accessibility permissions) |
 | `/applylog` | POST | `{steps: string[]}` | `{ok, file}` — appends a list of human-readable step strings to a new `autocut-apply-<ts>.log` in the output dir, so the panel can drop a trace after a multi-cut session |
@@ -424,6 +427,24 @@ the transcript, the panel hands the whole thing to a **full-panel takeover view*
 Whatever is marked is exactly what gets built — the bridge skips every filter
 that could drop one (see `/autoedit/run`).
 
+### GenMotion bridge
+
+[GenMotion](https://genmotion.dev) (`/Applications/GenMotion.app`, bundle `dev.genmotion.desktop`) is a separate Electron motion-design app whose agent runs on the user's own Claude Code or Codex subscription. Flimify does not render with it. It connects the two apps:
+
+- A **GenMotion button** in the panel header, shown only when the app is installed, opens a menu with **Open with project** (launches GenMotion with the open Premiere project's folder shared with its agent, so it can use the footage), **Open GenMotion**, and the user's GenMotion projects with thumbnail, scene count, length and size.
+- **Import** on a project places its newest MP4 export on the timeline through `importIntoPremiere` and records it in History as `GenMotion · <project name>`.
+- The bridge watches `~/.genmotion/projects/*/exports/` and announces a new MP4 over `/progress-stream` (`event: genmotionExport`) once the file has stopped growing, so an export made in GenMotion shows up in the panel with a notice and a dot on the button.
+
+What GenMotion does not offer, and so why the integration is shaped this way (checked against the installed 0.0.9 bundle rather than assumed):
+
+- `genmotion` on PATH is a 1.4KB shell launcher, not a CLI. It only runs `open -a GenMotion.app`, optionally with `--gm-cwd=<folder>` to share a folder. There is no prompt flag and no render command.
+- Rendering needs Electron. The main process loads its render bundle into a hidden BrowserWindow and screenshots frames there, so nothing can be invoked headlessly.
+- Its MCP server is created in-process for its own agent (`createSdkMcpServer`) with no transport, so nothing outside the app can connect to it.
+- It does run a local HTTP API, but on an ephemeral port behind a per-launch secret handed only to its own window. Do NOT scrape that secret or load its render bundle from Flimify: that gets around the access control of a paid product, and it would break on every GenMotion update. `tests/bridge-invariants.test.js` fails if the bridge references those internals.
+- `@genmotion/motion` is not on npm. The app supplies it to scenes at runtime.
+
+Projects are plain folders: `project.json` (fps, width, height, `scenes[{file, durationInFrames, name}]`), `scenes/*.tsx`, `exports/*.mp4` (H.264 yuv420p, imports cleanly), `.genmotion/thumbnail.jpg`.
+
 ### Settings panel
 
 Click the ⚙ gear icon in the header. Slide-up panel with:
@@ -506,7 +527,7 @@ curl -s http://127.0.0.1:3737/ping
 
 ### Validation suite
 
-Eleven passes guard the panel, the bridge, the render output and the Remotion skills. Run them after any change to `index.html`, `bridge.js`, `Captions.tsx`, or the v2 skill source files:
+Twelve passes guard the panel, the bridge, the render output and the Remotion skills. Run them after any change to `index.html`, `bridge.js`, `Captions.tsx`, or the v2 skill source files:
 
 One-time setup (the Python audits need a browser):
 ```bash
@@ -559,6 +580,13 @@ node tests/bridge-endpoints.test.js
 #     negative-duration line from a negative input timestamp. Prints a KNOWN GAP
 #     it deliberately does not assert (sub-frame clips still share a frame).
 node tests/captions-fuzz.test.js
+
+# 0g. GenMotion: the project scanner and the export watcher, run against a temp
+#     folder. The scanner must survive half-made projects and put the newest
+#     export first, since that is the file Import hands Premiere. The watcher must
+#     announce a new MP4 exactly once and only after it stops growing, because the
+#     encoder writes progressively and an early import gets a truncated clip.
+node tests/genmotion.test.js
 
 # 1. Strict TypeScript check on all 24 skill source files + the 3 showreel templates.
 #    Catches prop-naming bugs and JSX-case issues that the render itself tolerates.
@@ -623,6 +651,8 @@ The 7 workflow/teaching skills (ads, best-practices, production, superpowers-set
 
 - **Auto-update can clobber local edits.** If you're editing local files while developing, run the bridge with `CLAUDE_BRIDGE_NO_UPDATE=1`. The bridge fetches the latest from GitHub raw on every launch — if GitHub is behind your local, you lose work.
 - **Disk space matters.** Bridge can't write rendered files if root volume is full. ffmpeg silently fails. Renders end up zero-byte. Keep `~/PremiereClaude/output/` clean — old MOVs add up fast (renders can be 100-300 MB).
+- **`hidden` does not hide an `.icon-btn`.** The class sets `display`, which beats the browser's default `[hidden]` rule, so `btn.hidden = true` leaves the button on screen. `#genmotionBtn[hidden]` has its own rule for this. `#acctBtn` uses the same attribute and has the same latent problem: its code sets `hidden = true` when auth is disabled, but the button never actually disappears.
+- **The header's right-hand controls don't shrink or wrap.** Anything added there pushes the account button and status pill off the edge on a narrow dock. Below 560px the Ask Questions label hides (the button keeps its icon and tooltip), and below 460px the version tag hides (Settings still shows it). Re-measure at 430px after adding a header control.
 - **CEP textareas eat keystrokes.** Backtick fullscreen, paste shortcuts — all need capture-phase document listeners that preventDefault and forward via ExtendScript.
 
 ---
