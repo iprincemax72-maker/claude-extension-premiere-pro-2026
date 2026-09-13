@@ -236,6 +236,54 @@ async def run(pg):
     check("Import hands Premiere the newest export", gm.get("calls") == ["/tmp/a/exports/new.mp4"], str(gm))
     check("an imported GenMotion clip lands in history", gm.get("hist") == ["GenMotion · Drop Notch <ad>"], str(gm))
 
+    # ---- GenMotion as an engine -----------------------------------------------
+    # GenMotion takes no prompt from outside, so a send on its engine must never
+    # reach /chat. It opens the app with the prompt, keeps the prompt in History
+    # while it waits, and turns the next export into a normal render card.
+    ge = await pg.evaluate("""async () => {
+      const opt = document.querySelector('#engineMenu .eng-opt[data-engine="genmotion"]');
+      if (!opt) return { err: 'no engine option' };
+      opt.hidden = true;
+      const hiddenWhenMissing = getComputedStyle(opt).display === 'none';
+      setEngine('genmotion');
+      const refusedWhenMissing = tabs[activeTabIdx].engine === 'remotion';
+      opt.hidden = false;
+      setEngine('genmotion');
+      const label = document.getElementById('engineLabel').textContent;
+      const realFetch = window.fetch;
+      const posts = [];
+      window.fetch = async (url, opts) => {
+        const u = String(url);
+        if (u.endsWith('/genmotion/open') || u.endsWith('/chat')) {
+          posts.push({ u: u.endsWith('/chat') ? '/chat' : '/genmotion/open', body: JSON.parse(opts.body) });
+          return new Response(JSON.stringify({ ok: true, shared: null, copied: true }), { status: 200 });
+        }
+        return realFetch(url, opts);
+      };
+      const prompt = 'a neon lower third ' + Date.now();
+      input.value = prompt;
+      try { await sendMessage(); } finally { window.fetch = realFetch; }
+      const promptKept = history.some(h => h && h.kind === 'prompt' && h.prompt === prompt);
+      const file = '/tmp/gm-test/exports/neon.mp4';
+      window.genmotion.onExport({ file, name: 'neon.mp4', project: 'Neon' });
+      await new Promise(r => setTimeout(r, 100));
+      const cardShown = !!document.querySelector('.render-preview[data-render-path="' + file + '"]');
+      const fileEntry = history.some(h => h && h.path === file && h.prompt === prompt);
+      const promptGone = !history.some(h => h && h.kind === 'prompt' && h.prompt === prompt);
+      setEngine('remotion');
+      opt.hidden = true;
+      return { hiddenWhenMissing, refusedWhenMissing, label, posts, promptKept, cardShown, fileEntry, promptGone, prompt };
+    }""")
+    check("GenMotion engine option is hidden without GenMotion", ge.get("hiddenWhenMissing") is True, str(ge))
+    check("GenMotion engine can't be picked without GenMotion", ge.get("refusedWhenMissing") is True, str(ge))
+    check("GenMotion engine can be picked when installed", ge.get("label") == "GenMotion", str(ge))
+    check("a GenMotion send opens GenMotion with the prompt and never renders",
+          ge.get("posts") == [{"u": "/genmotion/open", "body": {"prompt": ge.get("prompt")}}], str(ge))
+    check("the GenMotion prompt is kept in History while waiting", ge.get("promptKept") is True, str(ge))
+    check("the next GenMotion export shows up as a render card", ge.get("cardShown") is True, str(ge))
+    check("the export replaces the waiting prompt in History",
+          ge.get("fileEntry") is True and ge.get("promptGone") is True, str(ge))
+
     # ---- the header fits a narrow dock ----------------------------------------
     # The header's right-hand controls never shrink or wrap, so adding the
     # GenMotion button pushed the account button and status pill off the edge at

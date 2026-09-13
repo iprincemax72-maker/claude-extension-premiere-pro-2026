@@ -109,6 +109,8 @@ check('GenMotion opens through its own launcher', /spawn\(GENMOTION_BIN/.test(SR
 check('refuses to hand GenMotion the disk root or the home folder',
       /dir === '\/' \|\| dir === os\.homedir\(\)/.test(SRC));
 check('new GenMotion exports wait for the file to stop growing', /size > 0 && size === lastSize/.test(SRC));
+check('a GenMotion prompt reaches the clipboard through stdin, never a shell or argv',
+      /spawn\('pbcopy', \[\]/.test(SRC) && /pb\.stdin\.end\(prompt\)/.test(SRC));
 
 // ── 5. the parallel pool must not re-read the queue while starting workers ──
 // Workers shift a task off before their first await, so re-reading queue.length

@@ -7,7 +7,7 @@ const fs = require('fs');
 const os = require('os');
 
 const PORT = 3737;
-const PANEL_VERSION = '12.0';   // bump each release — drives the /check-update badge + /diagnostics
+const PANEL_VERSION = '12.1';   // bump each release — drives the /check-update badge + /diagnostics
 // Model used when the per-mode generation model hard-fails (e.g. a separately
 // metered model reports "out of usage credits"). Haiku is the plan's base fast
 // model, so it stays available — a render degrades instead of dead-ending.
@@ -4167,17 +4167,32 @@ const server = http.createServer((req, res) => {
         if (!isDir || dir === '/' || dir === os.homedir()) return send(400, { ok: false, error: 'not a folder GenMotion can be given' });
         args.push(dir);
       }
+      const launch = (copied) => {
+        try {
+          const child = fs.existsSync(GENMOTION_BIN)
+            ? spawn(GENMOTION_BIN, args, { detached: true, stdio: 'ignore' })
+            : spawn('open', ['-a', GENMOTION_APP], { detached: true, stdio: 'ignore' });
+          child.on('error', () => {});
+          child.unref();
+        } catch (e) {
+          return send(500, { ok: false, error: String((e && e.message) || e) });
+        }
+        clog('bridge', 'info', 'genmotion opened', { shared: args[0] || null, copied });
+        send(200, { ok: true, shared: args[0] || null, copied });
+      };
+      const prompt = (typeof payload.prompt === 'string') ? payload.prompt.trim().slice(0, 20000) : '';
+      if (!prompt) return launch(false);
+      // GenMotion takes no prompt from outside, so it goes on the clipboard for the
+      // user to paste. Through stdin, so the text never touches a shell or argv.
+      let done = false;
+      const finish = (ok) => { if (!done) { done = true; launch(ok); } };
       try {
-        const child = fs.existsSync(GENMOTION_BIN)
-          ? spawn(GENMOTION_BIN, args, { detached: true, stdio: 'ignore' })
-          : spawn('open', ['-a', GENMOTION_APP], { detached: true, stdio: 'ignore' });
-        child.on('error', () => {});
-        child.unref();
-      } catch (e) {
-        return send(500, { ok: false, error: String((e && e.message) || e) });
-      }
-      clog('bridge', 'info', 'genmotion opened', { shared: args[0] || null });
-      send(200, { ok: true, shared: args[0] || null });
+        const pb = spawn('pbcopy', [], { stdio: ['pipe', 'ignore', 'ignore'], env: { ...process.env, LANG: 'en_US.UTF-8' } });
+        pb.on('error', () => finish(false));
+        pb.on('close', (code) => finish(code === 0));
+        pb.stdin.on('error', () => {});
+        pb.stdin.end(prompt);
+      } catch { finish(false); }
     });
     return;
   }
