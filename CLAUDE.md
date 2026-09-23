@@ -222,6 +222,7 @@ CLAUDE.md     # This file — agent-facing
 | `/preview/<file>` | GET | — | Streams a file from `~/PremiereClaude/output/` with byte-range support |
 | `/delete-file` | POST | `{path}` | `{ok, deleted?}` — deletes a rendered file from disk for the panel's "Delete" buttons (render cards + History entries). SAFE-GUARDED: media extensions only, path must resolve inside `OUTPUT_DIR` or a `*/output/*` folder under the user's home, no `..` traversal, regular files only. Idempotent (already-gone returns `{ok, alreadyGone}`). Rejects system files / paths outside the output area with 403. |
 | `/progress-stream` | GET | — | SSE — pushes `{ text, pct }` per work-stage event |
+| `/models` | GET | `?refresh=1` | `{ok, claude:[{value, id, name, desc, newest}], gpt:[{value, name, desc}]}`. What each CLI can run right now, read from the CLIs themselves. The composer's model picker is built from it. |
 | `/genmotion/status` | GET | — | `{ok, installed, version, launcher, projectsRoot}`. Whether GenMotion is installed. Also starts the export watcher if it is not running yet. |
 | `/genmotion/projects` | GET | — | `{ok, installed, projects:[{id, dir, name, engine, fps, width, height, scenes, durationSec, thumbnail, updatedAt, exports:[{file, name, size, mtime}]}]}`. GenMotion projects newest first, each project's exports newest first. Folders without a readable `project.json` are skipped. |
 | `/genmotion/open` | POST | `{dir?, prompt?}` | `{ok, shared, copied}`. Launches GenMotion through its own `genmotion` launcher, sharing `dir` with its agent when given. Refuses the disk root and the home folder, as the launcher does. Kept out of the endpoint fuzz tests, because an empty body is a valid request that opens the app. `prompt` goes on the clipboard through `pbcopy` stdin, since GenMotion can't be handed one. |
@@ -323,15 +324,25 @@ A small ↻ button in the panel header triggers `/update` manually (force). Toas
   latest model"). A new release is therefore picked up with no code change —
   the pinned ids went stale and nobody noticed until the picker was still
   offering Opus 4.8 after it left the lineup. Old pinned ids are still accepted
-  so a saved setting keeps working. There is no CLI command that enumerates
-  models: `claude models` is not a subcommand, it is just a prompt, so it is
-  slow and can invent names. Do not build a model list on it.
+  so a saved setting keeps working. `claude models` is not a subcommand (it is
+  just a prompt, slow, and can invent names), so don't build a list on it.
+- **The picker is built from the CLIs.** `GET /models` asks claude for its model
+  list through the SDK's `initialize` control request (stream-json, no API call,
+  about 1s) and runs `codex debug models` for the GPT catalog, keeping only
+  listed models with no `upgrade` (codex's marker for a retiring model). Names
+  come from the CLI ("Opus 5.5"), so a release shows up on its own. The newest of
+  each family is offered by alias; the one before it is offered by pinned id,
+  taken from `models-seen.json` in the work dir, which remembers every version
+  the bridge has seen (seeded with Opus 5 and Fable 5). Cached 30 minutes. The
+  panel keeps the last list in localStorage and falls back to its static markup
+  when the bridge can't answer. `isAllowedModel` checks every model the panel
+  sends by shape, so a model released later is accepted without an edit.
 - **Every generation runs on Opus.** Haiku is gone from the render path — it was
   measured SLOWER end-to-end (238s vs 79s on the same graphic), because the cost
   here is agentic round-trips, not tokens per second. Haiku is still used for the
   composer's inline autocomplete only.
 - **Auto-Edit's thinking** (interview questions, moment plan, plan fit-check) uses
-  `AE_MODEL` — also Opus 5. These decide WHICH lines get a graphic, so a cheap
+  `AE_MODEL` — also the newest Opus. These decide WHICH lines get a graphic, so a cheap
   model there is what makes an edit feel wrong even when the graphics look good.
 - The composer's **model picker** overrides all of the above for `/chat` AND
   `/autoedit/run` (both accept `model`). Left on Auto it uses the per-mode default.
@@ -588,6 +599,12 @@ node tests/captions-fuzz.test.js
 #     announce a new MP4 exactly once and only after it stops growing, because the
 #     encoder writes progressively and an early import gets a truncated clip.
 node tests/genmotion.test.js
+
+# 0h. Model picker: the list is built from what the CLIs report. Names carry
+#     versions, the newest goes by alias, the previous version stays pickable by
+#     pinned id, a new release pushes the old newest into that slot, retiring GPT
+#     models drop out, and the allowlist takes future ids but nothing else.
+node tests/models.test.js
 
 # 1. Strict TypeScript check on all 24 skill source files + the 3 showreel templates.
 #    Catches prop-naming bugs and JSX-case issues that the render itself tolerates.

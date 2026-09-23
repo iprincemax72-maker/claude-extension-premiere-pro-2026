@@ -189,6 +189,67 @@ async def run(pg):
     check("picking an effort applies it",
           await pg.evaluate("() => userSettings.effort") == "high")
 
+    # ---- model menu comes from the CLIs --------------------------------------
+    # The picker used to be typed in by hand and kept saying "Opus 5" after Opus
+    # 5.5 shipped. It is now rebuilt from the bridge's /models, so real version
+    # names show, and a release appears without anyone editing the panel.
+    mc = await pg.evaluate("""async () => {
+      const realFetch = window.fetch;
+      let payload = { ok: true,
+        claude: [
+          { value: 'opus', name: 'Opus 5.5', desc: 'Best for everyday, complex tasks', newest: true },
+          { value: 'claude-opus-5', name: 'Opus 5', desc: 'Stays on this version', newest: false },
+          { value: 'fable', name: 'Fable 5.1', desc: 'Most capable', newest: true },
+          { value: 'claude-fable-5', name: 'Fable 5', desc: 'Stays on this version', newest: false },
+          { value: 'sonnet', name: 'Sonnet 5', desc: '<b>x</b>', newest: true },
+          { value: 'haiku', name: 'Haiku 4.5', desc: 'Fastest', newest: true } ],
+        gpt: [ { value: 'gpt-6-astra', name: 'GPT-6 Astra', desc: 'Frontier' } ] };
+      window.fetch = async (url, opts) => String(url).includes('/models')
+        ? new Response(JSON.stringify(payload), { status: 200 }) : realFetch(url, opts);
+      const out = {};
+      const names = () => [...document.querySelectorAll('#modelMenu .mdl-opt b')].map(b => b.textContent);
+      try {
+        setGenModel('auto');
+        out.loaded = await loadModelCatalog();
+        out.names = names();
+        out.autoLabel = document.getElementById('modelLabel').textContent;
+        out.descAsText = !document.querySelector('#modelMenu .mdl-opt[data-model="sonnet"] .eng-opt-main span b');
+        out.cached = JSON.parse(localStorage.getItem('claudeBridge.models') || 'null') !== null;
+        document.getElementById('modelBtn').click();
+        document.querySelector('#modelMenu .mdl-opt[data-model="claude-opus-5"]').click();
+        out.pinned = userSettings.model;
+        out.pinnedLabel = document.getElementById('modelLabel').textContent;
+        out.ticked = !!document.querySelector('#modelMenu .mdl-opt.sel[data-model="claude-opus-5"]');
+        // a month later, Opus 6 ships
+        payload = JSON.parse(JSON.stringify(payload));
+        payload.claude[0].name = 'Opus 6';
+        payload.claude[1] = { value: 'claude-opus-5-5', name: 'Opus 5.5', desc: 'Stays on this version', newest: false };
+        payload.gpt = [];
+        setGenModel('auto');
+        await loadModelCatalog();
+        out.laterNames = names();
+        out.laterAuto = document.getElementById('modelLabel').textContent;
+        out.gptKept = names().includes('GPT-6 Astra');
+        out.oldPinStillLabels = MODEL_LABELS['claude-opus-5'] === 'Opus 5';
+      } finally {
+        window.fetch = realFetch;
+        setGenModel('auto');
+      }
+      return out;
+    }""")
+    check("the model menu loads from the CLIs", mc.get("loaded") is True, str(mc))
+    check("model names carry versions",
+          mc.get("names", [])[:7] == ["Auto", "Opus 5.5", "Opus 5", "Fable 5.1", "Fable 5", "Sonnet 5", "Haiku 4.5"], str(mc.get("names")))
+    check("Auto says which model it lands on", mc.get("autoLabel") == "Auto · Opus 5.5", str(mc.get("autoLabel")))
+    check("model descriptions render as text", mc.get("descAsText") is True, str(mc))
+    check("the model list is remembered for the next load", mc.get("cached") is True, str(mc))
+    check("picking an older version pins it",
+          mc.get("pinned") == "claude-opus-5" and mc.get("pinnedLabel") == "Opus 5" and mc.get("ticked") is True, str(mc))
+    check("a new release shows up without a code change",
+          mc.get("laterAuto") == "Auto · Opus 6" and "Opus 5.5" in mc.get("laterNames", []), str(mc))
+    check("GPT rows stay when codex doesn't answer", mc.get("gptKept") is True, str(mc.get("laterNames")))
+    check("a model picked earlier still has its name", mc.get("oldPinStillLabels") is True, str(mc))
+
     # ---- GenMotion menu ------------------------------------------------------
     # GenMotion has no headless API, so the menu is launch, projects and imports.
     # Import must hand Premiere the NEWEST export and record it in history, and a

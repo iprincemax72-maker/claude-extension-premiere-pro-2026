@@ -95,6 +95,23 @@ async function reachable() {
     check(`${ep} has the expected shape`, shaped);
   }
 
+  // The model picker is built from this. It asks both CLIs, so give it time.
+  {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 30000);
+    let ok = false, shaped = false, detail = '';
+    try {
+      const r = await fetch(BRIDGE + '/models', { signal: ctl.signal });
+      ok = r.status === 200;
+      const d = await r.json();
+      shaped = !!d && d.ok === true && Array.isArray(d.claude) && d.claude.length > 0 && Array.isArray(d.gpt)
+               && d.claude.every(m => typeof m.value === 'string' && /^[A-Z][A-Za-z]+ \d/.test(m.name));
+      detail = (d.claude || []).map(m => m.name).join(', ');
+    } catch (e) { detail = String(e && e.message); } finally { clearTimeout(t); }
+    check('/models answers 200', ok);
+    check('/models lists versioned Claude models', shaped, detail);
+  }
+
   // The render index is what makes a render survive the panel closing.
   {
     const ctl = new AbortController();

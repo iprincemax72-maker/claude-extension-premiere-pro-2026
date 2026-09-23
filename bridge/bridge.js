@@ -7,7 +7,7 @@ const fs = require('fs');
 const os = require('os');
 
 const PORT = 3737;
-const PANEL_VERSION = '12.1';   // bump each release — drives the /check-update badge + /diagnostics
+const PANEL_VERSION = '12.2';   // bump each release — drives the /check-update badge + /diagnostics
 // Model used when the per-mode generation model hard-fails (e.g. a separately
 // metered model reports "out of usage credits"). Haiku is the plan's base fast
 // model, so it stays available — a render degrades instead of dead-ending.
@@ -29,7 +29,6 @@ const CODEX_BIN = (() => {
   return 'codex';   // last resort: whatever PATH resolves
 })();
 
-const GPT_MODELS = ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'];
 function isGptModel(m) { return typeof m === 'string' && /^gpt-/i.test(m); }
 
 // Both CLIs happen to take the SAME five effort levels: claude via --effort,
@@ -215,6 +214,152 @@ function ensureGenmotionWatcher() {
   if (_genmotionWatcher || !genmotionInstalled()) return;
   _genmotionWatcher = watchGenmotionExports(GENMOTION_PROJECTS, broadcastGenmotionExport);
 }
+
+// ── MODEL CATALOG ─────────────────────────────────────────────────────────
+// The picker used to be typed in by hand, so it said "Opus 5" long after the
+// 'opus' alias had moved on to Opus 5.5. Both CLIs can say what they have:
+// claude answers the SDK's initialize request with its model list (no API
+// call), and `codex debug models` prints the catalog. Every Claude version seen
+// is remembered, so the one before the newest stays pickable after a release.
+const MODELS_SEEN_FILE = path.join(WORK_DIR, 'models-seen.json');
+const MODELS_TTL_MS = 30 * 60 * 1000;
+const CLAUDE_ALIASES = ['opus', 'sonnet', 'haiku', 'fable'];
+// The pins the old hand-typed picker offered, so the previous version shows up
+// before the bridge has seen a release happen.
+const MODELS_SEED = [
+  { id: 'claude-opus-5', name: 'Opus 5' },
+  { id: 'claude-fable-5', name: 'Fable 5' },
+];
+
+// "Opus 5.5 with 1M context · Best for..." -> { family: 'opus', name: 'Opus 5.5', ver: '5.5' }
+function modelName(desc) {
+  const m = /^([A-Z][A-Za-z]+) (\d+(?:\.\d+)*)/.exec(String(desc || ''));
+  return m ? { family: m[1].toLowerCase(), name: m[1] + ' ' + m[2], ver: m[2] } : null;
+}
+function cmpVer(a, b) {
+  const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] || 0) - (y[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+// raw is claude's models array, seen is {id: name}. The newest of each family
+// goes by its alias so it keeps moving; the one before it goes by its pinned id.
+function buildClaudeModels(raw, seen) {
+  seen = Object.assign({}, seen);
+  for (const s of MODELS_SEED) if (!seen[s.id]) seen[s.id] = s.name;
+  const list = [], families = new Set();
+  for (const m of (Array.isArray(raw) ? raw : [])) {
+    if (!m || m.value === 'default') continue;
+    const n = modelName(m.description);
+    if (!n || families.has(n.family)) continue;
+    families.add(n.family);
+    const id = String(m.resolvedModel || '').replace(/\[.*$/, '');
+    if (/^claude-[a-z0-9-]+$/.test(id)) seen[id] = n.name;
+    const value = CLAUDE_ALIASES.includes(n.family) ? n.family : String(m.value || '').replace(/\[.*$/, '');
+    list.push({ value, id, name: n.name, desc: String(m.description).split('·').slice(1).join('·').trim(), newest: true });
+    let prev = null;
+    for (const [pid, pname] of Object.entries(seen)) {
+      const pn = modelName(pname);
+      if (!pn || pn.family !== n.family || pid === id || cmpVer(pn.ver, n.ver) >= 0) continue;
+      if (!prev || cmpVer(pn.ver, prev.ver) > 0) prev = { id: pid, name: pn.name, ver: pn.ver };
+    }
+    if (prev) list.push({ value: prev.id, id: prev.id, name: prev.name, desc: 'Stays on this version', newest: false });
+  }
+  return { list, seen };
+}
+
+// Listed and not retiring (a model with an `upgrade` is on its way out). The
+// visibility check also drops codex's own hidden review model.
+function buildGptModels(raw) {
+  return (Array.isArray(raw) ? raw : [])
+    .filter(m => m && m.visibility === 'list' && !m.upgrade && isGptModel(m.slug))
+    .sort((a, b) => (a.priority || 99) - (b.priority || 99))
+    .map(m => ({ value: m.slug, name: String(m.display_name || m.slug).replace(/-(?=[A-Z][a-z])/g, ' '), desc: String(m.description || '') }));
+}
+
+// Anything the picker can send. Checked by shape so a model that ships after
+// this was written still gets through.
+function isAllowedModel(m) {
+  if (typeof m !== 'string' || !m || m.length > 64) return false;
+  return CLAUDE_ALIASES.includes(m) || /^claude-[a-z]+(-\d+)+$/.test(m) || /^gpt-[a-z0-9.]+(-[a-z0-9.]+)*$/.test(m);
+}
+
+function fetchClaudeModelList(timeoutMs) {
+  return new Promise((resolve) => {
+    let child = null, buf = '', done = false;
+    const finish = (v) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try { child && child.kill('SIGKILL'); } catch {}
+      resolve(v);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs || 20000);
+    try {
+      child = spawnClaude(['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose'],
+                          { cwd: WORK_DIR, stdio: ['pipe', 'pipe', 'ignore'] });
+    } catch { return finish(null); }
+    child.on('error', () => finish(null));
+    child.on('close', () => finish(null));
+    child.stdout.on('data', (c) => {
+      buf += c;
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i);
+        buf = buf.slice(i + 1);
+        let d;
+        try { d = JSON.parse(line); } catch { continue; }
+        if (d && d.type === 'control_response') {
+          const r = d.response && d.response.response;
+          return finish(r && Array.isArray(r.models) ? r.models : null);
+        }
+      }
+    });
+    child.stdin.on('error', () => {});
+    child.stdin.write(JSON.stringify({ type: 'control_request', request_id: 'models', request: { subtype: 'initialize' } }) + '\n');
+  });
+}
+
+function fetchGptModelList(timeoutMs) {
+  return new Promise((resolve) => {
+    let child, out = '';
+    try { child = spawn(CODEX_BIN, ['debug', 'models'], { stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return resolve(null); }
+    const timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch {} }, timeoutMs || 20000);
+    child.on('error', () => { clearTimeout(timer); resolve(null); });
+    child.stdout.on('data', (c) => { out += c; });
+    child.on('close', () => {
+      clearTimeout(timer);
+      try { const d = JSON.parse(out); resolve(Array.isArray(d.models) ? d.models : null); } catch { resolve(null); }
+    });
+  });
+}
+
+let _models = null, _modelsAt = 0, _modelsInflight = null;
+function getModels(force) {
+  if (!force && _models && Date.now() - _modelsAt < MODELS_TTL_MS) return Promise.resolve(_models);
+  if (_modelsInflight) return _modelsInflight;
+  _modelsInflight = (async () => {
+    const [craw, graw] = await Promise.all([fetchClaudeModelList(), fetchGptModelList()]);
+    const last = _models || { claude: [], gpt: [] };
+    let claude = last.claude;
+    if (craw) {
+      let seen = {};
+      try { seen = JSON.parse(fs.readFileSync(MODELS_SEEN_FILE, 'utf8')) || {}; } catch {}
+      const built = buildClaudeModels(craw, seen);
+      claude = built.list;
+      try { fs.writeFileSync(MODELS_SEEN_FILE, JSON.stringify(built.seen, null, 2)); } catch {}
+    }
+    _models = { claude, gpt: graw ? buildGptModels(graw) : last.gpt };
+    // a CLI that failed to answer gets asked again in a minute, not in half an hour
+    _modelsAt = (craw && graw) ? Date.now() : Date.now() - MODELS_TTL_MS + 60000;
+    return _models;
+  })().finally(() => { _modelsInflight = null; });
+  return _modelsInflight;
+}
+setTimeout(() => { getModels().catch(() => {}); }, 5000);
 
 // ── DURABLE RENDER INDEX ──────────────────────────────────────────────────
 // History lived only in the panel's localStorage. Close Premiere (which closes
@@ -4130,6 +4275,18 @@ const server = http.createServer((req, res) => {
 
   // GenMotion. See the GENMOTION block near the top for why this is launch,
   // projects on disk and exports, and nothing that reaches inside the app.
+  // What each CLI can run right now. The panel's model picker is built from this.
+  if (req.method === 'GET' && (req.url === '/models' || req.url.startsWith('/models?'))) {
+    getModels(/[?&]refresh=1\b/.test(req.url)).then((m) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, claude: m.claude, gpt: m.gpt }));
+    }).catch((e) => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: String((e && e.message) || e) }));
+    });
+    return;
+  }
+
   if (req.method === 'GET' && req.url === '/genmotion/status') {
     ensureGenmotionWatcher();
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -4494,7 +4651,7 @@ const server = http.createServer((req, res) => {
       // the one feature whose quality silently changed when that default moved
       // — and the composer's model picker never reached it. Pin it, and let the
       // picker override when it is set to something other than 'auto'.
-      const wantModel = (typeof payload.model === 'string' && payload.model && payload.model !== 'auto')
+      const wantModel = (isAllowedModel(payload.model) && !isGptModel(payload.model))
         ? payload.model : AE_MODEL;
       const args = [
         '-p',
@@ -5105,8 +5262,7 @@ const server = http.createServer((req, res) => {
         // any model that runs dry so a render degrades instead of erroring out.
         // The panel's composer-bar model picker can pin a specific model; 'auto'
         // (or anything unrecognised) falls through to the per-mode default above.
-        const ALLOWED_GEN_MODELS = [...GPT_MODELS, 'opus', 'sonnet', 'haiku', 'fable', 'claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-fable-5'];
-        const pickedModel = ALLOWED_GEN_MODELS.includes(payload && payload.model) ? payload.model : null;
+        const pickedModel = isAllowedModel(payload && payload.model) ? payload.model : null;
         const genModel = opts.model || pickedModel || 'opus';
         const genEffort = cleanEffort(payload && payload.effort);
         // One dispatch point so the fan-out, the retry and the credits-fallback
@@ -6467,8 +6623,7 @@ const server = http.createServer((req, res) => {
             .filter(p => typeof p === 'string' && p && (() => { try { return fs.existsSync(p); } catch { return false; } })())
             .slice(0, 6);
           const aeEngine = (payload.engine === 'hyperframes') ? 'hyperframes' : 'remotion';
-          const AE_ALLOWED = ['opus', 'sonnet', 'haiku', 'fable', 'claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-fable-5'];
-          const aeModel = AE_ALLOWED.includes(payload && payload.model) ? payload.model : null;
+          const aeModel = (isAllowedModel(payload && payload.model) && !isGptModel(payload.model)) ? payload.model : null;
           const genOpts = { styleMode, styleSpec, width: vidW, height: vidH, voiceoverOnly, faceFrames, userExtra, refImages, engine: aeEngine, model: aeModel };
           // Persist the final plan + render options so a SINGLE graphic can be
           // re-rendered later (the per-graphic "Change" feature) without re-running

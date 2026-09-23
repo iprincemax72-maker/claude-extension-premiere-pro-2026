@@ -96,6 +96,10 @@ check('claude gets --effort only when set', /\.\.\.\(genEffort \? \['--effort', 
 check('codex gets model_reasoning_effort', /model_reasoning_effort="' \+ o\.effort/.test(SRC));
 check('no retired models in the allowlist',
       !/'gpt-4|'o3'|'gpt-5'/.test(SRC));
+check('every model the panel sends goes through one allowlist',
+      !/ALLOWED_GEN_MODELS|AE_ALLOWED/.test(SRC)
+      && (SRC.match(/isAllowedModel\(payload(?: && payload)?\.model\)/g) || []).length >= 3);
+check('the model list is read from the claude CLI, not typed in', /subtype: 'initialize'/.test(SRC) && /\['debug', 'models'\]/.test(SRC));
 
 // ── 4d. GenMotion: supported surface only ─────────────────────────────────
 // GenMotion's local HTTP API runs behind a per-launch secret handed only to its

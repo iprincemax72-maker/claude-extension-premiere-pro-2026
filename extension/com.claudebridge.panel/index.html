@@ -2168,6 +2168,8 @@
   .eng-opt-main span { font-size: 10.5px; color: var(--text-dim); }
   /* Model + engine picker menus — compact: names only, tight rows */
   #modelMenu, #engineMenu { min-width: 168px; padding: 4px; gap: 1px; }
+  /* it opens upward and lists every version, so a short dock scrolls it instead of cutting the top off */
+  #modelMenu { max-height: calc(100vh - 150px); overflow-y: auto; }
   #modelMenu .eng-opt, #engineMenu .eng-opt { padding: 5px 8px; }
   #modelMenu .eng-opt-main span, #engineMenu .eng-opt-main span { display: none; }
   #modelMenu .eng-opt-main b, #engineMenu .eng-opt-main b { font-size: 11.5px; font-weight: 500; }
@@ -4003,7 +4005,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot" role="img" aria-label="Flimify"></div>
     <span>Flimify</span>
-    <span class="version-tag" id="versionTag">12.1</span>
+    <span class="version-tag" id="versionTag">12.2</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -4627,7 +4629,7 @@
         <button class="settings-btn" id="settingCopyDiag" title="Copies env + a live claude probe + recent errors — paste it to support">Copy diagnostics for support</button>
         <button class="settings-btn danger" id="settingFactoryReset">Reset all settings</button>
       </div>
-      <div class="settings-foot">v<span id="settingsVersion">12.1</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
+      <div class="settings-foot">v<span id="settingsVersion">12.2</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
       <div class="settings-credit">
         Made by <a href="https://github.com/iprincemax72-maker" target="_blank" class="credit-link">iprincemax72-maker</a> <span class="credit-heart">&#10084;</span> Premiere Pro
       </div>
@@ -4752,7 +4754,7 @@
       </div>
       <!-- MODEL picker — deliberately in the composer bar (NOT buried in settings)
            so a model that runs out of usage credits can be swapped in one click. -->
-      <div class="eng-group" id="modelGroup" title="Which Claude model writes the animation. Auto uses Opus 5. Choose a model to lock that one instead.">
+      <div class="eng-group" id="modelGroup" title="Which model writes the animation. Auto uses the newest Opus. Choose a model to lock that one instead.">
         <button class="eng-btn" id="modelBtn" type="button" aria-haspopup="true" aria-expanded="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3.2M12 18.8V22M4.9 4.9l2.3 2.3M16.8 16.8l2.3 2.3M2 12h3.2M18.8 12H22M4.9 19.1l2.3-2.3M16.8 7.2l2.3-2.3"/></svg>
           <span id="modelLabel">Auto</span>
@@ -4760,7 +4762,7 @@
         </button>
         <div class="eng-menu" id="modelMenu" role="menu">
           <button class="eng-opt mdl-opt" data-model="auto" role="menuitemradio" type="button">
-            <span class="eng-opt-main"><b>Auto</b><span>Opus 5 — the strong model is also the fastest here</span></span>
+            <span class="eng-opt-main"><b>Auto</b><span>The newest Opus</span></span>
             <svg class="eng-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </button>
           <button class="eng-opt mdl-opt" data-model="haiku" role="menuitemradio" type="button">
@@ -7755,7 +7757,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '12.1';
+  const PANEL_VERSION = '12.2';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -9575,10 +9577,10 @@ function syncEngineUI() {
 
 // MODEL picker — which Claude model writes the animation. Lives in the composer
 // bar (not settings) so a model that runs dry on usage credits is one click to
-// swap. 'auto' defers to the bridge's default, which is Opus 5 for every mode.
-// Aliases, not pinned ids. The CLI resolves 'opus' to the newest Opus, so a new
-// model release shows up here on its own instead of waiting for someone to edit
-// this list. Old pinned ids still work if a saved setting has one.
+// swap. 'auto' defers to the bridge's default, the newest Opus, for every mode.
+// The menu is rebuilt from the bridge's /models, which asks both CLIs what they
+// have, so it names real versions ("Opus 5.5") and a release shows up on its
+// own. These labels are the fallback for when the bridge can't answer.
 const MODEL_LABELS = {
   'auto': 'Auto',
   'haiku': 'Haiku',
@@ -9646,7 +9648,7 @@ function setGenModel(m) {
 }
 // What 'auto' actually resolves to — MUST match the bridge's per-mode default.
 function autoModelFor(mode) {
-  return 'claude-opus-5';
+  return 'opus';
 }
 function syncModelUI() {
   const m = (userSettings && userSettings.model) || 'auto';
@@ -9666,18 +9668,66 @@ function syncModelUI() {
   document.querySelectorAll('#modelMenu .mdl-opt').forEach(o =>
     o.classList.toggle('sel', o.dataset.model === m));
 }
+
+const MODELS_CACHE_KEY = 'claudeBridge.models';
+let _modelCatalog = '';
+function applyModelCatalog(d) {
+  const menu = document.getElementById('modelMenu');
+  const ok = (m) => m && typeof m.value === 'string' && m.value && typeof m.name === 'string' && m.name;
+  const claude = (d && Array.isArray(d.claude)) ? d.claude.filter(ok) : [];
+  const gpt = (d && Array.isArray(d.gpt)) ? d.gpt.filter(ok) : [];
+  if (!menu || !claude.length) return false;
+  const key = JSON.stringify([claude, gpt]);
+  if (key === _modelCatalog) return true;
+  _modelCatalog = key;
+  const tick = (menu.querySelector('.eng-tick') || {}).outerHTML || '';
+  const row = (value, name, desc) => '<button class="eng-opt mdl-opt" data-model="' + escapeHTML(value)
+    + '" role="menuitemradio" type="button"><span class="eng-opt-main"><b>' + escapeHTML(name) + '</b>'
+    + (desc ? '<span>' + escapeHTML(String(desc)) + '</span>' : '') + '</span>' + tick + '</button>';
+  const opus = claude.find(m => m.value === 'opus');
+  let html = row('auto', 'Auto', opus ? opus.name + ', the newest Opus' : 'The newest Opus');
+  for (const m of claude) { MODEL_LABELS[m.value] = m.name; html += row(m.value, m.name, m.desc); }
+  // codex didn't answer: keep the GPT rows that are already there
+  const sep = menu.querySelector('.eng-sep');
+  if (gpt.length) {
+    html += '<div class="eng-sep">GPT · runs on your ChatGPT plan</div>';
+    for (const m of gpt) { MODEL_LABELS[m.value] = m.name; html += row(m.value, m.name, m.desc); }
+  } else {
+    for (let n = sep; n; n = n.nextElementSibling) html += n.outerHTML;
+  }
+  menu.innerHTML = html;
+  return true;
+}
+async function loadModelCatalog() {
+  try {
+    const d = await (await fetch(BRIDGE + '/models')).json();
+    if (!d || !d.ok || !applyModelCatalog(d)) return false;
+    try { localStorage.setItem(MODELS_CACHE_KEY, JSON.stringify({ claude: d.claude, gpt: d.gpt })); } catch (e) {}
+    syncModelUI();
+    return true;
+  } catch (e) { return false; }
+}
 (function initModel() {
   const group = document.getElementById('modelGroup');
   const btn = document.getElementById('modelBtn');
   const menu = document.getElementById('modelMenu');
   if (!group || !btn || !menu) return;
   if (!userSettings.model) userSettings.model = 'auto';
+  // last list the bridge gave, so the names are right before it answers again
+  try { applyModelCatalog(JSON.parse(localStorage.getItem(MODELS_CACHE_KEY) || 'null')); } catch (e) {}
   syncModelUI();
+  (async () => {
+    for (let i = 0; i < 8; i++) {
+      if (await loadModelCatalog()) return;
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  })();
   const close = () => { group.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); };
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     const open = group.classList.toggle('open');
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) loadModelCatalog();
   });
   menu.addEventListener('click', (e) => {
     const opt = e.target.closest('.mdl-opt');
