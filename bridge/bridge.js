@@ -7,7 +7,7 @@ const fs = require('fs');
 const os = require('os');
 
 const PORT = 3737;
-const PANEL_VERSION = '12.2';   // bump each release — drives the /check-update badge + /diagnostics
+const PANEL_VERSION = '12.3';   // bump each release — drives the /check-update badge + /diagnostics
 // Model used when the per-mode generation model hard-fails (e.g. a separately
 // metered model reports "out of usage credits"). Haiku is the plan's base fast
 // model, so it stays available — a render degrades instead of dead-ending.
@@ -6860,18 +6860,23 @@ async function ensureRemotionSkills() {
       p.on('error', reject);
       p.on('close', (c) => (c === 0 ? resolve() : reject(new Error('tar exit ' + c))));
     });
-    const src = path.join(tmp, 'skills-main', 'skills', 'remotion');
-    if (!fs.existsSync(path.join(src, 'SKILL.md'))) throw new Error('unexpected tarball layout');
+    // Remotion renamed skills/remotion to skills/remotion-best-practices and moved
+    // rules/ into topic folders (remotion-markup/, remotion-render/, ...). Looking
+    // only for the old path failed every launch from July on, so the skill froze.
+    const src = ['remotion-best-practices', 'remotion']
+      .map(d => path.join(tmp, 'skills-main', 'skills', d))
+      .find(d => fs.existsSync(path.join(d, 'SKILL.md')));
+    if (!src) throw new Error('unexpected tarball layout');
 
-    // Collect official files (SKILL.md + rules/** incl. assets), then merge.
-    const files = ['SKILL.md'];
+    // Every official file in the skill, then merge.
+    const files = [];
     const walk = (rel) => {
       for (const ent of fs.readdirSync(path.join(src, rel), { withFileTypes: true })) {
-        const r = rel + '/' + ent.name;
+        const r = rel ? rel + '/' + ent.name : ent.name;
         if (ent.isDirectory()) walk(r); else files.push(r);
       }
     };
-    walk('rules');
+    walk('');
     let added = 0, updated = 0, keptLocal = 0;
     for (const rel of files) {
       const offBuf = fs.readFileSync(path.join(src, rel));
@@ -6916,7 +6921,7 @@ const REMOTION_TOOLKIT_PACKAGES = [
 // alongside Remotion so the engine toggle's "HyperFrames" mode works. NOT
 // version-pinned to remotion — it's an independent package.
 const HYPERFRAMES_PACKAGE = 'hyperframes';
-const HYPERFRAMES_VERSION = '0.7.64';
+const HYPERFRAMES_VERSION = '0.8.72';
 
 // Ensure the hyperframes CLI is installed in the remotion-intro project and its
 // telemetry is off. One-time, non-blocking, runs at launch.

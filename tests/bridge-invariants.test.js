@@ -99,6 +99,8 @@ check('no retired models in the allowlist',
 check('every model the panel sends goes through one allowlist',
       !/ALLOWED_GEN_MODELS|AE_ALLOWED/.test(SRC)
       && (SRC.match(/isAllowedModel\(payload(?: && payload)?\.model\)/g) || []).length >= 3);
+check('the Remotion skill sync finds the renamed upstream folder',
+      /\['remotion-best-practices', 'remotion'\]/.test(SRC) && !/walk\('rules'\)/.test(SRC));
 check('the model list is read from the claude CLI, not typed in', /subtype: 'initialize'/.test(SRC) && /\['debug', 'models'\]/.test(SRC));
 
 // ── 4d. GenMotion: supported surface only ─────────────────────────────────
