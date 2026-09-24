@@ -250,6 +250,45 @@ async def run(pg):
     check("GPT rows stay when codex doesn't answer", mc.get("gptKept") is True, str(mc.get("laterNames")))
     check("a model picked earlier still has its name", mc.get("oldPinStillLabels") is True, str(mc))
 
+    # ---- live feed + steer ---------------------------------------------------
+    # The feed turns the bridge's activity events into readable lines, and a
+    # steer that the bridge refuses must fall back to the queue, not vanish.
+    lf = await pg.evaluate("""async () => {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = thinkingHTML();
+      document.body.appendChild(wrap);
+      const ui = makeProgressUI(wrap, 30);
+      ui.activity({ kind: 'thinking', on: true });
+      const thinking = wrap.querySelector('.live-now.on') !== null;
+      ui.activity({ kind: 'say', text: 'Building it [[IMPORT:/x.mp4]] now <b>' });
+      ui.activity({ kind: 'writing', file: 'Card.tsx', lines: 42 });
+      const write = wrap.querySelector('.live-write').textContent;
+      ui.activity({ kind: 'step', text: 'Rendering video', detail: 'npx remotion render' });
+      const out = { thinking, write,
+        stoppedThinking: wrap.querySelector('.live-now.on') === null,
+        say: wrap.querySelector('.live-say').textContent,
+        steps: wrap.querySelectorAll('.live-steps li').length,
+        markup: !!wrap.querySelector('.live-say b') };
+      ui.cleanup(); wrap.remove();
+      const realFetch = window.fetch;
+      window.fetch = async (u, o) => String(u).endsWith('/steer')
+        ? new Response(JSON.stringify({ ok: false, error: 'not running' }), { status: 409 }) : realFetch(u, o);
+      const tab = tabs[activeTabIdx];
+      tab.runReqId = 'r1';
+      tab.queue = [{ id: 'q1', msg: 'make it red', refs: [] }];
+      await steerQueued('q1');
+      out.keptInQueue = tab.queue.length === 1;
+      window.fetch = realFetch;
+      tab.queue = []; tab.runReqId = null;
+      return out;
+    }""")
+    check("the live feed shows thinking, then stops when output starts", lf.get("thinking") and lf.get("stoppedThinking"), str(lf))
+    check("the live feed hides import markers and renders text as text",
+          "IMPORT" not in lf.get("say", "") and not lf.get("markup"), str(lf))
+    check("the live feed shows the file being written", lf.get("write") == "Writing Card.tsx · 42 lines", str(lf))
+    check("the live feed lists steps", lf.get("steps") == 1, str(lf))
+    check("a refused steer stays in the queue", lf.get("keptInQueue") is True, str(lf))
+
     # ---- GenMotion menu ------------------------------------------------------
     # GenMotion has no headless API, so the menu is launch, projects and imports.
     # Import must hand Premiere the NEWEST export and record it in history, and a

@@ -21,7 +21,7 @@
 const BRIDGE = process.env.BRIDGE || 'http://127.0.0.1:3737';
 const TIMEOUT_MS = 8000;
 
-const ENDPOINTS = ['/expand', '/complete', '/autoedit/run', '/autoedit/analyze', '/captions', '/chat'];
+const ENDPOINTS = ['/expand', '/complete', '/autoedit/run', '/autoedit/analyze', '/captions', '/chat', '/steer'];
 // Valid JSON that is not an object. `null` is the one that throws on deref;
 // the rest are here so a future "fix" that only special-cases null still fails.
 const HOSTILE = ['null', '[]', '123', '"a string"', 'true', '{}'];

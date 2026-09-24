@@ -7,7 +7,7 @@ const fs = require('fs');
 const os = require('os');
 
 const PORT = 3737;
-const PANEL_VERSION = '12.3';   // bump each release — drives the /check-update badge + /diagnostics
+const PANEL_VERSION = '12.4';   // bump each release — drives the /check-update badge + /diagnostics
 // Model used when the per-mode generation model hard-fails (e.g. a separately
 // metered model reports "out of usage credits"). Haiku is the plan's base fast
 // model, so it stays available — a render degrades instead of dead-ending.
@@ -3051,6 +3051,105 @@ function broadcastProgressDone(reqId) {
     try { c.write('event: done\ndata: ' + data + '\n\n'); } catch {}
   }
 }
+// Live activity for the panel's feed: thinking, what the model says, each step,
+// and the file being written.
+function broadcastActivity(reqId, a) {
+  const data = JSON.stringify(Object.assign({ reqId: reqId || '' }, a));
+  for (const c of progressClients) {
+    try { c.write('event: activity\ndata: ' + data + '\n\n'); } catch {}
+  }
+}
+
+// Runs that take a message mid-flight, by reqId. A steer goes straight into the
+// running job, like typing into a busy Claude Code session.
+const _steerable = new Map();
+function steerRegister(reqId, fn) {
+  if (!reqId) return () => {};
+  let set = _steerable.get(reqId);
+  if (!set) _steerable.set(reqId, set = new Set());
+  set.add(fn);
+  return () => { set.delete(fn); if (!set.size && _steerable.get(reqId) === set) _steerable.delete(reqId); };
+}
+
+function toolDetail(blk) {
+  const i = (blk && blk.input) || {};
+  if (blk.name === 'Bash') return String(i.command || '').slice(0, 160);
+  if (i.file_path) return String(i.file_path).split(/[\\/]/).pop();
+  if (i.pattern) return String(i.pattern).slice(0, 80);
+  return '';
+}
+
+// Turns claude's stream-json (with --include-partial-messages) into activity
+// events. Text and file-writing deltas arrive many times a second, so they are
+// batched every 300ms rather than sent one by one. Claude's thinking text is not
+// in the stream (the block arrives empty), so thinking is reported as on/off.
+function makeClaudeActivity(reqId) {
+  let say = '', thinkingAt = 0, timer = null;
+  const blocks = {};
+  const flush = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (say) { broadcastActivity(reqId, { kind: 'say', text: say }); say = ''; }
+    for (const b of Object.values(blocks)) {
+      if (!b.dirty) continue;
+      b.dirty = false;
+      const fm = /"file_path"\s*:\s*"([^"]+)"/.exec(b.json);
+      broadcastActivity(reqId, { kind: 'writing', file: fm ? fm[1].split(/[\\/]/).pop() : '',
+                                 lines: (b.json.match(/\\n/g) || []).length });
+    }
+  };
+  const later = () => { if (!timer) timer = setTimeout(flush, 300); };
+  return {
+    feed(evt) {
+      if (evt.type === 'stream_event' && evt.event) {
+        const e = evt.event;
+        if (e.type === 'message_start') {
+          for (const k of Object.keys(blocks)) delete blocks[k];
+        } else if (e.type === 'content_block_start' && e.content_block) {
+          const cb = e.content_block;
+          blocks[e.index] = { type: cb.type, name: cb.name || '', json: '', dirty: false };
+          if (/thinking/.test(cb.type)) {
+            thinkingAt = Date.now();
+            broadcastActivity(reqId, { kind: 'thinking', on: true });
+          }
+        } else if (e.type === 'content_block_delta' && e.delta) {
+          const b = blocks[e.index];
+          if (e.delta.type === 'text_delta') { say += e.delta.text || ''; later(); }
+          else if (e.delta.type === 'input_json_delta' && b && /^(Write|Edit|MultiEdit)$/.test(b.name)) {
+            b.json += e.delta.partial_json || '';
+            b.dirty = true;
+            later();
+          }
+        } else if (e.type === 'content_block_stop') {
+          const b = blocks[e.index];
+          if (b && /thinking/.test(b.type) && thinkingAt) {
+            broadcastActivity(reqId, { kind: 'thinking', on: false, ms: Date.now() - thinkingAt });
+            thinkingAt = 0;
+          }
+          if (b && b.dirty) flush();
+          delete blocks[e.index];
+        }
+        return;
+      }
+      const content = evt.message && Array.isArray(evt.message.content) ? evt.message.content : [];
+      if (evt.type === 'assistant') {
+        for (const blk of content) {
+          if (blk.type !== 'tool_use') continue;
+          const step = toolUseToStatus(blk);
+          if (step) broadcastActivity(reqId, { kind: 'step', text: step, detail: toolDetail(blk) });
+        }
+      } else if (evt.type === 'user') {
+        for (const blk of content) {
+          if (blk.type !== 'tool_result' || !blk.is_error) continue;
+          const t = typeof blk.content === 'string' ? blk.content
+            : (Array.isArray(blk.content) ? blk.content.map(c => c.text || '').join(' ') : '');
+          broadcastActivity(reqId, { kind: 'error', text: String(t).slice(0, 200) });
+        }
+      }
+    },
+    stop() { flush(); },
+  };
+}
+
 // Push ONE finished version's importable files to the panel the moment it's done,
 // so the user can preview v1 while v2/v3 are still rendering (multi-version fan-out).
 function broadcastVersionReady(reqId, info) {
@@ -4275,6 +4374,26 @@ const server = http.createServer((req, res) => {
 
   // GenMotion. See the GENMOTION block near the top for why this is launch,
   // projects on disk and exports, and nothing that reaches inside the app.
+  // Send a message into a running job without waiting for it to finish.
+  if (req.method === 'POST' && req.url === '/steer') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+      let p;
+      try { p = parseObjBody(body || '{}'); } catch { return send(400, { ok: false, error: 'bad json' }); }
+      const text = typeof p.text === 'string' ? p.text.trim().slice(0, 8000) : '';
+      if (!text) return send(400, { ok: false, error: 'empty message' });
+      const fns = _steerable.get(String(p.reqId || ''));
+      if (!fns || !fns.size) return send(409, { ok: false, error: 'not running' });
+      let n = 0;
+      for (const fn of fns) { try { fn(text); n++; } catch {} }
+      clog('bridge', 'info', 'steered', { delivered: n, len: text.length }, String(p.reqId));
+      send(200, { ok: n > 0, delivered: n });
+    });
+    return;
+  }
+
   // What each CLI can run right now. The panel's model picker is built from this.
   if (req.method === 'GET' && (req.url === '/models' || req.url.startsWith('/models?'))) {
     getModels(/[?&]refresh=1\b/.test(req.url)).then((m) => {
@@ -5184,7 +5303,127 @@ const server = http.createServer((req, res) => {
       // Codex has no --append-system-prompt, so the system prompt is prepended to
       // the message, and the final assistant message comes from -o rather than
       // being mined out of a stream.
+      // GPT runs go through `codex app-server`, which takes a steer mid-turn
+      // (turn/steer) and streams reasoning summaries, commands and the reply as
+      // they happen. If it will not start (an older codex, say), fall back to
+      // plain `codex exec`, which can do neither.
       function runCodexOnce(o) {
+        return runCodexServer(o).then(r => (r && r.fallback) ? runCodexExec(o) : r);
+      }
+
+      function runCodexServer(o) {
+        return new Promise(resolve => {
+          let proc;
+          try { proc = spawn(CODEX_BIN, ['app-server'], { cwd: o.cwd, env: process.env, stdio: ['pipe', 'pipe', 'pipe'] }); }
+          catch { return resolve({ fallback: true }); }
+          if (o.procs) o.procs.push(proc);
+          proc.stdin.on('error', () => {});
+          let buf = '', nextId = 0, threadId = null, turnId = null, started = false;
+          let resolved = false, aborted = false, errMsg = '', say = '', think = '', timer = null;
+          const pending = new Map(), texts = [];
+          const unsteer = steerRegister(reqId, (text) => {
+            if (!threadId || !turnId) throw new Error('not started');
+            call('turn/steer', { threadId, expectedTurnId: turnId, input: [{ type: 'text', text }] });
+          });
+          const flush = () => {
+            if (timer) { clearTimeout(timer); timer = null; }
+            if (o.quiet) { say = think = ''; return; }
+            if (think) { broadcastActivity(reqId, { kind: 'reasoning', text: think }); think = ''; }
+            if (say) { broadcastActivity(reqId, { kind: 'say', text: say }); say = ''; }
+          };
+          const later = () => { if (!timer) timer = setTimeout(flush, 300); };
+          const call = (method, params) => new Promise((res) => {
+            const id = ++nextId;
+            pending.set(id, res);
+            proc.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+          });
+          const done = (obj) => {
+            if (resolved) return;
+            resolved = true;
+            clearTimeout(hardKiller); clearTimeout(bootTimer);
+            flush();
+            unsteer();
+            if (!o.procs) { try { req.off('aborted', onAbort); } catch {} }
+            try { proc.kill('SIGKILL'); } catch {}
+            resolve(obj);
+          };
+          const onAbort = () => { aborted = true; done({ ok: false, aborted: true }); };
+          if (!o.procs) req.once('aborted', onAbort);
+          const HARD_TIMEOUT_MS = 30 * 60 * 1000;
+          const hardKiller = setTimeout(() => done({ ok: false, error: 'codex hard timeout (30 min)' }), HARD_TIMEOUT_MS);
+          // No turn within 30s means this codex has no working app-server.
+          const bootTimer = setTimeout(() => { if (!started) done({ fallback: true }); }, 30000);
+
+          proc.on('error', () => done({ fallback: true }));
+          proc.on('close', () => {
+            if (aborted) return done({ ok: false, aborted: true });
+            if (!started) return done({ fallback: true });
+            done(texts.length ? { ok: true, reply: texts.join('\n\n') } : { ok: false, error: errMsg || 'codex app-server exited' });
+          });
+          proc.stderr.on('data', () => {});
+          proc.stdout.on('data', chunk => {
+            buf += chunk.toString();
+            let nl;
+            while ((nl = buf.indexOf('\n')) >= 0) {
+              const line = buf.slice(0, nl).trim();
+              buf = buf.slice(nl + 1);
+              if (!line) continue;
+              let d;
+              try { d = JSON.parse(line); } catch { continue; }
+              if (d.id != null && !d.method) {
+                const res = pending.get(d.id);
+                if (res) { pending.delete(d.id); res(d); }
+                continue;
+              }
+              const m = d.method, pr = d.params || {};
+              if (m === 'turn/started') { started = true; turnId = (pr.turn && pr.turn.id) || turnId; }
+              else if (m === 'item/reasoning/summaryTextDelta') { think += pr.delta || ''; later(); }
+              else if (m === 'item/agentMessage/delta') { say += pr.delta || ''; later(); }
+              else if (m === 'item/started' && pr.item && !o.quiet) {
+                const it = pr.item;
+                if (it.type === 'commandExecution') {
+                  const cmd = String(it.command || '').replace(/^\/bin\/\w+ -lc '([\s\S]*)'$/, '$1');
+                  const step = /remotion\s+render|hyperframes\s+render/.test(cmd) ? 'Rendering video' : 'Running command';
+                  broadcastProgress(step, null, reqId);
+                  broadcastActivity(reqId, { kind: 'step', text: step, detail: cmd.slice(0, 160) });
+                } else if (it.type === 'fileChange') {
+                  const files = (Array.isArray(it.changes) ? it.changes : []).map(c => String(c.path || '').split(/[\\/]/).pop()).filter(Boolean);
+                  broadcastProgress('Editing ' + (files[0] || 'files'), null, reqId);
+                  broadcastActivity(reqId, { kind: 'step', text: 'Editing files', detail: files.join(', ').slice(0, 160) });
+                } else if (it.type === 'reasoning') {
+                  broadcastActivity(reqId, { kind: 'thinking', on: true });
+                }
+              } else if (m === 'item/completed' && pr.item) {
+                if (pr.item.type === 'agentMessage' && typeof pr.item.text === 'string') texts.push(pr.item.text);
+                if (pr.item.type === 'reasoning' && !o.quiet) broadcastActivity(reqId, { kind: 'thinking', on: false });
+              } else if (m === 'error') {
+                errMsg = String((pr.error && pr.error.message) || pr.message || JSON.stringify(pr)).slice(0, 600);
+              } else if (m === 'turn/completed') {
+                const t = pr.turn || {};
+                if (t.status !== 'completed' && !texts.length) errMsg = errMsg || String((t.error && t.error.message) || ('turn ' + t.status));
+                return done(texts.length ? { ok: true, reply: texts.join('\n\n') } : { ok: false, error: errMsg || 'codex returned no reply' });
+              }
+            }
+          });
+
+          (async () => {
+            const init = await call('initialize', { clientInfo: { name: 'flimify', version: PANEL_VERSION } });
+            if (!init || init.error) return done({ fallback: true });
+            proc.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'initialized' }) + '\n');
+            const th = await call('thread/start', { model: o.model, cwd: o.cwd, approvalPolicy: 'never',
+                                                  sandbox: 'danger-full-access', ephemeral: true, developerInstructions: o.sys });
+            threadId = th && th.result && th.result.thread && th.result.thread.id;
+            if (!threadId) return done({ fallback: true });
+            const turn = await call('turn/start', { threadId, input: [{ type: 'text', text: o.msg }], summary: 'auto',
+                                                   ...(o.effort ? { effort: o.effort } : {}) });
+            if (!turn || turn.error) return done({ fallback: true });
+            started = true;
+            turnId = turnId || (turn.result && turn.result.turn && turn.result.turn.id);
+          })().catch(() => done({ fallback: true }));
+        });
+      }
+
+      function runCodexExec(o) {
         const outFile = path.join(os.tmpdir(), 'flimify-codex-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.txt');
         const args = [
           'exec',
@@ -5271,26 +5510,32 @@ const server = http.createServer((req, res) => {
           return runCodexOnce({ model: genModel, sys: useSys, msg: useMsg, cwd: useCwd,
                                 quiet, procs: opts.procs, effort: genEffort });
         }
+        // The prompt goes in over stdin as stream-json and stdin stays open, so a
+        // steer from the panel can be written into the running job. stdin is
+        // closed at the first result, or claude would sit waiting for more.
         const args = [
           '-p',
+          '--input-format', 'stream-json',
           '--output-format', 'stream-json',
           '--verbose',
+          '--include-partial-messages',
           '--model', genModel,
           ...(genEffort ? ['--effort', genEffort] : []),
           '--permission-mode', 'bypassPermissions',
           '--append-system-prompt', useSys,
           '--no-session-persistence',
-          useMsg,
         ];
         return new Promise(resolve => {
-          // stdin 'ignore' — without it the claude CLI emits a benign stderr
-          // warning ("Warning: no stdin data received in 3s") that the panel
-          // surfaces as an error mid-animation. This is the main /chat path,
-          // so it was the most visible offender.
           const proc = spawnClaude(args, {
-            cwd: useCwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
+            cwd: useCwd, env: process.env, stdio: ['pipe', 'pipe', 'pipe'],
           });
           if (opts.procs) opts.procs.push(proc);
+          proc.stdin.on('error', () => {});
+          const tell = (text) => proc.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: text } }) + '\n');
+          tell(useMsg);
+          const unsteer = steerRegister(reqId, tell);
+          const act = quiet ? null : makeClaudeActivity(reqId);
+          const results = [];
           let stderr = '';
           let lineBuf = '';
           let finalReply = '';
@@ -5328,7 +5573,17 @@ const server = http.createServer((req, res) => {
               try { evt = JSON.parse(line); } catch { continue; }
               const status = streamEventToStatus(evt);
               if (status && !quiet) broadcastProgress(status, null, reqId);
-              if (evt.type === 'result' && typeof evt.result === 'string') finalReply = evt.result;
+              if (act) act.feed(evt);
+              if (evt.type === 'result') {
+                // A steer that landed after claude began its final answer runs as a
+                // second pass. Keep every pass's text so the first one's import
+                // marker is not lost.
+                if (typeof evt.result === 'string') results.push(evt.result);
+                finalReply = results.join('\n\n');
+                unsteer();
+                try { proc.stdin.end(); } catch {}
+                continue;
+              }
               if (evt.type === 'assistant' && evt.message && Array.isArray(evt.message.content)) {
                 for (const blk of evt.message.content) {
                   if (blk.type === 'text' && typeof blk.text === 'string') finalReply = blk.text;
@@ -5354,6 +5609,8 @@ const server = http.createServer((req, res) => {
             if (resolved) return;
             resolved = true;
             clearTimeout(hardKiller);
+            unsteer();
+            if (act) act.stop();
             if (!opts.procs) { try { req.off('aborted', onAbort); } catch {} }
             resolve(obj);
           };

@@ -1278,6 +1278,36 @@
 
   /* ───── PROGRESS BAR under the orbital thinking dots ───── */
   .thinking-stack { display: flex; flex-direction: column; }
+  html.panel-idle *, html.panel-idle *::before, html.panel-idle *::after { animation-play-state: paused !important; }
+  /* Live feed under the progress bar: what the job is doing right now. */
+  .live { margin-top: 9px; font-size: 11.5px; line-height: 1.5; color: var(--text-dim); }
+  .live-head { display: inline-flex; align-items: center; gap: 5px; background: none; border: 0; padding: 0;
+    font: 500 10.5px var(--font-ui); color: var(--text-faint); cursor: pointer; }
+  .live-head:hover { color: var(--text-dim); }
+  .live-head svg { width: 9px; height: 9px; transition: transform .15s var(--ease-out); }
+  .live.closed .live-head svg { transform: rotate(-90deg); }
+  .live.closed .live-body { display: none; }
+  .live-body { margin-top: 6px; padding-left: 10px; border-left: 1px solid var(--border-soft);
+    max-height: 190px; overflow-y: auto; overscroll-behavior: contain; }
+  .live-now { display: none; align-items: center; gap: 6px; color: var(--text); }
+  .live-now.on { display: flex; }
+  .live-now i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: livePulse 1.2s ease-in-out infinite; }
+  @keyframes livePulse { 50% { opacity: .25; } }
+  .live-reason { font-style: italic; color: var(--text-dim); white-space: pre-wrap; }
+  .live-say { color: var(--text); white-space: pre-wrap; }
+  .live-write { font-family: var(--font-mono); font-size: 10.5px; color: var(--accent); }
+  .live-steps { list-style: none; margin: 4px 0 0; padding: 0; }
+  .live-steps li { display: flex; gap: 6px; min-width: 0; padding: 1px 0; }
+  .live-steps li b { font-weight: 500; color: var(--text); flex: 0 0 auto; }
+  .live-steps li span { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .live-steps li.err span { color: var(--err); white-space: normal; }
+  .live-reason:empty, .live-say:empty, .live-write:empty, .live-steps:empty { display: none; }
+  .queue-item .queue-item-steer { border: 0; background: var(--accent-soft); color: var(--accent);
+    font: 600 10px var(--font-ui); border-radius: 5px; padding: 2px 6px; cursor: pointer; }
+  .queue-item .queue-item-steer:hover { background: var(--accent); color: #fff; }
+  .esc-hint .steer-hint { display: none; }
+  .esc-hint.steerable .steer-hint { display: inline; }
   .thinking-row { display: flex; align-items: center; gap: 6px; }
   .thinking-elapsed {
     margin-left: auto;
@@ -4005,7 +4035,7 @@
   <div class="brand" id="brandHome" role="button" tabindex="0" title="New chat — back to home">
     <div class="brand-dot" role="img" aria-label="Flimify"></div>
     <span>Flimify</span>
-    <span class="version-tag" id="versionTag">12.3</span>
+    <span class="version-tag" id="versionTag">12.4</span>
     <button class="update-btn" id="updateBtn" type="button" title="Pull the latest version from GitHub" aria-label="Check for update">
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -4629,7 +4659,7 @@
         <button class="settings-btn" id="settingCopyDiag" title="Copies env + a live claude probe + recent errors — paste it to support">Copy diagnostics for support</button>
         <button class="settings-btn danger" id="settingFactoryReset">Reset all settings</button>
       </div>
-      <div class="settings-foot">v<span id="settingsVersion">12.3</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
+      <div class="settings-foot">v<span id="settingsVersion">12.4</span> · <a href="https://github.com/iprincemax72-maker/claude-extension-premiere-pro-2026" target="_blank" id="settingsRepoLink">github</a></div>
       <div class="settings-credit">
         Made by <a href="https://github.com/iprincemax72-maker" target="_blank" class="credit-link">iprincemax72-maker</a> <span class="credit-heart">&#10084;</span> Premiere Pro
       </div>
@@ -4855,7 +4885,7 @@
     <div class="input-toolbar">
       <div class="tb-left">
         <span class="hint-text" id="hint"><kbd class="k-tab" title="Press Tab to accept the grey ghost-text suggestion Flimify shows ahead of your cursor">Tab</kbd> accept · <kbd title="Enter sends the message">Enter</kbd> send · <kbd>⌘V</kbd> paste · <kbd>⌘C</kbd> copy</span>
-        <span class="esc-hint" id="escHint" title="Cancel the current request"><kbd>esc</kbd> cancel</span>
+        <span class="esc-hint" id="escHint" title="Cancel the current request"><kbd>esc</kbd> cancel<span class="steer-hint"> · <kbd>⌘↵</kbd> steer</span></span>
       </div>
       <div class="tb-right">
       <button class="ae-pill" id="autoeditBtn" type="button" title="Auto-Edit — transcribe the selection, then pick where the graphics go">
@@ -7757,7 +7787,7 @@ renderHistoryBadge();
 // On hot-reload the new host.jsx loads in-place and this check is re-run.
 // Single version tag — just shows the panel version. No jsx mismatch display.
 (function setVersion() {
-  const PANEL_VERSION = '12.3';
+  const PANEL_VERSION = '12.4';
   const tag = document.getElementById('versionTag');
   if (tag) tag.textContent = PANEL_VERSION;
   const sv = document.getElementById('settingsVersion');
@@ -8705,6 +8735,12 @@ const Particles = (function () {
 
   let t = 0;
   let lastTs = 0;
+  // The manifest turns off CEF's frame limit and vsync, so a bare rAF loop ran
+  // as fast as the machine allowed, right next to Premiere. The motes drift
+  // slowly, and 30fps looks the same as 60 for half the work.
+  const FRAME_MS = 1000 / 30;
+  let tmr = 0;
+  function next() { tmr = setTimeout(() => { tmr = 0; raf = requestAnimationFrame(frame); }, FRAME_MS); }
   function frame(ts) {
     if (!running || !ctx) return;
     // Delta-time so motion speed is INDEPENDENT of frame rate. The manifest's
@@ -8754,7 +8790,8 @@ const Particles = (function () {
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-    raf = requestAnimationFrame(frame);
+    raf = 0;
+    next();
   }
 
   function start() {
@@ -8763,9 +8800,14 @@ const Particles = (function () {
     lastTs = 0;                  // reset so resuming doesn't compute a huge dt
     raf = requestAnimationFrame(frame);
   }
-  function stop() {
+  // Freeze in place without clearing, so the dots stay on screen while paused.
+  function pause() {
     running = false;
     if (raf) cancelAnimationFrame(raf), raf = 0;
+    if (tmr) clearTimeout(tmr), tmr = 0;
+  }
+  function stop() {
+    pause();
     if (ctx) ctx.clearRect(0, 0, W, H);
   }
 
@@ -8791,7 +8833,7 @@ const Particles = (function () {
     rt = setTimeout(() => { if (style !== 'off' && cvs && ctx) { resize(); buildSprite(); spawn(); } }, 150);
   });
 
-  return { configure };
+  return { configure, pause, resume() { if (style !== 'off') start(); } };
 })();
 
 applySettings();
@@ -12480,14 +12522,85 @@ function makeProgressUI(thinkingBody, estimateSeconds) {
   const timer = setInterval(tick, 200);
   tick();
 
+  // Live feed. Built lazily on the first activity event, so a job that sends
+  // none (older bridge, Auto-Edit) looks exactly as before.
+  let live = null, thinkingSince = 0, thinkTimer = null, steps = 0;
+  const LIVE_KEY = 'claudeBridge.liveOpen';
+  function ensureLive() {
+    if (live) return live;
+    const stack = thinkingBody.querySelector('.thinking-stack') || thinkingBody;
+    const box = document.createElement('div');
+    let closed = false;
+    try { closed = localStorage.getItem(LIVE_KEY) === '0'; } catch (e) {}
+    box.className = 'live' + (closed ? ' closed' : '');
+    box.innerHTML = '<button type="button" class="live-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>Live</button>'
+      + '<div class="live-body"><div class="live-now"><i></i><span></span></div><div class="live-reason"></div>'
+      + '<div class="live-say"></div><div class="live-write"></div><ul class="live-steps"></ul></div>';
+    box.querySelector('.live-head').addEventListener('click', () => {
+      const c = box.classList.toggle('closed');
+      try { localStorage.setItem(LIVE_KEY, c ? '0' : '1'); } catch (e) {}
+    });
+    stack.appendChild(box);
+    const q = (sel) => box.querySelector(sel);
+    live = { box, body: q('.live-body'), now: q('.live-now'), nowText: q('.live-now span'), reason: q('.live-reason'),
+             say: q('.live-say'), write: q('.live-write'), steps: q('.live-steps') };
+    return live;
+  }
+  const tail = (str, n) => (str.length > n ? '…' + str.slice(-n) : str);
+  function stickToBottom(fn) {
+    const b = live.body, atEnd = b.scrollHeight - b.scrollTop - b.clientHeight < 24;
+    fn();
+    if (atEnd) b.scrollTop = b.scrollHeight;
+  }
+  function showThinking(on) {
+    clearInterval(thinkTimer);
+    live.now.classList.toggle('on', on);
+    if (!on) return;
+    thinkingSince = Date.now();
+    const paint = () => { live.nowText.textContent = 'Thinking · ' + Math.round((Date.now() - thinkingSince) / 1000) + 's'; };
+    paint();
+    thinkTimer = setInterval(paint, 1000);
+  }
+  function activity(a) {
+    if (completed || !a || !a.kind) return;
+    ensureLive();
+    stickToBottom(() => {
+      if (a.kind === 'thinking') return showThinking(!!a.on);
+      if (a.kind === 'reasoning') { live.reason.textContent = tail(live.reason.textContent + a.text, 500); return; }
+      if (a.kind === 'say') {
+        showThinking(false);
+        live.say.textContent = tail(live.say.textContent + String(a.text || '').replace(/\[\[IMPORT:[^\]]*\]\]/g, ''), 600);
+        return;
+      }
+      if (a.kind === 'writing') {
+        showThinking(false);
+        live.write.textContent = 'Writing ' + (a.file || 'file') + ' · ' + (a.lines || 0) + ' lines';
+        return;
+      }
+      if (a.kind === 'step' || a.kind === 'error') {
+        showThinking(false);
+        if (a.kind === 'step') live.write.textContent = '';
+        const li = document.createElement('li');
+        if (a.kind === 'error') li.className = 'err';
+        li.innerHTML = '<b></b><span></span>';
+        li.firstChild.textContent = a.kind === 'error' ? 'Error' : a.text;
+        li.lastChild.textContent = a.kind === 'error' ? a.text : (a.detail || '');
+        li.title = li.lastChild.textContent;
+        live.steps.appendChild(li);
+        if (++steps > 40) live.steps.removeChild(live.steps.firstChild);
+      }
+    });
+  }
+
   return {
+    activity,
     complete() {
       if (completed) return;
       completed = true;
       bar.classList.add('complete');
       fill.style.width = '100%';
     },
-    cleanup() { clearInterval(timer); },
+    cleanup() { clearInterval(timer); clearInterval(thinkTimer); },
     setStatus,
     setPct(p) {
       if (typeof p !== 'number' || completed) return;
@@ -13103,6 +13216,8 @@ const escHint = document.getElementById('escHint');
 function updateEscHint() {
   const anyBusy = !!activeChatAbort || expanding || !!activeAutocut || !!activeAutoedit;
   escHint.classList.toggle('show', anyBusy);
+  escHint.classList.toggle('steerable', !!activeChatAbort);
+  syncIdlePause();
   // Refresh the tab strip so the pulsing dot tracks in-flight work
   try {
     if (tabs[activeTabIdx]) {
@@ -13114,6 +13229,19 @@ function updateEscHint() {
     renderTabStrip && renderTabStrip();
   } catch {}
 }
+
+// Nothing on screen needs to move while the user works in Premiere, so the dots
+// and the looping CSS animations pause while the panel is unfocused and idle.
+// Anything running keeps animating, so a job never looks frozen.
+let _panelFocused = true;
+function syncIdlePause() {
+  const busy = !!activeChatAbort || expanding || !!activeAutocut || !!activeAutoedit;
+  const pause = !_panelFocused && !busy;
+  document.documentElement.classList.toggle('panel-idle', pause);
+  try { pause ? Particles.pause() : Particles.resume(); } catch (e) {}
+}
+window.addEventListener('blur', () => { _panelFocused = false; syncIdlePause(); });
+window.addEventListener('focus', () => { _panelFocused = true; syncIdlePause(); });
 
 function setBusy(busy) {
   if (busy) {
@@ -13210,6 +13338,38 @@ function enqueueCurrentSend() {
   cclog('info', 'prompt queued', { depth: tab.queue.length });
 }
 
+// Steer: send a message into the job that is running now instead of waiting for
+// it to finish, the way typing into a busy Claude Code session works. The bridge
+// writes it into the live claude or codex run. Returns false if that job is not
+// taking messages any more (finished, or an older bridge).
+async function steerRunning(text, refs) {
+  const tab = tabs[activeTabIdx];
+  const reqId = tab && tab.runReqId;
+  if (!reqId || !text) return false;
+  const body = (refs && refs.length ? refs.map(r => '[REFERENCE: ' + r.path + ']').join('\n') + '\n' : '') + text;
+  try {
+    const r = await fetch(BRIDGE + '/steer', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                               body: JSON.stringify({ reqId, text: body }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) return false;
+  } catch (e) { return false; }
+  makeMsg('you', '<div class="reply-ref"><span class="reply-ref-label">Steered</span></div><p>'
+    + escapeHTML(text).replace(/\n/g, '<br>') + '</p>');
+  cclog('info', 'steered', { len: text.length });
+  return true;
+}
+async function steerQueued(id) {
+  const tab = tabs[activeTabIdx];
+  const it = tab && tab.queue && tab.queue.find(q => q.id === id);
+  if (!it) return;
+  if (await steerRunning(it.msg, it.refs)) {
+    tab.queue = tab.queue.filter(q => q.id !== id);
+    renderQueueStrip();
+  } else {
+    ccToast('That job has stopped taking messages, so this stays in the queue.', true);
+  }
+}
+
 // Render the active tab's queue into the strip above the composer.
 function renderQueueStrip() {
   const strip = document.getElementById('queueStrip');
@@ -13229,8 +13389,10 @@ function renderQueueStrip() {
     const label = it.varCtx
       ? 'Version ' + it.varCtx.index + ' of ' + it.varCtx.total
       : escapeHTML(it.msg.slice(0, 60)) + (it.msg.length > 60 ? '…' : '');
+    const steerable = !idle && tab.runReqId && !it.varCtx && !it.iterCtx;
     return '<span class="queue-item' + (i === 0 && !idle ? ' running' : '') + '" data-id="' + it.id + '">'
       + '<span class="queue-item-text">' + label + '</span>'
+      + (steerable ? '<button type="button" class="queue-item-steer" data-id="' + it.id + '" title="Send this into the running job now">Steer</button>' : '')
       + '<button type="button" class="queue-item-x" data-id="' + it.id + '" title="Remove from queue" aria-label="Remove">×</button>'
       + '</span>';
   }).join('');
@@ -13292,6 +13454,8 @@ function _maybeDrainQueue(tab, opts) {
       }
       return;
     }
+    const st = e.target.closest && e.target.closest('.queue-item-steer');
+    if (st) { steerQueued(st.getAttribute('data-id')); return; }
     const x = e.target.closest && e.target.closest('.queue-item-x');
     if (x) {
       const id = x.getAttribute('data-id');
@@ -13666,12 +13830,16 @@ async function sendMessage(presetMsg, sendOpts) {
   // so a resumed task knows roughly where it was when killed.
   let lastStatus = '';
   let progressES = null;
+  if (_sendTab) { _sendTab.runReqId = reqId; try { renderQueueStrip(); } catch {} }
   // Paths already shown via the live per-version stream — so the final batch
   // response doesn't add a duplicate card for a version we already surfaced.
   const streamedPaths = new Set();
   const activeTabTypeEarly = (tabs[activeTabIdx] && tabs[activeTabIdx].type) || 'animation';
   try {
     progressES = new EventSource(BRIDGE + '/progress-stream');
+    progressES.addEventListener('activity', (ev) => {
+      try { const a = JSON.parse(ev.data); if (a.reqId === reqId && progressUI.activity) progressUI.activity(a); } catch {}
+    });
     progressES.addEventListener('progress', (ev) => {
       try {
         const payload = JSON.parse(ev.data);
@@ -13798,6 +13966,7 @@ async function sendMessage(presetMsg, sendOpts) {
     // global would leave this tab's stashed flag set, so switching back to it
     // would restore a stale "busy" (red stop + esc-cancel on a finished render).
     if (_sendTab) _sendTab.activeChatAbort = null;
+    if (_sendTab && _sendTab.runReqId === reqId) { _sendTab.runReqId = null; try { renderQueueStrip(); } catch {} }
     if (_sendTab === tabs[activeTabIdx]) {
       activeChatAbort = null;
       setBusy(false);
@@ -13906,8 +14075,12 @@ async function sendContinuationChat(originalMsg, lastStatus) {
   const labelEl = placeholder.body.querySelector('.orbit-label');
   let resumeStatus = '';
   let progressES = null;
+  if (_sendTab) { _sendTab.runReqId = reqId; try { renderQueueStrip(); } catch {} }
   try {
     progressES = new EventSource(BRIDGE + '/progress-stream');
+    progressES.addEventListener('activity', (ev) => {
+      try { const a = JSON.parse(ev.data); if (a.reqId === reqId && progressUI.activity) progressUI.activity(a); } catch {}
+    });
     progressES.addEventListener('progress', (ev) => {
       try {
         const payload = JSON.parse(ev.data);
@@ -13981,6 +14154,7 @@ async function sendContinuationChat(originalMsg, lastStatus) {
     // Same tab-aware cleanup as sendMessage — clear THIS send's tab, only touch
     // the active-tab busy UI if this send belongs to the active tab.
     if (_sendTab) _sendTab.activeChatAbort = null;
+    if (_sendTab && _sendTab.runReqId === reqId) { _sendTab.runReqId = null; try { renderQueueStrip(); } catch {} }
     if (_sendTab === tabs[activeTabIdx]) {
       activeChatAbort = null;
       setBusy(false);
@@ -14284,6 +14458,20 @@ input.addEventListener('keydown', (e) => {
   if ((e.key === 'ArrowRight') && activeSuggestion && input.selectionStart === input.value.length) {
     e.preventDefault();
     acceptGhost();
+    return;
+  }
+  // ⌘↵ while a job runs sends the text into it (steer); plain ↵ still queues.
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && activeChatAbort && tabs[activeTabIdx] && tabs[activeTabIdx].runReqId) {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    steerRunning(text, activeReferences.slice()).then(ok => {
+      if (!ok) { enqueueCurrentSend(); ccToast("That job isn't taking messages right now, so it's queued instead."); return; }
+      input.value = '';
+      try { localStorage.removeItem(DRAFT_KEY); } catch {}
+      autosize(); clearGhost();
+      if (activeReferences.length) clearReferences();
+    });
     return;
   }
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }

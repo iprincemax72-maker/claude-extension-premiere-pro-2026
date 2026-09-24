@@ -101,6 +101,15 @@ check('every model the panel sends goes through one allowlist',
       && (SRC.match(/isAllowedModel\(payload(?: && payload)?\.model\)/g) || []).length >= 3);
 check('the Remotion skill sync finds the renamed upstream folder',
       /\['remotion-best-practices', 'remotion'\]/.test(SRC) && !/walk\('rules'\)/.test(SRC));
+// ── 4e. steering: a message can reach a running job ──────────────────────
+// claude gets its prompt over stdin as stream-json and stdin stays open for
+// steers. It must be closed at the first result, or claude waits for more input
+// forever and the render never returns.
+check('renders take their prompt over stdin so a steer can follow',
+      /'--input-format', 'stream-json',\s*'--output-format', 'stream-json'/.test(SRC) && /tell\(useMsg\)/.test(SRC));
+check('claude stdin is closed at the first result', /evt\.type === 'result'[\s\S]{0,400}proc\.stdin\.end\(\)/.test(SRC));
+check('a finished job stops taking steers', /unsteer\(\);[\s\S]{0,60}try \{ proc\.stdin\.end\(\)/.test(SRC));
+check('GPT runs use the app-server and fall back to exec', /runCodexServer\(o\)\.then\(r => \(r && r\.fallback\) \? runCodexExec\(o\) : r\)/.test(SRC));
 check('the model list is read from the claude CLI, not typed in', /subtype: 'initialize'/.test(SRC) && /\['debug', 'models'\]/.test(SRC));
 
 // ── 4d. GenMotion: supported surface only ─────────────────────────────────
